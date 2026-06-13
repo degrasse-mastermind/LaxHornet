@@ -1,11 +1,11 @@
-const CACHE_NAME = "laxhornet-v14";
+const CACHE_NAME = "laxhornet-v15";
 const APP_ASSETS = [
   "./",
   "./index.html",
   "./logo-options.html",
   "./styles.css?v=14",
-  "./app.js?v=14",
-  "./manifest.json?v=13",
+  "./app.js?v=15",
+  "./manifest.json?v=15",
   "./assets/icon.svg?v=11",
   "./assets/laxhornet-logo.png",
   "./assets/logo-concept-1-venom-wordmark.svg",
@@ -34,6 +34,19 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          return response;
+        })
+        .catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html"))),
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
