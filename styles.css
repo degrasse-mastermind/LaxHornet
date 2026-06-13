@@ -82,16 +82,22 @@ button:disabled {
 }
 
 .brand-row {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
+  min-height: 52px;
 }
 
 .brand {
+  position: absolute;
+  left: calc(50% + 7px);
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 10px;
+  width: min(58vw, 250px);
   min-width: 0;
   padding: 0;
   border: 0;
@@ -102,16 +108,19 @@ button:disabled {
 
 .brand-logo-wrap {
   display: block;
+  width: 100%;
   min-width: 0;
+  text-align: center;
 }
 
 .brand-logo {
   display: block;
-  width: min(52vw, 240px);
+  width: 100%;
   height: auto;
   max-height: 38px;
+  margin: 0 auto;
   object-fit: contain;
-  object-position: left center;
+  object-position: center;
   filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.24));
 }
 
@@ -145,6 +154,8 @@ button:disabled {
 }
 
 .status-chip {
+  position: absolute;
+  right: 0;
   flex: 0 0 auto;
   min-height: 34px;
   padding: 7px 10px;
