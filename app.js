@@ -326,7 +326,10 @@ function renderShell(content, options = {}) {
             <p class="brand-subtitle">${escapeHTML(subtitle || "Youth lacrosse stats")}</p>
           </span>
         </button>
-        <span class="status-chip">${state.activeGame ? "Live" : "Offline Ready"}</span>
+        <span class="topbar-actions">
+          <button class="help-chip" type="button" data-nav="help" aria-label="Open help">?</button>
+          <span class="status-chip">${state.activeGame ? "Live" : "Offline Ready"}</span>
+        </span>
       </div>
     </header>
     ${content}
@@ -657,6 +660,55 @@ function renderDashboard() {
   `);
 }
 
+function renderHelp() {
+  const impactRows = STAT_DEFS.filter((stat) => stat.key !== "note")
+    .map(
+      (stat) => `
+        <tr>
+          <td>${stat.label}</td>
+          <td>${pointText(stat.points)}</td>
+        </tr>
+      `,
+    )
+    .join("");
+
+  return renderShell(`
+    <section class="screen-title">
+      <h2>Impact Help</h2>
+      <p>A quick guide to the metrics on Game Review and Season Dashboard.</p>
+    </section>
+
+    <section class="stack">
+      <div class="card pad">
+        <h3>Game Impact Score</h3>
+        <p class="muted small">Every logged event gets an impact value. Positive plays add to the score, while turnovers, failed clears, and penalties subtract from it. The game total is the sum of all event values.</p>
+      </div>
+
+      <div class="card pad">
+        <h3>Average Game Impact Score</h3>
+        <p class="muted small">Average Impact is the season's total Game Impact Score divided by games played. Example: 60 total impact across 5 games = 12.0 average impact.</p>
+      </div>
+
+      <div class="card pad">
+        <h3>Points vs Impact</h3>
+        <p class="muted small">Lacrosse points are goals plus assists. Impact Score is broader: it also counts ground balls, clears, defensive stops, hustle plays, smart plays, and mistakes.</p>
+      </div>
+
+      <div class="card table-card">
+        <table class="stat-table">
+          <thead><tr><th>Event</th><th>Impact</th></tr></thead>
+          <tbody>${impactRows}</tbody>
+        </table>
+      </div>
+
+      <div class="card pad">
+        <h3>Shot Percentages</h3>
+        <p class="muted small">Shooting % is goals divided by total shots. Shot on goal % is shots on goal divided by total shots. In this app, a Shot on Goal counts as both a shot and a shot on goal.</p>
+      </div>
+    </section>
+  `);
+}
+
 function render() {
   const screens = {
     home: renderHome,
@@ -666,6 +718,7 @@ function render() {
     review: renderReview,
     past: renderPastGames,
     dashboard: renderDashboard,
+    help: renderHelp,
   };
   app.innerHTML = (screens[state.screen] || renderHome)();
 }

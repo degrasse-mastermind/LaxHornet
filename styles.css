@@ -85,19 +85,15 @@ button:disabled {
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 12px;
   min-height: 52px;
 }
 
 .brand {
-  position: absolute;
-  left: calc(50% + 7px);
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 10px;
-  width: min(58vw, 250px);
   min-width: 0;
   padding: 0;
   border: 0;
@@ -108,19 +104,18 @@ button:disabled {
 
 .brand-logo-wrap {
   display: block;
-  width: 100%;
   min-width: 0;
-  text-align: center;
+  text-align: left;
 }
 
 .brand-logo {
   display: block;
-  width: 100%;
+  width: min(52vw, 240px);
   height: auto;
   max-height: 38px;
-  margin: 0 auto;
+  margin: 0;
   object-fit: contain;
-  object-position: center;
+  object-position: left center;
   filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.24));
 }
 
@@ -154,8 +149,6 @@ button:disabled {
 }
 
 .status-chip {
-  position: absolute;
-  right: 0;
   flex: 0 0 auto;
   min-height: 34px;
   padding: 7px 10px;
@@ -165,6 +158,27 @@ button:disabled {
   background: rgba(255, 255, 255, 0.08);
   font-size: 0.8rem;
   font-weight: 800;
+}
+
+.topbar-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.help-chip {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 1.02rem;
+  font-weight: 950;
+  line-height: 1;
 }
 
 .screen-title {
