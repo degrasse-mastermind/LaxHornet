@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="LaxHornet icon">
-  <rect width="512" height="512" rx="96" fill="#050505"/>
-  <path d="M92 354h328v42H92z" fill="#f5b532"/>
-  <path d="M142 116h70v222h-70zM234 116h70v86h68v-86h70v222h-70v-84h-68v84h-70z" fill="#ffffff"/>
-  <path d="M86 93l70 54M426 93l-70 54" stroke="#f5b532" stroke-width="30" stroke-linecap="round"/>
-</svg>
