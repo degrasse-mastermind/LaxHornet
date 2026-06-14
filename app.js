@@ -143,7 +143,9 @@ const DEFAULT_PLAYER = {
 };
 
 const app = document.querySelector("#app");
-const startupShareCode = new URLSearchParams(window.location.search).get("share")?.trim().toUpperCase() || "";
+const startupParams = new URLSearchParams(window.location.search);
+const startupShareCode = startupParams.get("share")?.trim().toUpperCase() || "";
+const startupAuthStatus = startupParams.get("auth") || "";
 const supabaseClient =
   window.supabase?.createClient && SUPABASE_CONFIG.url && SUPABASE_CONFIG.publishableKey
     ? window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.publishableKey)
@@ -205,6 +207,7 @@ function authRedirectUrl() {
   const url = new URL(window.location.href);
   url.search = "";
   url.hash = "";
+  url.searchParams.set("auth", "verified");
   return url.toString();
 }
 
@@ -1699,9 +1702,29 @@ function renderHelp() {
   `);
 }
 
+function renderAuthSuccess() {
+  const signedIn = Boolean(state.authUser);
+  return renderShell(`
+    <section class="screen-title">
+      <h2>Account Confirmed</h2>
+      <p>${signedIn ? "You're signed in and ready to track games." : "Your email has been verified. Sign in below to finish."}</p>
+    </section>
+
+    <section class="stack">
+      <div class="card pad account-success-card">
+        <h3>Welcome to LaxHornet</h3>
+        <p class="muted small">Parent accounts keep each family's players, games, and season dashboard separate.</p>
+        <button class="btn positive" type="button" data-nav="home">${signedIn ? "Go to Home" : "Sign In"}</button>
+      </div>
+      ${signedIn ? "" : renderAccountCard()}
+    </section>
+  `);
+}
+
 function render() {
   const screens = {
     home: renderHome,
+    authSuccess: renderAuthSuccess,
     settings: renderSettings,
     start: renderStartGame,
     live: renderLiveTracker,
@@ -1920,6 +1943,9 @@ async function initApp() {
 
   if (startupShareCode) {
     loadSharedGame(startupShareCode);
+  } else if (startupAuthStatus === "verified") {
+    state.screen = "authSuccess";
+    render();
   } else {
     render();
   }

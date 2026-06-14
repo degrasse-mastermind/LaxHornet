@@ -656,6 +656,10 @@ button:disabled {
   border-color: rgba(245, 181, 50, 0.36);
 }
 
+.account-success-card {
+  border-color: rgba(17, 132, 71, 0.36);
+}
+
 .account-actions {
   display: grid;
   grid-template-columns: 1fr;
