@@ -606,12 +606,13 @@ button:disabled {
 }
 
 .table-card {
-  overflow-x: auto;
+  overflow-x: hidden;
 }
 
 .stat-table {
   width: 100%;
-  min-width: 460px;
+  min-width: 0;
+  table-layout: fixed;
   border-collapse: collapse;
   color: var(--text);
   background: #ffffff;
@@ -622,7 +623,8 @@ button:disabled {
   padding: 10px 12px;
   border-bottom: 1px solid var(--line);
   text-align: left;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .stat-table th {
@@ -634,7 +636,14 @@ button:disabled {
 
 .stat-table td:last-child,
 .stat-table th:last-child {
+  width: 34%;
   text-align: right;
+  white-space: nowrap;
+}
+
+.stat-table td:first-child,
+.stat-table th:first-child {
+  width: 66%;
 }
 
 .empty {
