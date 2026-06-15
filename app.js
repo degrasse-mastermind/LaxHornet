@@ -1281,7 +1281,7 @@ function renderAccountCard() {
   if (!supabaseClient) {
     return `
       <section class="card pad">
-        <h3>Parent Account</h3>
+        <h3>User Profile</h3>
         <p class="muted small">Supabase is not available, so this device is using local-only storage.</p>
       </section>
     `;
@@ -1290,7 +1290,7 @@ function renderAccountCard() {
   if (state.authUser) {
     return `
       <section class="card pad account-card">
-        <h3>Parent Account</h3>
+        <h3>User Profile</h3>
         <p class="muted small">${escapeHTML(userEmail())}</p>
         <div class="account-actions">
           <button class="btn neutral" type="button" data-action="sync-cloud-games">Sync Cloud Games</button>
@@ -1302,8 +1302,8 @@ function renderAccountCard() {
 
   return `
     <form class="card pad form-grid account-card" data-form="auth">
-      <h3>Parent Account</h3>
-      <p class="muted small">Sign in so each parent keeps their own players, games, and season dashboard separate.</p>
+      <h3>User Profile</h3>
+      <p class="muted small">Sign in so each user keeps their own players, games, and season dashboard separate.</p>
       <div class="field">
         <label for="authEmail">Email</label>
         <input id="authEmail" name="email" type="email" autocomplete="email" required />
@@ -1962,7 +1962,7 @@ function renderAuthSuccess() {
     <section class="stack">
       <div class="card pad account-success-card">
         <h3>Welcome to LaxHornet</h3>
-        <p class="muted small">Parent accounts keep each family's players, games, and season dashboard separate.</p>
+        <p class="muted small">User profiles keep each family's players, games, and season dashboard separate.</p>
         <div class="account-actions">
           <button class="btn positive" type="button" data-nav="home">${signedIn ? "Go to Home" : "Sign In"}</button>
           <button class="btn secondary" type="button" data-nav="tutorial">Quick Tutorial</button>
@@ -1987,7 +1987,7 @@ function renderTutorial() {
 
       <div class="card pad">
         <h3>2. Sign In For Cloud Sync</h3>
-        <p class="muted small">Use a Parent Account when you want games backed up online. Each parent only sees their own synced games and season dashboard.</p>
+        <p class="muted small">Use a User Profile when you want games backed up online. Each user only sees their own synced games and season dashboard.</p>
       </div>
 
       <div class="card pad">
