@@ -3,6 +3,7 @@
 
 create table if not exists public.games (
   id text primary key,
+  player_id text,
   user_id uuid references auth.users(id) on delete cascade,
   share_code text not null unique,
   is_shared boolean not null default false,
@@ -40,8 +41,10 @@ create table if not exists public.events (
 alter table public.games add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table public.games add column if not exists is_shared boolean not null default false;
 alter table public.games add column if not exists period_format text not null default 'quarters';
+alter table public.games add column if not exists player_id text;
 alter table public.events add column if not exists user_id uuid references auth.users(id) on delete cascade;
 
+create index if not exists games_player_id_idx on public.games (player_id);
 create index if not exists games_user_id_idx on public.games (user_id);
 create index if not exists games_share_code_idx on public.games (share_code);
 create index if not exists events_user_id_idx on public.events (user_id);

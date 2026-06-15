@@ -1,5 +1,7 @@
 const STORAGE_KEYS = {
   player: "laxhornet.playerSettings",
+  players: "laxhornet.players",
+  activePlayerId: "laxhornet.activePlayerId",
   games: "laxhornet.games",
   activeGame: "laxhornet.activeGame",
   reviewGameId: "laxhornet.reviewGameId",
@@ -218,6 +220,7 @@ const TAG_SUGGESTIONS = {
 };
 
 const DEFAULT_PLAYER = {
+  id: "",
   name: "Your player",
   number: "",
   team: "",
@@ -236,10 +239,18 @@ const supabaseClient =
 
 let sharedGameChannel = null;
 let lastSyncErrorAt = 0;
+const legacyPlayer = normalizePlayer(loadJSON(STORAGE_KEYS.player, DEFAULT_PLAYER), { createId: true });
+const initialPlayers = normalizePlayers(loadJSON(STORAGE_KEYS.players, null), legacyPlayer);
+const initialActivePlayerId = loadJSON(STORAGE_KEYS.activePlayerId, legacyPlayer.id);
+const safeActivePlayerId = initialPlayers.some((player) => player.id === initialActivePlayerId)
+  ? initialActivePlayerId
+  : initialPlayers[0].id;
 
 const state = {
   screen: "home",
-  player: loadJSON(STORAGE_KEYS.player, DEFAULT_PLAYER),
+  players: initialPlayers,
+  activePlayerId: safeActivePlayerId,
+  player: activePlayerFrom(initialPlayers, safeActivePlayerId),
   games: loadJSON(STORAGE_KEYS.games, []),
   activeGame: loadJSON(STORAGE_KEYS.activeGame, null),
   reviewGameId: loadJSON(STORAGE_KEYS.reviewGameId, null),
@@ -255,8 +266,9 @@ const state = {
   authBusy: false,
 };
 
-state.games = state.games.map(normalizeGame);
-state.activeGame = state.activeGame ? normalizeGame(state.activeGame) : null;
+syncActivePlayer();
+state.games = state.games.map((game) => normalizeGame(game, state.player));
+state.activeGame = state.activeGame ? normalizeGame(state.activeGame, state.player) : null;
 persistAll();
 
 function loadJSON(key, fallback) {
@@ -274,6 +286,129 @@ function saveJSON(key, value) {
 
 function uid(prefix = "id") {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizePlayer(player = {}, options = {}) {
+  const id = player.id || player.playerId || player.player_id || (options.createId ? uid("player") : "");
+  return {
+    id,
+    name: String(player.name || "").trim() || DEFAULT_PLAYER.name,
+    number: String(player.number || "").trim(),
+    team: String(player.team || "").trim(),
+    position: String(player.position || "").trim(),
+    notes: String(player.notes || "").trim(),
+  };
+}
+
+function normalizePlayers(players, fallbackPlayer = legacyPlayer) {
+  const source = Array.isArray(players) && players.length ? players : [fallbackPlayer];
+  const merged = new Map();
+  source.forEach((player) => {
+    const normalized = normalizePlayer(player, { createId: true });
+    merged.set(normalized.id, normalized);
+  });
+  return [...merged.values()];
+}
+
+function activePlayerFrom(players, activePlayerId) {
+  return players.find((player) => player.id === activePlayerId) || players[0] || normalizePlayer(DEFAULT_PLAYER, { createId: true });
+}
+
+function syncActivePlayer() {
+  if (!state.players.length) state.players = [normalizePlayer(DEFAULT_PLAYER, { createId: true })];
+  if (!state.players.some((player) => player.id === state.activePlayerId)) {
+    state.activePlayerId = state.players[0].id;
+  }
+  state.player = activePlayerFrom(state.players, state.activePlayerId);
+}
+
+function playerTitle(player = state.player) {
+  const normalized = normalizePlayer(player);
+  return `${normalized.name || "Player"}${normalized.number ? ` #${normalized.number}` : ""}`;
+}
+
+function playerSubline(player = state.player) {
+  const normalized = normalizePlayer(player);
+  return [normalized.team, normalized.position].filter(Boolean).join(" - ") || "Add player details before the next game.";
+}
+
+function gamePlayerId(game = {}) {
+  return game.playerId || game.player_id || game.playerSnapshot?.id || game.player_snapshot?.id || "";
+}
+
+function gamePlayerSnapshot(game = {}) {
+  return normalizePlayer(game.playerSnapshot || game.player_snapshot || state.player);
+}
+
+function playerGameCount(playerId) {
+  return state.games.filter((game) => gamePlayerId(game) === playerId).length;
+}
+
+function setActivePlayer(playerId, message = "") {
+  if (!state.players.some((player) => player.id === playerId)) return;
+  state.activePlayerId = playerId;
+  syncActivePlayer();
+  persistAll();
+  render();
+  if (message) showToast(message);
+}
+
+function updatePlayerInRoster(player) {
+  const normalized = normalizePlayer(player, { createId: true });
+  state.players = state.players.map((item) => (item.id === normalized.id ? normalized : item));
+  state.activePlayerId = normalized.id;
+  syncActivePlayer();
+
+  const applySnapshot = (game) =>
+    gamePlayerId(game) === normalized.id
+      ? normalizeGame({ ...game, playerId: normalized.id, playerSnapshot: { ...normalized } }, normalized)
+      : game;
+
+  state.games = state.games.map(applySnapshot);
+  if (state.activeGame) state.activeGame = applySnapshot(state.activeGame);
+  state.games
+    .filter((game) => gamePlayerId(game) === normalized.id)
+    .forEach((game) => syncGameToSupabase(game));
+}
+
+function addPlayer() {
+  const player = normalizePlayer({ name: `Player ${state.players.length + 1}` }, { createId: true });
+  state.players = [...state.players, player];
+  state.activePlayerId = player.id;
+  syncActivePlayer();
+  persistAll();
+  render();
+  showToast("New player added");
+}
+
+function deleteActivePlayer() {
+  if (state.players.length <= 1) {
+    showToast("Keep at least one player");
+    return;
+  }
+  const activeGameMatches = state.activeGame && gamePlayerId(state.activeGame) === state.activePlayerId;
+  const savedGames = playerGameCount(state.activePlayerId);
+  if (activeGameMatches || savedGames) {
+    showToast("Delete this player's games first");
+    return;
+  }
+  const removedName = state.player.name;
+  state.players = state.players.filter((player) => player.id !== state.activePlayerId);
+  state.activePlayerId = state.players[0].id;
+  syncActivePlayer();
+  persistAll();
+  render();
+  showToast(`${removedName} removed`);
+}
+
+function mergePlayersFromGames(games = []) {
+  const players = new Map(state.players.map((player) => [player.id, player]));
+  games.forEach((game) => {
+    const snapshot = normalizePlayer(game.playerSnapshot || game.player_snapshot || {});
+    if (snapshot.id && !players.has(snapshot.id)) players.set(snapshot.id, snapshot);
+  });
+  state.players = [...players.values()];
+  syncActivePlayer();
 }
 
 function makeShareCode() {
@@ -376,14 +511,24 @@ function normalizeEvent(event = {}, gameId = "") {
   };
 }
 
-function normalizeGame(game = {}) {
+function normalizeGame(game = {}, fallbackPlayer = null) {
   const id = game.id || uid("game");
   const periodFormat = periodFormatForGame(game);
   const periods = PERIOD_FORMATS[periodFormat].periods;
   const currentQuarter = game.currentQuarter || game.current_quarter || PERIOD_FORMATS[periodFormat].start;
+  const fallbackSnapshot = fallbackPlayer ? normalizePlayer(fallbackPlayer) : null;
+  const rawSnapshot = game.playerSnapshot || game.player_snapshot || fallbackSnapshot || {};
+  let playerSnapshot = normalizePlayer(rawSnapshot);
+  const playerId = game.playerId || game.player_id || playerSnapshot.id || fallbackSnapshot?.id || "";
+  if (playerId && !playerSnapshot.id) playerSnapshot = { ...playerSnapshot, id: playerId };
+  if ((!playerSnapshot.name || playerSnapshot.name === DEFAULT_PLAYER.name) && fallbackSnapshot?.name) {
+    playerSnapshot = { ...fallbackSnapshot, id: playerId || fallbackSnapshot.id };
+  }
   return {
     ...game,
     id,
+    playerId: playerId || playerSnapshot.id || "",
+    playerSnapshot,
     shareCode: game.shareCode || game.share_code || makeShareCode(),
     userId: game.userId || game.user_id || "",
     isShared: Boolean(game.isShared ?? game.is_shared ?? false),
@@ -394,7 +539,10 @@ function normalizeGame(game = {}) {
 }
 
 function persistAll() {
+  syncActivePlayer();
   saveJSON(STORAGE_KEYS.player, state.player);
+  saveJSON(STORAGE_KEYS.players, state.players);
+  saveJSON(STORAGE_KEYS.activePlayerId, state.activePlayerId);
   saveJSON(STORAGE_KEYS.games, state.games);
   if (state.activeGame) {
     saveJSON(STORAGE_KEYS.activeGame, state.activeGame);
@@ -451,8 +599,10 @@ function updateReviewGame(gameId, updater, message = "Game updated") {
 
 function makeGame(formData) {
   const periodFormat = PERIOD_FORMATS[formData.get("periodFormat")] ? formData.get("periodFormat") : "quarters";
+  const player = { ...state.player };
   return {
     id: uid("game"),
+    playerId: player.id,
     shareCode: makeShareCode(),
     userId: currentUserId() || "",
     isShared: false,
@@ -461,7 +611,7 @@ function makeGame(formData) {
     date: formData.get("date") || todayISO(),
     location: formData.get("location")?.trim() || "",
     gameType: formData.get("gameType") || "Regular season",
-    playerSnapshot: { ...state.player },
+    playerSnapshot: player,
     currentQuarter: PERIOD_FORMATS[periodFormat].start,
     events: [],
     status: "in-progress",
@@ -575,8 +725,14 @@ function pct(value) {
 
 function visibleGames() {
   const userId = currentUserId();
-  if (!userId) return state.games.filter((game) => !game.userId);
-  return state.games.filter((game) => !game.userId || game.userId === userId);
+  const userGames = userId
+    ? state.games.filter((game) => !game.userId || game.userId === userId)
+    : state.games.filter((game) => !game.userId);
+  if (!state.activePlayerId) return userGames;
+  return userGames.filter((game) => {
+    const playerId = gamePlayerId(game);
+    return playerId ? playerId === state.activePlayerId : state.players.length <= 1;
+  });
 }
 
 function currentReviewGame() {
@@ -744,6 +900,9 @@ function csvEscape(value) {
 function buildCSV() {
   const headers = [
     "gameId",
+    "playerId",
+    "playerName",
+    "playerNumber",
     "gameDate",
     "opponent",
     "eventId",
@@ -758,8 +917,13 @@ function buildCSV() {
     "fieldZone",
   ];
   const rows = state.games.flatMap((game) =>
-    normalizeGame(game).events.map((event) => [
+    normalizeGame(game).events.map((event) => {
+      const player = gamePlayerSnapshot(game);
+      return [
       game.id,
+      gamePlayerId(game),
+      player.name,
+      player.number,
       game.date,
       game.opponent,
       event.id,
@@ -772,7 +936,8 @@ function buildCSV() {
       event.tags,
       event.note,
       event.fieldZone,
-    ]),
+    ];
+    }),
   );
   return [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
 }
@@ -797,9 +962,11 @@ function exportCSV() {
 function exportJSON() {
   const payload = {
     app: "LaxHornet",
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     player: state.player,
+    players: state.players,
+    activePlayerId: state.activePlayerId,
     games: state.games.map(normalizeGame),
   };
   downloadFile(
@@ -819,13 +986,27 @@ function importJSONFile(file) {
       const importedGames = Array.isArray(payload) ? payload : payload.games;
       if (!Array.isArray(importedGames)) throw new Error("Missing games array");
 
-      if (payload.player) state.player = { ...DEFAULT_PLAYER, ...payload.player };
+      const importedPlayers = Array.isArray(payload.players)
+        ? payload.players.map((player) => normalizePlayer(player, { createId: true }))
+        : payload.player
+          ? [normalizePlayer(payload.player, { createId: true })]
+          : [];
+      if (importedPlayers.length) {
+        const mergedPlayers = new Map(state.players.map((player) => [player.id, player]));
+        importedPlayers.forEach((player) => mergedPlayers.set(player.id, player));
+        state.players = [...mergedPlayers.values()];
+        if (payload.activePlayerId && state.players.some((player) => player.id === payload.activePlayerId)) {
+          state.activePlayerId = payload.activePlayerId;
+        }
+        syncActivePlayer();
+      }
 
       const merged = new Map(state.games.map((game) => [game.id, normalizeGame(game)]));
       importedGames.map(normalizeGame).forEach((game) => merged.set(game.id, game));
       state.games = [...merged.values()].sort(
         (a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt),
       );
+      mergePlayersFromGames(state.games);
       persistAll();
       render();
       showToast("JSON backup imported");
@@ -841,6 +1022,7 @@ function gameToSupabaseRow(game) {
   const userId = normalized.userId || currentUserId();
   return {
     id: normalized.id,
+    player_id: normalized.playerId || normalized.playerSnapshot?.id || "",
     user_id: userId,
     share_code: normalized.shareCode,
     is_shared: Boolean(normalized.isShared),
@@ -907,6 +1089,7 @@ function eventFromSupabaseRow(row) {
 function gameFromSupabaseRow(row, events = []) {
   return normalizeGame({
     id: row.id,
+    playerId: row.player_id || row.player_snapshot?.id || "",
     userId: row.user_id || "",
     shareCode: row.share_code,
     isShared: Boolean(row.is_shared),
@@ -1002,6 +1185,7 @@ async function loadCloudGames(options = {}) {
 
   const cloudGames = (data || []).map((game) => gameFromSupabaseRow(game, game.events || []));
   state.games = mergeGames(state.games, cloudGames);
+  mergePlayersFromGames(state.games);
   persistAll();
   state.syncStatus = "Cloud games loaded";
   if (!options.silent) {
@@ -1078,6 +1262,7 @@ async function syncGameToSupabase(game, options = {}) {
   }
   const normalized = normalizeGame({ ...game, userId: game.userId || userId });
   const { error, skipped } = await upsertWithOptionalColumns("games", gameToSupabaseRow(normalized), [
+    "player_id",
     "period_format",
   ]);
   if (error) {
@@ -1320,9 +1505,41 @@ function renderAccountCard() {
   `;
 }
 
+function renderPlayerSwitcher(options = {}) {
+  const title = options.title || "Tracking Player";
+  const helper = options.helper || "Choose who these stats belong to.";
+  const showManage = options.showManage !== false;
+  const shellClass = options.inline ? "player-switch-card inline" : "card pad player-switch-card";
+  const chips = state.players
+    .map((player) => {
+      const active = player.id === state.activePlayerId;
+      return `
+        <button class="player-chip ${active ? "active" : ""}" type="button" data-player-select="${player.id}" aria-pressed="${active}">
+          <strong>${escapeHTML(player.name || "Player")}</strong>
+          ${player.number ? `<span>#${escapeHTML(player.number)}</span>` : ""}
+        </button>
+      `;
+    })
+    .join("");
+
+  return `
+    <section class="${shellClass}">
+      <div class="section-head">
+        <div>
+          <h3>${escapeHTML(title)}</h3>
+          <p class="muted small">${escapeHTML(helper)}</p>
+        </div>
+        ${showManage ? `<button class="mini-btn light" type="button" data-nav="settings">Manage</button>` : ""}
+      </div>
+      <div class="player-chip-row">${chips}</div>
+    </section>
+  `;
+}
+
 function renderHome() {
   const season = calculateSeasonTotals();
   const active = state.activeGame;
+  const activePlayer = active ? gamePlayerSnapshot(active) : null;
   const watchExpanded = state.watchShareExpanded;
 
   return renderShell(`
@@ -1332,10 +1549,9 @@ function renderHome() {
     </section>
 
     <section class="stack">
-      <div class="card pad">
-        <h3>${escapeHTML(state.player.name || "Player")}${state.player.number ? ` #${escapeHTML(state.player.number)}` : ""}</h3>
-        <p class="muted small">${escapeHTML([state.player.team, state.player.position].filter(Boolean).join(" - ") || "Add player details before the next game.")}</p>
-      </div>
+      ${renderPlayerSwitcher({
+        helper: `${playerSubline(state.player)} Season totals below are for this player.`,
+      })}
 
       <div class="metric-grid">
         <div class="metric"><strong>${season.gamesPlayed}</strong><span>Games</span></div>
@@ -1347,7 +1563,7 @@ function renderHome() {
       <div class="action-grid">
         ${
           active
-            ? `<button class="btn positive" type="button" data-nav="live">Resume Live Game</button>`
+            ? `<button class="btn positive" type="button" data-nav="live">Resume ${escapeHTML(playerTitle(activePlayer))}</button>`
             : `<button class="btn positive" type="button" data-nav="start">Start New Game</button>`
         }
         <button class="btn neutral" type="button" data-nav="dashboard">Season Dashboard</button>
@@ -1384,37 +1600,53 @@ function renderHome() {
 }
 
 function renderSettings() {
+  const gameCount = playerGameCount(state.activePlayerId);
   return renderShell(`
     <section class="screen-title">
       <h2>Player Settings</h2>
-      <p>Saved on this device with localStorage.</p>
+      <p>Add players, pick the active player, and edit details saved on this device.</p>
     </section>
 
-    <form class="card pad form-grid" data-form="settings">
-      <div class="form-grid two">
-        <div class="field">
-          <label for="playerName">Player name</label>
-          <input id="playerName" name="name" value="${escapeHTML(state.player.name)}" required />
-        </div>
-        <div class="field">
-          <label for="number">Jersey number</label>
-          <input id="number" name="number" inputmode="numeric" value="${escapeHTML(state.player.number)}" />
-        </div>
-        <div class="field">
-          <label for="team">Team</label>
-          <input id="team" name="team" value="${escapeHTML(state.player.team)}" />
-        </div>
-        <div class="field">
-          <label for="position">Position</label>
-          <input id="position" name="position" value="${escapeHTML(state.player.position)}" placeholder="Midfield, attack, defense..." />
-        </div>
+    <section class="stack">
+      ${renderPlayerSwitcher({
+        title: "Player Roster",
+        helper: "Tap a player to make them active before starting a game.",
+        showManage: false,
+      })}
+
+      <div class="action-grid two-actions">
+        <button class="btn neutral" type="button" data-action="add-player">Add Player</button>
+        <button class="btn secondary" type="button" data-action="delete-player">Delete Player</button>
       </div>
-      <div class="field">
-        <label for="notes">Player notes</label>
-        <textarea id="notes" name="notes">${escapeHTML(state.player.notes)}</textarea>
-      </div>
-      <button class="btn positive" type="submit">Save Player Settings</button>
-    </form>
+      <p class="muted small roster-note">${gameCount ? `${gameCount} saved game${gameCount === 1 ? "" : "s"} for ${escapeHTML(state.player.name)}.` : `No saved games yet for ${escapeHTML(state.player.name)}.`}</p>
+
+      <form class="card pad form-grid" data-form="settings">
+        <h3>Edit ${escapeHTML(playerTitle(state.player))}</h3>
+        <div class="form-grid two">
+          <div class="field">
+            <label for="playerName">Player name</label>
+            <input id="playerName" name="name" value="${escapeHTML(state.player.name)}" required />
+          </div>
+          <div class="field">
+            <label for="number">Jersey number</label>
+            <input id="number" name="number" inputmode="numeric" value="${escapeHTML(state.player.number)}" />
+          </div>
+          <div class="field">
+            <label for="team">Team</label>
+            <input id="team" name="team" value="${escapeHTML(state.player.team)}" />
+          </div>
+          <div class="field">
+            <label for="position">Position</label>
+            <input id="position" name="position" value="${escapeHTML(state.player.position)}" placeholder="Midfield, attack, defense..." />
+          </div>
+        </div>
+        <div class="field">
+          <label for="notes">Player notes</label>
+          <textarea id="notes" name="notes">${escapeHTML(state.player.notes)}</textarea>
+        </div>
+        <button class="btn positive" type="submit">Save Player Settings</button>
+      </form>
+    </section>
   `);
 }
 
@@ -1426,6 +1658,11 @@ function renderStartGame() {
     </section>
 
     <form class="card pad form-grid" data-form="start-game">
+      ${renderPlayerSwitcher({
+        title: "Player For This Game",
+        helper: "Double-check this before the opening whistle.",
+        inline: true,
+      })}
       <div class="field">
         <label for="opponent">Opponent</label>
         <input id="opponent" name="opponent" placeholder="Opponent team" required />
@@ -1505,10 +1742,11 @@ function renderLiveTracker() {
   }
 
   const game = state.activeGame;
+  const player = gamePlayerSnapshot(game);
   const totals = calculateTotals(game.events);
   const recentEvents = [...game.events].reverse().slice(0, 5);
   const periods = periodsForGame(game);
-  const details = `${formatDate(game.date)} - ${periodFormatLabel(game)}${game.location ? ` - ${escapeHTML(game.location)}` : ""}`;
+  const details = `${escapeHTML(playerTitle(player))} - ${formatDate(game.date)} - ${periodFormatLabel(game)}${game.location ? ` - ${escapeHTML(game.location)}` : ""}`;
 
   return renderShell(`
     <section class="screen-title live-title">
@@ -1692,6 +1930,7 @@ function renderReview() {
   }
 
   const totals = calculateTotals(game.events);
+  const player = gamePlayerSnapshot(game);
   const editingEvent = state.editingEventId
     ? game.events.find((event) => event.id === state.editingEventId)
     : null;
@@ -1701,7 +1940,7 @@ function renderReview() {
   return renderShell(`
     <section class="screen-title">
       <h2>Game Review</h2>
-      <p>${escapeHTML(game.opponent)} - ${formatDate(game.date)}</p>
+      <p>${escapeHTML(playerTitle(player))} - ${escapeHTML(game.opponent)} - ${formatDate(game.date)}</p>
     </section>
 
     <section class="stack">
@@ -1820,38 +2059,45 @@ function renderPastGames() {
   return renderShell(`
     <section class="screen-title">
       <h2>Past Games</h2>
-      <p>Saved games stay on this device and can be reviewed or deleted.</p>
+      <p>Showing saved games for ${escapeHTML(playerTitle(state.player))}.</p>
     </section>
 
-    <section class="card pad export-card">
-      <h3>Backup & Export</h3>
-      <p class="muted small">Exports include event tags, notes, categories, and impact values.</p>
-      <div class="export-actions">
-        <button class="btn neutral" type="button" data-action="export-csv">Export CSV</button>
-        <button class="btn neutral" type="button" data-action="export-json">Export JSON</button>
-        <label class="btn secondary import-label" for="jsonImport">Import JSON</label>
-        <input class="import-input" id="jsonImport" type="file" accept="application/json,.json" data-import-json />
-      </div>
-    </section>
+    <section class="stack">
+      ${renderPlayerSwitcher({
+        helper: "Switch players to review a different player's games.",
+      })}
 
-    <section class="card">
-      ${
-        games.length
-          ? games.map(renderGameListRow).join("")
-          : `<div class="empty">No saved games yet.</div>`
-      }
+      <section class="card pad export-card">
+        <h3>Backup & Export</h3>
+        <p class="muted small">Exports include player info, event tags, notes, categories, and impact values.</p>
+        <div class="export-actions">
+          <button class="btn neutral" type="button" data-action="export-csv">Export CSV</button>
+          <button class="btn neutral" type="button" data-action="export-json">Export JSON</button>
+          <label class="btn secondary import-label" for="jsonImport">Import JSON</label>
+          <input class="import-input" id="jsonImport" type="file" accept="application/json,.json" data-import-json />
+        </div>
+      </section>
+
+      <section class="card">
+        ${
+          games.length
+            ? games.map(renderGameListRow).join("")
+            : `<div class="empty">No saved games yet.</div>`
+        }
+      </section>
     </section>
   `);
 }
 
 function renderGameListRow(game) {
   const totals = calculateTotals(game.events);
+  const player = gamePlayerSnapshot(game);
   return `
     <div class="list-row">
       <button class="brand" type="button" data-review="${game.id}" style="color: var(--text); text-align: left;">
         <span>
           <h3>${escapeHTML(game.opponent)}</h3>
-          <p>${formatDate(game.date)} - Impact ${totals.impact} - ${totals.goals}G ${totals.assists}A</p>
+          <p>${escapeHTML(playerTitle(player))} - ${formatDate(game.date)} - Impact ${totals.impact} - ${totals.goals}G ${totals.assists}A</p>
         </span>
       </button>
       <div class="row-actions">
@@ -1867,10 +2113,13 @@ function renderDashboard() {
   return renderShell(`
     <section class="screen-title">
       <h2>Season Dashboard</h2>
-      <p>Totals update from every saved game.</p>
+      <p>Totals for ${escapeHTML(playerTitle(state.player))}.</p>
     </section>
 
     <section class="stack">
+      ${renderPlayerSwitcher({
+        helper: "Switch players to see a separate season dashboard.",
+      })}
       <div class="metric-grid">
         <div class="metric"><strong>${totals.gamesPlayed}</strong><span>Games Played</span></div>
         <div class="metric"><strong>${totals.averageImpact.toFixed(1)}</strong><span>Avg Impact</span></div>
@@ -1982,7 +2231,7 @@ function renderTutorial() {
     <section class="stack tutorial-list">
       <div class="card pad">
         <h3>1. Set Up The Player</h3>
-        <p class="muted small">Open Player Settings and enter the player name, number, team, and position. These details stay on the device and are copied into each new game.</p>
+        <p class="muted small">Open Player Settings to add one or more players, tap the player you want active, and enter name, number, team, and position. New games are saved under the active player.</p>
       </div>
 
       <div class="card pad">
@@ -1992,7 +2241,7 @@ function renderTutorial() {
 
       <div class="card pad">
         <h3>3. Start A Game</h3>
-        <p class="muted small">Tap Start New Game, enter the opponent, and choose Quarters or Halves. In Live Game, use the subtle period buttons so each event lands in the right part of the game.</p>
+        <p class="muted small">Tap Start New Game, double-check the player selector, enter the opponent, and choose Quarters or Halves. In Live Game, use the subtle period buttons so each event lands in the right part of the game.</p>
       </div>
 
       <div class="card pad">
@@ -2007,7 +2256,7 @@ function renderTutorial() {
 
       <div class="card pad">
         <h3>6. Review, Correct, And Tag</h3>
-        <p class="muted small">After a game, open Game Review to edit events, correct notes, add tags, and check totals like Impact Score, Effort Score, Faceoff %, Save %, and shooting percentages. Tap ? for metric explanations.</p>
+        <p class="muted small">After a game, open Game Review to edit events, correct notes, add tags, and check totals like Impact Score, Effort Score, Faceoff %, Save %, and shooting percentages. Season Dashboard and Past Games follow the active player, so switch players when you want another player's totals.</p>
       </div>
 
       <div class="card pad">
@@ -2055,13 +2304,14 @@ function handleSubmit(event) {
   }
 
   if (form.dataset.form === "settings") {
-    state.player = {
+    updatePlayerInRoster({
+      id: state.activePlayerId,
       name: formData.get("name")?.trim() || DEFAULT_PLAYER.name,
       number: formData.get("number")?.trim() || "",
       team: formData.get("team")?.trim() || "",
       position: formData.get("position")?.trim() || "",
       notes: formData.get("notes")?.trim() || "",
-    };
+    });
     persistAll();
     navigate("home");
     showToast("Player settings saved");
@@ -2128,6 +2378,12 @@ function handleClick(event) {
     return;
   }
 
+  const playerSelect = event.target.closest("[data-player-select]");
+  if (playerSelect) {
+    setActivePlayer(playerSelect.dataset.playerSelect, "Player selected");
+    return;
+  }
+
   const statButton = event.target.closest("[data-stat]");
   if (statButton) {
     logEvent(statButton.dataset.stat);
@@ -2162,6 +2418,8 @@ function handleClick(event) {
     if (action.dataset.action === "copy-share-link") copyShareLink();
     if (action.dataset.action === "sign-out") signOut();
     if (action.dataset.action === "sync-cloud-games") loadCloudGames();
+    if (action.dataset.action === "add-player") addPlayer();
+    if (action.dataset.action === "delete-player") deleteActivePlayer();
     if (action.dataset.action === "toggle-watch-share") {
       state.watchShareExpanded = !state.watchShareExpanded;
       render();
