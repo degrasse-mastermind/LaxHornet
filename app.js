@@ -1992,22 +1992,27 @@ function renderTutorial() {
 
       <div class="card pad">
         <h3>3. Start A Game</h3>
-        <p class="muted small">Tap Start New Game, enter the opponent, choose Quarters or Halves, and use the large stat buttons during play. Select the current period so each event lands in the right part of the game.</p>
+        <p class="muted small">Tap Start New Game, enter the opponent, and choose Quarters or Halves. In Live Game, use the subtle period buttons so each event lands in the right part of the game.</p>
       </div>
 
       <div class="card pad">
         <h3>4. Track Fast</h3>
-        <p class="muted small">Tap each event once as it happens. Undo removes the last event. Save keeps the game locally and syncs it when you are signed in.</p>
+        <p class="muted small">Live stats are grouped by game flow: Offense, Possession / IQ, Defense / Clears, and Specialty. The most common field events stay higher on the page, while faceoff, goalie, and note buttons sit lower.</p>
       </div>
 
       <div class="card pad">
-        <h3>5. Review And Tag</h3>
-        <p class="muted small">After a game, open Game Review to edit events, correct notes, add tags, and check totals like Impact Score, Effort Score, Save %, and shooting percentages.</p>
+        <h3>5. Save, Undo, And Share</h3>
+        <p class="muted small">Undo removes the last event. Save keeps the game locally and syncs it when you are signed in. Live Share is a small link beside the game date so family can watch from another iPhone, phone, tablet, or computer. The link automatically copies to the clipboard, so just paste it into a text or email.</p>
       </div>
 
       <div class="card pad">
-        <h3>6. Share Live</h3>
-        <p class="muted small">From the Live Game Tracker, copy the Live Share link so family can watch a read-only timeline from another iPhone, phone, tablet, or computer.</p>
+        <h3>6. Review, Correct, And Tag</h3>
+        <p class="muted small">After a game, open Game Review to edit events, correct notes, add tags, and check totals like Impact Score, Effort Score, Faceoff %, Save %, and shooting percentages. Tap ? for metric explanations.</p>
+      </div>
+
+      <div class="card pad">
+        <h3>7. Watch A Shared Game</h3>
+        <p class="muted small">On Home, expand Watch Shared Game, enter the share code or open a shared link, and follow the read-only live timeline from another device.</p>
       </div>
 
       <div class="action-grid">
