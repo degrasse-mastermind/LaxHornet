@@ -8,28 +8,30 @@
   --line: #d8dadd;
   --text: #111317;
   --muted: #555d67;
-  --positive: #118447;
-  --positive-dark: #0b6334;
+  --positive: #0f6f3d;
+  --positive-dark: #084926;
   --neutral: #3c4652;
   --neutral-dark: #232a31;
-  --negative: #d85a24;
-  --negative-dark: #aa3d14;
-  --offense: #128348;
-  --offense-dark: #075a31;
-  --effort: #b77800;
-  --effort-dark: #765000;
-  --defense: #00746f;
-  --defense-dark: #004e4a;
-  --clear: #2f5e92;
-  --clear-dark: #1f3e62;
-  --goalie-save: #007f8a;
-  --goalie-save-dark: #00535d;
-  --goalie-allowed: #7a3db8;
-  --goalie-allowed-dark: #4e2578;
-  --faceoff-win: #c38b00;
-  --faceoff-win-dark: #7c5b00;
-  --faceoff-loss: #8b4b2f;
-  --faceoff-loss-dark: #5e2f1c;
+  --negative: #b84a24;
+  --negative-dark: #7d2d17;
+  --stat-base: #202020;
+  --stat-base-dark: #151515;
+  --offense: #0d7a43;
+  --offense-dark: #064325;
+  --effort: #8f1b1b;
+  --effort-dark: #4f1212;
+  --defense: #1f6f6a;
+  --defense-dark: #123e3b;
+  --clear: #36546c;
+  --clear-dark: #1d2f3e;
+  --goalie-save: #2f6d72;
+  --goalie-save-dark: #1d4245;
+  --goalie-allowed: #5d4d6a;
+  --goalie-allowed-dark: #342c3d;
+  --faceoff-win: #5e5140;
+  --faceoff-win-dark: #332c24;
+  --faceoff-loss: #5a4038;
+  --faceoff-loss-dark: #30231f;
   --danger: #cf2f33;
   --warning: #ec8b22;
   --hornet-red: #e81010;
@@ -365,51 +367,16 @@ button:disabled {
   background: rgba(255, 255, 255, 0.08);
 }
 
-.btn.positive,
-.stat-button.positive {
+.btn.positive {
   background: linear-gradient(180deg, var(--positive), var(--positive-dark));
 }
 
-.btn.neutral,
-.stat-button.neutral {
+.btn.neutral {
   background: linear-gradient(180deg, var(--neutral), var(--neutral-dark));
 }
 
-.btn.negative,
-.stat-button.negative {
+.btn.negative {
   background: linear-gradient(180deg, var(--negative), var(--negative-dark));
-}
-
-.stat-button.offense {
-  background: linear-gradient(180deg, var(--offense), var(--offense-dark));
-}
-
-.stat-button.effort {
-  background: linear-gradient(180deg, var(--effort), var(--effort-dark));
-}
-
-.stat-button.defense {
-  background: linear-gradient(180deg, var(--defense), var(--defense-dark));
-}
-
-.stat-button.clear {
-  background: linear-gradient(180deg, var(--clear), var(--clear-dark));
-}
-
-.stat-button.goalieSave {
-  background: linear-gradient(180deg, var(--goalie-save), var(--goalie-save-dark));
-}
-
-.stat-button.goalieAllowed {
-  background: linear-gradient(180deg, var(--goalie-allowed), var(--goalie-allowed-dark));
-}
-
-.stat-button.faceoffWin {
-  background: linear-gradient(180deg, var(--faceoff-win), var(--faceoff-win-dark));
-}
-
-.stat-button.faceoffLoss {
-  background: linear-gradient(180deg, var(--faceoff-loss), var(--faceoff-loss-dark));
 }
 
 .btn.danger {
@@ -577,8 +544,54 @@ button:disabled {
   padding: 12px;
   border-radius: var(--radius);
   color: #ffffff;
+  background:
+    linear-gradient(90deg, var(--stat-accent, var(--neutral)) 0 5px, transparent 5px),
+    linear-gradient(180deg, var(--stat-base), var(--stat-base-dark));
   text-align: left;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 10px 20px rgba(0, 0, 0, 0.22);
+}
+
+.stat-button.positive,
+.stat-button.offense {
+  --stat-accent: var(--offense);
+}
+
+.stat-button.neutral {
+  --stat-accent: #6c7681;
+}
+
+.stat-button.negative {
+  --stat-accent: var(--negative);
+}
+
+.stat-button.effort {
+  --stat-accent: var(--effort);
+}
+
+.stat-button.defense {
+  --stat-accent: var(--defense);
+}
+
+.stat-button.clear {
+  --stat-accent: var(--clear);
+}
+
+.stat-button.goalieSave {
+  --stat-accent: var(--goalie-save);
+}
+
+.stat-button.goalieAllowed {
+  --stat-accent: var(--goalie-allowed);
+}
+
+.stat-button.faceoffWin {
+  --stat-accent: var(--faceoff-win);
+}
+
+.stat-button.faceoffLoss {
+  --stat-accent: var(--faceoff-loss);
 }
 
 .stat-button.compact {
