@@ -943,6 +943,44 @@ function reportSyncError(error) {
   }
 }
 
+function missingSupabaseColumn(error) {
+  const message = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`;
+  return (
+    message.match(/'([^']+)' column/i)?.[1] ||
+    message.match(/column "([^"]+)"/i)?.[1] ||
+    ""
+  );
+}
+
+function removeColumnFromPayload(payload, column) {
+  const remove = (row) => {
+    const next = { ...row };
+    delete next[column];
+    return next;
+  };
+  return Array.isArray(payload) ? payload.map(remove) : remove(payload);
+}
+
+async function upsertWithOptionalColumns(table, payload, optionalColumns = []) {
+  let nextPayload = payload;
+  const skipped = new Set();
+
+  for (let attempt = 0; attempt <= optionalColumns.length; attempt += 1) {
+    const { error } = await supabaseClient.from(table).upsert(nextPayload);
+    if (!error) return { error: null, skipped: [...skipped] };
+
+    const missingColumn = missingSupabaseColumn(error);
+    if (!optionalColumns.includes(missingColumn) || skipped.has(missingColumn)) {
+      return { error, skipped: [...skipped] };
+    }
+
+    skipped.add(missingColumn);
+    nextPayload = removeColumnFromPayload(nextPayload, missingColumn);
+  }
+
+  return { error: { message: "Could not sync Live Share data" }, skipped: [...skipped] };
+}
+
 function mergeGames(localGames, cloudGames) {
   const merged = new Map(localGames.map((game) => [game.id, normalizeGame(game)]));
   cloudGames.map(normalizeGame).forEach((game) => merged.set(game.id, game));
@@ -1039,23 +1077,30 @@ async function syncGameToSupabase(game, options = {}) {
     return false;
   }
   const normalized = normalizeGame({ ...game, userId: game.userId || userId });
-  const { error } = await supabaseClient.from("games").upsert(gameToSupabaseRow(normalized));
+  const { error, skipped } = await upsertWithOptionalColumns("games", gameToSupabaseRow(normalized), [
+    "period_format",
+  ]);
   if (error) {
     reportSyncError(error);
     return false;
   }
 
   if (options.includeEvents && normalized.events.length) {
-    const { error: eventsError } = await supabaseClient
-      .from("events")
-      .upsert(normalized.events.map((event) => eventToSupabaseRow({ ...event, userId })));
+    const { error: eventsError, skipped: skippedEventColumns } = await upsertWithOptionalColumns(
+      "events",
+      normalized.events.map((event) => eventToSupabaseRow({ ...event, userId })),
+      ["tags", "field_zone", "corrected_at", "tags_updated_at"],
+    );
     if (eventsError) {
       reportSyncError(eventsError);
       return false;
     }
+    skipped.push(...skippedEventColumns);
   }
 
-  state.syncStatus = "Live Share synced";
+  state.syncStatus = skipped.length
+    ? "Live Share synced; database update recommended"
+    : "Live Share synced";
   return true;
 }
 
@@ -1063,11 +1108,18 @@ async function syncLoggedEvent(game, event) {
   if (!supabaseClient || !game || !event) return;
   const gameSynced = await syncGameToSupabase(game);
   if (!gameSynced) return;
-  const { error } = await supabaseClient.from("events").upsert(eventToSupabaseRow(event));
+  const { error, skipped } = await upsertWithOptionalColumns("events", eventToSupabaseRow(event), [
+    "tags",
+    "field_zone",
+    "corrected_at",
+    "tags_updated_at",
+  ]);
   if (error) {
     reportSyncError(error);
   } else {
-    state.syncStatus = "Live Share synced";
+    state.syncStatus = skipped.length
+      ? "Live Share synced; database update recommended"
+      : "Live Share synced";
   }
 }
 
