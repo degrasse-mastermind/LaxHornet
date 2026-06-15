@@ -235,6 +235,32 @@ button:disabled {
   line-height: 1.25;
 }
 
+.live-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
+.live-share-link {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  color: #d7dde4;
+  background: transparent;
+  font-size: 0.74rem;
+  font-weight: 850;
+  line-height: 1.25;
+  text-decoration: underline;
+  text-decoration-color: rgba(245, 181, 50, 0.55);
+  text-underline-offset: 3px;
+  box-shadow: none;
+}
+
+.live-share-link:active {
+  color: #ffffff;
+}
+
 .stack {
   display: grid;
   gap: 12px;

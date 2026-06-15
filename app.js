@@ -251,7 +251,6 @@ const state = {
   tagEditingEventId: null,
   tagDraftTags: [],
   watchShareExpanded: false,
-  liveShareExpanded: false,
   toast: "",
   authBusy: false,
 };
@@ -1158,12 +1157,22 @@ async function loadSharedGame(shareCode) {
 async function copyShareLink() {
   const game = state.activeGame || currentReviewGame();
   if (!game) return;
+  if (!supabaseClient) {
+    showToast("Live Share is not available");
+    return;
+  }
+  if (!currentUserId()) {
+    state.syncStatus = "Sign in for Live Share";
+    showToast("Sign in to use Live Share");
+    return;
+  }
   game.isShared = true;
   game.userId = game.userId || currentUserId() || "";
   if (state.activeGame?.id === game.id) state.activeGame = game;
   upsertGame(game);
   persistAll();
-  await syncGameToSupabase(game, { includeEvents: true });
+  const synced = await syncGameToSupabase(game, { includeEvents: true });
+  if (!synced) return;
   const link = shareLinkForGame(game);
   try {
     await navigator.clipboard.writeText(link);
@@ -1213,38 +1222,6 @@ function renderBottomNav() {
       <button class="btn ghost" type="button" data-nav="settings">Player</button>
       <button class="btn ghost" type="button" data-nav="tutorial">Guide</button>
     </nav>
-  `;
-}
-
-function renderShareCard(game) {
-  const normalized = normalizeGame(game);
-  const canCloudSync = Boolean(currentUserId());
-  const expanded = state.liveShareExpanded;
-  return `
-    <section class="card pad share-card ${expanded ? "expanded" : "collapsed"}">
-      <div class="collapsible-card-head">
-        <div>
-          <h3>Live Share</h3>
-          <p class="muted small">${
-            canCloudSync
-              ? "Copy the link for read-only live viewing from another device."
-              : "Sign in to enable cloud sharing from another iPhone."
-          }</p>
-        </div>
-        <button class="collapse-icon" type="button" data-action="toggle-live-share" aria-expanded="${expanded}" aria-label="${expanded ? "Minimize Live Share" : "Expand Live Share"}">
-          <span aria-hidden="true">${expanded ? "⌄" : "›"}</span>
-        </button>
-      </div>
-      ${
-        expanded
-          ? `<div class="share-card-body">
-              <div class="share-code">${escapeHTML(normalized.shareCode)}</div>
-              <button class="btn neutral" type="button" data-action="copy-share-link" ${canCloudSync ? "" : "disabled"}>Copy Share Link</button>
-              <p class="muted small">${escapeHTML(state.syncStatus)}</p>
-            </div>`
-          : ""
-      }
-    </section>
   `;
 }
 
@@ -1479,11 +1456,15 @@ function renderLiveTracker() {
   const totals = calculateTotals(game.events);
   const recentEvents = [...game.events].reverse().slice(0, 5);
   const periods = periodsForGame(game);
+  const details = `${formatDate(game.date)} - ${periodFormatLabel(game)}${game.location ? ` - ${escapeHTML(game.location)}` : ""}`;
 
   return renderShell(`
     <section class="screen-title live-title">
       <h2>${escapeHTML(game.opponent)}</h2>
-      <p>${formatDate(game.date)} - ${periodFormatLabel(game)}${game.location ? ` - ${escapeHTML(game.location)}` : ""}</p>
+      <p class="live-meta">
+        <span>${details}</span>
+        <button class="live-share-link" type="button" data-action="copy-share-link">Live Share</button>
+      </p>
     </section>
 
     <div class="period-tabs" role="group" aria-label="Period selector">
@@ -1509,8 +1490,6 @@ function renderLiveTracker() {
           : `<p class="muted small">No events yet. Tap a stat button to start the log.</p>`
       }
     </section>
-
-    ${renderShareCard(game)}
 
     <div class="sticky-actions">
       <div class="sticky-inner">
@@ -2126,10 +2105,6 @@ function handleClick(event) {
     if (action.dataset.action === "copy-share-link") copyShareLink();
     if (action.dataset.action === "sign-out") signOut();
     if (action.dataset.action === "sync-cloud-games") loadCloudGames();
-    if (action.dataset.action === "toggle-live-share") {
-      state.liveShareExpanded = !state.liveShareExpanded;
-      render();
-    }
     if (action.dataset.action === "toggle-watch-share") {
       state.watchShareExpanded = !state.watchShareExpanded;
       render();
