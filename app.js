@@ -269,6 +269,7 @@ const state = {
 syncActivePlayer();
 state.games = state.games.map((game) => normalizeGame(game, state.player));
 state.activeGame = state.activeGame ? normalizeGame(state.activeGame, state.player) : null;
+mergePlayersFromGames([state.activeGame, ...state.games].filter(Boolean));
 persistAll();
 
 function loadJSON(key, fallback) {
@@ -307,11 +308,63 @@ function normalizePlayers(players, fallbackPlayer = legacyPlayer) {
     const normalized = normalizePlayer(player, { createId: true });
     merged.set(normalized.id, normalized);
   });
-  return [...merged.values()];
+  return dedupePlayers([...merged.values()]).players;
 }
 
 function activePlayerFrom(players, activePlayerId) {
   return players.find((player) => player.id === activePlayerId) || players[0] || normalizePlayer(DEFAULT_PLAYER, { createId: true });
+}
+
+function playerIdentityKey(player = {}) {
+  const normalized = normalizePlayer(player);
+  return [normalized.name, normalized.number, normalized.team, normalized.position]
+    .map((value) => value.trim().toLowerCase())
+    .join("|");
+}
+
+function mergePlayerDetails(base, next) {
+  return {
+    ...base,
+    name: base.name && base.name !== DEFAULT_PLAYER.name ? base.name : next.name,
+    number: base.number || next.number,
+    team: base.team || next.team,
+    position: base.position || next.position,
+    notes: base.notes || next.notes,
+  };
+}
+
+function dedupePlayers(players = [], preferredId = "") {
+  const byId = new Map();
+  const byKey = new Map();
+  const idMap = new Map();
+  const ordered = [];
+
+  const orderedPlayers = [...players].sort((a, b) => {
+    if (a.id === preferredId) return -1;
+    if (b.id === preferredId) return 1;
+    return 0;
+  });
+
+  orderedPlayers.forEach((player) => {
+    const normalized = normalizePlayer(player, { createId: true });
+    const key = playerIdentityKey(normalized);
+    const existingId = byKey.get(key);
+    if (existingId) {
+      const existing = byId.get(existingId);
+      byId.set(existingId, mergePlayerDetails(existing, normalized));
+      idMap.set(normalized.id, existingId);
+      return;
+    }
+    byId.set(normalized.id, normalized);
+    byKey.set(key, normalized.id);
+    idMap.set(normalized.id, normalized.id);
+    ordered.push(normalized.id);
+  });
+
+  return {
+    players: ordered.map((id) => byId.get(id)).filter(Boolean),
+    idMap,
+  };
 }
 
 function syncActivePlayer() {
@@ -366,6 +419,7 @@ function updatePlayerInRoster(player) {
 
   state.games = state.games.map(applySnapshot);
   if (state.activeGame) state.activeGame = applySnapshot(state.activeGame);
+  reconcilePlayerRoster();
   state.games
     .filter((game) => gamePlayerId(game) === normalized.id)
     .forEach((game) => syncGameToSupabase(game));
@@ -405,9 +459,37 @@ function mergePlayersFromGames(games = []) {
   const players = new Map(state.players.map((player) => [player.id, player]));
   games.forEach((game) => {
     const snapshot = normalizePlayer(game.playerSnapshot || game.player_snapshot || {});
-    if (snapshot.id && !players.has(snapshot.id)) players.set(snapshot.id, snapshot);
+    const matchingPlayer = [...players.values()].find((player) => playerIdentityKey(player) === playerIdentityKey(snapshot));
+    if (matchingPlayer) {
+      players.set(matchingPlayer.id, mergePlayerDetails(matchingPlayer, snapshot));
+    } else if (snapshot.id && !players.has(snapshot.id)) {
+      players.set(snapshot.id, snapshot);
+    }
   });
   state.players = [...players.values()];
+  reconcilePlayerRoster();
+}
+
+function reconcilePlayerRoster() {
+  const { players, idMap } = dedupePlayers(state.players, state.activePlayerId);
+  state.players = players.length ? players : [normalizePlayer(DEFAULT_PLAYER, { createId: true })];
+  state.activePlayerId = idMap.get(state.activePlayerId) || state.activePlayerId;
+
+  const playersByKey = new Map(state.players.map((player) => [playerIdentityKey(player), player]));
+  const reconcileGame = (game) => {
+    const snapshot = gamePlayerSnapshot(game);
+    const originalId = gamePlayerId(game);
+    const mappedId = idMap.get(originalId);
+    const matchedPlayer = mappedId
+      ? state.players.find((player) => player.id === mappedId)
+      : playersByKey.get(playerIdentityKey(snapshot));
+    return matchedPlayer
+      ? normalizeGame({ ...game, playerId: matchedPlayer.id, playerSnapshot: { ...matchedPlayer } }, matchedPlayer)
+      : game;
+  };
+
+  state.games = state.games.map(reconcileGame);
+  if (state.activeGame) state.activeGame = reconcileGame(state.activeGame);
   syncActivePlayer();
 }
 
