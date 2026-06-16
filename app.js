@@ -3,6 +3,8 @@ const STORAGE_KEYS = {
   players: "laxhornet.players",
   activePlayerId: "laxhornet.activePlayerId",
   games: "laxhornet.games",
+  deletedGames: "laxhornet.deletedGames",
+  deletedEvents: "laxhornet.deletedEvents",
   activeGame: "laxhornet.activeGame",
   reviewGameId: "laxhornet.reviewGameId",
 };
@@ -259,8 +261,11 @@ const state = {
   sharedCode: startupShareCode,
   syncStatus: supabaseClient ? "Live Share ready" : "Live Share unavailable",
   editingEventId: null,
+  editingGameDetails: false,
   tagEditingEventId: null,
   tagDraftTags: [],
+  deletedGameIds: loadJSON(STORAGE_KEYS.deletedGames, []),
+  deletedEventIds: loadJSON(STORAGE_KEYS.deletedEvents, []),
   watchShareExpanded: false,
   toast: "",
   authBusy: false,
@@ -567,6 +572,26 @@ function uniqueTags(tags = []) {
   return [...new Set(tags.map(normalizeTag).filter(Boolean))];
 }
 
+function uniqueIds(ids = []) {
+  return [...new Set(ids.map((id) => String(id || "").trim()).filter(Boolean))];
+}
+
+function rememberDeletedGame(gameId) {
+  state.deletedGameIds = uniqueIds([...state.deletedGameIds, gameId]);
+}
+
+function rememberDeletedEvent(eventId) {
+  state.deletedEventIds = uniqueIds([...state.deletedEventIds, eventId]);
+}
+
+function isDeletedGame(gameId) {
+  return state.deletedGameIds.includes(gameId);
+}
+
+function isDeletedEvent(eventId) {
+  return state.deletedEventIds.includes(eventId);
+}
+
 function normalizeEvent(event = {}, gameId = "") {
   const stat = STAT_BY_KEY[event.statType] || {
     key: event.statType || "note",
@@ -624,7 +649,7 @@ function normalizeGame(game = {}, fallbackPlayer = null) {
     isShared: Boolean(game.isShared ?? game.is_shared ?? false),
     periodFormat,
     currentQuarter: periods.includes(currentQuarter) ? currentQuarter : periods[0],
-    events: (game.events || []).map((event) => normalizeEvent(event, id)),
+    events: (game.events || []).filter((event) => !isDeletedEvent(event.id)).map((event) => normalizeEvent(event, id)),
   };
 }
 
@@ -633,6 +658,8 @@ function persistAll() {
   saveJSON(STORAGE_KEYS.player, state.player);
   saveJSON(STORAGE_KEYS.players, state.players);
   saveJSON(STORAGE_KEYS.activePlayerId, state.activePlayerId);
+  saveJSON(STORAGE_KEYS.deletedGames, uniqueIds(state.deletedGameIds));
+  saveJSON(STORAGE_KEYS.deletedEvents, uniqueIds(state.deletedEventIds));
   saveJSON(STORAGE_KEYS.games, state.games);
   if (state.activeGame) {
     saveJSON(STORAGE_KEYS.activeGame, state.activeGame);
@@ -661,6 +688,7 @@ function navigate(screen) {
 
 function upsertGame(game) {
   game = normalizeGame(game);
+  if (isDeletedGame(game.id)) return;
   const index = state.games.findIndex((item) => item.id === game.id);
   if (index >= 0) {
     state.games[index] = { ...game };
@@ -912,7 +940,13 @@ function deleteGame(id) {
   const game = state.games.find((item) => item.id === id);
   if (!game) return;
   if (!window.confirm(`Delete ${game.opponent} on ${formatDate(game.date)}?`)) return;
+  rememberDeletedGame(id);
+  (game.events || []).forEach((event) => rememberDeletedEvent(event.id));
   state.games = state.games.filter((item) => item.id !== id);
+  if (state.activeGame?.id === id) state.activeGame = null;
+  state.editingGameDetails = false;
+  state.editingEventId = null;
+  state.tagEditingEventId = null;
   if (state.reviewGameId === id) state.reviewGameId = state.games[0]?.id || null;
   persistAll();
   deleteSupabaseGame(id);
@@ -931,7 +965,9 @@ function deleteEvent(gameId, eventId) {
     ...game,
     events: game.events.filter((item) => item.id !== eventId),
   };
+  rememberDeletedEvent(eventId);
   if (state.editingEventId === eventId) state.editingEventId = null;
+  if (state.tagEditingEventId === eventId) state.tagEditingEventId = null;
   deleteSupabaseEvent(eventId);
   saveReviewedGame(updatedGame, "Event deleted");
   render();
@@ -1255,13 +1291,21 @@ async function upsertWithOptionalColumns(table, payload, optionalColumns = []) {
 }
 
 function mergeGames(localGames, cloudGames) {
-  const merged = new Map(localGames.map((game) => [game.id, normalizeGame(game)]));
-  cloudGames.map(normalizeGame).forEach((game) => merged.set(game.id, game));
+  const merged = new Map(
+    localGames
+      .filter((game) => !isDeletedGame(game.id))
+      .map((game) => [game.id, normalizeGame(game)]),
+  );
+  cloudGames
+    .filter((game) => !isDeletedGame(game.id))
+    .map(normalizeGame)
+    .forEach((game) => merged.set(game.id, game));
   return [...merged.values()].sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
 }
 
 async function loadCloudGames(options = {}) {
   if (!supabaseClient || !currentUserId()) return;
+  await flushDeletedCloudRecords();
   const { data, error } = await supabaseClient
     .from("games")
     .select("*, events(*)")
@@ -1281,6 +1325,20 @@ async function loadCloudGames(options = {}) {
   if (!options.silent) {
     render();
     showToast("Cloud games synced");
+  }
+}
+
+async function flushDeletedCloudRecords() {
+  if (!supabaseClient || !currentUserId()) return;
+  const deletedEvents = uniqueIds(state.deletedEventIds);
+  const deletedGames = uniqueIds(state.deletedGameIds);
+  if (deletedEvents.length) {
+    const { error } = await supabaseClient.from("events").delete().in("id", deletedEvents);
+    if (error) reportSyncError(error);
+  }
+  if (deletedGames.length) {
+    const { error } = await supabaseClient.from("games").delete().in("id", deletedGames);
+    if (error) reportSyncError(error);
   }
 }
 
@@ -1345,6 +1403,7 @@ async function signOut() {
 
 async function syncGameToSupabase(game, options = {}) {
   if (!supabaseClient || !game) return false;
+  if (isDeletedGame(game.id)) return false;
   const userId = currentUserId();
   if (!userId) {
     state.syncStatus = "Sign in for cloud sync";
@@ -1962,6 +2021,58 @@ function renderEventEditForm(game, event) {
   `;
 }
 
+function renderGameEditForm(game) {
+  const currentPlayerId = gamePlayerId(game) || state.activePlayerId;
+  const playerOptions = state.players
+    .map(
+      (player) =>
+        `<option value="${player.id}" ${player.id === currentPlayerId ? "selected" : ""}>${escapeHTML(playerTitle(player))}</option>`,
+    )
+    .join("");
+  return `
+    <form class="card pad form-grid edit-game-form" data-form="game-edit" data-game-id="${game.id}">
+      <h3>Edit Game Details</h3>
+      <div class="form-grid two">
+        <div class="field">
+          <label for="editGameOpponent">Opponent</label>
+          <input id="editGameOpponent" name="opponent" value="${escapeHTML(game.opponent || "")}" required />
+        </div>
+        <div class="field">
+          <label for="editGameDate">Date</label>
+          <input id="editGameDate" name="date" type="date" value="${escapeHTML(game.date || todayISO())}" required />
+        </div>
+        <div class="field">
+          <label for="editGamePlayer">Player</label>
+          <select id="editGamePlayer" name="playerId">${playerOptions}</select>
+        </div>
+        <div class="field">
+          <label for="editGameType">Game type</label>
+          <select id="editGameType" name="gameType">
+            ${["Regular season", "Tournament", "Playoff", "Scrimmage"]
+              .map((type) => `<option ${type === (game.gameType || "Regular season") ? "selected" : ""}>${type}</option>`)
+              .join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label for="editPeriodFormat">Game format</label>
+          <select id="editPeriodFormat" name="periodFormat">
+            <option value="quarters" ${periodFormatForGame(game) === "quarters" ? "selected" : ""}>Quarters</option>
+            <option value="halves" ${periodFormatForGame(game) === "halves" ? "selected" : ""}>Halves</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="editGameLocation">Location</label>
+          <input id="editGameLocation" name="location" value="${escapeHTML(game.location || "")}" />
+        </div>
+      </div>
+      <div class="edit-actions">
+        <button class="btn positive" type="submit">Save Game Details</button>
+        <button class="btn secondary" type="button" data-action="cancel-edit-game">Cancel</button>
+      </div>
+    </form>
+  `;
+}
+
 function suggestedTagsForEvent(event) {
   return TAG_SUGGESTIONS[event.statType] || [];
 }
@@ -2021,6 +2132,7 @@ function renderReview() {
 
   const totals = calculateTotals(game.events);
   const player = gamePlayerSnapshot(game);
+  const canEditGame = !state.editingGameDetails;
   const editingEvent = state.editingEventId
     ? game.events.find((event) => event.id === state.editingEventId)
     : null;
@@ -2040,6 +2152,8 @@ function renderReview() {
         <div class="metric"><strong>${totals.goals}</strong><span>Goals</span></div>
         <div class="metric"><strong>${totals.assists}</strong><span>Assists</span></div>
       </div>
+      ${canEditGame ? `<button class="btn neutral" type="button" data-action="edit-game-details">Edit Game Details</button>` : ""}
+      ${state.editingGameDetails ? renderGameEditForm(game) : ""}
       ${renderTotalsTable(totals)}
       ${editingEvent ? renderEventEditForm(game, editingEvent) : ""}
       ${tagEditingEvent ? renderTagEditor(game, tagEditingEvent) : ""}
@@ -2191,7 +2305,7 @@ function renderGameListRow(game) {
         </span>
       </button>
       <div class="row-actions">
-        <button class="icon-btn" type="button" data-review="${game.id}" aria-label="Review game">View</button>
+        <button class="icon-btn wide" type="button" data-review="${game.id}" aria-label="Review and edit game">Review/Edit</button>
         <button class="icon-btn delete" type="button" data-delete="${game.id}" aria-label="Delete game">Del</button>
       </div>
     </div>
@@ -2451,6 +2565,35 @@ function handleSubmit(event) {
     render();
   }
 
+  if (form.dataset.form === "game-edit") {
+    const game = state.games.find((item) => item.id === form.dataset.gameId);
+    if (!game) return;
+    const selectedPlayer = state.players.find((player) => player.id === formData.get("playerId")) || gamePlayerSnapshot(game);
+    const nextPeriodFormat = PERIOD_FORMATS[formData.get("periodFormat")] ? formData.get("periodFormat") : periodFormatForGame(game);
+    const nextPeriods = PERIOD_FORMATS[nextPeriodFormat].periods;
+    const updatedGame = normalizeGame(
+      {
+        ...game,
+        opponent: formData.get("opponent")?.trim() || "Opponent",
+        date: formData.get("date") || game.date || todayISO(),
+        location: formData.get("location")?.trim() || "",
+        gameType: formData.get("gameType") || game.gameType || "Regular season",
+        periodFormat: nextPeriodFormat,
+        currentQuarter: nextPeriods.includes(game.currentQuarter) ? game.currentQuarter : nextPeriods[0],
+        playerId: selectedPlayer.id,
+        playerSnapshot: { ...selectedPlayer },
+        savedAt: new Date().toISOString(),
+      },
+      selectedPlayer,
+    );
+    state.editingGameDetails = false;
+    state.activePlayerId = selectedPlayer.id;
+    syncActivePlayer();
+    state.reviewGameId = updatedGame.id;
+    saveReviewedGame(updatedGame, "Game details saved");
+    render();
+  }
+
   if (form.dataset.form === "custom-tag") {
     const tag = formData.get("customTag")?.trim();
     if (tag) addDraftTag(tag);
@@ -2493,6 +2636,17 @@ function handleClick(event) {
     if (action.dataset.action === "end-game") endGame();
     if (action.dataset.action === "cancel-edit-event") {
       state.editingEventId = null;
+      render();
+    }
+    if (action.dataset.action === "edit-game-details") {
+      state.editingGameDetails = true;
+      state.editingEventId = null;
+      state.tagEditingEventId = null;
+      render();
+      document.querySelector(".edit-game-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    if (action.dataset.action === "cancel-edit-game") {
+      state.editingGameDetails = false;
       render();
     }
     if (action.dataset.action === "cancel-tags") {
