@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v75";
+const APP_VERSION = "v76";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -2669,6 +2669,7 @@ function setQuarter(quarter) {
 }
 
 function renderShell(content, options = {}) {
+  const statusText = state.activeGame ? "Live" : "";
   return `
     <header class="topbar">
       <div class="brand-row">
@@ -2681,7 +2682,7 @@ function renderShell(content, options = {}) {
         <span class="topbar-actions">
           <button class="help-chip" type="button" data-nav="help" aria-label="Open help">?</button>
           <button class="help-chip tutorial-chip" type="button" data-nav="tutorial" aria-label="Open quick tutorial">i</button>
-          <span class="status-chip">${state.activeGame ? "Live" : "Offline Ready"}</span>
+          ${statusText ? `<span class="status-chip">${statusText}</span>` : ""}
         </span>
       </div>
     </header>
@@ -2759,8 +2760,8 @@ function renderAccountCard() {
 
   return `
     <form class="card pad form-grid account-card" data-form="auth">
-      <h3>User Profile</h3>
-      <p class="muted small">Sign in for cloud backup. Personal players stay private; team roster players can be shared with parents you invite.</p>
+      <h3>Sign in or create account</h3>
+      <p class="muted small">Use a User Profile to request team access, verify your player, and keep stats separate from other parents on this device.</p>
       <p class="muted small">App version: ${escapeHTML(APP_VERSION)}</p>
       <div class="field">
         <label for="authEmail">Email</label>
@@ -2778,6 +2779,35 @@ function renderAccountCard() {
         <button class="btn positive" type="submit" name="authAction" value="sign-in" ${state.authBusy ? "disabled" : ""}>${state.authBusy ? "Working..." : "Sign In"}</button>
         <button class="btn secondary" type="submit" name="authAction" value="sign-up" ${state.authBusy ? "disabled" : ""}>${state.authBusy ? "Sending..." : "Create Account"}</button>
       </div>
+    </form>
+  `;
+}
+
+function renderWatchSharedGameForm(options = {}) {
+  const expanded = options.expanded ?? state.watchShareExpanded;
+  const compact = options.compact !== false;
+  return `
+    <form class="card pad form-grid share-watch-form ${expanded ? "expanded" : "collapsed"} ${compact ? "compact-watch-card" : ""}" data-form="watch-share">
+      <div class="collapsible-card-head">
+        <div>
+          <h3>Watch Shared Game</h3>
+          <p class="muted small">Enter a family share code to watch a read-only live game.</p>
+        </div>
+        <button class="collapse-icon" type="button" data-action="toggle-watch-share" aria-expanded="${expanded}" aria-controls="watchShareFields" aria-label="${expanded ? "Minimize Watch Shared Game" : "Expand Watch Shared Game"}">
+          <span aria-hidden="true">${expanded ? "v" : ">"}</span>
+        </button>
+      </div>
+      ${
+        expanded
+          ? `<div class="share-watch-fields" id="watchShareFields">
+              <div class="field">
+                <label for="shareCode">Share code</label>
+                <input id="shareCode" name="shareCode" value="${escapeHTML(state.sharedCode)}" placeholder="ABC123" autocapitalize="characters" />
+              </div>
+              <button class="btn neutral" type="submit">Watch Live</button>
+            </div>`
+          : ""
+      }
     </form>
   `;
 }
@@ -3118,10 +3148,11 @@ function renderTeamRosterCard(options = {}) {
 }
 
 function renderHome() {
+  if (!state.authUser) return renderWelcome();
+
   const season = calculateSeasonTotals();
   const active = state.activeGame;
   const activePlayer = active ? gamePlayerSnapshot(active) : null;
-  const watchExpanded = state.watchShareExpanded;
 
   return renderShell(`
     <section class="screen-title home-title">
@@ -3156,30 +3187,59 @@ function renderHome() {
 
       ${renderTeamRosterCard({ compact: true })}
 
-      <form class="card pad form-grid share-watch-form ${watchExpanded ? "expanded" : "collapsed"}" data-form="watch-share">
-        <div class="collapsible-card-head">
-          <div>
-            <h3>Watch Shared Game</h3>
-            <p class="muted small">Enter a family share code to watch a read-only live game.</p>
-          </div>
-          <button class="collapse-icon" type="button" data-action="toggle-watch-share" aria-expanded="${watchExpanded}" aria-controls="watchShareFields" aria-label="${watchExpanded ? "Minimize Watch Shared Game" : "Expand Watch Shared Game"}">
-            <span aria-hidden="true">${watchExpanded ? "v" : ">"}</span>
-          </button>
-        </div>
-        ${
-          watchExpanded
-            ? `<div class="share-watch-fields" id="watchShareFields">
-                <div class="field">
-                  <label for="shareCode">Share code</label>
-                  <input id="shareCode" name="shareCode" value="${escapeHTML(state.sharedCode)}" placeholder="ABC123" autocapitalize="characters" />
-                </div>
-                <button class="btn neutral" type="submit">Watch Live</button>
-              </div>`
-            : ""
-        }
-      </form>
+      ${renderWatchSharedGameForm()}
     </section>
   `);
+}
+
+function renderWelcome() {
+  return renderShell(`
+    <section class="welcome-hero">
+      <div class="welcome-copy">
+        <h2>Fast stats for a fast game.</h2>
+        <p>LaxHornet helps parents track youth lacrosse stats live, share game updates, and keep each player&apos;s season organized.</p>
+      </div>
+      <div class="welcome-actions">
+        <button class="btn positive" type="button" data-action="focus-auth">Sign In</button>
+        <button class="btn secondary" type="button" data-action="focus-auth">Create Account</button>
+      </div>
+    </section>
+
+    <section class="stack welcome-stack">
+      ${renderAccountCard()}
+
+      <div class="card pad welcome-info-card">
+        <h3>How access works</h3>
+        <div class="welcome-step-list">
+          <div><strong>1</strong><span>Create a User Profile.</span></div>
+          <div><strong>2</strong><span>Request access with your team code.</span></div>
+          <div><strong>3</strong><span>Trackers verify their player by jersey number.</span></div>
+        </div>
+      </div>
+
+      ${renderWatchSharedGameForm()}
+
+      <div class="card pad faq-card">
+        <h3>Quick FAQ</h3>
+        <details>
+          <summary>Do I need an account?</summary>
+          <p class="muted small">Yes for team rosters, player verification, cloud sync, and sharing stats across parent accounts.</p>
+        </details>
+        <details>
+          <summary>Can I watch without tracking?</summary>
+          <p class="muted small">Yes. Use Watch Shared Game with a share code from the tracker&apos;s iPhone or another device.</p>
+        </details>
+        <details>
+          <summary>Who can create teams?</summary>
+          <p class="muted small">Only approved Admin users can create or manage team rosters. Trackers request team access and verify their player before entering stats.</p>
+        </details>
+        <div class="action-grid compact">
+          <button class="btn neutral" type="button" data-nav="tutorial">Quick Guide</button>
+          <button class="btn secondary" type="button" data-nav="help">Impact Help</button>
+        </div>
+      </div>
+    </section>
+  `, { hideNav: true });
 }
 
 function renderSettings() {
@@ -3892,6 +3952,9 @@ function renderAuthSuccess() {
 }
 
 function renderTutorial() {
+  const tutorialCta = state.authUser
+    ? `<button class="btn neutral" type="button" data-nav="start">Start New Game</button>`
+    : `<button class="btn neutral" type="button" data-action="focus-auth">Sign In / Create Account</button>`;
   return renderShell(`
     <section class="screen-title">
       <h2>Quick Tutorial</h2>
@@ -3946,13 +4009,17 @@ function renderTutorial() {
 
       <div class="action-grid">
         <button class="btn positive" type="button" data-nav="home">Go to Home</button>
-        <button class="btn neutral" type="button" data-nav="start">Start New Game</button>
+        ${tutorialCta}
       </div>
     </section>
-  `);
+  `, { hideNav: !state.authUser });
 }
 
 function render() {
+  const publicScreens = ["home", "tutorial", "help", "shared", "authSuccess"];
+  if (!state.authUser && !publicScreens.includes(state.screen)) {
+    state.screen = "home";
+  }
   const screens = {
     home: renderHome,
     authSuccess: renderAuthSuccess,
@@ -4186,6 +4253,14 @@ function handleClick(event) {
     if (action.dataset.action === "export-csv") exportCSV();
     if (action.dataset.action === "export-json") exportJSON();
     if (action.dataset.action === "copy-share-link") copyShareLink();
+    if (action.dataset.action === "focus-auth") {
+      if (state.screen !== "home") {
+        navigate("home");
+        return;
+      }
+      document.querySelector(".account-card input")?.focus();
+      document.querySelector(".account-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
     if (action.dataset.action === "sign-out") signOut();
     if (action.dataset.action === "refresh-profile") loadUserProfile();
     if (action.dataset.action === "request-admin") requestUserRole("admin");

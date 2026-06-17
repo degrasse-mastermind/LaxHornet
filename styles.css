@@ -214,6 +214,96 @@ button:disabled {
   font-size: 1.42rem;
 }
 
+.welcome-hero {
+  display: grid;
+  gap: 18px;
+  margin: 18px 0 14px;
+  padding: 18px 2px 6px;
+}
+
+.welcome-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.welcome-copy h2 {
+  max-width: 10ch;
+  margin: 0;
+  color: #ffffff;
+  font-size: 2.45rem;
+  line-height: 0.98;
+}
+
+.welcome-copy p {
+  max-width: 34rem;
+  margin: 0;
+  color: #d7d9dd;
+  font-size: 1rem;
+  line-height: 1.48;
+}
+
+.welcome-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.welcome-stack {
+  gap: 12px;
+}
+
+.welcome-info-card,
+.faq-card {
+  border-color: rgba(232, 16, 16, 0.24);
+}
+
+.welcome-step-list {
+  display: grid;
+  gap: 10px;
+}
+
+.welcome-step-list div {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-size: 0.94rem;
+  line-height: 1.35;
+}
+
+.welcome-step-list strong {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 999px;
+  color: #ffffff;
+  background: var(--hornet-red);
+  font-size: 0.9rem;
+}
+
+.faq-card {
+  display: grid;
+  gap: 10px;
+}
+
+.faq-card details {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.faq-card summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 850;
+}
+
+.action-grid.compact {
+  grid-template-columns: 1fr 1fr;
+  margin-top: 4px;
+}
+
 .screen-title p {
   margin: 8px 0 0;
   color: #c6c8cc;
