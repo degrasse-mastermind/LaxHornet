@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v88";
+const APP_VERSION = "v89";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -3460,9 +3460,9 @@ function renderHome() {
 
       <div class="metric-grid">
         <div class="metric"><strong>${season.gamesPlayed}</strong><span>Games</span></div>
+        <div class="metric"><strong>${season.averageImpact.toFixed(1)}</strong><span>Avg Impact</span></div>
         <div class="metric"><strong>${season.goals}</strong><span>Goals</span></div>
         <div class="metric"><strong>${season.assists}</strong><span>Assists</span></div>
-        <div class="metric"><strong>${season.averageImpact.toFixed(1)}</strong><span>Avg Impact</span></div>
       </div>
 
       <div class="action-grid">
