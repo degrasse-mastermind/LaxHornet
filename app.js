@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v91";
+const APP_VERSION = "v92";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -3474,7 +3474,7 @@ function renderHome() {
         ${
           active
             ? `<button class="btn positive" type="button" data-nav="live">Resume ${escapeHTML(playerTitle(activePlayer))}</button>`
-            : `<button class="btn positive" type="button" data-nav="start">Start New Game</button>`
+            : `<button class="btn positive" type="button" data-nav="start">Track New Game</button>`
         }
         <button class="btn neutral" type="button" data-nav="past">Review Games</button>
       </div>
@@ -3521,7 +3521,7 @@ function renderMore() {
         <div class="more-action-list">
           <button class="more-action" type="button" data-nav="${active ? "live" : "start"}">
             <span>${renderNavIcon("track")}</span>
-            <strong>${active ? "Resume Live Game" : "Start New Game"}</strong>
+            <strong>${active ? "Resume Live Game" : "Track New Game"}</strong>
             <small>${active ? `Continue tracking ${escapeHTML(playerTitle(activePlayer))}.` : "Open the game setup screen."}</small>
           </button>
           <button class="more-action" type="button" data-nav="settings">
@@ -3850,7 +3850,7 @@ function renderStartGame() {
   const viewOnlyTeamPlayer = isTeamPlayer(state.player) && !canTrackPlayer(state.player);
   return renderShell(`
     <section class="screen-title">
-      <h2>Start New Game</h2>
+      <h2>Track New Game</h2>
       <p>Set the opponent, choose the game format, then start tracking.</p>
     </section>
 
@@ -3939,9 +3939,9 @@ function renderLiveTracker() {
     return renderShell(`
       <section class="screen-title">
         <h2>No active game</h2>
-        <p>Start a new game to open the live tracker.</p>
+        <p>Track a new game to open the live tracker.</p>
       </section>
-      <button class="btn positive" type="button" data-nav="start">Start New Game</button>
+      <button class="btn positive" type="button" data-nav="start">Track New Game</button>
     `);
   }
 
@@ -4181,7 +4181,7 @@ function renderReview() {
         <h2>Game Review</h2>
         <p>No saved games yet.</p>
       </section>
-      <button class="btn positive" type="button" data-nav="start">Start New Game</button>
+      <button class="btn positive" type="button" data-nav="start">Track New Game</button>
     `);
   }
 
@@ -4513,7 +4513,7 @@ function renderRequestSubmitted() {
 
 function renderTutorial() {
   const tutorialCta = state.authUser
-    ? `<button class="btn neutral" type="button" data-nav="start">Start New Game</button>`
+    ? `<button class="btn neutral" type="button" data-nav="start">Track New Game</button>`
     : `<button class="btn neutral" type="button" data-action="focus-auth">Sign In / Create Account</button>`;
   return renderShell(`
     <section class="screen-title">
@@ -4543,8 +4543,8 @@ function renderTutorial() {
       </div>
 
       <div class="card pad">
-        <h3>5. Start A Game</h3>
-        <p class="muted small">Tap Start New Game, double-check the player selector, enter the opponent, and choose Quarters or Halves. In Live Game, use the subtle period buttons so each event lands in the right part of the game.</p>
+        <h3>5. Track A Game</h3>
+        <p class="muted small">Tap Track New Game, double-check the player selector, enter the opponent, and choose Quarters or Halves. In Live Game, use the subtle period buttons so each event lands in the right part of the game.</p>
       </div>
 
       <div class="card pad">
