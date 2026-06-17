@@ -700,6 +700,7 @@ button:disabled {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.btn.brand,
 .btn.positive {
   border: 1px solid rgba(232, 16, 16, 0.72);
   background:
@@ -710,6 +711,12 @@ button:disabled {
 
 .btn.neutral {
   background: linear-gradient(180deg, var(--neutral), var(--neutral-dark));
+}
+
+.btn.brand.neutral {
+  background:
+    linear-gradient(90deg, var(--hornet-red) 0 6px, transparent 6px),
+    linear-gradient(180deg, #2a3038, #13161a);
 }
 
 .btn.negative {

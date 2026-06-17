@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v96";
+const APP_VERSION = "v97";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -3366,13 +3366,13 @@ function renderHome() {
         <div class="metric"><strong>${season.assists}</strong><span>Assists</span></div>
       </div>
 
-      <div class="action-grid">
+      <div class="action-grid home-action-grid">
         ${
           active
-            ? `<button class="btn positive" type="button" data-nav="live">Resume ${escapeHTML(playerTitle(activePlayer))}</button>`
-            : `<button class="btn positive" type="button" data-nav="start">Track New Game</button>`
+            ? `<button class="btn brand positive" type="button" data-nav="live">Resume ${escapeHTML(playerTitle(activePlayer))}</button>`
+            : `<button class="btn brand positive" type="button" data-nav="start">Track New Game</button>`
         }
-        <button class="btn neutral" type="button" data-nav="past">Review Games</button>
+        <button class="btn brand neutral" type="button" data-nav="past">Review Games</button>
       </div>
     </section>
   `);
