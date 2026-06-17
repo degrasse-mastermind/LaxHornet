@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v82";
+const APP_VERSION = "v84";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -3499,37 +3499,115 @@ function renderHome() {
 }
 
 function renderMore() {
+  const team = activeTeam();
+  const requestSummary = state.teamAccessRequests.filter((request) => request.userId === currentUserId());
+  const latestRequest = requestSummary[0] || null;
+  const playerLine = [playerSubline(state.player)].filter(Boolean).join("");
+  const profileName = [state.userProfile?.firstName, state.userProfile?.lastName].filter(Boolean).join(" ");
+  const accessText = team
+    ? "Access: approved"
+    : latestRequest
+      ? `Access: ${latestRequest.status}`
+      : "No approved team yet";
+  const active = state.activeGame;
+  const activePlayer = active ? gamePlayerSnapshot(active) : null;
+
   return renderShell(`
     <section class="screen-title">
       <h2>More</h2>
-      <p>Manage your player, account, team access, and app help.</p>
+      <p>Quick access to setup, account, team access, watching, and help.</p>
     </section>
 
     <section class="stack">
       <section class="card pad more-card">
+        <div>
+          <h3>Game Day</h3>
+          <p class="muted small">${escapeHTML(playerTitle(activePlayer || state.player))}${playerLine ? ` - ${escapeHTML(playerLine)}` : ""}</p>
+        </div>
+        <div class="more-status-grid">
+          <div class="more-status-cell">
+            <span>Active player</span>
+            <strong>${escapeHTML(playerTitle(state.player))}</strong>
+          </div>
+          <div class="more-status-cell">
+            <span>Team</span>
+            <strong>${escapeHTML(team?.name || state.player.team || "Not connected")}</strong>
+          </div>
+        </div>
+        <div class="more-action-list">
+          <button class="more-action" type="button" data-nav="${active ? "live" : "start"}">
+            <span>${renderNavIcon("track")}</span>
+            <strong>${active ? "Resume Live Game" : "Start New Game"}</strong>
+            <small>${active ? `Continue tracking ${escapeHTML(playerTitle(activePlayer))}.` : "Open the game setup screen."}</small>
+          </button>
+          <button class="more-action" type="button" data-nav="settings">
+            <span>${renderNavIcon("games")}</span>
+            <strong>Player & Team</strong>
+            <small>Change player, review team access, and manage team details.</small>
+          </button>
+        </div>
+      </section>
+
+      <section class="card pad more-card">
+        <div>
+          <h3>Account</h3>
+          <p class="muted small">${escapeHTML(profileName || userEmail())}${userEmail() ? ` - ${escapeHTML(userEmail())}` : ""}</p>
+        </div>
+        <div class="more-status-grid">
+          <div class="more-status-cell">
+            <span>Status</span>
+            <strong>${escapeHTML(state.syncStatus || "Signed in")}</strong>
+          </div>
+          <div class="more-status-cell">
+            <span>App</span>
+            <strong>${escapeHTML(APP_VERSION)}</strong>
+          </div>
+        </div>
+        ${state.cloudError ? `<div class="notice-card error-card"><strong>Last Supabase error</strong><p class="muted small">${escapeHTML(state.cloudError)}</p></div>` : ""}
+        <div class="more-action-list">
+          <button class="more-action" type="button" data-nav="profileSetup">
+            <span>${renderNavIcon("more")}</span>
+            <strong>User Profile</strong>
+            <small>Edit parent details and request team access.</small>
+          </button>
+          <button class="more-action" type="button" data-action="sync-cloud-games">
+            <span>${renderNavIcon("season")}</span>
+            <strong>Sync Cloud Games</strong>
+            <small>Refresh saved games, teams, requests, and player access.</small>
+          </button>
+          <button class="more-action danger-link" type="button" data-action="sign-out">
+            <span>${renderNavIcon("more")}</span>
+            <strong>Sign Out</strong>
+            <small>Use this before switching parent accounts on the same device.</small>
+          </button>
+        </div>
+      </section>
+
+      <section class="card pad more-card">
         <div class="section-head">
           <div>
-            <h3>My Player</h3>
-            <p class="muted small">${escapeHTML(playerTitle(state.player))} - ${escapeHTML(playerSubline(state.player))}</p>
+            <h3>Team Access</h3>
+            <p class="muted small">${escapeHTML(team?.name || latestRequest?.teamName || "Request access from your team admin.")}</p>
+          </div>
+        </div>
+        <div class="more-status-grid">
+          <div class="more-status-cell">
+            <span>Status</span>
+            <strong>${escapeHTML(accessText)}</strong>
+          </div>
+          <div class="more-status-cell">
+            <span>Player</span>
+            <strong>${escapeHTML(isTeamPlayer(state.player) ? playerTitle(state.player) : "Not verified")}</strong>
           </div>
         </div>
         <div class="more-action-list">
           <button class="more-action" type="button" data-nav="settings">
             <span>${renderNavIcon("track")}</span>
-            <strong>Player & Team</strong>
-            <small>Choose from the roster and check player access.</small>
-          </button>
-          <button class="more-action" type="button" data-nav="profileSetup">
-            <span>${renderNavIcon("more")}</span>
-            <strong>User Profile</strong>
-            <small>Edit parent details or request team access.</small>
+            <strong>Open Player & Team</strong>
+            <small>View team stats, access requests, and player setup.</small>
           </button>
         </div>
       </section>
-
-      ${renderAccountCard()}
-
-      ${renderTeamRosterCard({ compact: true })}
 
       ${renderWatchSharedGameForm()}
 
