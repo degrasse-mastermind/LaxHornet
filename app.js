@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v78";
+const APP_VERSION = "v79";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -2151,6 +2151,7 @@ async function handleAuthSubmit(formData) {
   }
 
   if (authAction === "sign-up") {
+    state.cloudError = "";
     state.signupDraft = { email, password };
     state.accessRequestSummary = null;
     state.userProfile = normalizeUserProfile({ email });
@@ -2169,11 +2170,10 @@ async function handleAuthSubmit(formData) {
 
   if (result.error) {
     const message = result.error.message || "";
-    showToast(
-      /rate|too many|exceeded/i.test(message)
-        ? "Email limit hit. Wait, or set up custom SMTP."
-        : message,
-    );
+    state.cloudError = /rate|too many|exceeded/i.test(message)
+      ? "Email limit hit. Wait, or use custom SMTP."
+      : readableSupabaseError(result.error) || message;
+    showToast(state.cloudError);
     render();
     return;
   }
@@ -2356,15 +2356,15 @@ async function submitSignupAccessRequest(formData) {
 
   if (result.error) {
     const message = result.error.message || "";
-    showToast(
-      /rate|too many|exceeded/i.test(message)
-        ? "Email limit hit. Wait, or use custom SMTP."
-        : message,
-    );
+    state.cloudError = /rate|too many|exceeded/i.test(message)
+      ? "Email limit hit. Wait, or use custom SMTP."
+      : readableSupabaseError(result.error) || message;
+    showToast(state.cloudError);
     render();
     return;
   }
 
+  state.cloudError = "";
   state.accessRequestSummary = requestSummary;
   state.signupDraft = null;
   setAuthUser(result.data.session?.user || null);
@@ -3456,6 +3456,8 @@ function renderProfileSetup() {
         <strong>Approval protects the roster.</strong>
         <p class="muted small">When approved, this account will unlock only the rostered player matching the jersey number you submit.</p>
       </div>
+
+      ${state.cloudError ? `<div class="notice-card error-card"><strong>Could not submit request.</strong><p class="muted small">${escapeHTML(state.cloudError)}</p></div>` : ""}
 
       <div class="account-actions">
         <button class="btn positive" type="submit" ${state.authBusy ? "disabled" : ""}>${state.authBusy ? "Submitting..." : signupDraft ? "Submit Request" : "Save Profile"}</button>
