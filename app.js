@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v103";
+const APP_VERSION = "v104";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -3133,7 +3133,7 @@ function renderPlayerSwitcher(options = {}) {
                 : ""
           }
         </div>
-        ${showManage ? `<button class="mini-btn light" type="button" data-nav="player">Manage</button>` : ""}
+        ${showManage ? `<button class="mini-btn light" type="button" data-nav="player">Players</button>` : ""}
       </div>
       <div class="player-chip-row">${chips || `<p class="muted small">No players available.</p>`}</div>
     </section>
