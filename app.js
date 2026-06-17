@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v92";
+const APP_VERSION = "v93";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -3114,7 +3114,7 @@ function renderPlayerSwitcher(options = {}) {
   const title = options.title || "Tracking Player";
   const helper = options.helper === false ? "" : options.helper || "Choose who these stats belong to.";
   const helperLines = Array.isArray(options.helperLines) ? options.helperLines.filter(Boolean) : null;
-  const showPlayerSubline = Boolean(options.showPlayerSubline);
+  const showPlayerSubline = options.showPlayerSubline !== false;
   const showManage = options.showManage !== false;
   const shellClass = options.inline ? "player-switch-card inline" : "card pad player-switch-card";
   const defaultPlayers = activeTeamRoster().length ? activeTeamRoster().map(rosterPlayerToPlayer) : state.players;
@@ -3460,7 +3460,6 @@ function renderHome() {
     <section class="stack">
       ${renderPlayerSwitcher({
         helper: false,
-        showPlayerSubline: true,
       })}
 
       <div class="metric-grid">
