@@ -458,6 +458,64 @@ begin
 end;
 $$;
 
+create or replace function public.laxhornet_create_team(
+  team_id text,
+  team_name text,
+  invite_code text,
+  tracker_code text,
+  member_id text
+)
+returns table(
+  id text,
+  name text,
+  invite_code text,
+  tracker_code text,
+  role text,
+  created_by uuid,
+  created_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  created_team public.teams%rowtype;
+begin
+  if (select auth.uid()) is null then
+    raise exception 'Sign in required';
+  end if;
+
+  if not (select public.laxhornet_can_create_team()) then
+    raise exception 'Admin approval required';
+  end if;
+
+  insert into public.teams (id, name, invite_code, tracker_code, created_by)
+  values (
+    team_id,
+    nullif(trim(team_name), ''),
+    upper(invite_code),
+    upper(tracker_code),
+    (select auth.uid())
+  )
+  returning * into created_team;
+
+  insert into public.team_members (id, team_id, user_id, role)
+  values (member_id, created_team.id, (select auth.uid()), 'admin')
+  on conflict (team_id, user_id) do update
+  set role = 'admin';
+
+  return query
+  select
+    created_team.id,
+    created_team.name,
+    created_team.invite_code,
+    created_team.tracker_code,
+    'admin'::text,
+    created_team.created_by,
+    created_team.created_at;
+end;
+$$;
+
 create or replace function public.laxhornet_team_access_codes(check_team_id text)
 returns table(invite_code text, tracker_code text)
 language sql
@@ -481,6 +539,7 @@ grant execute on function public.laxhornet_review_admin_request(uuid, boolean) t
 grant execute on function public.laxhornet_team_role(text) to authenticated;
 grant execute on function public.laxhornet_can_edit_team(text) to authenticated;
 grant execute on function public.laxhornet_join_team_by_code(text) to authenticated;
+grant execute on function public.laxhornet_create_team(text, text, text, text, text) to authenticated;
 grant execute on function public.laxhornet_team_access_codes(text) to authenticated;
 
 drop policy if exists "laxhornet public read games" on public.games;

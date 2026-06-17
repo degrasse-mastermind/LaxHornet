@@ -2004,34 +2004,24 @@ async function createTeam(formData) {
     createdBy: currentUserId(),
   });
 
-  const { error: teamError } = await supabaseClient.from("teams").insert({
-    id: team.id,
-    name: team.name,
+  const { data: teamRows, error: createError } = await supabaseClient.rpc("laxhornet_create_team", {
+    team_id: team.id,
+    team_name: team.name,
     invite_code: team.inviteCode,
     tracker_code: team.trackerCode,
-    created_by: currentUserId(),
+    member_id: uid("member"),
   });
-  if (teamError) {
-    reportTeamCreateError(teamError);
+  if (createError) {
+    reportTeamCreateError(createError);
     return;
   }
 
-  const { error: memberError } = await supabaseClient.from("team_members").insert({
-    id: uid("member"),
-    team_id: team.id,
-    user_id: currentUserId(),
-    role: "admin",
-  });
-  if (memberError) {
-    reportTeamCreateError(memberError);
-    return;
-  }
-
-  state.teams = normalizeTeams([...state.teams, team]);
-  state.activeTeamId = team.id;
+  const createdTeam = teamFromSupabaseRows((Array.isArray(teamRows) ? teamRows[0] : teamRows) || team);
+  state.teams = normalizeTeams([...state.teams, createdTeam]);
+  state.activeTeamId = createdTeam.id;
   persistAll();
   render();
-  showToast(`Team created. Viewer code ${team.inviteCode}`);
+  showToast(`Team created. Viewer code ${createdTeam.inviteCode}`);
 }
 
 async function joinTeam(formData) {
