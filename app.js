@@ -1521,6 +1521,10 @@ function shareLinkForGame(game) {
 }
 
 function reportSyncError(error) {
+  if (isTeamSetupError(error)) {
+    reportTeamSetupError(error);
+    return;
+  }
   console.warn("LaxHornet Supabase sync failed:", error);
   state.syncStatus = "Live Share setup needed";
   const now = Date.now();
@@ -1530,8 +1534,29 @@ function reportSyncError(error) {
   }
 }
 
+function supabaseErrorText(error = {}) {
+  return `${error.message || ""} ${error.details || ""} ${error.hint || ""} ${error.code || ""}`.trim();
+}
+
+function isTeamSetupError(error = {}) {
+  const text = supabaseErrorText(error);
+  return /teams|team_members|roster_players|tracker_code|laxhornet_|schema cache|relation|column|function|permission|policy/i.test(text);
+}
+
+function reportTeamSetupError(error) {
+  console.warn("LaxHornet team roster setup failed:", error);
+  state.syncStatus = "Team roster database update needed";
+  const now = Date.now();
+  if (now - lastSyncErrorAt > 8000) {
+    lastSyncErrorAt = now;
+    showToast("Run the Supabase team roster SQL");
+  } else {
+    render();
+  }
+}
+
 function missingSupabaseColumn(error) {
-  const message = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`;
+  const message = supabaseErrorText(error);
   return (
     message.match(/'([^']+)' column/i)?.[1] ||
     message.match(/column "([^"]+)"/i)?.[1] ||
@@ -1614,7 +1639,7 @@ async function loadCloudTeams(options = {}) {
     .eq("user_id", currentUserId());
 
   if (memberError) {
-    if (!options.silent) reportSyncError(memberError);
+    if (!options.silent) reportTeamSetupError(memberError);
     return;
   }
 
@@ -1633,7 +1658,7 @@ async function loadCloudTeams(options = {}) {
       .order("number", { ascending: true });
 
     if (rosterError) {
-      if (!options.silent) reportSyncError(rosterError);
+      if (!options.silent) reportTeamSetupError(rosterError);
       return;
     }
 
@@ -1653,7 +1678,7 @@ async function loadCloudTeams(options = {}) {
 async function loadEditableTeamAccessCodes() {
   if (!supabaseClient || !currentUserId()) return;
   for (const team of state.teams.filter((item) => canEditTeam(item.id))) {
-    const { data, error } = await supabaseClient.rpc("laxhornet_team_access_codes", { check_team_id: team.id });
+  const { data, error } = await supabaseClient.rpc("laxhornet_team_access_codes", { check_team_id: team.id });
     if (error || !Array.isArray(data) || !data[0]) continue;
     state.teams = normalizeTeams([
       ...state.teams,
@@ -1852,7 +1877,7 @@ async function createTeam(formData) {
     created_by: currentUserId(),
   });
   if (teamError) {
-    reportSyncError(teamError);
+    reportTeamSetupError(teamError);
     return;
   }
 
@@ -1863,7 +1888,7 @@ async function createTeam(formData) {
     role: "admin",
   });
   if (memberError) {
-    reportSyncError(memberError);
+    reportTeamSetupError(memberError);
     return;
   }
 
@@ -1888,7 +1913,7 @@ async function joinTeam(formData) {
     join_code: accessCode,
   });
   if (joinError) {
-    reportSyncError(joinError);
+    reportTeamSetupError(joinError);
     return;
   }
   const joined = Array.isArray(joinRows) ? joinRows[0] : null;
@@ -1935,7 +1960,7 @@ async function addRosterPlayer(formData) {
     active: true,
   });
   if (error) {
-    reportSyncError(error);
+    reportTeamSetupError(error);
     return;
   }
 
