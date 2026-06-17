@@ -2207,7 +2207,8 @@ function renderPlayerSwitcher(options = {}) {
   const helper = options.helper || "Choose who these stats belong to.";
   const showManage = options.showManage !== false;
   const shellClass = options.inline ? "player-switch-card inline" : "card pad player-switch-card";
-  const chips = state.players
+  const players = Array.isArray(options.players) ? options.players : state.players;
+  const chips = players
     .map((player) => {
       const active = player.id === state.activePlayerId;
       return `
@@ -2228,7 +2229,7 @@ function renderPlayerSwitcher(options = {}) {
         </div>
         ${showManage ? `<button class="mini-btn light" type="button" data-nav="settings">Manage</button>` : ""}
       </div>
-      <div class="player-chip-row">${chips}</div>
+      <div class="player-chip-row">${chips || `<p class="muted small">No players available.</p>`}</div>
     </section>
   `;
 }
@@ -2441,59 +2442,34 @@ function renderHome() {
 }
 
 function renderSettings() {
+  const team = activeTeam();
+  const rosterPlayers = activeTeamRoster().map(rosterPlayerToPlayer);
   const gameCount = playerGameCount(state.activePlayerId);
   return renderShell(`
     <section class="screen-title">
       <h2>Player Settings</h2>
-      <p>Add personal players or manage a shared team roster for parent accounts.</p>
+      <p>Pick a player from the preloaded Team Roster. Roster edits require admin or tracker access.</p>
     </section>
 
     <section class="stack">
       ${renderTeamRosterCard()}
 
-      ${renderPlayerSwitcher({
-        title: "Active Tracking Player",
-        helper: "Tap a player to make them active before starting a game.",
-        showManage: false,
-      })}
-
-      <div class="action-grid two-actions">
-        <button class="btn neutral" type="button" data-action="add-player">Add Player</button>
-        <button class="btn secondary" type="button" data-action="delete-player">Delete Player</button>
-      </div>
-      <p class="muted small roster-note">${gameCount ? `${gameCount} saved game${gameCount === 1 ? "" : "s"} for ${escapeHTML(state.player.name)}.` : `No saved games yet for ${escapeHTML(state.player.name)}.`}</p>
-
-      <form class="card pad form-grid" data-form="settings">
-        <h3>Edit ${escapeHTML(playerTitle(state.player))}</h3>
-        ${
-          isTeamPlayer(state.player)
-            ? `<p class="muted small">This player came from a shared team roster. Changes here affect local snapshots; edit the team roster entry from Team Roster before new games.</p>`
-            : ""
-        }
-        <div class="form-grid two">
-          <div class="field">
-            <label for="playerName">Player name</label>
-            <input id="playerName" name="name" value="${escapeHTML(state.player.name)}" required />
-          </div>
-          <div class="field">
-            <label for="number">Jersey number</label>
-            <input id="number" name="number" inputmode="numeric" value="${escapeHTML(state.player.number)}" />
-          </div>
-          <div class="field">
-            <label for="team">Team</label>
-            <input id="team" name="team" value="${escapeHTML(state.player.team)}" />
-          </div>
-          <div class="field">
-            <label for="position">Position</label>
-            <input id="position" name="position" value="${escapeHTML(state.player.position)}" placeholder="Midfield, attack, defense..." />
-          </div>
-        </div>
-        <div class="field">
-          <label for="notes">Player notes</label>
-          <textarea id="notes" name="notes">${escapeHTML(state.player.notes)}</textarea>
-        </div>
-        <button class="btn positive" type="submit">Save Player Settings</button>
-      </form>
+      ${
+        team && rosterPlayers.length
+          ? `
+            ${renderPlayerSwitcher({
+              title: `${team.name} Players`,
+              helper: "Choose from the preloaded team roster before starting a game.",
+              showManage: false,
+              players: rosterPlayers,
+            })}
+            <p class="muted small roster-note">${gameCount ? `${gameCount} saved game${gameCount === 1 ? "" : "s"} for ${escapeHTML(state.player.name)}.` : `No saved games yet for ${escapeHTML(state.player.name)}.`}</p>
+          `
+          : `<section class="card pad">
+              <h3>No Preloaded Players Yet</h3>
+              <p class="muted small">Join or sync a team roster first. If roster players need to be added, ask a team admin or tracker to preload them in Team Roster.</p>
+            </section>`
+      }
     </section>
   `);
 }
@@ -3144,7 +3120,7 @@ function renderTutorial() {
     <section class="stack tutorial-list">
       <div class="card pad">
         <h3>1. Set Up The Player</h3>
-        <p class="muted small">Open Player Settings to add personal players or use Team Roster for a shared team list. Tap the player you want active before starting a game.</p>
+        <p class="muted small">Open Player Settings to pick from the preloaded Team Roster. Admins and trackers can preload roster players in Team Roster; regular viewers can only select and review them.</p>
       </div>
 
       <div class="card pad">
