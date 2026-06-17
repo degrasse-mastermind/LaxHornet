@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v122";
+const APP_VERSION = "v123";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -2051,6 +2051,19 @@ async function loadCloudTeams(options = {}) {
   const cloudTeams = normalizeTeams((memberRows || []).map(teamFromSupabaseRows));
   state.teams = cloudTeams;
 
+  if (isPlatformReviewer()) {
+    const { data: ownedTeams, error: ownedTeamsError } = await supabaseClient
+      .from("teams")
+      .select("id,name,invite_code,tracker_code,created_by,created_at")
+      .eq("created_by", currentUserId());
+    if (!ownedTeamsError && Array.isArray(ownedTeams)) {
+      state.teams = normalizeTeams([
+        ...state.teams,
+        ...ownedTeams.map((team) => teamFromSupabaseRows({ ...team, role: "admin" })),
+      ]);
+    }
+  }
+
   await loadTeamAccessRequests({ silent: true });
   const approvedRequestTeams = state.teamAccessRequests
     .filter((request) => request.status === "approved" && request.teamId)
@@ -2127,7 +2140,7 @@ async function loadTeamAccessRequests(options = {}) {
   }
 
   const editableTeamIds = state.teams.filter((team) => canManageRoster(team.id)).map((team) => team.id);
-  if (editableTeamIds.length) {
+  if (editableTeamIds.length || isPlatformReviewer()) {
     const { data, error } = await supabaseClient.rpc("laxhornet_pending_team_access_requests");
     if (error) {
       if (!options.silent) reportTeamSetupError(error);
@@ -3441,6 +3454,47 @@ function renderTeamAccessRequests() {
   `;
 }
 
+function renderAdminTeamRequestInbox() {
+  if (!isPlatformReviewer()) return "";
+  const requests = state.teamAccessRequests.filter((request) => request.status === "pending");
+  return `
+    <section class="card pad admin-review-card">
+      <div class="section-head compact-head">
+        <div>
+          <h3>Pending Parent Requests</h3>
+          <p class="muted small">Approve team and player access across every roster.</p>
+        </div>
+        <button class="mini-btn light" type="button" data-action="sync-team-roster">Sync</button>
+      </div>
+      ${
+        requests.length
+          ? `<div class="admin-request-list">
+              ${requests
+                .map(
+                  (request) => {
+                    const parentName = [request.firstName, request.lastName].filter(Boolean).join(" ");
+                    return `
+                      <div class="admin-request-row detailed">
+                        <span>
+                          <strong>${escapeHTML(parentName || request.email || "Unknown parent")}</strong>
+                          <small>${escapeHTML(request.teamName || "Team")} - Jersey #${escapeHTML(request.childJerseyNumber || "not provided")} - ${escapeHTML(request.email || "No email")}</small>
+                        </span>
+                        <span class="event-actions">
+                          <button class="mini-btn" type="button" data-review-team-access="${request.id}" data-approved="true">Approve</button>
+                          <button class="mini-btn danger" type="button" data-review-team-access="${request.id}" data-approved="false">Reject</button>
+                        </span>
+                      </div>
+                    `;
+                  },
+                )
+                .join("")}
+            </div>`
+          : `<p class="muted small">No pending parent requests.</p>`
+      }
+    </section>
+  `;
+}
+
 function renderClaimByNumberForm(teamId, options = {}) {
   const suffix = options.suffix || teamId || "active";
   return `
@@ -4052,6 +4106,7 @@ function renderTeamPage() {
     </section>
 
     <section class="stack">
+      ${renderAdminTeamRequestInbox()}
       ${renderTeamRosterCard()}
       ${renderTeamAccessTools()}
     </section>
