@@ -466,26 +466,26 @@ security definer
 set search_path = public
 as $$
 declare
-  current_role text;
+  member_role text;
 begin
   select role
-  into current_role
+  into member_role
   from public.team_members
   where team_id = check_team_id
     and user_id = (select auth.uid())
   limit 1;
 
-  current_role := coalesce(current_role, 'tracker');
+  member_role := coalesce(member_role, 'tracker');
 
-  if current_role = 'admin' and not (select public.laxhornet_is_platform_reviewer()) then
+  if member_role = 'admin' and not (select public.laxhornet_is_platform_reviewer()) then
     return 'tracker';
   end if;
 
-  if current_role = 'viewer' or current_role = 'member' then
+  if member_role = 'viewer' or member_role = 'member' then
     return 'tracker';
   end if;
 
-  return current_role;
+  return member_role;
 end;
 $$;
 
