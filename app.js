@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v128";
+const APP_VERSION = "v129";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -3472,8 +3472,8 @@ function renderRosterPlayerEditForm(selectedRosterPlayer, options = {}) {
         <label for="${escapeHTML(prefix)}Name">Player name</label>
         <input id="${escapeHTML(prefix)}Name" name="name" value="${escapeHTML(player.name)}" required />
       </div>
-      <div class="form-grid two">
-        <div class="field">
+      <div class="form-grid two roster-edit-details">
+        <div class="field roster-number-field">
           <label for="${escapeHTML(prefix)}Number">Jersey #</label>
           <input id="${escapeHTML(prefix)}Number" name="number" value="${escapeHTML(player.number)}" inputmode="numeric" />
         </div>
