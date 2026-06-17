@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v77";
+const APP_VERSION = "v78";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -285,6 +285,8 @@ const state = {
   deletedEventIds: initialStoredState.deletedEventIds,
   watchShareExpanded: false,
   teamRosterExpanded: true,
+  signupDraft: null,
+  accessRequestSummary: null,
   toast: "",
   authBusy: false,
 };
@@ -409,6 +411,10 @@ function normalizeTeamAccessRequest(request = {}) {
     teamName: request.teamName || request.team_name || "",
     userId: request.userId || request.user_id || "",
     email: request.email || "",
+    firstName: String(request.firstName || request.first_name || "").trim(),
+    lastName: String(request.lastName || request.last_name || "").trim(),
+    phone: String(request.phone || "").trim(),
+    childJerseyNumber: String(request.childJerseyNumber || request.child_jersey_number || "").trim(),
     requestedRole: normalizeTeamRole(request.requestedRole || request.requested_role || "tracker"),
     status: String(request.status || "pending").trim().toLowerCase(),
     createdAt: request.createdAt || request.created_at || null,
@@ -1905,6 +1911,10 @@ function teamAccessRequestFromSupabaseRow(row = {}) {
     teamName: row.team_name || row.teams?.name || "",
     userId: row.user_id,
     email: row.email,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    phone: row.phone,
+    childJerseyNumber: row.child_jersey_number,
     requestedRole: row.requested_role,
     status: row.status,
     createdAt: row.created_at,
@@ -1962,6 +1972,7 @@ async function loadCloudTeams(options = {}) {
   await loadTeamAccessRequests({ silent: true });
 
   mergeRosterPlayersIntoPlayers();
+  ensureActiveTeamRosterPlayer();
   syncActivePlayer();
   persistAll();
   if (!options.silent) {
@@ -2134,28 +2145,25 @@ async function handleAuthSubmit(formData) {
   const email = formData.get("email")?.trim();
   const password = formData.get("password") || "";
   const authAction = formData.get("authAction");
-  const requestedRole = "tracker";
   if (!email || password.length < 6) {
     showToast("Use an email and 6+ character password");
+    return;
+  }
+
+  if (authAction === "sign-up") {
+    state.signupDraft = { email, password };
+    state.accessRequestSummary = null;
+    state.userProfile = normalizeUserProfile({ email });
+    state.screen = "profileSetup";
+    render();
+    window.scrollTo({ top: 0, behavior: "smooth" });
     return;
   }
 
   state.authBusy = true;
   render();
 
-  const result =
-    authAction === "sign-up"
-      ? await supabaseClient.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: authRedirectUrl(),
-            data: {
-              requested_role: requestedRole,
-            },
-          },
-        })
-      : await supabaseClient.auth.signInWithPassword({ email, password });
+  const result = await supabaseClient.auth.signInWithPassword({ email, password });
 
   state.authBusy = false;
 
@@ -2171,7 +2179,6 @@ async function handleAuthSubmit(formData) {
   }
 
   setAuthUser(result.data.user || result.data.session?.user || state.authUser);
-  if (state.authUser && authAction === "sign-up") await requestUserRole(requestedRole, { silent: true });
   if (state.authUser) await loadUserProfile({ silent: true });
   if (state.authUser && needsParentProfileSetup()) state.screen = "profileSetup";
   state.syncStatus = state.authUser ? "Signed in" : "Check email to confirm account";
@@ -2274,13 +2281,102 @@ async function saveParentProfile(formData) {
     updatedAt: new Date().toISOString(),
   });
 
-  if (teamAccessCode) await requestTeamAccessByCode(teamAccessCode, { silent: true });
+  if (teamAccessCode) await requestTeamAccessByCode(teamAccessCode, { silent: true, childJerseyNumber });
   await loadUserProfile({ silent: true });
   await loadCloudTeams({ silent: true });
-  state.screen = "home";
+  if (teamAccessCode) {
+    state.accessRequestSummary = {
+      email: userEmail(),
+      firstName,
+      lastName,
+      phone,
+      teamAccessCode,
+      childJerseyNumber,
+    };
+    state.screen = "requestSubmitted";
+  } else {
+    state.screen = "home";
+  }
   persistAll();
   render();
   showToast(teamAccessCode ? "Profile saved and team access requested" : "Profile saved");
+}
+
+async function submitSignupAccessRequest(formData) {
+  if (!supabaseClient || !state.signupDraft?.email || !state.signupDraft?.password) {
+    showToast("Start with email and password first");
+    state.screen = "home";
+    render();
+    return;
+  }
+
+  if (state.authBusy) return;
+
+  const firstName = formData.get("firstName")?.trim() || "";
+  const lastName = formData.get("lastName")?.trim() || "";
+  const phone = formData.get("phone")?.trim() || "";
+  const teamAccessCode = formData.get("teamAccessCode")?.trim().toUpperCase() || "";
+  const childJerseyNumber = formData.get("childJerseyNumber")?.trim() || "";
+
+  if (!firstName || !lastName || !teamAccessCode || !childJerseyNumber) {
+    showToast("Name, team code, and jersey number are required");
+    return;
+  }
+
+  const requestSummary = {
+    email: state.signupDraft.email,
+    firstName,
+    lastName,
+    phone,
+    teamAccessCode,
+    childJerseyNumber,
+  };
+
+  state.authBusy = true;
+  render();
+
+  const result = await supabaseClient.auth.signUp({
+    email: state.signupDraft.email,
+    password: state.signupDraft.password,
+    options: {
+      emailRedirectTo: authRedirectUrl(),
+      data: {
+        requested_role: "tracker",
+        first_name: firstName,
+        last_name: lastName,
+        phone,
+        team_access_code: teamAccessCode,
+        child_jersey_number: childJerseyNumber,
+        access_request_submitted_at: new Date().toISOString(),
+      },
+    },
+  });
+
+  state.authBusy = false;
+
+  if (result.error) {
+    const message = result.error.message || "";
+    showToast(
+      /rate|too many|exceeded/i.test(message)
+        ? "Email limit hit. Wait, or use custom SMTP."
+        : message,
+    );
+    render();
+    return;
+  }
+
+  state.accessRequestSummary = requestSummary;
+  state.signupDraft = null;
+  setAuthUser(result.data.session?.user || null);
+  if (state.authUser) {
+    await loadUserProfile({ silent: true });
+    await loadCloudTeams({ silent: true });
+  }
+  state.screen = "requestSubmitted";
+  state.syncStatus = "Request submitted";
+  persistAll();
+  render();
+  showToast("Request submitted");
 }
 
 async function loadUserProfile(options = {}) {
@@ -2429,8 +2525,9 @@ async function requestTeamAccessByCode(accessCode, options = {}) {
     if (!options.silent) showToast("Enter a team access code");
     return null;
   }
-  const { data: requestRows, error: requestError } = await supabaseClient.rpc("laxhornet_request_team_access", {
+  const { data: requestRows, error: requestError } = await supabaseClient.rpc("laxhornet_request_team_player_access", {
     join_code: code,
+    requested_child_jersey_number: String(options.childJerseyNumber || "").trim(),
   });
   if (requestError) {
     reportTeamSetupError(requestError);
@@ -2965,18 +3062,21 @@ function renderTeamAccessRequests() {
           ? `<div class="admin-request-list">
               ${requests
                 .map(
-                  (request) => `
-                    <div class="admin-request-row">
+                  (request) => {
+                    const parentName = [request.firstName, request.lastName].filter(Boolean).join(" ");
+                    return `
+                    <div class="admin-request-row detailed">
                       <span>
-                        <strong>${escapeHTML(request.email || "Unknown email")}</strong>
-                          <small>${teamRoleLabel(request.requestedRole)} access requested</small>
+                        <strong>${escapeHTML(parentName || request.email || "Unknown parent")}</strong>
+                          <small>${escapeHTML(request.email || "No email")} - ${teamRoleLabel(request.requestedRole)} - Jersey #${escapeHTML(request.childJerseyNumber || "not provided")}${request.phone ? ` - ${escapeHTML(request.phone)}` : ""}</small>
                       </span>
                       <span class="event-actions">
                         <button class="mini-btn" type="button" data-review-team-access="${request.id}" data-approved="true">Approve</button>
                         <button class="mini-btn danger" type="button" data-review-team-access="${request.id}" data-approved="false">Reject</button>
                       </span>
                     </div>
-                  `,
+                  `;
+                  },
                 )
                 .join("")}
             </div>`
@@ -3310,14 +3410,21 @@ function renderWelcome() {
 
 function renderProfileSetup() {
   const profile = state.userProfile || {};
-  const roleLabel = isPlatformReviewer() ? "Reviewer / Admin" : "Parent Tracker";
+  const signupDraft = !state.authUser && state.signupDraft;
+  const email = signupDraft?.email || userEmail() || profile.email || "";
+  const requiresTeamRequest = Boolean(signupDraft);
   return renderShell(`
     <section class="screen-title">
-      <h2>Finish Your Profile</h2>
-      <p>Add your name and request team access. Parent Trackers verify their player by jersey number after team access is approved.</p>
+      <h2>${signupDraft ? "Request Team Access" : "Finish Your Profile"}</h2>
+      <p>${signupDraft ? "Add your parent details, team code, and child jersey number. Your request will go to the LaxHornet admin for approval." : "Add your name and request team access. Your child is verified by jersey number during approval."}</p>
     </section>
 
     <form class="card pad form-grid profile-setup-card" data-form="profile-onboarding">
+      <div class="field">
+        <label for="profileEmail">Account email</label>
+        <input id="profileEmail" value="${escapeHTML(email)}" autocomplete="email" readonly />
+      </div>
+
       <div class="form-grid two">
         <div class="field">
           <label for="firstName">First name</label>
@@ -3330,33 +3437,28 @@ function renderProfileSetup() {
       </div>
 
       <div class="field">
-        <label for="profileRole">Role</label>
-        <input id="profileRole" value="${escapeHTML(roleLabel)}" readonly />
-      </div>
-
-      <div class="field">
         <label for="phone">Phone number <span class="optional-label">optional</span></label>
         <input id="phone" name="phone" value="${escapeHTML(profile.phone || "")}" type="tel" autocomplete="tel" placeholder="For team coordination" />
       </div>
 
       <div class="form-grid two">
         <div class="field">
-          <label for="teamAccessCode">Team access code <span class="optional-label">optional</span></label>
-          <input id="teamAccessCode" name="teamAccessCode" placeholder="ABC123" autocapitalize="characters" />
+          <label for="teamAccessCode">Team code${requiresTeamRequest ? "" : ` <span class="optional-label">optional</span>`}</label>
+          <input id="teamAccessCode" name="teamAccessCode" placeholder="ABC123" autocapitalize="characters" ${requiresTeamRequest ? "required" : ""} />
         </div>
         <div class="field">
-          <label for="childJerseyNumber">Child jersey # <span class="optional-label">optional</span></label>
-          <input id="childJerseyNumber" name="childJerseyNumber" value="${escapeHTML(profile.childJerseyNumber || "")}" inputmode="numeric" placeholder="12" />
+          <label for="childJerseyNumber">Child jersey #${requiresTeamRequest ? "" : ` <span class="optional-label">optional</span>`}</label>
+          <input id="childJerseyNumber" name="childJerseyNumber" value="${escapeHTML(profile.childJerseyNumber || "")}" inputmode="numeric" placeholder="12" ${requiresTeamRequest ? "required" : ""} />
         </div>
       </div>
 
       <div class="notice-card">
-        <strong>Team access comes first.</strong>
-        <p class="muted small">After your team admin approves access, enter your child's jersey number to unlock only that player for tracking.</p>
+        <strong>Approval protects the roster.</strong>
+        <p class="muted small">When approved, this account will unlock only the rostered player matching the jersey number you submit.</p>
       </div>
 
       <div class="account-actions">
-        <button class="btn positive" type="submit">Save Profile</button>
+        <button class="btn positive" type="submit" ${state.authBusy ? "disabled" : ""}>${state.authBusy ? "Submitting..." : signupDraft ? "Submit Request" : "Save Profile"}</button>
         <button class="btn secondary" type="button" data-nav="home">Back</button>
       </div>
     </form>
@@ -4072,6 +4174,35 @@ function renderAuthSuccess() {
   `);
 }
 
+function renderRequestSubmitted() {
+  const summary = state.accessRequestSummary || {};
+  const fullName = [summary.firstName, summary.lastName].filter(Boolean).join(" ");
+  return renderShell(`
+    <section class="screen-title">
+      <h2>Request Submitted</h2>
+      <p>Your account request is in review. You will be able to track stats after approval.</p>
+    </section>
+
+    <section class="stack">
+      <div class="card pad account-success-card">
+        <h3>What Happens Next</h3>
+        <p class="muted small">LaxHornet admin will review your team code and jersey number. Once approved, this account will only show the rostered player matching that jersey number.</p>
+        <div class="request-summary">
+          ${summary.email ? `<div><span>Email</span><strong>${escapeHTML(summary.email)}</strong></div>` : ""}
+          ${fullName ? `<div><span>Name</span><strong>${escapeHTML(fullName)}</strong></div>` : ""}
+          ${summary.teamAccessCode ? `<div><span>Team code</span><strong>${escapeHTML(summary.teamAccessCode)}</strong></div>` : ""}
+          ${summary.childJerseyNumber ? `<div><span>Jersey #</span><strong>${escapeHTML(summary.childJerseyNumber)}</strong></div>` : ""}
+        </div>
+        <p class="muted small">Check your inbox for account verification. After admin approval, sign in with this email and password to open your player&apos;s tracker.</p>
+        <div class="account-actions">
+          <button class="btn positive" type="button" data-nav="home">Back to Sign In</button>
+          <button class="btn secondary" type="button" data-nav="tutorial">Quick Tutorial</button>
+        </div>
+      </div>
+    </section>
+  `, { hideNav: !state.authUser });
+}
+
 function renderTutorial() {
   const tutorialCta = state.authUser
     ? `<button class="btn neutral" type="button" data-nav="start">Start New Game</button>`
@@ -4137,16 +4268,21 @@ function renderTutorial() {
 }
 
 function render() {
-  const publicScreens = ["home", "tutorial", "help", "shared", "authSuccess"];
-  if (!state.authUser && !publicScreens.includes(state.screen)) {
+  const publicScreens = ["home", "tutorial", "help", "shared", "authSuccess", "requestSubmitted"];
+  const signupProfileAllowed = state.screen === "profileSetup" && state.signupDraft;
+  if (!state.authUser && state.screen === "profileSetup" && !state.signupDraft) {
     state.screen = "home";
   }
-  if (state.authUser && needsParentProfileSetup() && !["profileSetup", "shared", "help", "tutorial", "authSuccess"].includes(state.screen)) {
+  if (!state.authUser && !publicScreens.includes(state.screen) && !signupProfileAllowed) {
+    state.screen = "home";
+  }
+  if (state.authUser && needsParentProfileSetup() && !["profileSetup", "shared", "help", "tutorial", "authSuccess", "requestSubmitted"].includes(state.screen)) {
     state.screen = "profileSetup";
   }
   const screens = {
     home: renderHome,
     authSuccess: renderAuthSuccess,
+    requestSubmitted: renderRequestSubmitted,
     profileSetup: renderProfileSetup,
     tutorial: renderTutorial,
     settings: renderSettings,
@@ -4198,7 +4334,11 @@ function handleSubmit(event) {
   }
 
   if (form.dataset.form === "profile-onboarding") {
-    saveParentProfile(formData);
+    if (!state.authUser && state.signupDraft) {
+      submitSignupAccessRequest(formData);
+    } else {
+      saveParentProfile(formData);
+    }
   }
 
   if (form.dataset.form === "create-team") {

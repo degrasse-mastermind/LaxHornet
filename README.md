@@ -68,13 +68,19 @@ To create or update the database tables:
 3. Open `supabase-schema.sql` from this repo.
 4. Paste the full SQL into Supabase and run it.
 5. In Supabase, open **Authentication > Providers** and make sure Email is enabled.
-6. Open LaxHornet and create a user profile from the Home screen.
-7. Start a new game.
-8. Use **Copy Share Link** from the Live Game Tracker when you want a read-only share link.
+6. Open LaxHornet and create a team from the platform reviewer account.
+7. Add rostered players with jersey numbers.
+8. Share the team code with approved parents.
+9. Parents create an account, submit their team code and child jersey number, and wait for approval.
+10. Use **Copy Share Link** from the Live Game Tracker when you want a read-only share link.
 
-Games and events are private to the signed-in user by default. Team roster games are visible to signed-in parents who joined the same team and verified their rostered player. Parent Tracker accounts can enter shared team stats after team approval and player verification. Copying a share link marks that game as shared so family can watch it read-only from another iPhone.
+Games and events are private to the signed-in user by default. Team roster games are visible to signed-in parents who are approved for the same team and claimed to one rostered player. Parent Tracker accounts can enter shared team stats only after admin approval. Copying a share link marks that game as shared so family can watch it read-only from another iPhone.
 
 Team creation and roster administration are limited to the platform reviewer account: `degrassed@gmail.com`.
+
+### Request And Approval Emails
+
+`supabase-schema.sql` creates a `notification_queue` table for account request and approval email events. A static GitHub Pages app cannot send private transactional email by itself, so connect this queue to a Supabase Edge Function, Database Webhook, or Resend worker to deliver the queued messages.
 
 ## Shared Team Rosters
 
@@ -84,8 +90,9 @@ Use **Team Roster** when multiple parents need to track or view stats for the sa
 2. Create a team to generate team access codes.
 3. Add rostered players by name and jersey number.
 4. Give team access codes only to parents who should request access.
-5. The parent signs in, requests team access, waits for approval, then verifies their child by jersey number.
-6. The other parent signs in, joins the team, syncs teams, and selects the same rostered player.
+5. The parent creates an account and submits the team code plus their child's jersey number.
+6. The platform reviewer approves the request; approval automatically claims the matching rostered player.
+7. The parent signs in and sees only that rostered player.
 
 Best practice: choose one official Parent Tracker for each player/game. Multiple parents can sync and review the same stats, but two Parent Tracker accounts logging the same player at the same time can create duplicate events.
 
