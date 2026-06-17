@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v112";
+const APP_VERSION = "v113";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -257,6 +257,7 @@ let lastSyncErrorAt = 0;
 let activeStorageUserId = "";
 let waitingServiceWorker = null;
 let reloadingForUpdate = false;
+let serviceWorkerRegistration = null;
 const initialStoredState = readStoredAccountState();
 
 const state = {
@@ -3517,6 +3518,11 @@ function renderMore() {
             <strong>Sync Cloud Games</strong>
             <small>Refresh saved games, teams, requests, and player access.</small>
           </button>
+          <button class="more-action" type="button" data-action="check-app-update">
+            <span>${renderNavIcon("manage")}</span>
+            <strong>Check for Updates</strong>
+            <small>Look for the newest LaxHornet version without reinstalling.</small>
+          </button>
           <button class="more-action danger-link" type="button" data-action="sign-out">
             <span>${renderNavIcon("more")}</span>
             <strong>Sign Out</strong>
@@ -4865,6 +4871,7 @@ function handleClick(event) {
     if (action.dataset.action === "request-admin") requestUserRole("admin");
     if (action.dataset.action === "refresh-admin-requests") loadAdminRequests();
     if (action.dataset.action === "sync-cloud-games") loadCloudGames();
+    if (action.dataset.action === "check-app-update") checkForAppUpdate({ manual: true });
     if (action.dataset.action === "sync-team-roster") loadCloudTeams();
     if (action.dataset.action === "add-player") addPlayer();
     if (action.dataset.action === "delete-player") deleteActivePlayer();
@@ -4979,8 +4986,10 @@ function registerServiceWorker() {
     navigator.serviceWorker
       .register("service-worker.js")
       .then((registration) => {
+        serviceWorkerRegistration = registration;
         watchServiceWorkerUpdates(registration);
         registration.update().catch(() => {});
+        checkForAppUpdate().catch(() => {});
         window.setInterval(() => registration.update().catch(() => {}), 60 * 60 * 1000);
       })
       .catch(() => {
@@ -5018,9 +5027,51 @@ function showUpdateAvailable(worker) {
   render();
 }
 
+async function fetchServerAppVersion() {
+  const response = await fetch(`version.json?ts=${Date.now()}`, {
+    cache: "no-store",
+    headers: { "Cache-Control": "no-cache" },
+  });
+  if (!response.ok) throw new Error("Version check failed");
+  const data = await response.json();
+  return String(data.version || "").trim();
+}
+
+async function checkForAppUpdate(options = {}) {
+  if (!("serviceWorker" in navigator)) {
+    showToast("Updates load when the app opens");
+    return;
+  }
+  try {
+    const registration = serviceWorkerRegistration || (await navigator.serviceWorker.getRegistration());
+    if (registration) {
+      serviceWorkerRegistration = registration;
+      await registration.update();
+      if (registration.waiting && navigator.serviceWorker.controller) {
+        showUpdateAvailable(registration.waiting);
+        if (options.manual) showToast("Update ready");
+        return;
+      }
+    }
+
+    const serverVersion = await fetchServerAppVersion();
+    if (serverVersion && serverVersion !== APP_VERSION) {
+      state.updateAvailable = true;
+      state.updateInstalling = false;
+      render();
+      if (options.manual) showToast(`Update found: ${serverVersion}`);
+      return;
+    }
+
+    if (options.manual) showToast("LaxHornet is up to date");
+  } catch {
+    if (options.manual) showToast("Could not check for updates");
+  }
+}
+
 function applyAppUpdate() {
   if (!waitingServiceWorker) {
-    showToast("Update will load on next open");
+    window.location.reload();
     return;
   }
   state.updateAvailable = true;
