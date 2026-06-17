@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v76";
+const APP_VERSION = "v77";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -240,7 +240,7 @@ const DEFAULT_PLAYER = {
 
 const DEFAULT_TEAM_INVITE_LENGTH = 6;
 const TEAM_MANAGE_ROLES = ["admin"];
-const APP_ROLES = ["viewer", "tracker", "admin"];
+const APP_ROLES = ["tracker", "admin"];
 
 const app = document.querySelector("#app");
 const startupParams = new URLSearchParams(window.location.search);
@@ -372,16 +372,16 @@ function normalizeTeam(team = {}) {
     name: String(team.name || "").trim() || "Team",
     inviteCode: String(team.inviteCode || team.invite_code || "").trim().toUpperCase(),
     trackerCode: String(team.trackerCode || team.tracker_code || "").trim().toUpperCase(),
-    role: normalizeTeamRole(team.role || "viewer"),
+    role: normalizeTeamRole(team.role || "tracker"),
     createdBy: team.createdBy || team.created_by || "",
     createdAt: team.createdAt || team.created_at || new Date().toISOString(),
   };
 }
 
-function normalizeTeamRole(role = "viewer") {
+function normalizeTeamRole(role = "tracker") {
   const cleanRole = String(role || "").trim().toLowerCase();
-  if (cleanRole === "member") return "viewer";
-  return ["admin", "tracker", "viewer"].includes(cleanRole) ? cleanRole : "viewer";
+  if (cleanRole === "member" || cleanRole === "viewer") return "tracker";
+  return ["admin", "tracker"].includes(cleanRole) ? cleanRole : "tracker";
 }
 
 function normalizeTeams(teams = []) {
@@ -395,7 +395,7 @@ function normalizeTeams(teams = []) {
         ...normalized,
         inviteCode: normalized.inviteCode || existing?.inviteCode || "",
         trackerCode: normalized.trackerCode || existing?.trackerCode || "",
-        role: TEAM_MANAGE_ROLES.includes(existing?.role) && normalized.role === "viewer" ? existing.role : normalized.role,
+        role: TEAM_MANAGE_ROLES.includes(existing?.role) && normalized.role === "tracker" ? existing.role : normalized.role,
       });
     }
   });
@@ -409,7 +409,7 @@ function normalizeTeamAccessRequest(request = {}) {
     teamName: request.teamName || request.team_name || "",
     userId: request.userId || request.user_id || "",
     email: request.email || "",
-    requestedRole: normalizeTeamRole(request.requestedRole || request.requested_role || "viewer"),
+    requestedRole: normalizeTeamRole(request.requestedRole || request.requested_role || "tracker"),
     status: String(request.status || "pending").trim().toLowerCase(),
     createdAt: request.createdAt || request.created_at || null,
   };
@@ -477,24 +477,22 @@ function teamById(teamId) {
 }
 
 function teamRole(teamId) {
-  return normalizeTeamRole(teamById(teamId)?.role || "viewer");
+  const role = normalizeTeamRole(teamById(teamId)?.role || "tracker");
+  return !isPlatformReviewer() && role === "admin" ? "tracker" : role;
 }
 
 function teamRoleLabel(role) {
   const cleanRole = normalizeTeamRole(role);
   if (cleanRole === "admin") return "Admin";
-  if (cleanRole === "tracker") return "Tracker";
-  return "Viewer";
+  return "Parent Tracker";
 }
 
 function canEditTeam(teamId) {
-  if (isPlatformReviewer()) return true;
-  return TEAM_MANAGE_ROLES.includes(teamRole(teamId));
+  return isPlatformReviewer() && TEAM_MANAGE_ROLES.includes(teamRole(teamId));
 }
 
 function canManageRoster(teamId) {
-  if (isPlatformReviewer()) return true;
-  return teamRole(teamId) === "admin";
+  return isPlatformReviewer() && teamRole(teamId) === "admin";
 }
 
 function hasPlayerClaim(teamId, rosterPlayerId) {
@@ -505,7 +503,7 @@ function hasPlayerClaim(teamId, rosterPlayerId) {
 function canTrackRosterPlayer(teamId, rosterPlayerId) {
   const role = teamRole(teamId);
   if (!teamId) return true;
-  if (role === "admin") return true;
+  if (isPlatformReviewer() && role === "admin") return true;
   if (role === "tracker") return hasPlayerClaim(teamId, rosterPlayerId);
   return false;
 }
@@ -839,16 +837,16 @@ function userEmail() {
   return state.authUser?.email || "";
 }
 
-function normalizeAppRole(role = "viewer") {
+function normalizeAppRole(role = "tracker") {
   const cleanRole = String(role || "").trim().toLowerCase();
-  return APP_ROLES.includes(cleanRole) ? cleanRole : "viewer";
+  if (cleanRole === "viewer") return "tracker";
+  return APP_ROLES.includes(cleanRole) ? cleanRole : "tracker";
 }
 
-function appRoleLabel(role = "viewer") {
+function appRoleLabel(role = "tracker") {
   const cleanRole = normalizeAppRole(role);
   if (cleanRole === "admin") return "Admin";
-  if (cleanRole === "tracker") return "Tracker";
-  return "Viewer";
+  return "Parent Tracker";
 }
 
 function isPlatformReviewer() {
@@ -859,8 +857,13 @@ function normalizeUserProfile(profile = {}) {
   return {
     userId: profile.userId || profile.user_id || currentUserId() || "",
     email: profile.email || userEmail(),
-    requestedRole: normalizeAppRole(profile.requestedRole || profile.requested_role || "viewer"),
-    approvedRole: normalizeAppRole(profile.approvedRole || profile.approved_role || (isPlatformReviewer() ? "admin" : "viewer")),
+    firstName: String(profile.firstName || profile.first_name || "").trim(),
+    lastName: String(profile.lastName || profile.last_name || "").trim(),
+    phone: String(profile.phone || "").trim(),
+    childJerseyNumber: String(profile.childJerseyNumber || profile.child_jersey_number || "").trim(),
+    onboardingCompleted: Boolean(profile.onboardingCompleted ?? profile.onboarding_completed ?? false),
+    requestedRole: normalizeAppRole(profile.requestedRole || profile.requested_role || "tracker"),
+    approvedRole: normalizeAppRole(profile.approvedRole || profile.approved_role || (isPlatformReviewer() ? "admin" : "tracker")),
     adminStatus: String(profile.adminStatus || profile.admin_status || "approved").trim().toLowerCase(),
     reviewedBy: profile.reviewedBy || profile.reviewed_by || "",
     reviewedAt: profile.reviewedAt || profile.reviewed_at || null,
@@ -871,15 +874,15 @@ function normalizeUserProfile(profile = {}) {
 
 function currentAppRole() {
   if (isPlatformReviewer()) return "admin";
-  return normalizeAppRole(state.userProfile?.approvedRole || "viewer");
+  return normalizeAppRole(state.userProfile?.approvedRole || "tracker");
 }
 
 function requestedAdminPending() {
-  return state.userProfile?.requestedRole === "admin" && state.userProfile?.adminStatus === "pending";
+  return false;
 }
 
 function canCreateTeams() {
-  return isPlatformReviewer() || (state.userProfile?.approvedRole === "admin" && state.userProfile?.adminStatus === "approved");
+  return isPlatformReviewer();
 }
 
 function authRedirectUrl() {
@@ -1877,7 +1880,7 @@ function teamFromSupabaseRows(memberRow = {}) {
     name: team.name,
     inviteCode: team.invite_code,
     trackerCode: team.tracker_code || "",
-    role: memberRow.role || team.role || "viewer",
+    role: memberRow.role || team.role || "tracker",
     createdBy: team.created_by,
     createdAt: team.created_at,
   });
@@ -2131,7 +2134,7 @@ async function handleAuthSubmit(formData) {
   const email = formData.get("email")?.trim();
   const password = formData.get("password") || "";
   const authAction = formData.get("authAction");
-  const requestedRole = normalizeAppRole(formData.get("requestedRole") || "viewer");
+  const requestedRole = "tracker";
   if (!email || password.length < 6) {
     showToast("Use an email and 6+ character password");
     return;
@@ -2170,6 +2173,7 @@ async function handleAuthSubmit(formData) {
   setAuthUser(result.data.user || result.data.session?.user || state.authUser);
   if (state.authUser && authAction === "sign-up") await requestUserRole(requestedRole, { silent: true });
   if (state.authUser) await loadUserProfile({ silent: true });
+  if (state.authUser && needsParentProfileSetup()) state.screen = "profileSetup";
   state.syncStatus = state.authUser ? "Signed in" : "Check email to confirm account";
   if (state.authUser) await loadCloudGames({ silent: true });
   render();
@@ -2187,7 +2191,7 @@ async function signOut() {
 
 async function requestUserRole(role, options = {}) {
   if (!supabaseClient || !currentUserId()) return null;
-  const requestedRole = normalizeAppRole(role);
+  const requestedRole = isPlatformReviewer() && normalizeAppRole(role) === "admin" ? "admin" : "tracker";
   const { data, error } = await supabaseClient.rpc("laxhornet_request_user_role", {
     requested_app_role: requestedRole,
   });
@@ -2199,9 +2203,84 @@ async function requestUserRole(role, options = {}) {
   state.userProfile = normalizeUserProfile(row || {});
   if (!options.silent) {
     render();
-    showToast(requestedRole === "admin" ? "Admin request submitted" : `${appRoleLabel(requestedRole)} role saved`);
+    showToast(`${appRoleLabel(requestedRole)} profile saved`);
   }
   return state.userProfile;
+}
+
+function needsParentProfileSetup() {
+  if (!state.authUser || isPlatformReviewer()) return false;
+  const profile = state.userProfile || {};
+  return !profile.onboardingCompleted || !profile.firstName || !profile.lastName;
+}
+
+async function saveParentProfile(formData) {
+  if (!supabaseClient || !currentUserId()) {
+    showToast("Sign in first");
+    return;
+  }
+
+  const firstName = formData.get("firstName")?.trim() || "";
+  const lastName = formData.get("lastName")?.trim() || "";
+  const phone = formData.get("phone")?.trim() || "";
+  const childJerseyNumber = formData.get("childJerseyNumber")?.trim() || "";
+  const teamAccessCode = formData.get("teamAccessCode")?.trim().toUpperCase() || "";
+
+  if (!firstName || !lastName) {
+    showToast("Enter first and last name");
+    return;
+  }
+
+  const profilePayload = {
+    user_id: currentUserId(),
+    email: userEmail(),
+    first_name: firstName,
+    last_name: lastName,
+    phone,
+    child_jersey_number: childJerseyNumber,
+    requested_role: isPlatformReviewer() ? "admin" : "tracker",
+    approved_role: isPlatformReviewer() ? "admin" : "tracker",
+    admin_status: "approved",
+    onboarding_completed: true,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await upsertWithOptionalColumns("user_profiles", profilePayload, [
+    "first_name",
+    "last_name",
+    "phone",
+    "child_jersey_number",
+    "onboarding_completed",
+    "updated_at",
+  ]);
+
+  if (error) {
+    reportTeamSetupError(error);
+    return;
+  }
+
+  state.userProfile = normalizeUserProfile({
+    ...(state.userProfile || {}),
+    userId: currentUserId(),
+    email: userEmail(),
+    firstName,
+    lastName,
+    phone,
+    childJerseyNumber,
+    requestedRole: isPlatformReviewer() ? "admin" : "tracker",
+    approvedRole: isPlatformReviewer() ? "admin" : "tracker",
+    adminStatus: "approved",
+    onboardingCompleted: true,
+    updatedAt: new Date().toISOString(),
+  });
+
+  if (teamAccessCode) await requestTeamAccessByCode(teamAccessCode, { silent: true });
+  await loadUserProfile({ silent: true });
+  await loadCloudTeams({ silent: true });
+  state.screen = "home";
+  persistAll();
+  render();
+  showToast(teamAccessCode ? "Profile saved and team access requested" : "Profile saved");
 }
 
 async function loadUserProfile(options = {}) {
@@ -2211,7 +2290,13 @@ async function loadUserProfile(options = {}) {
     if (!options.silent) reportTeamSetupError(error);
     return null;
   }
-  const row = Array.isArray(data) ? data[0] : data;
+  let row = Array.isArray(data) ? data[0] : data;
+  const { data: profileRow, error: profileError } = await supabaseClient
+    .from("user_profiles")
+    .select("*")
+    .eq("user_id", currentUserId())
+    .maybeSingle();
+  if (!profileError && profileRow) row = profileRow;
   state.userProfile = normalizeUserProfile(row || {});
   if (isPlatformReviewer()) await loadAdminRequests({ silent: true });
   if (!options.silent) render();
@@ -2331,36 +2416,43 @@ async function createTeam(formData) {
   state.activeTeamId = createdTeam.id;
   persistAll();
   render();
-  showToast(`Team created. Viewer code ${createdTeam.inviteCode}`);
+  showToast(`Team created. Team code ${createdTeam.inviteCode}`);
 }
 
-async function joinTeam(formData) {
+async function requestTeamAccessByCode(accessCode, options = {}) {
   if (!supabaseClient || !currentUserId()) {
-    showToast("Sign in to join a team");
-    return;
+    if (!options.silent) showToast("Sign in to join a team");
+    return null;
   }
-  const accessCode = formData.get("inviteCode")?.trim().toUpperCase();
-  if (!accessCode) {
-    showToast("Enter an invite or tracker code");
-    return;
+  const code = String(accessCode || "").trim().toUpperCase();
+  if (!code) {
+    if (!options.silent) showToast("Enter a team access code");
+    return null;
   }
   const { data: requestRows, error: requestError } = await supabaseClient.rpc("laxhornet_request_team_access", {
-    join_code: accessCode,
+    join_code: code,
   });
   if (requestError) {
     reportTeamSetupError(requestError);
-    return;
+    return null;
   }
   const requested = Array.isArray(requestRows) ? requestRows[0] : null;
   if (!requested?.team_id) {
-    showToast("Team code not found");
-    return;
+    if (!options.silent) showToast("Team code not found");
+    return null;
   }
 
   state.teamAccessRequests = normalizeTeamAccessRequests([...state.teamAccessRequests, teamAccessRequestFromSupabaseRow(requested)]);
   persistAll();
-  render();
-  showToast(`Access requested for ${requested.team_name || "team"}`);
+  if (!options.silent) {
+    render();
+    showToast(`Access requested for ${requested.team_name || "team"}`);
+  }
+  return requested;
+}
+
+async function joinTeam(formData) {
+  await requestTeamAccessByCode(formData.get("inviteCode"));
 }
 
 async function addRosterPlayer(formData) {
@@ -2717,51 +2809,29 @@ function renderAccountCard() {
 
   if (state.authUser) {
     const role = currentAppRole();
-    const pendingCopy = requestedAdminPending()
-      ? `<p class="muted small">Admin request pending review by ${escapeHTML(PLATFORM_REVIEWER_EMAIL)}. You can still use viewer access.</p>`
-      : "";
-    const canRequestAdmin = !isPlatformReviewer() && role !== "admin" && !requestedAdminPending();
     return `
       <section class="card pad account-card">
         <h3>User Profile</h3>
+        <p class="muted small">${escapeHTML([state.userProfile?.firstName, state.userProfile?.lastName].filter(Boolean).join(" ") || userEmail())}</p>
         <p class="muted small">${escapeHTML(userEmail())}</p>
         <p class="muted small">Role: ${escapeHTML(isPlatformReviewer() ? "Reviewer / Admin" : appRoleLabel(role))}</p>
-        ${pendingCopy}
-        ${
-          !canCreateTeams()
-            ? `<p class="muted small">Team creation requires approved Admin access. Reviewer: ${escapeHTML(PLATFORM_REVIEWER_EMAIL)}.</p>`
-            : ""
-        }
         <p class="muted small">${escapeHTML(state.syncStatus)}</p>
         <p class="muted small">App version: ${escapeHTML(APP_VERSION)}</p>
         ${state.cloudError ? `<p class="muted small">Last Supabase error: ${escapeHTML(state.cloudError)}</p>` : ""}
         <div class="account-actions">
           <button class="btn neutral" type="button" data-action="sync-cloud-games">Sync Cloud Games</button>
-          ${
-            canRequestAdmin
-              ? `<button class="btn secondary" type="button" data-action="request-admin">Request Admin</button>`
-              : ""
-          }
+          <button class="btn secondary" type="button" data-nav="profileSetup">Edit Profile</button>
           <button class="btn secondary" type="button" data-action="refresh-profile">Refresh Profile</button>
           <button class="btn secondary" type="button" data-action="sign-out">Sign Out</button>
         </div>
       </section>
-      ${renderAdminReviewCard()}
     `;
   }
-
-  const roleOptions = [
-    ["viewer", "Viewer - review roster and stats"],
-    ["tracker", "Tracker - join teams with tracker code"],
-    ["admin", "Admin - request approval to create teams"],
-  ]
-    .map(([value, label]) => `<option value="${value}">${label}</option>`)
-    .join("");
 
   return `
     <form class="card pad form-grid account-card" data-form="auth">
       <h3>Sign in or create account</h3>
-      <p class="muted small">Use a User Profile to request team access, verify your player, and keep stats separate from other parents on this device.</p>
+      <p class="muted small">Use your account to request team access, verify your player, and keep stats separate from other parents on this device.</p>
       <p class="muted small">App version: ${escapeHTML(APP_VERSION)}</p>
       <div class="field">
         <label for="authEmail">Email</label>
@@ -2770,10 +2840,6 @@ function renderAccountCard() {
       <div class="field">
         <label for="authPassword">Password</label>
         <input id="authPassword" name="password" type="password" autocomplete="current-password" minlength="6" required />
-      </div>
-      <div class="field">
-        <label for="requestedRole">Role for new account</label>
-        <select id="requestedRole" name="requestedRole">${roleOptions}</select>
       </div>
       <div class="account-actions">
         <button class="btn positive" type="submit" name="authAction" value="sign-in" ${state.authBusy ? "disabled" : ""}>${state.authBusy ? "Working..." : "Sign In"}</button>
@@ -2903,7 +2969,7 @@ function renderTeamAccessRequests() {
                     <div class="admin-request-row">
                       <span>
                         <strong>${escapeHTML(request.email || "Unknown email")}</strong>
-                        <small>${teamRoleLabel(request.requestedRole)} access requested</small>
+                          <small>${teamRoleLabel(request.requestedRole)} access requested</small>
                       </span>
                       <span class="event-actions">
                         <button class="mini-btn" type="button" data-review-team-access="${request.id}" data-approved="true">Approve</button>
@@ -3037,12 +3103,12 @@ function renderTeamRosterCard(options = {}) {
           <h3>Team Roster</h3>
           <p class="muted small">${
             team
-              ? `Shared roster for ${escapeHTML(team.name)}. ${roleCopy} access. Viewer code: ${escapeHTML(team.inviteCode)}${
-                  manageRoster && team.trackerCode ? ` Tracker code: ${escapeHTML(team.trackerCode)}` : ""
+              ? `Shared roster for ${escapeHTML(team.name)}. ${roleCopy} access. Team code: ${escapeHTML(team.inviteCode)}${
+                  manageRoster && team.trackerCode ? ` Parent Tracker code: ${escapeHTML(team.trackerCode)}` : ""
                 }`
               : canCreateTeams()
-                ? "Create a team or request access with an invite or tracker code."
-                : "Request access with an invite or tracker code from your team admin."
+                ? "Create a team or request access with a team code."
+                : "Request access with a team code from your team admin."
           }</p>
         </div>
         ${
@@ -3087,7 +3153,7 @@ function renderTeamRosterCard(options = {}) {
                 <form class="inline-mini-form" data-form="join-team">
                   <label for="inviteCode">Request team access</label>
                   <div class="inline-input-action">
-                    <input id="inviteCode" name="inviteCode" placeholder="Invite or tracker code" autocapitalize="characters" />
+                    <input id="inviteCode" name="inviteCode" placeholder="Team access code" autocapitalize="characters" />
                     <button class="mini-btn" type="submit">Request</button>
                   </div>
                 </form>
@@ -3128,7 +3194,7 @@ function renderTeamRosterCard(options = {}) {
                               <button class="mini-btn" type="submit">Add Player</button>
                             </div>
                           </form>`
-                        : `<p class="muted small team-note">${teamRole(team.id) === "tracker" ? "Verify your child by jersey number before tracking." : "Ask a team admin for tracker access if you should be able to enter shared stats."}</p>`
+                        : `<p class="muted small team-note">${teamRole(team.id) === "tracker" ? "Verify your child by jersey number before tracking." : "Ask the team admin for access if you should be able to enter shared stats."}</p>`
                     }
                     ${
                       manageRoster
@@ -3138,7 +3204,7 @@ function renderTeamRosterCard(options = {}) {
                   `
                   : ""
               }
-              <p class="muted small team-note">Best practice: share viewer codes broadly and tracker codes only with parents assigned to enter stats.</p>
+              <p class="muted small team-note">Best practice: share team access codes only with parents assigned to enter stats.</p>
             </div>
           `
           : ""
@@ -3213,7 +3279,7 @@ function renderWelcome() {
         <div class="welcome-step-list">
           <div><strong>1</strong><span>Create a User Profile.</span></div>
           <div><strong>2</strong><span>Request access with your team code.</span></div>
-          <div><strong>3</strong><span>Trackers verify their player by jersey number.</span></div>
+          <div><strong>3</strong><span>Parent Trackers verify their player by jersey number.</span></div>
         </div>
       </div>
 
@@ -3227,11 +3293,11 @@ function renderWelcome() {
         </details>
         <details>
           <summary>Can I watch without tracking?</summary>
-          <p class="muted small">Yes. Use Watch Shared Game with a share code from the tracker&apos;s iPhone or another device.</p>
+          <p class="muted small">Yes. Use Watch Shared Game with a share code from the Parent Tracker&apos;s iPhone or another device.</p>
         </details>
         <details>
           <summary>Who can create teams?</summary>
-          <p class="muted small">Only approved Admin users can create or manage team rosters. Trackers request team access and verify their player before entering stats.</p>
+          <p class="muted small">Team rosters are managed by LaxHornet admin access. Parent Trackers request team access and verify their player before entering stats.</p>
         </details>
         <div class="action-grid compact">
           <button class="btn neutral" type="button" data-nav="tutorial">Quick Guide</button>
@@ -3240,6 +3306,61 @@ function renderWelcome() {
       </div>
     </section>
   `, { hideNav: true });
+}
+
+function renderProfileSetup() {
+  const profile = state.userProfile || {};
+  const roleLabel = isPlatformReviewer() ? "Reviewer / Admin" : "Parent Tracker";
+  return renderShell(`
+    <section class="screen-title">
+      <h2>Finish Your Profile</h2>
+      <p>Add your name and request team access. Parent Trackers verify their player by jersey number after team access is approved.</p>
+    </section>
+
+    <form class="card pad form-grid profile-setup-card" data-form="profile-onboarding">
+      <div class="form-grid two">
+        <div class="field">
+          <label for="firstName">First name</label>
+          <input id="firstName" name="firstName" value="${escapeHTML(profile.firstName || "")}" autocomplete="given-name" required />
+        </div>
+        <div class="field">
+          <label for="lastName">Last name</label>
+          <input id="lastName" name="lastName" value="${escapeHTML(profile.lastName || "")}" autocomplete="family-name" required />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="profileRole">Role</label>
+        <input id="profileRole" value="${escapeHTML(roleLabel)}" readonly />
+      </div>
+
+      <div class="field">
+        <label for="phone">Phone number <span class="optional-label">optional</span></label>
+        <input id="phone" name="phone" value="${escapeHTML(profile.phone || "")}" type="tel" autocomplete="tel" placeholder="For team coordination" />
+      </div>
+
+      <div class="form-grid two">
+        <div class="field">
+          <label for="teamAccessCode">Team access code <span class="optional-label">optional</span></label>
+          <input id="teamAccessCode" name="teamAccessCode" placeholder="ABC123" autocapitalize="characters" />
+        </div>
+        <div class="field">
+          <label for="childJerseyNumber">Child jersey # <span class="optional-label">optional</span></label>
+          <input id="childJerseyNumber" name="childJerseyNumber" value="${escapeHTML(profile.childJerseyNumber || "")}" inputmode="numeric" placeholder="12" />
+        </div>
+      </div>
+
+      <div class="notice-card">
+        <strong>Team access comes first.</strong>
+        <p class="muted small">After your team admin approves access, enter your child's jersey number to unlock only that player for tracking.</p>
+      </div>
+
+      <div class="account-actions">
+        <button class="btn positive" type="submit">Save Profile</button>
+        <button class="btn secondary" type="button" data-nav="home">Back</button>
+      </div>
+    </form>
+  `, { hideNav: !state.authUser });
 }
 
 function renderSettings() {
@@ -3288,7 +3409,7 @@ function renderSettings() {
   return renderShell(`
     <section class="screen-title">
       <h2>Player Settings</h2>
-      <p>Pick a player from the Team Roster. Roster edits require admin access; trackers must verify their child before tracking.</p>
+      <p>Pick a player from the Team Roster. Roster edits require admin access; Parent Trackers must verify their child before tracking.</p>
     </section>
 
     <section class="stack">
@@ -3307,7 +3428,7 @@ function renderSettings() {
           `
           : `<section class="card pad">
               <h3>No Preloaded Players Yet</h3>
-              <p class="muted small">Join or sync a team roster first. If roster players need to be added, ask a team admin or tracker to preload them in Team Roster.</p>
+              <p class="muted small">Join or sync a team roster first. If roster players need to be added, ask the team admin to preload them in Team Roster.</p>
             </section>`
       }
       ${rosterEditCard}
@@ -3703,7 +3824,7 @@ function renderSharedGame() {
     return renderShell(`
       <section class="screen-title">
         <h2>Shared Game</h2>
-        <p>${code ? `Loading share code ${code}...` : "Enter a share code from the tracker phone."}</p>
+        <p>${code ? `Loading share code ${code}...` : "Enter a share code from the Parent Tracker phone."}</p>
       </section>
       <form class="card pad form-grid" data-form="watch-share">
         <div class="field">
@@ -3964,7 +4085,7 @@ function renderTutorial() {
     <section class="stack tutorial-list">
       <div class="card pad">
         <h3>1. Set Up The Player</h3>
-        <p class="muted small">Open Player Settings to pick from the preloaded Team Roster. Admins and trackers can preload roster players in Team Roster; regular viewers can only select and review them.</p>
+        <p class="muted small">Open Player Settings to pick from the preloaded Team Roster. Parent Trackers verify their player before tracking shared team stats.</p>
       </div>
 
       <div class="card pad">
@@ -3974,12 +4095,12 @@ function renderTutorial() {
 
       <div class="card pad">
         <h3>3. Create Or Join A Team</h3>
-        <p class="muted small">Create a team to get a viewer invite code and a tracker access code. Share viewer codes broadly. Share tracker codes only with parents who should enter roster players or shared stats.</p>
+        <p class="muted small">Use a team access code from the team admin to request access. After approval, verify your player by jersey number.</p>
       </div>
 
       <div class="card pad">
-        <h3>4. Pick One Tracker</h3>
-        <p class="muted small">For the cleanest stats, pick one official tracker for each player/game. Viewers can follow roster stats, but cannot add roster players, start shared team games, or edit shared team events.</p>
+        <h3>4. Pick One Parent Tracker</h3>
+        <p class="muted small">For the cleanest stats, pick one official Parent Tracker for each player/game. Other family members can watch using Live Share from another iPhone, phone, tablet, or computer.</p>
       </div>
 
       <div class="card pad">
@@ -4020,9 +4141,13 @@ function render() {
   if (!state.authUser && !publicScreens.includes(state.screen)) {
     state.screen = "home";
   }
+  if (state.authUser && needsParentProfileSetup() && !["profileSetup", "shared", "help", "tutorial", "authSuccess"].includes(state.screen)) {
+    state.screen = "profileSetup";
+  }
   const screens = {
     home: renderHome,
     authSuccess: renderAuthSuccess,
+    profileSetup: renderProfileSetup,
     tutorial: renderTutorial,
     settings: renderSettings,
     start: renderStartGame,
@@ -4070,6 +4195,10 @@ function handleSubmit(event) {
 
   if (form.dataset.form === "auth") {
     handleAuthSubmit(formData);
+  }
+
+  if (form.dataset.form === "profile-onboarding") {
+    saveParentProfile(formData);
   }
 
   if (form.dataset.form === "create-team") {

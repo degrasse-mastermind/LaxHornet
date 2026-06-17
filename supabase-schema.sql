@@ -69,8 +69,13 @@ create table if not exists public.roster_players (
 create table if not exists public.user_profiles (
   user_id uuid primary key references auth.users(id) on delete cascade,
   email text not null default '',
-  requested_role text not null default 'viewer',
-  approved_role text not null default 'viewer',
+  first_name text not null default '',
+  last_name text not null default '',
+  phone text not null default '',
+  child_jersey_number text not null default '',
+  onboarding_completed boolean not null default false,
+  requested_role text not null default 'tracker',
+  approved_role text not null default 'tracker',
   admin_status text not null default 'approved',
   reviewed_by uuid references auth.users(id) on delete set null,
   reviewed_at timestamptz,
@@ -83,7 +88,7 @@ create table if not exists public.team_access_requests (
   team_id text not null references public.teams(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
   email text not null default '',
-  requested_role text not null default 'viewer',
+  requested_role text not null default 'tracker',
   status text not null default 'pending',
   created_at timestamptz not null default now(),
   reviewed_by uuid references auth.users(id) on delete set null,
@@ -111,10 +116,30 @@ alter table public.events add column if not exists user_id uuid references auth.
 alter table public.events add column if not exists team_id text references public.teams(id) on delete set null;
 alter table public.events add column if not exists roster_player_id text references public.roster_players(id) on delete set null;
 alter table public.teams add column if not exists tracker_code text unique;
+alter table public.user_profiles add column if not exists first_name text not null default '';
+alter table public.user_profiles add column if not exists last_name text not null default '';
+alter table public.user_profiles add column if not exists phone text not null default '';
+alter table public.user_profiles add column if not exists child_jersey_number text not null default '';
+alter table public.user_profiles add column if not exists onboarding_completed boolean not null default false;
+alter table public.user_profiles alter column requested_role set default 'tracker';
+alter table public.user_profiles alter column approved_role set default 'tracker';
+alter table public.team_access_requests alter column requested_role set default 'tracker';
 
 update public.team_members
-set role = 'viewer'
-where role = 'member';
+set role = 'tracker'
+where role in ('member', 'viewer');
+
+update public.user_profiles
+set requested_role = 'tracker'
+where requested_role = 'viewer';
+
+update public.user_profiles
+set approved_role = 'tracker'
+where approved_role = 'viewer';
+
+update public.team_access_requests
+set requested_role = 'tracker'
+where requested_role = 'viewer';
 
 delete from public.player_claims older
 using public.player_claims newer
@@ -241,16 +266,7 @@ set search_path = public
 as $$
   select case
     when (select public.laxhornet_is_platform_reviewer()) then 'admin'
-    else coalesce(
-      (
-        select approved_role
-        from public.user_profiles
-        where user_id = (select auth.uid())
-          and admin_status = 'approved'
-        limit 1
-      ),
-      'viewer'
-    )
+    else 'tracker'
   end;
 $$;
 
@@ -285,9 +301,11 @@ declare
   next_approved_role text;
   next_admin_status text;
 begin
-  clean_role := lower(coalesce(requested_app_role, 'viewer'));
-  if clean_role not in ('viewer', 'tracker', 'admin') then
-    clean_role := 'viewer';
+  clean_role := lower(coalesce(requested_app_role, 'tracker'));
+  if (select public.laxhornet_is_platform_reviewer()) then
+    clean_role := 'admin';
+  else
+    clean_role := 'tracker';
   end if;
 
   user_email := lower(coalesce((auth.jwt() ->> 'email'), ''));
@@ -295,9 +313,6 @@ begin
   if (select public.laxhornet_is_platform_reviewer()) then
     next_approved_role := 'admin';
     next_admin_status := 'approved';
-  elsif clean_role = 'admin' then
-    next_approved_role := 'viewer';
-    next_admin_status := 'pending';
   else
     next_approved_role := clean_role;
     next_admin_status := 'approved';
@@ -329,13 +344,10 @@ begin
   set email = excluded.email,
       requested_role = excluded.requested_role,
       approved_role = case
-        when public.user_profiles.approved_role = 'admin' then 'admin'
-        else excluded.approved_role
+        when (select public.laxhornet_is_platform_reviewer()) then 'admin'
+        else 'tracker'
       end,
-      admin_status = case
-        when public.user_profiles.approved_role = 'admin' then 'approved'
-        else excluded.admin_status
-      end,
+      admin_status = 'approved',
       updated_at = now();
 
   return query
@@ -372,7 +384,7 @@ set search_path = public
 as $$
 begin
   if not exists (select 1 from public.user_profiles where user_profiles.user_id = (select auth.uid())) then
-    perform public.laxhornet_request_user_role(coalesce((auth.jwt() -> 'user_metadata' ->> 'requested_role'), 'viewer'));
+    perform public.laxhornet_request_user_role(coalesce((auth.jwt() -> 'user_metadata' ->> 'requested_role'), 'tracker'));
   end if;
 
   return query
@@ -436,7 +448,7 @@ begin
   end if;
 
   update public.user_profiles
-  set approved_role = case when approve then 'admin' else 'viewer' end,
+  set approved_role = case when approve then 'admin' else 'tracker' end,
       admin_status = case when approve then 'approved' else 'rejected' end,
       reviewed_by = (select auth.uid()),
       reviewed_at = now(),
@@ -449,20 +461,32 @@ $$;
 
 create or replace function public.laxhornet_team_role(check_team_id text)
 returns text
-language sql
+language plpgsql
 security definer
 set search_path = public
 as $$
-  select coalesce(
-    (
-      select role
-      from public.team_members
-      where team_id = check_team_id
-        and user_id = (select auth.uid())
-      limit 1
-    ),
-    'viewer'
-  );
+declare
+  current_role text;
+begin
+  select role
+  into current_role
+  from public.team_members
+  where team_id = check_team_id
+    and user_id = (select auth.uid())
+  limit 1;
+
+  current_role := coalesce(current_role, 'tracker');
+
+  if current_role = 'admin' and not (select public.laxhornet_is_platform_reviewer()) then
+    return 'tracker';
+  end if;
+
+  if current_role = 'viewer' or current_role = 'member' then
+    return 'tracker';
+  end if;
+
+  return current_role;
+end;
 $$;
 
 create or replace function public.laxhornet_can_edit_team(check_team_id text)
@@ -555,10 +579,7 @@ begin
     return;
   end if;
 
-  next_role := case
-    when upper(coalesce(matched_team.tracker_code, '')) = upper(join_code) then 'tracker'
-    else 'viewer'
-  end;
+  next_role := 'tracker';
   requester_email := lower(coalesce((auth.jwt() ->> 'email'), ''));
 
   insert into public.team_access_requests (id, team_id, user_id, email, requested_role, status)
@@ -1115,13 +1136,13 @@ with check (created_by = (select auth.uid()) and (select public.laxhornet_can_cr
 create policy "laxhornet update teams"
 on public.teams for update
 to authenticated
-using (created_by = (select auth.uid()))
-with check (created_by = (select auth.uid()));
+using (created_by = (select auth.uid()) and (select public.laxhornet_can_create_team()))
+with check (created_by = (select auth.uid()) and (select public.laxhornet_can_create_team()));
 
 create policy "laxhornet delete teams"
 on public.teams for delete
 to authenticated
-using (created_by = (select auth.uid()));
+using (created_by = (select auth.uid()) and (select public.laxhornet_can_create_team()));
 
 create policy "laxhornet read team members"
 on public.team_members for select
