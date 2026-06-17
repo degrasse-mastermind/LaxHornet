@@ -145,7 +145,33 @@ create index if not exists team_access_requests_user_id_idx on public.team_acces
 create index if not exists player_claims_team_id_idx on public.player_claims (team_id);
 create index if not exists player_claims_user_id_idx on public.player_claims (user_id);
 create index if not exists player_claims_roster_player_id_idx on public.player_claims (roster_player_id);
-create unique index if not exists player_claims_team_user_unique_idx on public.player_claims (team_id, user_id);
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'player_claims_team_user_key'
+      and conrelid = 'public.player_claims'::regclass
+  ) then
+    if exists (
+      select 1
+      from pg_class indexes
+      join pg_namespace schemas on schemas.oid = indexes.relnamespace
+      where schemas.nspname = 'public'
+        and indexes.relname = 'player_claims_team_user_unique_idx'
+    ) then
+      alter table public.player_claims
+      add constraint player_claims_team_user_key
+      unique using index player_claims_team_user_unique_idx;
+    else
+      alter table public.player_claims
+      add constraint player_claims_team_user_key
+      unique (team_id, user_id);
+    end if;
+  end if;
+end $$;
+
 create index if not exists user_profiles_email_idx on public.user_profiles (lower(email));
 create index if not exists user_profiles_admin_status_idx on public.user_profiles (admin_status);
 
