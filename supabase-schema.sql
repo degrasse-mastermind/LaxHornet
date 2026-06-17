@@ -402,13 +402,14 @@ language sql
 security definer
 set search_path = public
 as $$
-  select exists (
-    select 1
-    from public.team_members
-    where team_id = check_team_id
-      and user_id = (select auth.uid())
-      and role in ('admin', 'tracker')
-  );
+  select (select public.laxhornet_is_platform_reviewer())
+    or exists (
+      select 1
+      from public.team_members
+      where team_id = check_team_id
+        and user_id = (select auth.uid())
+        and role in ('admin', 'tracker')
+    );
 $$;
 
 create or replace function public.laxhornet_join_team_by_code(join_code text)

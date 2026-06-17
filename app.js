@@ -18,6 +18,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
+const APP_VERSION = "v67";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -2333,6 +2334,7 @@ function renderAccountCard() {
       <section class="card pad">
         <h3>User Profile</h3>
         <p class="muted small">Supabase is not available, so this device is using local-only storage.</p>
+        <p class="muted small">App version: ${escapeHTML(APP_VERSION)}</p>
       </section>
     `;
   }
@@ -2355,6 +2357,7 @@ function renderAccountCard() {
             : ""
         }
         <p class="muted small">${escapeHTML(state.syncStatus)}</p>
+        <p class="muted small">App version: ${escapeHTML(APP_VERSION)}</p>
         ${state.cloudError ? `<p class="muted small">Last Supabase error: ${escapeHTML(state.cloudError)}</p>` : ""}
         <div class="account-actions">
           <button class="btn neutral" type="button" data-action="sync-cloud-games">Sync Cloud Games</button>
@@ -2383,6 +2386,7 @@ function renderAccountCard() {
     <form class="card pad form-grid account-card" data-form="auth">
       <h3>User Profile</h3>
       <p class="muted small">Sign in for cloud backup. Personal players stay private; team roster players can be shared with parents you invite.</p>
+      <p class="muted small">App version: ${escapeHTML(APP_VERSION)}</p>
       <div class="field">
         <label for="authEmail">Email</label>
         <input id="authEmail" name="email" type="email" autocomplete="email" required />
