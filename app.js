@@ -282,6 +282,10 @@ const state = {
 };
 
 mergeRosterPlayersIntoPlayers();
+if (initialActivePlayerId && state.players.some((player) => player.id === initialActivePlayerId)) {
+  state.activePlayerId = initialActivePlayerId;
+}
+ensureActiveTeamRosterPlayer();
 syncActivePlayer();
 state.games = state.games.map((game) => normalizeGame(game, state.player));
 state.activeGame = state.activeGame ? normalizeGame(state.activeGame, state.player) : null;
@@ -436,6 +440,13 @@ function mergeRosterPlayersIntoPlayers() {
   if (state.activeTeamId && !state.teams.some((team) => team.id === state.activeTeamId)) {
     state.activeTeamId = state.teams[0]?.id || "";
   }
+}
+
+function ensureActiveTeamRosterPlayer() {
+  const roster = activeTeamRoster();
+  if (!roster.length) return;
+  if (roster.some((player) => player.id === state.activePlayerId)) return;
+  state.activePlayerId = roster[0].id;
 }
 
 function activeTeamRoster() {
@@ -840,6 +851,7 @@ function normalizeGame(game = {}, fallbackPlayer = null) {
 
 function persistAll() {
   mergeRosterPlayersIntoPlayers();
+  ensureActiveTeamRosterPlayer();
   syncActivePlayer();
   saveJSON(STORAGE_KEYS.player, state.player);
   saveJSON(STORAGE_KEYS.players, state.players);
@@ -2207,7 +2219,8 @@ function renderPlayerSwitcher(options = {}) {
   const helper = options.helper || "Choose who these stats belong to.";
   const showManage = options.showManage !== false;
   const shellClass = options.inline ? "player-switch-card inline" : "card pad player-switch-card";
-  const players = Array.isArray(options.players) ? options.players : state.players;
+  const defaultPlayers = activeTeamRoster().length ? activeTeamRoster().map(rosterPlayerToPlayer) : state.players;
+  const players = Array.isArray(options.players) ? options.players : defaultPlayers;
   const chips = players
     .map((player) => {
       const active = player.id === state.activePlayerId;
