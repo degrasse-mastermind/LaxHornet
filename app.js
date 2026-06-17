@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v115";
+const APP_VERSION = "v116";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -291,6 +291,7 @@ const state = {
   teamRosterExpanded: true,
   teamAccessExpanded: false,
   exportToolsExpanded: false,
+  helpExpanded: false,
   signupDraft: null,
   accessRequestSummary: null,
   toast: "",
@@ -3452,6 +3453,7 @@ function renderMore() {
   const profileName = [state.userProfile?.firstName, state.userProfile?.lastName].filter(Boolean).join(" ");
   const active = state.activeGame;
   const activePlayer = active ? gamePlayerSnapshot(active) : null;
+  const helpExpanded = state.helpExpanded;
 
   return renderShell(`
     <section class="screen-title">
@@ -3536,20 +3538,30 @@ function renderMore() {
 
       ${renderWatchSharedGameForm()}
 
-      <section class="card pad more-card">
-        <h3>Help</h3>
-        <div class="more-action-list">
-          <button class="more-action" type="button" data-nav="tutorial">
-            <span>${renderNavIcon("games")}</span>
-            <strong>Quick Guide</strong>
-            <small>Learn the game-day flow and sharing tools.</small>
-          </button>
-          <button class="more-action" type="button" data-nav="help">
-            <span>${renderNavIcon("season")}</span>
-            <strong>Impact Help</strong>
-            <small>See how Impact Score and percentages work.</small>
+      <section class="card pad more-card ${helpExpanded ? "" : "collapsed"}">
+        <div class="collapsible-card-head">
+          <div>
+            <h3>Help</h3>
+            <p class="muted small">Quick guide and scoring help.</p>
+          </div>
+          <button class="collapse-icon" type="button" data-action="toggle-help-card" aria-expanded="${helpExpanded}" aria-label="${helpExpanded ? "Minimize Help" : "Expand Help"}">
+            <span aria-hidden="true">${helpExpanded ? "v" : ">"}</span>
           </button>
         </div>
+        ${helpExpanded ? `
+          <div class="more-action-list">
+            <button class="more-action" type="button" data-nav="tutorial">
+              <span>${renderNavIcon("games")}</span>
+              <strong>Quick Guide</strong>
+              <small>Learn the game-day flow and sharing tools.</small>
+            </button>
+            <button class="more-action" type="button" data-nav="help">
+              <span>${renderNavIcon("season")}</span>
+              <strong>Impact Help</strong>
+              <small>See how Impact Score and percentages work.</small>
+            </button>
+          </div>
+        ` : ""}
       </section>
     </section>
   `);
@@ -4896,6 +4908,10 @@ function handleClick(event) {
     }
     if (action.dataset.action === "toggle-export-tools") {
       state.exportToolsExpanded = !state.exportToolsExpanded;
+      render();
+    }
+    if (action.dataset.action === "toggle-help-card") {
+      state.helpExpanded = !state.helpExpanded;
       render();
     }
     if (action.dataset.action === "apply-update") {
