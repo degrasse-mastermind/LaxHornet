@@ -234,6 +234,7 @@ const DEFAULT_PLAYER = {
 };
 
 const DEFAULT_TEAM_INVITE_LENGTH = 6;
+const TEAM_EDIT_ROLES = ["admin", "tracker"];
 
 const app = document.querySelector("#app");
 const startupParams = new URLSearchParams(window.location.search);
@@ -327,17 +328,33 @@ function normalizeTeam(team = {}) {
     id,
     name: String(team.name || "").trim() || "Team",
     inviteCode: String(team.inviteCode || team.invite_code || "").trim().toUpperCase(),
-    role: String(team.role || "member").trim() || "member",
+    trackerCode: String(team.trackerCode || team.tracker_code || "").trim().toUpperCase(),
+    role: normalizeTeamRole(team.role || "viewer"),
     createdBy: team.createdBy || team.created_by || "",
     createdAt: team.createdAt || team.created_at || new Date().toISOString(),
   };
+}
+
+function normalizeTeamRole(role = "viewer") {
+  const cleanRole = String(role || "").trim().toLowerCase();
+  if (cleanRole === "member") return "viewer";
+  return ["admin", "tracker", "viewer"].includes(cleanRole) ? cleanRole : "viewer";
 }
 
 function normalizeTeams(teams = []) {
   const merged = new Map();
   (Array.isArray(teams) ? teams : []).forEach((team) => {
     const normalized = normalizeTeam(team);
-    if (normalized.id) merged.set(normalized.id, { ...merged.get(normalized.id), ...normalized });
+    const existing = merged.get(normalized.id);
+    if (normalized.id) {
+      merged.set(normalized.id, {
+        ...existing,
+        ...normalized,
+        inviteCode: normalized.inviteCode || existing?.inviteCode || "",
+        trackerCode: normalized.trackerCode || existing?.trackerCode || "",
+        role: TEAM_EDIT_ROLES.includes(existing?.role) && normalized.role === "viewer" ? existing.role : normalized.role,
+      });
+    }
   });
   return [...merged.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -371,6 +388,26 @@ function normalizeRosterPlayers(players = []) {
 
 function teamById(teamId) {
   return state.teams.find((team) => team.id === teamId) || null;
+}
+
+function teamRole(teamId) {
+  return normalizeTeamRole(teamById(teamId)?.role || "viewer");
+}
+
+function teamRoleLabel(role) {
+  const cleanRole = normalizeTeamRole(role);
+  if (cleanRole === "admin") return "Admin";
+  if (cleanRole === "tracker") return "Tracker";
+  return "Viewer";
+}
+
+function canEditTeam(teamId) {
+  return TEAM_EDIT_ROLES.includes(teamRole(teamId));
+}
+
+function canEditGame(game = {}) {
+  const teamId = gameTeamId(game);
+  return !teamId || canEditTeam(teamId);
 }
 
 function activeTeam() {
@@ -547,6 +584,10 @@ function setActivePlayer(playerId, message = "") {
 }
 
 function updatePlayerInRoster(player) {
+  if (isTeamPlayer(player) && !canEditTeam(player.teamId)) {
+    showToast("View-only team roster");
+    return;
+  }
   const normalized = normalizePlayer(player, { createId: true });
   state.players = state.players.map((item) => (item.id === normalized.id ? normalized : item));
   state.activePlayerId = normalized.id;
@@ -847,6 +888,10 @@ function upsertGame(game) {
 }
 
 function saveReviewedGame(game, message = "Game updated") {
+  if (!canEditGame(game)) {
+    showToast("View-only team access");
+    return;
+  }
   const updatedGame = normalizeGame({ ...game, savedAt: new Date().toISOString() });
   upsertGame(updatedGame);
   if (state.activeGame?.id === updatedGame.id) {
@@ -1019,6 +1064,10 @@ function currentReviewGame() {
 
 function saveActiveGame(message = "Game saved locally") {
   if (!state.activeGame) return;
+  if (!canEditGame(state.activeGame)) {
+    showToast("View-only team access");
+    return;
+  }
   state.activeGame.savedAt = new Date().toISOString();
   upsertGame(state.activeGame);
   persistAll();
@@ -1030,6 +1079,10 @@ function logEvent(statKey) {
   if (!state.activeGame) {
     showToast("Start a game first");
     navigate("start");
+    return;
+  }
+  if (!canEditGame(state.activeGame)) {
+    showToast("View-only team access");
     return;
   }
 
@@ -1070,6 +1123,10 @@ function undoLastEvent() {
     showToast("No events to undo");
     return;
   }
+  if (!canEditGame(state.activeGame)) {
+    showToast("View-only team access");
+    return;
+  }
   const removed = state.activeGame.events.pop();
   state.activeGame.savedAt = new Date().toISOString();
   persistAll();
@@ -1081,6 +1138,10 @@ function undoLastEvent() {
 
 function endGame() {
   if (!state.activeGame) return;
+  if (!canEditGame(state.activeGame)) {
+    showToast("View-only team access");
+    return;
+  }
   state.activeGame.status = "complete";
   state.activeGame.endedAt = new Date().toISOString();
   state.activeGame.savedAt = new Date().toISOString();
@@ -1097,6 +1158,10 @@ function endGame() {
 function deleteGame(id) {
   const game = state.games.find((item) => item.id === id);
   if (!game) return;
+  if (!canEditGame(game)) {
+    showToast("View-only team access");
+    return;
+  }
   if (!window.confirm(`Delete ${game.opponent} on ${formatDate(game.date)}?`)) return;
   rememberDeletedGame(id);
   (game.events || []).forEach((event) => rememberDeletedEvent(event.id));
@@ -1115,6 +1180,10 @@ function deleteGame(id) {
 function deleteEvent(gameId, eventId) {
   const game = state.games.find((item) => item.id === gameId);
   if (!game) return;
+  if (!canEditGame(game)) {
+    showToast("View-only team access");
+    return;
+  }
   const event = game.events.find((item) => item.id === eventId);
   if (!event) return;
   if (!window.confirm(`Delete ${event.statLabel}?`)) return;
@@ -1154,6 +1223,11 @@ function removeDraftTag(tag) {
 }
 
 function saveEventTags(gameId, eventId) {
+  const game = state.games.find((item) => item.id === gameId);
+  if (game && !canEditGame(game)) {
+    showToast("View-only team access");
+    return;
+  }
   const tags = uniqueTags(state.tagDraftTags);
   updateReviewGame(
     gameId,
@@ -1501,7 +1575,8 @@ function teamFromSupabaseRows(memberRow = {}) {
     id: team.id || memberRow.team_id,
     name: team.name,
     inviteCode: team.invite_code,
-    role: memberRow.role || team.role || "member",
+    trackerCode: team.tracker_code || "",
+    role: memberRow.role || team.role || "viewer",
     createdBy: team.created_by,
     createdAt: team.created_at,
   });
@@ -1523,7 +1598,7 @@ async function loadCloudTeams(options = {}) {
   if (!supabaseClient || !currentUserId()) return;
   const { data: memberRows, error: memberError } = await supabaseClient
     .from("team_members")
-    .select("team_id, role, teams(*)")
+    .select("team_id, role, teams(id,name,invite_code,created_by,created_at)")
     .eq("user_id", currentUserId());
 
   if (memberError) {
@@ -1551,6 +1626,7 @@ async function loadCloudTeams(options = {}) {
     }
 
     state.rosterPlayers = normalizeRosterPlayers([...state.rosterPlayers, ...(rosterRows || []).map(rosterPlayerFromSupabaseRow)]);
+    await loadEditableTeamAccessCodes();
   }
 
   mergeRosterPlayersIntoPlayers();
@@ -1559,6 +1635,22 @@ async function loadCloudTeams(options = {}) {
   if (!options.silent) {
     render();
     showToast(state.teams.length ? "Team roster synced" : "No team rosters found");
+  }
+}
+
+async function loadEditableTeamAccessCodes() {
+  if (!supabaseClient || !currentUserId()) return;
+  for (const team of state.teams.filter((item) => canEditTeam(item.id))) {
+    const { data, error } = await supabaseClient.rpc("laxhornet_team_access_codes", { check_team_id: team.id });
+    if (error || !Array.isArray(data) || !data[0]) continue;
+    state.teams = normalizeTeams([
+      ...state.teams,
+      {
+        ...team,
+        inviteCode: data[0].invite_code || team.inviteCode,
+        trackerCode: data[0].tracker_code || team.trackerCode,
+      },
+    ]);
   }
 }
 
@@ -1637,6 +1729,7 @@ async function syncLocalGamesToCloud() {
   let uploaded = 0;
   for (const game of localGames.values()) {
     if (game.userId && game.userId !== currentUserId()) continue;
+    if (gameTeamId(game) && !canEditTeam(gameTeamId(game))) continue;
     const normalized = normalizeGame({ ...game, userId: currentUserId() });
     if (state.activeGame?.id === normalized.id) state.activeGame = normalized;
     const index = state.games.findIndex((item) => item.id === normalized.id);
@@ -1734,6 +1827,7 @@ async function createTeam(formData) {
     id: uid("team"),
     name,
     inviteCode: makeInviteCode(),
+    trackerCode: makeInviteCode(),
     role: "admin",
     createdBy: currentUserId(),
   });
@@ -1742,6 +1836,7 @@ async function createTeam(formData) {
     id: team.id,
     name: team.name,
     invite_code: team.inviteCode,
+    tracker_code: team.trackerCode,
     created_by: currentUserId(),
   });
   if (teamError) {
@@ -1764,7 +1859,7 @@ async function createTeam(formData) {
   state.activeTeamId = team.id;
   persistAll();
   render();
-  showToast(`Team created. Invite code ${team.inviteCode}`);
+  showToast(`Team created. Viewer code ${team.inviteCode}`);
 }
 
 async function joinTeam(formData) {
@@ -1772,48 +1867,30 @@ async function joinTeam(formData) {
     showToast("Sign in to join a team");
     return;
   }
-  const inviteCode = formData.get("inviteCode")?.trim().toUpperCase();
-  if (!inviteCode) {
-    showToast("Enter an invite code");
+  const accessCode = formData.get("inviteCode")?.trim().toUpperCase();
+  if (!accessCode) {
+    showToast("Enter an invite or tracker code");
     return;
   }
-  const { data: teamRow, error: teamError } = await supabaseClient
-    .from("teams")
-    .select("*")
-    .eq("invite_code", inviteCode)
-    .maybeSingle();
-  if (teamError) {
-    reportSyncError(teamError);
+  const { data: joinRows, error: joinError } = await supabaseClient.rpc("laxhornet_join_team_by_code", {
+    join_code: accessCode,
+  });
+  if (joinError) {
+    reportSyncError(joinError);
     return;
   }
-  if (!teamRow) {
-    showToast("Team invite not found");
-    return;
-  }
-
-  const team = normalizeTeam({ ...teamRow, role: "member" });
-  const { error: memberError } = await supabaseClient
-    .from("team_members")
-    .upsert(
-      {
-        id: `${team.id}-${currentUserId()}`,
-        team_id: team.id,
-        user_id: currentUserId(),
-        role: "member",
-      },
-      { onConflict: "team_id,user_id" },
-    );
-  if (memberError) {
-    reportSyncError(memberError);
+  const joined = Array.isArray(joinRows) ? joinRows[0] : null;
+  if (!joined?.team_id) {
+    showToast("Team code not found");
     return;
   }
 
-  state.teams = normalizeTeams([...state.teams, team]);
-  state.activeTeamId = team.id;
+  state.activeTeamId = joined.team_id;
   await loadCloudTeams({ silent: true });
   await loadCloudGames({ silent: true });
+  const team = teamById(joined.team_id);
   render();
-  showToast(`Joined ${team.name}`);
+  showToast(`Joined ${team?.name || "team"} as ${teamRoleLabel(joined.role)}`);
 }
 
 async function addRosterPlayer(formData) {
@@ -1824,6 +1901,10 @@ async function addRosterPlayer(formData) {
   }
   if (!currentUserId()) {
     showToast("Sign in to add team players");
+    return;
+  }
+  if (!canEditTeam(team.id)) {
+    showToast("View-only team access");
     return;
   }
   const rosterPlayer = normalizeRosterPlayer({
@@ -1858,6 +1939,10 @@ async function addRosterPlayer(formData) {
 async function syncGameToSupabase(game, options = {}) {
   if (!supabaseClient || !game) return false;
   if (isDeletedGame(game.id)) return false;
+  if (gameTeamId(game) && !canEditTeam(gameTeamId(game))) {
+    state.syncStatus = "Team roster is view-only";
+    return false;
+  }
   const userId = currentUserId();
   if (!userId) {
     state.syncStatus = "Sign in for cloud sync";
@@ -1896,6 +1981,10 @@ async function syncGameToSupabase(game, options = {}) {
 
 async function syncLoggedEvent(game, event) {
   if (!supabaseClient || !game || !event) return;
+  if (gameTeamId(game) && !canEditTeam(gameTeamId(game))) {
+    state.syncStatus = "Team roster is view-only";
+    return;
+  }
   const gameSynced = await syncGameToSupabase(game);
   if (!gameSynced) return;
   const { error, skipped } = await upsertWithOptionalColumns("events", eventToSupabaseRow(event), [
@@ -2158,13 +2247,15 @@ function renderTeamRosterCard(options = {}) {
 
   const team = activeTeam();
   const roster = activeTeamRoster();
+  const editable = team ? canEditTeam(team.id) : false;
+  const roleCopy = team ? teamRoleLabel(team.role) : "";
   const teams = state.teams
     .map((item) => {
       const active = item.id === state.activeTeamId;
       return `
         <button class="team-chip ${active ? "active" : ""}" type="button" data-team-select="${item.id}" aria-pressed="${active}">
           <strong>${escapeHTML(item.name)}</strong>
-          <span>${escapeHTML(item.inviteCode || "No code")}</span>
+          <span>${teamRoleLabel(item.role)}${item.inviteCode ? ` - ${escapeHTML(item.inviteCode)}` : ""}</span>
         </button>
       `;
     })
@@ -2182,7 +2273,7 @@ function renderTeamRosterCard(options = {}) {
           `;
         })
         .join("")
-    : `<p class="muted small">No rostered players yet. Add players by name and jersey number.</p>`;
+    : `<p class="muted small">${editable ? "No rostered players yet. Add players by name and jersey number." : "No rostered players have been added yet."}</p>`;
 
   return `
     <section class="card pad team-card ${compact && !expanded ? "collapsed" : ""}">
@@ -2191,8 +2282,10 @@ function renderTeamRosterCard(options = {}) {
           <h3>Team Roster</h3>
           <p class="muted small">${
             team
-              ? `Shared roster for ${escapeHTML(team.name)}. Invite code: ${escapeHTML(team.inviteCode)}`
-              : "Create a team or join with an invite code."
+              ? `Shared roster for ${escapeHTML(team.name)}. ${roleCopy} access. Viewer code: ${escapeHTML(team.inviteCode)}${
+                  editable && team.trackerCode ? ` Tracker code: ${escapeHTML(team.trackerCode)}` : ""
+                }`
+              : "Create a team or join with an invite or tracker code."
           }</p>
         </div>
         ${
@@ -2228,7 +2321,7 @@ function renderTeamRosterCard(options = {}) {
                 <form class="inline-mini-form" data-form="join-team">
                   <label for="inviteCode">Join team</label>
                   <div class="inline-input-action">
-                    <input id="inviteCode" name="inviteCode" placeholder="Invite code" autocapitalize="characters" />
+                    <input id="inviteCode" name="inviteCode" placeholder="Invite or tracker code" autocapitalize="characters" />
                     <button class="mini-btn" type="submit">Join</button>
                   </div>
                 </form>
@@ -2241,31 +2334,39 @@ function renderTeamRosterCard(options = {}) {
                       <div class="section-head compact-head">
                         <div>
                           <h4>Rostered Players</h4>
-                          <p class="muted small">Stats follow the rostered player across every parent account.</p>
+                          <p class="muted small">${
+                            editable
+                              ? "Stats follow the rostered player across every parent account."
+                              : "View-only access. You can review the roster and stats, but cannot add players or log shared stats."
+                          }</p>
                         </div>
                       </div>
                       <div class="player-chip-row">${rosterChips}</div>
                     </div>
-                    <form class="team-add-player-form" data-form="add-roster-player">
-                      <div class="form-grid two">
-                        <div class="field">
-                          <label for="rosterName">Player name</label>
-                          <input id="rosterName" name="rosterName" placeholder="Player name" required />
-                        </div>
-                        <div class="field">
-                          <label for="rosterNumber">Jersey #</label>
-                          <input id="rosterNumber" name="rosterNumber" inputmode="numeric" placeholder="12" />
-                        </div>
-                      </div>
-                      <div class="inline-input-action">
-                        <input name="rosterPosition" placeholder="Position" />
-                        <button class="mini-btn" type="submit">Add Player</button>
-                      </div>
-                    </form>
+                    ${
+                      editable
+                        ? `<form class="team-add-player-form" data-form="add-roster-player">
+                            <div class="form-grid two">
+                              <div class="field">
+                                <label for="rosterName">Player name</label>
+                                <input id="rosterName" name="rosterName" placeholder="Player name" required />
+                              </div>
+                              <div class="field">
+                                <label for="rosterNumber">Jersey #</label>
+                                <input id="rosterNumber" name="rosterNumber" inputmode="numeric" placeholder="12" />
+                              </div>
+                            </div>
+                            <div class="inline-input-action">
+                              <input name="rosterPosition" placeholder="Position" />
+                              <button class="mini-btn" type="submit">Add Player</button>
+                            </div>
+                          </form>`
+                        : `<p class="muted small team-note">Ask a team admin for tracker access if you should be able to enter roster players or shared stats.</p>`
+                    }
                   `
                   : ""
               }
-              <p class="muted small team-note">Best practice: pick one official tracker for a player/game so two parents do not log the same play twice.</p>
+              <p class="muted small team-note">Best practice: share viewer codes broadly and tracker codes only with parents assigned to enter stats.</p>
             </div>
           `
           : ""
@@ -2398,6 +2499,7 @@ function renderSettings() {
 }
 
 function renderStartGame() {
+  const viewOnlyTeamPlayer = isTeamPlayer(state.player) && !canEditTeam(state.player.teamId);
   return renderShell(`
     <section class="screen-title">
       <h2>Start New Game</h2>
@@ -2407,9 +2509,16 @@ function renderStartGame() {
     <form class="card pad form-grid" data-form="start-game">
       ${renderPlayerSwitcher({
         title: "Player For This Game",
-        helper: "Double-check this before the opening whistle.",
+        helper: viewOnlyTeamPlayer
+          ? "This shared roster player is view-only for your account."
+          : "Double-check this before the opening whistle.",
         inline: true,
       })}
+      ${
+        viewOnlyTeamPlayer
+          ? `<div class="notice-card">Viewer access can review roster stats, but cannot start a shared team game or enter stats.</div>`
+          : ""
+      }
       <div class="field">
         <label for="opponent">Opponent</label>
         <input id="opponent" name="opponent" placeholder="Opponent team" required />
@@ -2440,7 +2549,7 @@ function renderStartGame() {
         <label for="location">Location</label>
         <input id="location" name="location" placeholder="Field or town" />
       </div>
-      <button class="btn positive" type="submit">Start Live Tracker</button>
+      <button class="btn positive" type="submit" ${viewOnlyTeamPlayer ? "disabled" : ""}>Start Live Tracker</button>
     </form>
   `);
 }
@@ -2730,7 +2839,8 @@ function renderReview() {
 
   const totals = calculateTotals(game.events);
   const player = gamePlayerSnapshot(game);
-  const canEditGame = !state.editingGameDetails;
+  const canEditCurrentGame = canEditGame(game);
+  const canShowGameEdit = canEditCurrentGame && !state.editingGameDetails;
   const editingEvent = state.editingEventId
     ? game.events.find((event) => event.id === state.editingEventId)
     : null;
@@ -2750,18 +2860,18 @@ function renderReview() {
         <div class="metric"><strong>${totals.goals}</strong><span>Goals</span></div>
         <div class="metric"><strong>${totals.assists}</strong><span>Assists</span></div>
       </div>
-      ${canEditGame ? `<button class="btn neutral" type="button" data-action="edit-game-details">Edit Game Details</button>` : ""}
-      ${state.editingGameDetails ? renderGameEditForm(game) : ""}
+      ${canShowGameEdit ? `<button class="btn neutral" type="button" data-action="edit-game-details">Edit Game Details</button>` : ""}
+      ${state.editingGameDetails && canEditCurrentGame ? renderGameEditForm(game) : ""}
       ${renderTotalsTable(totals)}
-      ${editingEvent ? renderEventEditForm(game, editingEvent) : ""}
-      ${tagEditingEvent ? renderTagEditor(game, tagEditingEvent) : ""}
+      ${editingEvent && canEditCurrentGame ? renderEventEditForm(game, editingEvent) : ""}
+      ${tagEditingEvent && canEditCurrentGame ? renderTagEditor(game, tagEditingEvent) : ""}
       <div class="card pad">
         <h3>Event Log</h3>
         ${
           game.events.length
             ? `<div class="event-list">${[...game.events]
                 .reverse()
-                .map((event) => renderEventRow(event, { editable: true, gameId: game.id }))
+                .map((event) => renderEventRow(event, { editable: canEditCurrentGame, gameId: game.id }))
                 .join("")}</div>`
             : `<p class="muted small">No events were logged for this game.</p>`
         }
@@ -2894,6 +3004,7 @@ function renderPastGames() {
 function renderGameListRow(game) {
   const totals = calculateTotals(game.events);
   const player = gamePlayerSnapshot(game);
+  const editable = canEditGame(game);
   return `
     <div class="list-row">
       <button class="brand" type="button" data-review="${game.id}" style="color: var(--text); text-align: left;">
@@ -2904,7 +3015,7 @@ function renderGameListRow(game) {
       </button>
       <div class="row-actions">
         <button class="icon-btn wide" type="button" data-review="${game.id}" aria-label="Review and edit game">Review/Edit</button>
-        <button class="icon-btn delete" type="button" data-delete="${game.id}" aria-label="Delete game">Del</button>
+        ${editable ? `<button class="icon-btn delete" type="button" data-delete="${game.id}" aria-label="Delete game">Del</button>` : ""}
       </div>
     </div>
   `;
@@ -3043,12 +3154,12 @@ function renderTutorial() {
 
       <div class="card pad">
         <h3>3. Create Or Join A Team</h3>
-        <p class="muted small">Create a team to get an invite code, then add rostered players by name and jersey number. Another parent can join with the code and see the same roster, games, and player totals.</p>
+        <p class="muted small">Create a team to get a viewer invite code and a tracker access code. Share viewer codes broadly. Share tracker codes only with parents who should enter roster players or shared stats.</p>
       </div>
 
       <div class="card pad">
         <h3>4. Pick One Tracker</h3>
-        <p class="muted small">For the cleanest stats, pick one official tracker for each player/game. Multiple parents can watch and sync the same data, but two people logging the same player at once can create duplicate events.</p>
+        <p class="muted small">For the cleanest stats, pick one official tracker for each player/game. Viewers can follow roster stats, but cannot add roster players, start shared team games, or edit shared team events.</p>
       </div>
 
       <div class="card pad">
@@ -3116,6 +3227,10 @@ function handleSubmit(event) {
   }
 
   if (form.dataset.form === "settings") {
+    if (isTeamPlayer(state.player) && !canEditTeam(state.player.teamId)) {
+      showToast("View-only team roster");
+      return;
+    }
     updatePlayerInRoster({
       id: state.activePlayerId,
       name: formData.get("name")?.trim() || DEFAULT_PLAYER.name,
@@ -3146,6 +3261,10 @@ function handleSubmit(event) {
   }
 
   if (form.dataset.form === "start-game") {
+    if (isTeamPlayer(state.player) && !canEditTeam(state.player.teamId)) {
+      showToast("This roster player is view-only");
+      return;
+    }
     if (state.activeGame && !window.confirm("Replace the current active game? Save it first if needed.")) {
       return;
     }
@@ -3160,6 +3279,10 @@ function handleSubmit(event) {
   if (form.dataset.form === "event-edit") {
     const game = state.games.find((item) => item.id === form.dataset.gameId);
     if (!game) return;
+    if (!canEditGame(game)) {
+      showToast("View-only team access");
+      return;
+    }
     const eventIndex = game.events.findIndex((item) => item.id === form.dataset.eventId);
     if (eventIndex < 0) return;
 
@@ -3188,6 +3311,10 @@ function handleSubmit(event) {
   if (form.dataset.form === "game-edit") {
     const game = state.games.find((item) => item.id === form.dataset.gameId);
     if (!game) return;
+    if (!canEditGame(game)) {
+      showToast("View-only team access");
+      return;
+    }
     const selectedPlayer = state.players.find((player) => player.id === formData.get("playerId")) || gamePlayerSnapshot(game);
     const nextPeriodFormat = PERIOD_FORMATS[formData.get("periodFormat")] ? formData.get("periodFormat") : periodFormatForGame(game);
     const nextPeriods = PERIOD_FORMATS[nextPeriodFormat].periods;
@@ -3268,6 +3395,11 @@ function handleClick(event) {
       render();
     }
     if (action.dataset.action === "edit-game-details") {
+      const game = currentReviewGame();
+      if (game && !canEditGame(game)) {
+        showToast("View-only team access");
+        return;
+      }
       state.editingGameDetails = true;
       state.editingEventId = null;
       state.tagEditingEventId = null;
@@ -3307,6 +3439,11 @@ function handleClick(event) {
 
   const editEvent = event.target.closest("[data-edit-event]");
   if (editEvent) {
+    const game = currentReviewGame();
+    if (game && !canEditGame(game)) {
+      showToast("View-only team access");
+      return;
+    }
     state.editingEventId = editEvent.dataset.editEvent;
     state.tagEditingEventId = null;
     state.tagDraftTags = [];
@@ -3317,6 +3454,11 @@ function handleClick(event) {
 
   const editTags = event.target.closest("[data-edit-tags]");
   if (editTags) {
+    const game = currentReviewGame();
+    if (game && !canEditGame(game)) {
+      showToast("View-only team access");
+      return;
+    }
     state.editingEventId = null;
     beginTagEdit(editTags.dataset.editTags);
     return;
