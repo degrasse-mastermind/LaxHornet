@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v125";
+const APP_VERSION = "v126";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -2766,7 +2766,14 @@ async function addRosterPlayer(formData) {
 }
 
 async function saveRosterPlayer(formData) {
-  const player = normalizePlayer(state.player);
+  const explicitRosterPlayerId = formData.get("rosterPlayerId")?.trim() || "";
+  const explicitTeamId = formData.get("teamId")?.trim() || "";
+  const explicitRosterPlayer = explicitRosterPlayerId
+    ? state.rosterPlayers.find((item) => item.id === explicitRosterPlayerId && (!explicitTeamId || item.teamId === explicitTeamId))
+    : null;
+  const player = explicitRosterPlayer
+    ? rosterPlayerToPlayer(explicitRosterPlayer)
+    : normalizePlayer(state.player);
   if (!isTeamPlayer(player)) {
     showToast("Pick a roster player first");
     return;
@@ -2782,8 +2789,8 @@ async function saveRosterPlayer(formData) {
   }
 
   const rosterPlayer = normalizeRosterPlayer({
-    id: player.rosterPlayerId || player.id,
-    teamId: player.teamId,
+    id: explicitRosterPlayerId || player.rosterPlayerId || player.id,
+    teamId: explicitTeamId || player.teamId,
     name: formData.get("name")?.trim() || "Roster Player",
     number: formData.get("number")?.trim() || "",
     position,
@@ -3425,6 +3432,8 @@ function renderRosterPlayerEditForm(selectedRosterPlayer, options = {}) {
   const prefix = options.idPrefix || "editRoster";
   return `
     <form class="card pad form-grid roster-edit-card" data-form="roster-player-edit">
+      <input type="hidden" name="rosterPlayerId" value="${escapeHTML(player.rosterPlayerId || player.id)}" />
+      <input type="hidden" name="teamId" value="${escapeHTML(player.teamId)}" />
       <div class="section-head compact-head">
         <div>
           <h3>Edit ${escapeHTML(player.name)}</h3>
