@@ -51,6 +51,21 @@ as $$
   select (select public.laxhornet_approved_app_role()) = 'admin';
 $$;
 
+create or replace function public.laxhornet_can_edit_team(check_team_id text)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.team_members
+    where team_id = check_team_id
+      and user_id = (select auth.uid())
+      and role in ('admin', 'tracker')
+  );
+$$;
+
 create or replace function public.laxhornet_create_team(
   p_team_id text,
   p_team_name text,
@@ -122,14 +137,68 @@ $laxhornet_create_team$;
 grant execute on function public.laxhornet_is_platform_reviewer() to authenticated;
 grant execute on function public.laxhornet_approved_app_role() to authenticated;
 grant execute on function public.laxhornet_can_create_team() to authenticated;
+grant execute on function public.laxhornet_can_edit_team(text) to authenticated;
 grant execute on function public.laxhornet_create_team(text, text, text, text, text) to authenticated;
+
+create or replace function public.laxhornet_create_roster_player(
+  p_roster_player_id text,
+  p_team_id text,
+  p_name text,
+  p_number text,
+  p_position text
+)
+returns table(
+  id text,
+  team_id text,
+  name text,
+  number text,
+  position text,
+  active boolean,
+  created_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public
+as $laxhornet_create_roster_player$
+begin
+  if (select auth.uid()) is null then
+    raise exception 'Sign in required';
+  end if;
+
+  if not (select public.laxhornet_can_edit_team(p_team_id)) then
+    raise exception 'Team editor access required';
+  end if;
+
+  return query
+  insert into public.roster_players (id, team_id, name, number, position, active)
+  values (
+    p_roster_player_id,
+    p_team_id,
+    nullif(trim(p_name), ''),
+    trim(coalesce(p_number, '')),
+    trim(coalesce(p_position, '')),
+    true
+  )
+  returning
+    roster_players.id,
+    roster_players.team_id,
+    roster_players.name,
+    roster_players.number,
+    roster_players.position,
+    roster_players.active,
+    roster_players.created_at;
+end;
+$laxhornet_create_roster_player$;
+
+grant execute on function public.laxhornet_create_roster_player(text, text, text, text, text) to authenticated;
 
 notify pgrst, 'reload schema';
 
 select
-  'laxhornet_create_team installed' as status,
+  'laxhornet roster functions installed' as status,
   routine_name,
   routine_type
 from information_schema.routines
 where routine_schema = 'public'
-  and routine_name = 'laxhornet_create_team';
+  and routine_name in ('laxhornet_create_team', 'laxhornet_create_roster_player')
+order by routine_name;

@@ -2083,22 +2083,22 @@ async function addRosterPlayer(formData) {
     number: formData.get("rosterNumber")?.trim() || "",
     position: formData.get("rosterPosition")?.trim() || "",
   });
-  const { error } = await supabaseClient.from("roster_players").insert({
-    id: rosterPlayer.id,
-    team_id: rosterPlayer.teamId,
-    name: rosterPlayer.name,
-    number: rosterPlayer.number,
-    position: rosterPlayer.position,
-    active: true,
+  const { data: rosterRows, error } = await supabaseClient.rpc("laxhornet_create_roster_player", {
+    p_roster_player_id: rosterPlayer.id,
+    p_team_id: rosterPlayer.teamId,
+    p_name: rosterPlayer.name,
+    p_number: rosterPlayer.number,
+    p_position: rosterPlayer.position,
   });
   if (error) {
     reportTeamSetupError(error);
     return;
   }
 
-  state.rosterPlayers = normalizeRosterPlayers([...state.rosterPlayers, rosterPlayer]);
+  const createdRosterPlayer = rosterPlayerFromSupabaseRow((Array.isArray(rosterRows) ? rosterRows[0] : rosterRows) || rosterPlayer);
+  state.rosterPlayers = normalizeRosterPlayers([...state.rosterPlayers, createdRosterPlayer]);
   mergeRosterPlayersIntoPlayers();
-  state.activePlayerId = rosterPlayer.id;
+  state.activePlayerId = createdRosterPlayer.id;
   syncActivePlayer();
   persistAll();
   render();
