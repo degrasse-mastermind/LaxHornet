@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v107";
+const APP_VERSION = "v108";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -3420,28 +3420,21 @@ function renderHome() {
 
 function renderMore() {
   const team = activeTeam();
-  const requestSummary = state.teamAccessRequests.filter((request) => request.userId === currentUserId());
-  const latestRequest = requestSummary[0] || null;
   const playerLine = [playerSubline(state.player)].filter(Boolean).join("");
   const profileName = [state.userProfile?.firstName, state.userProfile?.lastName].filter(Boolean).join(" ");
-  const accessText = team
-    ? "Access: approved"
-    : latestRequest
-      ? `Access: ${latestRequest.status}`
-      : "No approved team yet";
   const active = state.activeGame;
   const activePlayer = active ? gamePlayerSnapshot(active) : null;
 
   return renderShell(`
     <section class="screen-title">
-      <h2>More</h2>
+      <h2>Manage</h2>
       <p>Quick access to tracking, player details, team tools, account, watching, and help.</p>
     </section>
 
     <section class="stack">
       <section class="card pad more-card">
         <div>
-          <h3>Game Day</h3>
+          <h3>Game Day Manager</h3>
           <p class="muted small">${escapeHTML(playerTitle(activePlayer || state.player))}${playerLine ? ` - ${escapeHTML(playerLine)}` : ""}</p>
         </div>
         <div class="more-status-grid">
@@ -3462,8 +3455,13 @@ function renderMore() {
           </button>
           <button class="more-action" type="button" data-nav="player">
             <span>${renderNavIcon("games")}</span>
-            <strong>Player Details</strong>
+            <strong>Manage Players</strong>
             <small>View the selected player and edit roster details when allowed.</small>
+          </button>
+          <button class="more-action" type="button" data-nav="team">
+            <span>${renderNavIcon("track")}</span>
+            <strong>Manage Teams</strong>
+            <small>Sync, request access, and manage roster tools.</small>
           </button>
         </div>
       </section>
@@ -3499,32 +3497,6 @@ function renderMore() {
             <span>${renderNavIcon("more")}</span>
             <strong>Sign Out</strong>
             <small>Use this before switching parent accounts on the same device.</small>
-          </button>
-        </div>
-      </section>
-
-      <section class="card pad more-card">
-        <div class="section-head">
-          <div>
-            <h3>Team</h3>
-            <p class="muted small">${escapeHTML(team?.name || latestRequest?.teamName || "Request access from your team admin.")}</p>
-          </div>
-        </div>
-        <div class="more-status-grid">
-          <div class="more-status-cell">
-            <span>Status</span>
-            <strong>${escapeHTML(accessText)}</strong>
-          </div>
-          <div class="more-status-cell">
-            <span>Player</span>
-            <strong>${escapeHTML(isTeamPlayer(state.player) ? playerTitle(state.player) : "Not verified")}</strong>
-          </div>
-        </div>
-        <div class="more-action-list">
-          <button class="more-action" type="button" data-nav="team">
-            <span>${renderNavIcon("track")}</span>
-            <strong>Open Team</strong>
-            <small>Sync teams, request access, and manage roster tools.</small>
           </button>
         </div>
       </section>
