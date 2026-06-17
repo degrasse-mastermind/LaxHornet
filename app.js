@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v108";
+const APP_VERSION = "v109";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -2974,6 +2974,7 @@ function renderNavIcon(icon) {
     track: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2a8.8 8.8 0 1 0 0 17.6 8.8 8.8 0 0 0 0-17.6Zm0 3.2a5.6 5.6 0 1 1 0 11.2 5.6 5.6 0 0 1 0-11.2Zm0 3.1a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z"/></svg>`,
     games: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20H5a1.5 1.5 0 0 1-1.5-1.5v-13A1.5 1.5 0 0 1 5 4Zm1.8 4.2h10.4V6.8H6.8v1.4Zm0 4.1h10.4v-1.4H6.8v1.4Zm0 4.1h6.8V15H6.8v1.4Z"/></svg>`,
     season: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19h14v1.7H5V19Zm1.3-7.2h3v5.6h-3v-5.6Zm4.2-6.6h3v12.2h-3V5.2Zm4.2 3.9h3v8.3h-3V9.1Z"/></svg>`,
+    team: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 11.2a3.2 3.2 0 1 1 0-6.4 3.2 3.2 0 0 1 0 6.4Zm7.6.3a2.7 2.7 0 1 1 0-5.4 2.7 2.7 0 0 1 0 5.4ZM3.8 19.2c.4-3.2 2-5.4 4.4-5.4s4 2.2 4.4 5.4H3.8Zm8.5 0c.3-2 1.1-3.6 2.2-4.6.5-.4 1.1-.6 1.8-.6 2.1 0 3.6 2 4 5.2h-8Z"/></svg>`,
     more: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.4 13.9a1.9 1.9 0 1 1 0-3.8 1.9 1.9 0 0 1 0 3.8Zm5.6 0a1.9 1.9 0 1 1 0-3.8 1.9 1.9 0 0 1 0 3.8Zm5.6 0a1.9 1.9 0 1 1 0-3.8 1.9 1.9 0 0 1 0 3.8Z"/></svg>`,
   };
   return icons[icon] || icons.more;
@@ -3459,7 +3460,7 @@ function renderMore() {
             <small>View the selected player and edit roster details when allowed.</small>
           </button>
           <button class="more-action" type="button" data-nav="team">
-            <span>${renderNavIcon("track")}</span>
+            <span>${renderNavIcon("team")}</span>
             <strong>Manage Teams</strong>
             <small>Sync, request access, and manage roster tools.</small>
           </button>
