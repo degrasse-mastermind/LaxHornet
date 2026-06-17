@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v73";
+const APP_VERSION = "v74";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -239,7 +239,7 @@ const DEFAULT_PLAYER = {
 };
 
 const DEFAULT_TEAM_INVITE_LENGTH = 6;
-const TEAM_EDIT_ROLES = ["admin", "tracker"];
+const TEAM_MANAGE_ROLES = ["admin"];
 const APP_ROLES = ["viewer", "tracker", "admin"];
 
 const app = document.querySelector("#app");
@@ -368,7 +368,7 @@ function normalizeTeams(teams = []) {
         ...normalized,
         inviteCode: normalized.inviteCode || existing?.inviteCode || "",
         trackerCode: normalized.trackerCode || existing?.trackerCode || "",
-        role: TEAM_EDIT_ROLES.includes(existing?.role) && normalized.role === "viewer" ? existing.role : normalized.role,
+        role: TEAM_MANAGE_ROLES.includes(existing?.role) && normalized.role === "viewer" ? existing.role : normalized.role,
       });
     }
   });
@@ -462,7 +462,7 @@ function teamRoleLabel(role) {
 
 function canEditTeam(teamId) {
   if (isPlatformReviewer()) return true;
-  return TEAM_EDIT_ROLES.includes(teamRole(teamId));
+  return TEAM_MANAGE_ROLES.includes(teamRole(teamId));
 }
 
 function canManageRoster(teamId) {
@@ -1871,7 +1871,7 @@ async function loadCloudTeams(options = {}) {
   }
 
   const cloudTeams = normalizeTeams((memberRows || []).map(teamFromSupabaseRows));
-  state.teams = normalizeTeams([...state.teams, ...cloudTeams]);
+  state.teams = cloudTeams;
   if (!state.activeTeamId || !state.teams.some((team) => team.id === state.activeTeamId)) {
     state.activeTeamId = state.teams[0]?.id || "";
   }
@@ -2466,8 +2466,8 @@ async function syncGameToSupabase(game, options = {}) {
 
 async function syncLoggedEvent(game, event) {
   if (!supabaseClient || !game || !event) return;
-  if (gameTeamId(game) && !canEditTeam(gameTeamId(game))) {
-    state.syncStatus = "Team roster is view-only";
+  if (gameTeamId(game) && !canEditGame(game)) {
+    state.syncStatus = "Verify your child before syncing team stats";
     return;
   }
   const gameSynced = await syncGameToSupabase(game);
@@ -2895,7 +2895,7 @@ function renderTeamRosterCard(options = {}) {
 
   const team = activeTeam();
   const roster = activeTeamRoster();
-  const editable = team ? canEditTeam(team.id) : false;
+  const editable = team ? canManageRoster(team.id) : false;
   const manageRoster = team ? canManageRoster(team.id) : false;
   const roleCopy = team ? teamRoleLabel(team.role) : "";
   const teams = state.teams
@@ -2926,7 +2926,10 @@ function renderTeamRosterCard(options = {}) {
         })
         .join("")
     : "";
-  const showClaimByNumber = team && teamRole(team.id) === "tracker" && !state.playerClaims.some((claim) => claim.teamId === team.id);
+  const showClaimByNumber =
+    team &&
+    teamRole(team.id) === "tracker" &&
+    (!state.playerClaims.some((claim) => claim.teamId === team.id) || !roster.length);
   const emptyRosterCopy = showClaimByNumber
     ? "Enter your child's jersey number below to unlock that player."
     : editable
