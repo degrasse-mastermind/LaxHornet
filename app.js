@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v111";
+const APP_VERSION = "v112";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -255,6 +255,8 @@ const supabaseClient =
 let sharedGameChannel = null;
 let lastSyncErrorAt = 0;
 let activeStorageUserId = "";
+let waitingServiceWorker = null;
+let reloadingForUpdate = false;
 const initialStoredState = readStoredAccountState();
 
 const state = {
@@ -291,6 +293,8 @@ const state = {
   signupDraft: null,
   accessRequestSummary: null,
   toast: "",
+  updateAvailable: false,
+  updateInstalling: false,
   authBusy: false,
 };
 
@@ -2937,9 +2941,26 @@ function renderShell(content, options = {}) {
         </span>
       </div>
     </header>
+    ${renderUpdateBanner()}
     ${content}
     ${options.hideNav ? "" : renderBottomNav()}
     ${state.toast ? `<div class="toast" role="status">${escapeHTML(state.toast)}</div>` : ""}
+  `;
+}
+
+function renderUpdateBanner() {
+  if (!state.updateAvailable) return "";
+  return `
+    <section class="update-banner" role="status" aria-live="polite">
+      <div>
+        <strong>${state.updateInstalling ? "Updating LaxHornet..." : "Update available"}</strong>
+        <span>${state.updateInstalling ? "Reloading into the newest version." : "Tap once to load the newest version."}</span>
+      </div>
+      <div class="update-actions">
+        <button class="mini-btn light" type="button" data-action="apply-update" ${state.updateInstalling ? "disabled" : ""}>Update Now</button>
+        <button class="update-dismiss" type="button" data-action="dismiss-update" aria-label="Dismiss update notice">x</button>
+      </div>
+    </section>
   `;
 }
 
@@ -4864,6 +4885,13 @@ function handleClick(event) {
       state.exportToolsExpanded = !state.exportToolsExpanded;
       render();
     }
+    if (action.dataset.action === "apply-update") {
+      applyAppUpdate();
+    }
+    if (action.dataset.action === "dismiss-update") {
+      state.updateAvailable = false;
+      render();
+    }
     return;
   }
 
@@ -4948,10 +4976,57 @@ function handleChange(event) {
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("service-worker.js").catch(() => {
-      console.info("Service worker registration failed.");
+    navigator.serviceWorker
+      .register("service-worker.js")
+      .then((registration) => {
+        watchServiceWorkerUpdates(registration);
+        registration.update().catch(() => {});
+        window.setInterval(() => registration.update().catch(() => {}), 60 * 60 * 1000);
+      })
+      .catch(() => {
+        console.info("Service worker registration failed.");
+      });
+  });
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloadingForUpdate) return;
+    reloadingForUpdate = true;
+    window.location.reload();
+  });
+}
+
+function watchServiceWorkerUpdates(registration) {
+  if (registration.waiting && navigator.serviceWorker.controller) {
+    showUpdateAvailable(registration.waiting);
+  }
+
+  registration.addEventListener("updatefound", () => {
+    const worker = registration.installing;
+    if (!worker) return;
+    worker.addEventListener("statechange", () => {
+      if (worker.state === "installed" && navigator.serviceWorker.controller) {
+        showUpdateAvailable(worker);
+      }
     });
   });
+}
+
+function showUpdateAvailable(worker) {
+  waitingServiceWorker = worker;
+  state.updateAvailable = true;
+  state.updateInstalling = false;
+  render();
+}
+
+function applyAppUpdate() {
+  if (!waitingServiceWorker) {
+    showToast("Update will load on next open");
+    return;
+  }
+  state.updateAvailable = true;
+  state.updateInstalling = true;
+  render();
+  waitingServiceWorker.postMessage({ type: "SKIP_WAITING" });
 }
 
 async function initApp() {

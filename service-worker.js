@@ -1,12 +1,12 @@
-const CACHE_NAME = "laxhornet-v111";
+const CACHE_NAME = "laxhornet-v112";
 const APP_ASSETS = [
   "./",
   "./index.html",
   "./logo-options.html",
-  "./styles.css?v=111",
-  "./assets/supabase.min.js?v=111",
-  "./app.js?v=111",
-  "./manifest.json?v=111",
+  "./styles.css?v=112",
+  "./assets/supabase.min.js?v=112",
+  "./app.js?v=112",
+  "./manifest.json?v=112",
   "./assets/icon.svg?v=11",
   "./assets/laxhornet-logo.png",
   "./assets/logo-concept-1-venom-wordmark.svg",
@@ -19,7 +19,6 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_ASSETS)),
   );
-  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -62,4 +61,10 @@ self.addEventListener("fetch", (event) => {
         .catch(() => caches.match("./index.html"));
     }),
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
