@@ -1591,6 +1591,11 @@ function isTeamSetupError(error = {}) {
   return /teams|team_members|roster_players|tracker_code|laxhornet_|schema cache|relation|column|function|permission|policy/i.test(text);
 }
 
+function isPermissionError(error = {}) {
+  const text = supabaseErrorText(error);
+  return /row-level security|violates row-level security|permission denied|policy|not authorized|42501/i.test(text);
+}
+
 function reportTeamSetupError(error) {
   console.warn("LaxHornet team roster setup failed:", error);
   state.syncStatus = "Team roster database update needed";
@@ -1601,6 +1606,16 @@ function reportTeamSetupError(error) {
   } else {
     render();
   }
+}
+
+function reportTeamCreateError(error) {
+  console.warn("LaxHornet create team failed:", error);
+  if (isPermissionError(error)) {
+    state.syncStatus = "Admin approval required";
+    showToast("Admin approval required");
+    return;
+  }
+  reportTeamSetupError(error);
 }
 
 function missingSupabaseColumn(error) {
@@ -1997,7 +2012,7 @@ async function createTeam(formData) {
     created_by: currentUserId(),
   });
   if (teamError) {
-    reportTeamSetupError(teamError);
+    reportTeamCreateError(teamError);
     return;
   }
 
@@ -2008,7 +2023,7 @@ async function createTeam(formData) {
     role: "admin",
   });
   if (memberError) {
-    reportTeamSetupError(memberError);
+    reportTeamCreateError(memberError);
     return;
   }
 
