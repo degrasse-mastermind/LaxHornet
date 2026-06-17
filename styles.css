@@ -701,7 +701,11 @@ button:disabled {
 }
 
 .btn.positive {
-  background: linear-gradient(180deg, var(--positive), var(--positive-dark));
+  border: 1px solid rgba(232, 16, 16, 0.72);
+  background:
+    linear-gradient(90deg, var(--hornet-red) 0 6px, transparent 6px),
+    linear-gradient(180deg, #2a3038, #13161a);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 .btn.neutral {
