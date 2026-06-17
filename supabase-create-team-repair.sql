@@ -113,7 +113,7 @@ begin
     now(),
     now()
   )
-  on conflict (user_id) do update
+  on conflict on constraint user_profiles_pkey do update
   set email = excluded.email,
       requested_role = excluded.requested_role,
       approved_role = case
