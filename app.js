@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v133";
+const APP_VERSION = "v134";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -5223,7 +5223,6 @@ function renderPromoDemoPage() {
           <div class="promo-field-lines" aria-hidden="true"></div>
           <div class="promo-player-marker" aria-hidden="true"></div>
           <div class="promo-field-copy">
-            <span>Replace this side with game footage</span>
             <strong>Follow one player through the shift</strong>
           </div>
           <div class="promo-caption-stack">
