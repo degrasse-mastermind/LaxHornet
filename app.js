@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v120";
+const APP_VERSION = "v121";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -540,6 +540,14 @@ function visibleRosterPlayers(roster = state.rosterPlayers) {
   });
 }
 
+function teamRosterPlayers(teamId) {
+  if (!teamId) return [];
+  return state.rosterPlayers.filter((player) => {
+    const normalized = normalizeRosterPlayer(player);
+    return normalized.teamId === teamId && normalized.active !== false;
+  });
+}
+
 function visiblePlayers() {
   const localPlayers = state.players.filter((player) => !player.teamId);
   const rosterPlayers = visibleRosterPlayers().map(rosterPlayerToPlayer);
@@ -596,7 +604,7 @@ function ensureActiveTeamRosterPlayer() {
 function activeTeamRoster() {
   const team = activeTeam();
   if (!team) return [];
-  return visibleRosterPlayers(state.rosterPlayers.filter((player) => player.teamId === team.id));
+  return visibleRosterPlayers(teamRosterPlayers(team.id));
 }
 
 function teamIds() {
@@ -3363,6 +3371,24 @@ function renderClaimByNumberForm(teamId, options = {}) {
   `;
 }
 
+function renderPlayerVerificationBlock(teamId, options = {}) {
+  if (!teamId) return "";
+  const team = teamById(teamId);
+  const teamName = options.teamName || team?.name || "your team";
+  const suffix = options.suffix || teamId;
+  return `
+    <div class="team-roster-block verify-player-block">
+      <div class="section-head compact-head">
+        <div>
+          <h4>Verify Your Player</h4>
+          <p class="muted small">Access is approved for ${escapeHTML(teamName)}. Enter your child's jersey number to unlock only that player.</p>
+        </div>
+      </div>
+      ${renderClaimByNumberForm(teamId, { suffix })}
+    </div>
+  `;
+}
+
 function renderUnclaimedRosterPlayers(roster = []) {
   if (!roster.length) return "";
   const unclaimed = roster.filter((player) => !hasPlayerClaim(player.teamId, player.id));
@@ -3422,7 +3448,7 @@ function renderMyTeamAccessRequests() {
                     <small>Access: ${escapeHTML(request.status)}</small>
                   </span>
                 </div>
-                ${needsClaim ? renderClaimByNumberForm(request.teamId, { suffix: request.id || request.teamId }) : ""}
+                ${needsClaim ? renderPlayerVerificationBlock(request.teamId, { teamName: request.teamName, suffix: request.id || request.teamId }) : ""}
               `;
             },
           )
@@ -3446,6 +3472,7 @@ function renderTeamRosterCard(options = {}) {
 
   const team = activeTeam();
   const roster = activeTeamRoster();
+  const fullTeamRoster = team ? teamRosterPlayers(team.id) : [];
   const editable = team ? canManageRoster(team.id) : false;
   const manageRoster = team ? canManageRoster(team.id) : false;
   const teams = state.teams
@@ -3482,7 +3509,7 @@ function renderTeamRosterCard(options = {}) {
   const showClaimByNumber =
     team &&
     teamRole(team.id) === "tracker" &&
-    (!state.playerClaims.some((claim) => claim.teamId === team.id) || !roster.length);
+    !state.playerClaims.some((claim) => claim.teamId === team.id);
   const emptyRosterCopy = showClaimByNumber
     ? "Enter your child's jersey number below to unlock that player."
     : editable
@@ -3490,7 +3517,7 @@ function renderTeamRosterCard(options = {}) {
       : "No verified player is available for this account yet.";
   const rosterContent = roster.length ? rosterChips : `<p class="muted small">${emptyRosterCopy}</p>`;
   const claimByNumberForm = showClaimByNumber
-    ? renderClaimByNumberForm(team.id, { suffix: "active-team" })
+    ? renderPlayerVerificationBlock(team.id, { suffix: "active-team" })
     : "";
   const teamHeaderCopy = !team
     ? canCreateTeams()
@@ -3546,7 +3573,7 @@ function renderTeamRosterCard(options = {}) {
                               </div>
                             </div>
                             <div class="player-chip-row">${rosterContent}</div>
-                            ${renderUnclaimedRosterPlayers(roster)}
+                            ${renderUnclaimedRosterPlayers(fullTeamRoster)}
                             ${claimByNumberForm}
                           </div>
                           <form class="team-add-player-form" data-form="add-roster-player">
