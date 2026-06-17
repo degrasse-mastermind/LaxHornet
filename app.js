@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v121";
+const APP_VERSION = "v122";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -595,10 +595,11 @@ function mergeRosterPlayersIntoPlayers() {
 }
 
 function ensureActiveTeamRosterPlayer() {
-  const roster = activeTeamRoster().length ? activeTeamRoster() : visibleRosterPlayers();
-  if (!roster.length) return;
-  if (roster.some((player) => player.id === state.activePlayerId)) return;
-  state.activePlayerId = roster[0].id;
+  const allVisibleRoster = visibleRosterPlayers();
+  if (!allVisibleRoster.length) return;
+  if (allVisibleRoster.some((player) => player.id === state.activePlayerId)) return;
+  const activeRoster = activeTeamRoster();
+  state.activePlayerId = activeRoster[0]?.id || allVisibleRoster[0].id;
 }
 
 function activeTeamRoster() {
@@ -743,17 +744,27 @@ function gamePlayerSnapshot(game = {}) {
   return normalizePlayer(game.playerSnapshot || game.player_snapshot || state.player);
 }
 
+function gameBelongsToPlayer(game = {}, player = state.player) {
+  const normalized = normalizePlayer(player);
+  const rosterPlayerId = normalized.rosterPlayerId || (normalized.teamId ? normalized.id : "");
+  const gameRosterId = gameRosterPlayerId(game);
+  const gameTeam = gameTeamId(game);
+  const gamePlayer = gamePlayerId(game);
+  if (rosterPlayerId) {
+    return gameRosterId === rosterPlayerId || (gamePlayer === normalized.id && (!gameTeam || gameTeam === normalized.teamId));
+  }
+  return gamePlayer === normalized.id;
+}
+
 function playerGameCount(playerId) {
-  return state.games.filter((game) => gamePlayerId(game) === playerId).length;
+  const player = state.players.find((item) => item.id === playerId);
+  if (!player) return 0;
+  return state.games.filter((game) => gameBelongsToPlayer(game, player)).length;
 }
 
 function playerHasAnyGames(player = state.player) {
   const normalized = normalizePlayer(player);
-  const rosterPlayerId = normalized.rosterPlayerId || (normalized.teamId ? normalized.id : "");
-  const matchesPlayer = (game) => {
-    const gameRosterId = gameRosterPlayerId(game);
-    return gamePlayerId(game) === normalized.id || (rosterPlayerId && gameRosterId === rosterPlayerId);
-  };
+  const matchesPlayer = (game) => gameBelongsToPlayer(game, normalized);
   return Boolean((state.activeGame && matchesPlayer(state.activeGame)) || state.games.some(matchesPlayer));
 }
 
@@ -761,6 +772,7 @@ function setActivePlayer(playerId, message = "") {
   if (!state.players.some((player) => player.id === playerId)) return;
   state.activePlayerId = playerId;
   syncActivePlayer();
+  if (state.player.teamId) state.activeTeamId = state.player.teamId;
   persistAll();
   render();
   if (message) showToast(message);
@@ -1333,6 +1345,14 @@ function calculateTotals(events = []) {
 
 function calculateSeasonTotals() {
   const games = visibleGames();
+  return calculateSeasonTotalsFromGames(games);
+}
+
+function calculateSeasonTotalsForPlayer(player) {
+  return calculateSeasonTotalsFromGames(visibleGamesForPlayer(player));
+}
+
+function calculateSeasonTotalsFromGames(games) {
   const totals = games.reduce(
     (acc, game) => {
       const gameTotals = calculateTotals(game.events);
@@ -1383,6 +1403,10 @@ function pct(value) {
 }
 
 function visibleGames() {
+  return visibleGamesForPlayer(state.player);
+}
+
+function visibleGamesForPlayer(player = state.player) {
   const userId = currentUserId();
   const joinedTeamIds = teamIds();
   const userGames = userId
@@ -1391,10 +1415,11 @@ function visibleGames() {
         return !game.userId || game.userId === userId || (teamGameId && joinedTeamIds.includes(teamGameId));
       })
     : state.games.filter((game) => !game.userId && !gameTeamId(game));
-  if (!state.activePlayerId) return userGames;
+  const normalized = normalizePlayer(player);
+  if (!normalized.id) return userGames;
   return userGames.filter((game) => {
     const playerId = gamePlayerId(game);
-    return playerId ? playerId === state.activePlayerId : state.players.length <= 1;
+    return playerId ? gameBelongsToPlayer(game, normalized) : state.players.length <= 1;
   });
 }
 
@@ -2141,8 +2166,12 @@ async function loadClaimedRosterPlayers(options = {}) {
       ...state.rosterPlayers,
       ...claimedRosterPlayers,
     ]);
-    state.activeTeamId = state.activeTeamId || claimedRosterPlayers[0].teamId || "";
-    state.activePlayerId = claimedRosterPlayers[0].id;
+    const currentStillVisible = claimedRosterPlayers.some((player) => player.id === state.activePlayerId);
+    const selectedRosterPlayer = currentStillVisible
+      ? claimedRosterPlayers.find((player) => player.id === state.activePlayerId)
+      : claimedRosterPlayers[0];
+    state.activeTeamId = state.activeTeamId || selectedRosterPlayer?.teamId || "";
+    if (!currentStillVisible && selectedRosterPlayer?.id) state.activePlayerId = selectedRosterPlayer.id;
   }
   if (!options.silent) render();
   return claimedRosterPlayers;
@@ -3280,7 +3309,7 @@ function renderPlayerSwitcher(options = {}) {
   const showPlayerSubline = options.showPlayerSubline !== false;
   const showManage = options.showManage !== false;
   const shellClass = options.inline ? "player-switch-card inline" : "card pad player-switch-card";
-  const defaultPlayers = activeTeamRoster().length ? activeTeamRoster().map(rosterPlayerToPlayer) : state.players;
+  const defaultPlayers = visiblePlayers();
   const players = Array.isArray(options.players) ? options.players : defaultPlayers;
   const chips = players
     .map((player) => {
@@ -3308,9 +3337,65 @@ function renderPlayerSwitcher(options = {}) {
                 : ""
           }
         </div>
-        ${showManage ? `<button class="mini-btn light" type="button" data-nav="player">Players</button>` : ""}
+        ${showManage ? `<button class="mini-btn light" type="button" data-nav="player">My Players</button>` : ""}
       </div>
       <div class="player-chip-row">${chips || `<p class="muted small">No players available.</p>`}</div>
+    </section>
+  `;
+}
+
+function renderPlayerAssignmentCard(player) {
+  const normalized = normalizePlayer(player);
+  const active = normalized.id === state.activePlayerId;
+  const totals = calculateSeasonTotalsForPlayer(normalized);
+  const subline = playerSubline(normalized);
+  return `
+    <section class="player-assignment-card ${active ? "active" : ""}">
+      <div class="player-assignment-main">
+        <div>
+          <h3>${escapeHTML(playerTitle(normalized))}</h3>
+          <p>${escapeHTML(subline)}</p>
+        </div>
+        ${active ? `<span class="status-pill">Selected</span>` : `<button class="mini-btn light" type="button" data-player-select="${escapeHTML(normalized.id)}">Select</button>`}
+      </div>
+      <div class="player-assignment-stats">
+        <span><strong>${totals.gamesPlayed}</strong> Games</span>
+        <span><strong>${totals.averageImpact.toFixed(1)}</strong> Avg Impact</span>
+        <span><strong>${totals.goals}</strong> Goals</span>
+        <span><strong>${totals.assists}</strong> Assists</span>
+      </div>
+      <div class="player-assignment-actions">
+        <button class="mini-btn" type="button" data-player-go="${escapeHTML(normalized.id)}" data-target-screen="start">Track</button>
+        <button class="mini-btn light" type="button" data-player-go="${escapeHTML(normalized.id)}" data-target-screen="past">Games</button>
+        <button class="mini-btn light" type="button" data-player-go="${escapeHTML(normalized.id)}" data-target-screen="dashboard">Season</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderMyPlayersList() {
+  const players = visiblePlayers();
+  if (!players.length) {
+    return `
+      <section class="card pad">
+        <h3>No Verified Players Yet</h3>
+        <p class="muted small">Request team access, then verify your child by jersey number after approval.</p>
+        <button class="mini-btn" type="button" data-nav="team">Open Team Access</button>
+      </section>
+    `;
+  }
+  return `
+    <section class="card pad my-players-card">
+      <div class="section-head compact-head">
+        <div>
+          <h3>My Players</h3>
+          <p class="muted small">Each tile is a separate player/team tracking context.</p>
+        </div>
+        <button class="mini-btn light" type="button" data-nav="team">Team Access</button>
+      </div>
+      <div class="player-assignment-list">
+        ${players.map(renderPlayerAssignmentCard).join("")}
+      </div>
     </section>
   `;
 }
@@ -3519,6 +3604,7 @@ function renderTeamRosterCard(options = {}) {
   const claimByNumberForm = showClaimByNumber
     ? renderPlayerVerificationBlock(team.id, { suffix: "active-team" })
     : "";
+  const teamCardTitle = canCreateTeams() ? "Connected Team" : "Team Access";
   const teamHeaderCopy = !team
     ? canCreateTeams()
       ? "Create a team or request access with a team code."
@@ -3529,7 +3615,7 @@ function renderTeamRosterCard(options = {}) {
     <section class="card pad team-card ${compact && !expanded ? "collapsed" : ""}">
       <div class="collapsible-card-head">
         <div>
-          <h3>Connected Team</h3>
+          <h3>${escapeHTML(teamCardTitle)}</h3>
           ${teamHeaderCopy ? `<p class="muted small">${escapeHTML(teamHeaderCopy)}</p>` : ""}
         </div>
         ${
@@ -3700,12 +3786,12 @@ function renderMore() {
           <button class="more-action" type="button" data-nav="player">
             <span>${renderNavIcon("player")}</span>
             <strong>Manage Players</strong>
-            <small>View the selected player and edit roster details when allowed.</small>
+            <small>Choose who to track and review each player/team context.</small>
           </button>
           <button class="more-action" type="button" data-nav="team">
             <span>${renderNavIcon("team")}</span>
             <strong>Manage Teams</strong>
-            <small>Sync, request access, and manage roster tools.</small>
+            <small>Sync approvals, request access, and verify players.</small>
           </button>
         </div>
       </section>
@@ -3958,10 +4044,11 @@ function renderTeamAccessTools() {
 }
 
 function renderTeamPage() {
+  const admin = canCreateTeams();
   return renderShell(`
     <section class="screen-title">
-      <h2>Team</h2>
-      <p>Sync team data, request access with a team code, and manage roster tools in one place.</p>
+      <h2>${admin ? "Team" : "Team Access"}</h2>
+      <p>${admin ? "Sync team data, request access with a team code, and manage roster tools in one place." : "Request team access, sync approvals, and verify your child by jersey number."}</p>
     </section>
 
     <section class="stack">
@@ -4026,18 +4113,12 @@ function renderPlayerPage() {
       </section>`;
   return renderShell(`
     <section class="screen-title">
-      <h2>Player</h2>
-      <p>Review the selected player used for tracking, season totals, and saved games.</p>
+      <h2>My Players</h2>
+      <p>Choose the player and team context before tracking, reviewing games, or checking season totals.</p>
     </section>
 
     <section class="stack">
-      ${renderPlayerSwitcher({
-        title: "Selected Player",
-        helper: isTeamPlayer(state.player)
-          ? "This player is connected to the roster selected on the Team page."
-          : "This player is stored locally on this device.",
-        showManage: false,
-      })}
+      ${renderMyPlayersList()}
       ${team ? "" : `<section class="card pad">
         <h3>No Team Connected</h3>
         <p class="muted small">Use Team to request access with a team code, then sync after approval.</p>
@@ -4055,18 +4136,21 @@ function renderSettings() {
 
 function renderStartGame() {
   const viewOnlyTeamPlayer = isTeamPlayer(state.player) && !canTrackPlayer(state.player);
+  const availablePlayers = visiblePlayers();
   return renderShell(`
     <section class="screen-title">
       <h2>Track New Game</h2>
-      <p>Set the opponent, choose the game format, then start tracking.</p>
+      <p>${availablePlayers.length > 1 ? "Choose the player/team context, then set the game details." : "Set the opponent, choose the game format, then start tracking."}</p>
     </section>
 
     <form class="card pad form-grid" data-form="start-game">
       ${renderPlayerSwitcher({
-        title: "Player For This Game",
+        title: availablePlayers.length > 1 ? "Who Are You Tracking?" : "Player For This Game",
         helper: viewOnlyTeamPlayer
           ? "Verify this roster player as your child before tracking."
-          : "Double-check this before the opening whistle.",
+          : availablePlayers.length > 1
+            ? "Each player/team tile keeps stats separate."
+            : "Double-check this before the opening whistle.",
         inline: true,
       })}
       ${
@@ -5039,6 +5123,20 @@ function handleSubmit(event) {
 }
 
 function handleClick(event) {
+  const playerGo = event.target.closest("[data-player-go]");
+  if (playerGo) {
+    const playerId = playerGo.dataset.playerGo;
+    const targetScreen = playerGo.dataset.targetScreen || "home";
+    if (state.players.some((player) => player.id === playerId)) {
+      state.activePlayerId = playerId;
+      syncActivePlayer();
+      if (state.player.teamId) state.activeTeamId = state.player.teamId;
+      persistAll();
+      navigate(targetScreen);
+    }
+    return;
+  }
+
   const nav = event.target.closest("[data-nav]");
   if (nav) {
     navigate(nav.dataset.nav);
@@ -5054,6 +5152,11 @@ function handleClick(event) {
   const teamSelect = event.target.closest("[data-team-select]");
   if (teamSelect) {
     state.activeTeamId = teamSelect.dataset.teamSelect;
+    const rosterForTeam = activeTeamRoster();
+    if (rosterForTeam.length && !rosterForTeam.some((player) => player.id === state.activePlayerId)) {
+      state.activePlayerId = rosterForTeam[0].id;
+      syncActivePlayer();
+    }
     persistAll();
     render();
     showToast("Team selected");
