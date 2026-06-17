@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v109";
+const APP_VERSION = "v110";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -2974,7 +2974,8 @@ function renderNavIcon(icon) {
     track: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2a8.8 8.8 0 1 0 0 17.6 8.8 8.8 0 0 0 0-17.6Zm0 3.2a5.6 5.6 0 1 1 0 11.2 5.6 5.6 0 0 1 0-11.2Zm0 3.1a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z"/></svg>`,
     games: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20H5a1.5 1.5 0 0 1-1.5-1.5v-13A1.5 1.5 0 0 1 5 4Zm1.8 4.2h10.4V6.8H6.8v1.4Zm0 4.1h10.4v-1.4H6.8v1.4Zm0 4.1h6.8V15H6.8v1.4Z"/></svg>`,
     season: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19h14v1.7H5V19Zm1.3-7.2h3v5.6h-3v-5.6Zm4.2-6.6h3v12.2h-3V5.2Zm4.2 3.9h3v8.3h-3V9.1Z"/></svg>`,
-    team: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 11.2a3.2 3.2 0 1 1 0-6.4 3.2 3.2 0 0 1 0 6.4Zm7.6.3a2.7 2.7 0 1 1 0-5.4 2.7 2.7 0 0 1 0 5.4ZM3.8 19.2c.4-3.2 2-5.4 4.4-5.4s4 2.2 4.4 5.4H3.8Zm8.5 0c.3-2 1.1-3.6 2.2-4.6.5-.4 1.1-.6 1.8-.6 2.1 0 3.6 2 4 5.2h-8Z"/></svg>`,
+    player: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.8 5.8a2.6 2.6 0 1 1 5.2 0 2.6 2.6 0 0 1-5.2 0ZM9.4 3.2l1.2-1.1 5.1 5.7-1.2 1.1-1.6-1.8-1.5 1.3 2.2 2.4c.4.5.5 1.2.1 1.7l-1.6 2.6 3.3 1.3c.4.2.7.5.8.9l.8 3.7-2 .4-.6-2.9-4.3-1.7a1.3 1.3 0 0 1-.6-1.9l1.4-2.3-2.1-2.4-2.3 2.1 2.2 2.5-1.5 1.3-5.4-6.1 1.5-1.3 1.9 2.2 6.1-5.5-1.9-2.2Zm-2.3 15.9 4.6.2-.1 2.1-7.5-.3 2.9-4.7 1.8 1.1-1.7 1.6Z"/></svg>`,
+    team: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.2 2.7h1.6v3.2h-1.6V2.7Zm-5 1.6 1.3-.9 1.6 2.6-1.3.9-1.6-2.6Zm10.3 1.7 1.6-2.6 1.3.9-1.6 2.6-1.3-.9ZM8.1 9.2l2.4 2.2c.7.7 1.9.7 2.6 0l2.3-2.2c.5-.5 1.4-.5 1.9 0l.7.7-4.8 4.6c-.7.7-1.8.7-2.5 0L6 9.9l.7-.7c.4-.5 1.2-.5 1.4 0Zm-3.9 2.2 6 5.9c1.2 1.2 3.1 1.2 4.3 0l5.9-5.9 1.7 1.7-6 5.9c-2.1 2-5.4 2-7.5 0l-6-5.9 1.6-1.7ZM2.6 14.8 7.9 20l-1.6 1.6-5.3-5.2 1.6-1.6Zm18.8 0 1.6 1.6-5.3 5.2-1.6-1.6 5.3-5.2Z"/></svg>`,
     more: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.4 13.9a1.9 1.9 0 1 1 0-3.8 1.9 1.9 0 0 1 0 3.8Zm5.6 0a1.9 1.9 0 1 1 0-3.8 1.9 1.9 0 0 1 0 3.8Zm5.6 0a1.9 1.9 0 1 1 0-3.8 1.9 1.9 0 0 1 0 3.8Z"/></svg>`,
   };
   return icons[icon] || icons.more;
@@ -3455,7 +3456,7 @@ function renderMore() {
             <small>${active ? `Continue tracking ${escapeHTML(playerTitle(activePlayer))}.` : "Open the game setup screen."}</small>
           </button>
           <button class="more-action" type="button" data-nav="player">
-            <span>${renderNavIcon("games")}</span>
+            <span>${renderNavIcon("player")}</span>
             <strong>Manage Players</strong>
             <small>View the selected player and edit roster details when allowed.</small>
           </button>
