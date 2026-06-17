@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v118";
+const APP_VERSION = "v119";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -543,7 +543,10 @@ function visibleRosterPlayers(roster = state.rosterPlayers) {
 function visiblePlayers() {
   const localPlayers = state.players.filter((player) => !player.teamId);
   const rosterPlayers = visibleRosterPlayers().map(rosterPlayerToPlayer);
-  return dedupePlayers([...localPlayers, ...rosterPlayers], state.activePlayerId).players;
+  const filteredLocalPlayers = rosterPlayers.length
+    ? localPlayers.filter((player) => !isDefaultPlaceholderPlayer(player))
+    : localPlayers;
+  return dedupePlayers([...filteredLocalPlayers, ...rosterPlayers], state.activePlayerId).players;
 }
 
 function canEditGame(game = {}) {
@@ -574,14 +577,17 @@ function rosterPlayerToPlayer(rosterPlayer = {}) {
 function mergeRosterPlayersIntoPlayers() {
   const localPlayers = state.players.filter((player) => !player.teamId);
   const rosterPlayers = visibleRosterPlayers().map(rosterPlayerToPlayer);
-  state.players = dedupePlayers([...localPlayers, ...rosterPlayers], state.activePlayerId).players;
+  const filteredLocalPlayers = rosterPlayers.length
+    ? localPlayers.filter((player) => !isDefaultPlaceholderPlayer(player))
+    : localPlayers;
+  state.players = dedupePlayers([...filteredLocalPlayers, ...rosterPlayers], state.activePlayerId).players;
   if (state.activeTeamId && !state.teams.some((team) => team.id === state.activeTeamId)) {
     state.activeTeamId = state.teams[0]?.id || "";
   }
 }
 
 function ensureActiveTeamRosterPlayer() {
-  const roster = activeTeamRoster();
+  const roster = activeTeamRoster().length ? activeTeamRoster() : visibleRosterPlayers();
   if (!roster.length) return;
   if (roster.some((player) => player.id === state.activePlayerId)) return;
   state.activePlayerId = roster[0].id;
@@ -609,6 +615,16 @@ function makeInviteCode() {
 function isTeamPlayer(player = {}) {
   const normalized = normalizePlayer(player);
   return Boolean(normalized.teamId && normalized.rosterPlayerId);
+}
+
+function isDefaultPlaceholderPlayer(player = {}) {
+  const normalized = normalizePlayer(player);
+  return !normalized.teamId
+    && normalized.name === DEFAULT_PLAYER.name
+    && !normalized.number
+    && !normalized.team
+    && !normalized.position
+    && !normalized.notes;
 }
 
 function normalizePlayers(players, fallbackPlayer = normalizePlayer(DEFAULT_PLAYER, { createId: true })) {
