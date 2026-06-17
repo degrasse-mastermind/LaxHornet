@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v90";
+const APP_VERSION = "v91";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -3112,8 +3112,9 @@ function renderAdminReviewCard() {
 
 function renderPlayerSwitcher(options = {}) {
   const title = options.title || "Tracking Player";
-  const helper = options.helper || "Choose who these stats belong to.";
+  const helper = options.helper === false ? "" : options.helper || "Choose who these stats belong to.";
   const helperLines = Array.isArray(options.helperLines) ? options.helperLines.filter(Boolean) : null;
+  const showPlayerSubline = Boolean(options.showPlayerSubline);
   const showManage = options.showManage !== false;
   const shellClass = options.inline ? "player-switch-card inline" : "card pad player-switch-card";
   const defaultPlayers = activeTeamRoster().length ? activeTeamRoster().map(rosterPlayerToPlayer) : state.players;
@@ -3125,6 +3126,7 @@ function renderPlayerSwitcher(options = {}) {
         <button class="player-chip ${active ? "active" : ""}" type="button" data-player-select="${player.id}" aria-pressed="${active}">
           <strong>${escapeHTML(player.name || "Player")}</strong>
           ${player.number ? `<span>#${escapeHTML(player.number)}</span>` : ""}
+          ${showPlayerSubline ? `<span>${escapeHTML(playerSubline(player))}</span>` : ""}
         </button>
       `;
     })
@@ -3138,7 +3140,9 @@ function renderPlayerSwitcher(options = {}) {
           ${
             helperLines
               ? `<p class="muted small helper-lines">${helperLines.map((line) => `<span>${escapeHTML(line)}</span>`).join("")}</p>`
-              : `<p class="muted small">${escapeHTML(helper)}</p>`
+              : helper
+                ? `<p class="muted small">${escapeHTML(helper)}</p>`
+                : ""
           }
         </div>
         ${showManage ? `<button class="mini-btn light" type="button" data-nav="settings">Manage</button>` : ""}
@@ -3455,7 +3459,8 @@ function renderHome() {
 
     <section class="stack">
       ${renderPlayerSwitcher({
-        helperLines: [playerSubline(state.player)],
+        helper: false,
+        showPlayerSubline: true,
       })}
 
       <div class="metric-grid">
