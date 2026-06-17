@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v85";
+const APP_VERSION = "v86";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -2962,7 +2962,7 @@ function renderBottomNav() {
     { screen: trackTarget, label: state.activeGame ? "Live" : "Track", icon: "track", active: ["start", "live"].includes(state.screen) },
     { screen: "past", label: "Games", icon: "games", active: ["past", "review"].includes(state.screen) },
     { screen: "dashboard", label: "Season", icon: "season", active: state.screen === "dashboard" },
-    { screen: "more", label: "More", icon: "more", active: ["more", "settings", "profileSetup", "tutorial", "help"].includes(state.screen) },
+    { screen: "more", label: "More", icon: "more", active: ["more", "settings", "teamAccess", "profileSetup", "tutorial", "help"].includes(state.screen) },
   ];
   return `
     <nav class="bottom-nav" aria-label="Primary">
@@ -3377,6 +3377,7 @@ function renderTeamRosterCard(options = {}) {
             <div class="team-card-body">
               <div class="team-actions">
                 <button class="mini-btn light" type="button" data-action="sync-team-roster">Sync Teams</button>
+                <button class="mini-btn light" type="button" data-nav="teamAccess">Request Access</button>
               </div>
               ${
                 teams
@@ -3389,27 +3390,6 @@ function renderTeamRosterCard(options = {}) {
               }
 
               ${team ? renderTeamStatsRecord(team) : ""}
-
-              <div class="team-form-grid">
-                ${
-                  canCreateTeams()
-                    ? `<form class="inline-mini-form" data-form="create-team">
-                        <label for="teamName">Create team</label>
-                        <div class="inline-input-action">
-                          <input id="teamName" name="teamName" placeholder="Team name" />
-                          <button class="mini-btn" type="submit">Create</button>
-                        </div>
-                      </form>`
-                    : ""
-                }
-                <form class="inline-mini-form" data-form="join-team">
-                  <label for="inviteCode">Request team access</label>
-                  <div class="inline-input-action">
-                    <input id="inviteCode" name="inviteCode" placeholder="Team access code" autocapitalize="characters" />
-                    <button class="mini-btn" type="submit">Request</button>
-                  </div>
-                </form>
-              </div>
 
               ${
                 team
@@ -3452,7 +3432,6 @@ function renderTeamRosterCard(options = {}) {
                   `
                   : ""
               }
-              ${renderMyTeamAccessRequests()}
             </div>
           `
           : ""
@@ -3568,7 +3547,7 @@ function renderMore() {
           <button class="more-action" type="button" data-nav="profileSetup">
             <span>${renderNavIcon("more")}</span>
             <strong>User Profile</strong>
-            <small>Edit parent details and request team access.</small>
+            <small>Edit parent details and account information.</small>
           </button>
           <button class="more-action" type="button" data-action="sync-cloud-games">
             <span>${renderNavIcon("season")}</span>
@@ -3604,7 +3583,12 @@ function renderMore() {
           <button class="more-action" type="button" data-nav="settings">
             <span>${renderNavIcon("track")}</span>
             <strong>Open Player & Team</strong>
-            <small>View team stats, access requests, and player setup.</small>
+            <small>View team stats and player setup.</small>
+          </button>
+          <button class="more-action" type="button" data-nav="teamAccess">
+            <span>${renderNavIcon("games")}</span>
+            <strong>Request Team Access</strong>
+            <small>Enter a team code or review your requests.</small>
           </button>
         </div>
       </section>
@@ -3739,10 +3723,72 @@ function renderProfileSetup() {
   `, { hideNav: !state.authUser });
 }
 
+function renderTeamAccess() {
+  const team = activeTeam();
+  const requestList = renderMyTeamAccessRequests();
+  return renderShell(`
+    <section class="screen-title">
+      <h2>Team Access</h2>
+      <p>Enter a team code from your team admin, then verify your child by jersey number once access is approved.</p>
+    </section>
+
+    <section class="stack">
+      <section class="card pad">
+        <div class="section-head compact-head">
+          <div>
+            <h3>Request Access</h3>
+            <p class="muted small">${escapeHTML(team ? `Current team: ${team.name}` : "Use the code shared by your team admin.")}</p>
+          </div>
+        </div>
+        <form class="inline-mini-form" data-form="join-team">
+          <label for="inviteCode">Team access code</label>
+          <div class="inline-input-action">
+            <input id="inviteCode" name="inviteCode" placeholder="ABC123" autocapitalize="characters" autocomplete="off" />
+            <button class="mini-btn" type="submit">Request</button>
+          </div>
+        </form>
+      </section>
+
+      ${
+        canCreateTeams()
+          ? `<section class="card pad">
+              <div class="section-head compact-head">
+                <div>
+                  <h3>Create Team</h3>
+                  <p class="muted small">Admin-only setup for preloading the official roster.</p>
+                </div>
+              </div>
+              <form class="inline-mini-form" data-form="create-team">
+                <label for="teamName">Team name</label>
+                <div class="inline-input-action">
+                  <input id="teamName" name="teamName" placeholder="Team name" />
+                  <button class="mini-btn" type="submit">Create</button>
+                </div>
+              </form>
+            </section>`
+          : ""
+      }
+
+      <section class="card pad">
+        ${
+          requestList ||
+          `<div class="section-head compact-head">
+            <div>
+              <h3>My Team Requests</h3>
+              <p class="muted small">Approved access appears here. Parent Trackers verify one player by jersey number.</p>
+            </div>
+          </div>
+          <p class="muted small">No team access requests yet.</p>`
+        }
+      </section>
+
+      <button class="btn secondary" type="button" data-nav="settings">Back to Player & Team</button>
+    </section>
+  `);
+}
+
 function renderSettings() {
   const team = activeTeam();
-  const rosterPlayers = activeTeamRoster().map(rosterPlayerToPlayer);
-  const gameCount = playerGameCount(state.activePlayerId);
   const selectedRosterPlayer = isTeamPlayer(state.player) ? normalizePlayer(state.player) : null;
   const canEditSelectedRosterPlayer = selectedRosterPlayer ? canManageRoster(selectedRosterPlayer.teamId) : false;
   const rosterEditCard = selectedRosterPlayer
@@ -3780,28 +3826,16 @@ function renderSettings() {
   return renderShell(`
     <section class="screen-title">
       <h2>Player & Team</h2>
-      <p>Pick a player from the team player list. Roster edits require admin access; Parent Trackers must verify their child before tracking.</p>
+      <p>Review your connected team, synced stats, and player setup. Parent Trackers see only their verified player.</p>
     </section>
 
     <section class="stack">
       ${renderTeamRosterCard()}
-
-      ${
-        team && rosterPlayers.length
-          ? `
-            ${renderPlayerSwitcher({
-              title: `${team.name} Players`,
-              helper: "Choose from the preloaded team roster before starting a game.",
-              showManage: false,
-              players: rosterPlayers,
-            })}
-            <p class="muted small roster-note">${gameCount ? `${gameCount} saved game${gameCount === 1 ? "" : "s"} for ${escapeHTML(state.player.name)}.` : `No saved games yet for ${escapeHTML(state.player.name)}.`}</p>
-          `
-          : `<section class="card pad">
-              <h3>No Preloaded Players Yet</h3>
-              <p class="muted small">Join or sync a team first. If players need to be added, ask the team admin to preload them.</p>
-            </section>`
-      }
+      ${team ? "" : `<section class="card pad">
+        <h3>No Team Connected</h3>
+        <p class="muted small">Request access with a team code, then sync after your request is approved.</p>
+        <button class="mini-btn" type="button" data-nav="teamAccess">Request Team Access</button>
+      </section>`}
       ${rosterEditCard}
     </section>
   `);
@@ -4554,6 +4588,7 @@ function render() {
     requestSubmitted: renderRequestSubmitted,
     profileSetup: renderProfileSetup,
     more: renderMore,
+    teamAccess: renderTeamAccess,
     tutorial: renderTutorial,
     settings: renderSettings,
     start: renderStartGame,
