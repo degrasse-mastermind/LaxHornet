@@ -835,3 +835,5 @@ begin
     alter publication supabase_realtime add table public.roster_players;
   end if;
 end $$;
+
+notify pgrst, 'reload schema';
