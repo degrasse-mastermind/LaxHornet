@@ -586,6 +586,19 @@ button:disabled {
   gap: 10px;
 }
 
+.team-requests-card {
+  padding-top: 10px;
+}
+
+.team-requests-card .team-roster-block {
+  gap: 6px;
+}
+
+.team-requests-card h3,
+.team-requests-card h4 {
+  margin: 0 0 4px;
+}
+
 .team-form-actions {
   display: flex;
   justify-content: flex-end;
