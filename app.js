@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v70";
+const APP_VERSION = "v71";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -1889,7 +1889,10 @@ async function loadCloudTeams(options = {}) {
       return;
     }
 
-    state.rosterPlayers = normalizeRosterPlayers([...state.rosterPlayers, ...(rosterRows || []).map(rosterPlayerFromSupabaseRow)]);
+    state.rosterPlayers = normalizeRosterPlayers([
+      ...state.rosterPlayers.filter((player) => !ids.includes(player.teamId)),
+      ...(rosterRows || []).map(rosterPlayerFromSupabaseRow),
+    ]);
     await loadEditableTeamAccessCodes();
     await loadPlayerClaims({ silent: true });
   }
@@ -2197,12 +2200,20 @@ async function reviewTeamAccessRequest(requestId, approved) {
   showToast(approved ? "Team access approved" : "Team access rejected");
 }
 
-async function claimRosterPlayer(rosterPlayerId) {
-  const player = state.rosterPlayers.find((item) => item.id === rosterPlayerId);
-  if (!player) return;
+async function claimRosterPlayer(formData) {
+  const team = activeTeam();
+  if (!team) {
+    showToast("Sync your approved team first");
+    return;
+  }
+  const jerseyNumber = formData.get("claimJerseyNumber")?.trim();
+  if (!jerseyNumber) {
+    showToast("Enter your child's jersey number");
+    return;
+  }
   const { data, error } = await supabaseClient.rpc("laxhornet_claim_roster_player", {
-    p_team_id: player.teamId,
-    p_roster_player_id: player.id,
+    p_team_id: team.id,
+    p_jersey_number: jerseyNumber,
   });
   if (error) {
     reportTeamSetupError(error);
@@ -2210,11 +2221,12 @@ async function claimRosterPlayer(rosterPlayerId) {
   }
   const claim = playerClaimFromSupabaseRow((Array.isArray(data) ? data[0] : data) || {});
   state.playerClaims = normalizePlayerClaims([...state.playerClaims, claim]);
-  state.activePlayerId = player.id;
+  await loadCloudTeams({ silent: true });
+  state.activePlayerId = claim.rosterPlayerId || state.activePlayerId;
   syncActivePlayer();
   persistAll();
   render();
-  showToast(`${playerTitle(rosterPlayerToPlayer(player))} verified as your child`);
+  showToast("Player verified");
 }
 
 async function createTeam(formData) {
@@ -2879,19 +2891,36 @@ function renderTeamRosterCard(options = {}) {
           const player = rosterPlayerToPlayer(item);
           const active = player.id === state.activePlayerId;
           const claimed = hasPlayerClaim(item.teamId, item.id);
-          const canClaim = team && teamRole(team.id) !== "admin" && !claimed;
           return `
             <div class="player-chip-wrap">
               <button class="player-chip ${active ? "active" : ""}" type="button" data-player-select="${player.id}" aria-pressed="${active}">
                 <strong>${escapeHTML(player.name)}</strong>
                 <span>${item.number ? `#${escapeHTML(item.number)}` : "No jersey"}${item.position ? ` - ${escapeHTML(item.position)}` : ""}${claimed ? " - Verified child" : ""}</span>
               </button>
-              ${canClaim ? `<button class="mini-btn light" type="button" data-claim-player="${item.id}">This is my child</button>` : ""}
             </div>
           `;
         })
         .join("")
-    : `<p class="muted small">${editable ? "No rostered players yet. Add players by name and jersey number." : "No rostered players have been added yet."}</p>`;
+    : "";
+  const showClaimByNumber = team && teamRole(team.id) === "tracker" && !state.playerClaims.some((claim) => claim.teamId === team.id);
+  const emptyRosterCopy = showClaimByNumber
+    ? "Enter your child's jersey number below to unlock that player."
+    : editable
+      ? "No rostered players yet. Add players by name and jersey number."
+      : "No verified player is available for this account yet.";
+  const rosterContent = roster.length ? rosterChips : `<p class="muted small">${emptyRosterCopy}</p>`;
+  const claimByNumberForm = showClaimByNumber
+    ? `
+      <form class="inline-mini-form" data-form="claim-roster-player">
+        <label for="claimJerseyNumber">Confirm your player</label>
+        <div class="inline-input-action">
+          <input id="claimJerseyNumber" name="claimJerseyNumber" inputmode="numeric" placeholder="Jersey #" required />
+          <button class="mini-btn" type="submit">Verify</button>
+        </div>
+        <p class="muted small">Enter your child's jersey number. After verification, only that player will appear for this account.</p>
+      </form>
+    `
+    : "";
 
   return `
     <section class="card pad team-card ${compact && !expanded ? "collapsed" : ""}">
@@ -2930,18 +2959,17 @@ function renderTeamRosterCard(options = {}) {
               ${renderMyTeamAccessRequests()}
 
               <div class="team-form-grid">
-                <form class="inline-mini-form" data-form="create-team">
-                  <label for="teamName">Create team</label>
-                  <div class="inline-input-action">
-                    <input id="teamName" name="teamName" placeholder="Team name" />
-                    <button class="mini-btn" type="submit" ${canCreateTeams() ? "" : "disabled"}>Create</button>
-                  </div>
-                  ${
-                    canCreateTeams()
-                      ? ""
-                      : `<p class="muted small">${requestedAdminPending() ? "Admin approval is pending." : "Create Team requires approved Admin access."}</p>`
-                  }
-                </form>
+                ${
+                  canCreateTeams()
+                    ? `<form class="inline-mini-form" data-form="create-team">
+                        <label for="teamName">Create team</label>
+                        <div class="inline-input-action">
+                          <input id="teamName" name="teamName" placeholder="Team name" />
+                          <button class="mini-btn" type="submit">Create</button>
+                        </div>
+                      </form>`
+                    : ""
+                }
                 <form class="inline-mini-form" data-form="join-team">
                   <label for="inviteCode">Request team access</label>
                   <div class="inline-input-action">
@@ -2965,7 +2993,8 @@ function renderTeamRosterCard(options = {}) {
                           }</p>
                         </div>
                       </div>
-                      <div class="player-chip-row">${rosterChips}</div>
+                      <div class="player-chip-row">${rosterContent}</div>
+                      ${claimByNumberForm}
                     </div>
                     ${
                       manageRoster
@@ -2985,7 +3014,7 @@ function renderTeamRosterCard(options = {}) {
                               <button class="mini-btn" type="submit">Add Player</button>
                             </div>
                           </form>`
-                        : `<p class="muted small team-note">${teamRole(team.id) === "tracker" ? "Verify your child above before tracking that player." : "Ask a team admin for tracker access if you should be able to enter shared stats."}</p>`
+                        : `<p class="muted small team-note">${teamRole(team.id) === "tracker" ? "Verify your child by jersey number before tracking." : "Ask a team admin for tracker access if you should be able to enter shared stats."}</p>`
                     }
                     ${
                       manageRoster
@@ -3908,6 +3937,10 @@ function handleSubmit(event) {
     saveRosterPlayer(formData);
   }
 
+  if (form.dataset.form === "claim-roster-player") {
+    claimRosterPlayer(formData);
+  }
+
   if (form.dataset.form === "start-game") {
     if (isTeamPlayer(state.player) && !canTrackPlayer(state.player)) {
       showToast("Verify your child before tracking");
@@ -4098,12 +4131,6 @@ function handleClick(event) {
   const reviewTeamAccess = event.target.closest("[data-review-team-access]");
   if (reviewTeamAccess) {
     reviewTeamAccessRequest(reviewTeamAccess.dataset.reviewTeamAccess, reviewTeamAccess.dataset.approved === "true");
-    return;
-  }
-
-  const claimPlayer = event.target.closest("[data-claim-player]");
-  if (claimPlayer) {
-    claimRosterPlayer(claimPlayer.dataset.claimPlayer);
     return;
   }
 

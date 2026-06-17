@@ -97,6 +97,7 @@ create table if not exists public.player_claims (
   roster_player_id text not null references public.roster_players(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
+  constraint player_claims_team_user_key unique (team_id, user_id),
   constraint player_claims_team_user_player_key unique (team_id, user_id, roster_player_id)
 );
 
@@ -114,6 +115,15 @@ alter table public.teams add column if not exists tracker_code text unique;
 update public.team_members
 set role = 'viewer'
 where role = 'member';
+
+delete from public.player_claims older
+using public.player_claims newer
+where older.team_id = newer.team_id
+  and older.user_id = newer.user_id
+  and (
+    older.created_at < newer.created_at
+    or (older.created_at = newer.created_at and older.id < newer.id)
+  );
 
 create index if not exists games_player_id_idx on public.games (player_id);
 create index if not exists games_team_id_idx on public.games (team_id);
@@ -135,6 +145,7 @@ create index if not exists team_access_requests_user_id_idx on public.team_acces
 create index if not exists player_claims_team_id_idx on public.player_claims (team_id);
 create index if not exists player_claims_user_id_idx on public.player_claims (user_id);
 create index if not exists player_claims_roster_player_id_idx on public.player_claims (roster_player_id);
+create unique index if not exists player_claims_team_user_unique_idx on public.player_claims (team_id, user_id);
 create index if not exists user_profiles_email_idx on public.user_profiles (lower(email));
 create index if not exists user_profiles_admin_status_idx on public.user_profiles (admin_status);
 
@@ -443,6 +454,23 @@ as $$
     );
 $$;
 
+create or replace function public.laxhornet_can_track_roster_player(check_team_id text, check_roster_player_id text)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select (select public.laxhornet_is_platform_reviewer())
+    or (select public.laxhornet_team_role(check_team_id)) = 'admin'
+    or exists (
+      select 1
+      from public.player_claims claims
+      where claims.team_id = check_team_id
+        and claims.roster_player_id = check_roster_player_id
+        and claims.user_id = (select auth.uid())
+    );
+$$;
+
 create or replace function public.laxhornet_join_team_by_code(join_code text)
 returns table(team_id text, role text)
 language plpgsql
@@ -450,43 +478,18 @@ security definer
 set search_path = public
 as $$
 declare
-  matched_team public.teams%rowtype;
-  next_role text;
+  request_row record;
 begin
   select *
-  into matched_team
-  from public.teams
-  where upper(invite_code) = upper(join_code)
-     or upper(coalesce(tracker_code, '')) = upper(join_code)
+  into request_row
+  from public.laxhornet_request_team_access(join_code)
   limit 1;
 
-  if not found then
-    return;
+  if found then
+    team_id := request_row.team_id;
+    role := request_row.requested_role;
+    return next;
   end if;
-
-  next_role := case
-    when upper(coalesce(matched_team.tracker_code, '')) = upper(join_code) then 'tracker'
-    else 'viewer'
-  end;
-
-  insert into public.team_members (id, team_id, user_id, role)
-  values (matched_team.id || '-' || (select auth.uid())::text, matched_team.id, (select auth.uid()), next_role)
-  on conflict (team_id, user_id) do update
-  set role = case
-    when public.team_members.role = 'admin' then 'admin'
-    when public.team_members.role = 'tracker' and excluded.role = 'viewer' then 'tracker'
-    else excluded.role
-  end;
-
-  team_id := matched_team.id;
-  role := (
-    select team_members.role
-    from public.team_members
-    where team_members.team_id = matched_team.id
-      and team_members.user_id = (select auth.uid())
-    limit 1
-  );
-  return next;
 end;
 $$;
 
@@ -754,8 +757,8 @@ begin
     raise exception 'Sign in required';
   end if;
 
-  if not (select public.laxhornet_can_edit_team(p_team_id)) then
-    raise exception 'Team editor access required';
+  if not ((select public.laxhornet_is_platform_reviewer()) or (select public.laxhornet_team_role(p_team_id)) = 'admin') then
+    raise exception 'Team admin access required';
   end if;
 
   return query
@@ -804,8 +807,8 @@ begin
     raise exception 'Sign in required';
   end if;
 
-  if not (select public.laxhornet_can_edit_team(p_team_id)) then
-    raise exception 'Team editor access required';
+  if not ((select public.laxhornet_is_platform_reviewer()) or (select public.laxhornet_team_role(p_team_id)) = 'admin') then
+    raise exception 'Team admin access required';
   end if;
 
   return query
@@ -849,8 +852,8 @@ begin
     raise exception 'Sign in required';
   end if;
 
-  if not (select public.laxhornet_can_edit_team(p_team_id)) then
-    raise exception 'Team editor access required';
+  if not ((select public.laxhornet_is_platform_reviewer()) or (select public.laxhornet_team_role(p_team_id)) = 'admin') then
+    raise exception 'Team admin access required';
   end if;
 
   return query
@@ -871,7 +874,7 @@ $laxhornet_remove_roster_player$;
 
 create or replace function public.laxhornet_claim_roster_player(
   p_team_id text,
-  p_roster_player_id text
+  p_jersey_number text
 )
 returns table(
   id text,
@@ -884,6 +887,8 @@ language plpgsql
 security definer
 set search_path = public
 as $laxhornet_claim_roster_player$
+declare
+  matched_roster_player public.roster_players%rowtype;
 begin
   if (select auth.uid()) is null then
     raise exception 'Sign in required';
@@ -893,21 +898,24 @@ begin
     raise exception 'Approved team access required';
   end if;
 
-  if not exists (
-    select 1
-    from public.roster_players
-    where roster_players.id = p_roster_player_id
-      and roster_players.team_id = p_team_id
-      and roster_players.active = true
-  ) then
-    raise exception 'Roster player not found';
+  select *
+  into matched_roster_player
+  from public.roster_players
+  where roster_players.team_id = p_team_id
+    and roster_players.active = true
+    and trim(roster_players.number) = trim(p_jersey_number)
+  order by roster_players.created_at asc
+  limit 1;
+
+  if not found then
+    raise exception 'No active roster player found for that jersey number';
   end if;
 
   return query
   insert into public.player_claims (id, team_id, roster_player_id, user_id)
-  values ('claim-' || p_team_id || '-' || (select auth.uid())::text || '-' || p_roster_player_id, p_team_id, p_roster_player_id, (select auth.uid()))
-  on conflict on constraint player_claims_team_user_player_key do update
-  set created_at = public.player_claims.created_at
+  values ('claim-' || p_team_id || '-' || (select auth.uid())::text, p_team_id, matched_roster_player.id, (select auth.uid()))
+  on conflict (team_id, user_id) do update
+  set roster_player_id = excluded.roster_player_id
   returning
     player_claims.id,
     player_claims.team_id,
@@ -948,7 +956,7 @@ as $$
   select teams.invite_code, teams.tracker_code
   from public.teams
   where teams.id = check_team_id
-    and (select public.laxhornet_can_edit_team(check_team_id));
+    and ((select public.laxhornet_is_platform_reviewer()) or (select public.laxhornet_team_role(check_team_id)) = 'admin');
 $$;
 
 grant execute on function public.laxhornet_is_team_member(text) to authenticated;
@@ -961,6 +969,7 @@ grant execute on function public.laxhornet_pending_admin_requests() to authentic
 grant execute on function public.laxhornet_review_admin_request(uuid, boolean) to authenticated;
 grant execute on function public.laxhornet_team_role(text) to authenticated;
 grant execute on function public.laxhornet_can_edit_team(text) to authenticated;
+grant execute on function public.laxhornet_can_track_roster_player(text, text) to authenticated;
 grant execute on function public.laxhornet_join_team_by_code(text) to authenticated;
 grant execute on function public.laxhornet_request_team_access(text) to authenticated;
 grant execute on function public.laxhornet_pending_team_access_requests() to authenticated;
@@ -1059,7 +1068,7 @@ using (
 create policy "laxhornet insert player claims"
 on public.player_claims for insert
 to authenticated
-with check (user_id = (select auth.uid()) and (select public.laxhornet_is_team_member(team_id)));
+with check (false);
 
 create policy "laxhornet read teams"
 on public.teams for select
@@ -1119,23 +1128,33 @@ using (user_id = (select auth.uid()) or (select public.laxhornet_team_role(team_
 create policy "laxhornet read roster players"
 on public.roster_players for select
 to authenticated
-using ((select public.laxhornet_is_team_member(team_id)));
+using (
+  (select public.laxhornet_is_platform_reviewer())
+  or (select public.laxhornet_team_role(team_id)) = 'admin'
+  or exists (
+    select 1
+    from public.player_claims claims
+    where claims.team_id = roster_players.team_id
+      and claims.roster_player_id = roster_players.id
+      and claims.user_id = (select auth.uid())
+  )
+);
 
 create policy "laxhornet insert roster players"
 on public.roster_players for insert
 to authenticated
-with check ((select public.laxhornet_can_edit_team(team_id)));
+with check ((select public.laxhornet_is_platform_reviewer()) or (select public.laxhornet_team_role(team_id)) = 'admin');
 
 create policy "laxhornet update roster players"
 on public.roster_players for update
 to authenticated
-using ((select public.laxhornet_can_edit_team(team_id)))
-with check ((select public.laxhornet_can_edit_team(team_id)));
+using ((select public.laxhornet_is_platform_reviewer()) or (select public.laxhornet_team_role(team_id)) = 'admin')
+with check ((select public.laxhornet_is_platform_reviewer()) or (select public.laxhornet_team_role(team_id)) = 'admin');
 
 create policy "laxhornet delete roster players"
 on public.roster_players for delete
 to authenticated
-using ((select public.laxhornet_can_edit_team(team_id)));
+using ((select public.laxhornet_is_platform_reviewer()) or (select public.laxhornet_team_role(team_id)) = 'admin');
 
 create policy "laxhornet read own or shared games"
 on public.games for select
@@ -1143,7 +1162,7 @@ to anon, authenticated
 using (
   is_shared = true
   or (select auth.uid()) = user_id
-  or (team_id is not null and (select public.laxhornet_is_team_member(team_id)))
+  or (team_id is not null and (select public.laxhornet_can_track_roster_player(team_id, roster_player_id)))
 );
 
 create policy "laxhornet insert own games"
@@ -1151,7 +1170,7 @@ on public.games for insert
 to authenticated
 with check (
   (select auth.uid()) = user_id
-  and (team_id is null or (select public.laxhornet_can_edit_team(team_id)))
+  and (team_id is null or (select public.laxhornet_can_track_roster_player(team_id, roster_player_id)))
 );
 
 create policy "laxhornet update own games"
@@ -1159,11 +1178,11 @@ on public.games for update
 to authenticated
 using (
   (team_id is null and (select auth.uid()) = user_id)
-  or (team_id is not null and (select public.laxhornet_can_edit_team(team_id)))
+  or (team_id is not null and (select public.laxhornet_can_track_roster_player(team_id, roster_player_id)))
 )
 with check (
   (team_id is null and (select auth.uid()) = user_id)
-  or (team_id is not null and (select public.laxhornet_can_edit_team(team_id)))
+  or (team_id is not null and (select public.laxhornet_can_track_roster_player(team_id, roster_player_id)))
 );
 
 create policy "laxhornet delete own games"
@@ -1171,7 +1190,7 @@ on public.games for delete
 to authenticated
 using (
   (team_id is null and (select auth.uid()) = user_id)
-  or (team_id is not null and (select public.laxhornet_can_edit_team(team_id)))
+  or (team_id is not null and (select public.laxhornet_can_track_roster_player(team_id, roster_player_id)))
 );
 
 create policy "laxhornet read own or shared events"
@@ -1179,14 +1198,14 @@ on public.events for select
 to anon, authenticated
 using (
   (select auth.uid()) = user_id
-  or (team_id is not null and (select public.laxhornet_is_team_member(team_id)))
+  or (team_id is not null and (select public.laxhornet_can_track_roster_player(team_id, roster_player_id)))
   or exists (
     select 1
     from public.games
     where games.id = events.game_id
       and (
         games.is_shared = true
-        or (games.team_id is not null and (select public.laxhornet_is_team_member(games.team_id)))
+        or (games.team_id is not null and (select public.laxhornet_can_track_roster_player(games.team_id, games.roster_player_id)))
       )
   )
 );
@@ -1202,7 +1221,7 @@ with check (
     where games.id = events.game_id
       and (
         (games.team_id is null and games.user_id = (select auth.uid()))
-        or (games.team_id is not null and (select public.laxhornet_can_edit_team(games.team_id)))
+        or (games.team_id is not null and (select public.laxhornet_can_track_roster_player(games.team_id, games.roster_player_id)))
       )
   )
 );
@@ -1219,12 +1238,12 @@ using (
         and games.team_id is not null
     )
   )
-  or (team_id is not null and (select public.laxhornet_can_edit_team(team_id)))
+  or (team_id is not null and (select public.laxhornet_can_track_roster_player(team_id, roster_player_id)))
   or exists (
     select 1 from public.games
     where games.id = events.game_id
       and games.team_id is not null
-      and (select public.laxhornet_can_edit_team(games.team_id))
+      and (select public.laxhornet_can_track_roster_player(games.team_id, games.roster_player_id))
   )
 )
 with check (
@@ -1237,12 +1256,12 @@ with check (
           and games.team_id is not null
       )
     )
-    or (team_id is not null and (select public.laxhornet_can_edit_team(team_id)))
+    or (team_id is not null and (select public.laxhornet_can_track_roster_player(team_id, roster_player_id)))
     or exists (
       select 1 from public.games
       where games.id = events.game_id
         and games.team_id is not null
-        and (select public.laxhornet_can_edit_team(games.team_id))
+        and (select public.laxhornet_can_track_roster_player(games.team_id, games.roster_player_id))
     )
   )
   and exists (
@@ -1251,7 +1270,7 @@ with check (
     where games.id = events.game_id
       and (
         (games.team_id is null and games.user_id = (select auth.uid()))
-        or (games.team_id is not null and (select public.laxhornet_can_edit_team(games.team_id)))
+        or (games.team_id is not null and (select public.laxhornet_can_track_roster_player(games.team_id, games.roster_player_id)))
       )
   )
 );
@@ -1268,12 +1287,12 @@ using (
         and games.team_id is not null
     )
   )
-  or (team_id is not null and (select public.laxhornet_can_edit_team(team_id)))
+  or (team_id is not null and (select public.laxhornet_can_track_roster_player(team_id, roster_player_id)))
   or exists (
     select 1 from public.games
     where games.id = events.game_id
       and games.team_id is not null
-      and (select public.laxhornet_can_edit_team(games.team_id))
+      and (select public.laxhornet_can_track_roster_player(games.team_id, games.roster_player_id))
   )
 );
 
