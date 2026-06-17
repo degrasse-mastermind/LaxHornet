@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v119";
+const APP_VERSION = "v120";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -3363,6 +3363,39 @@ function renderClaimByNumberForm(teamId, options = {}) {
   `;
 }
 
+function renderUnclaimedRosterPlayers(roster = []) {
+  if (!roster.length) return "";
+  const unclaimed = roster.filter((player) => !hasPlayerClaim(player.teamId, player.id));
+  return `
+    <div class="team-roster-block">
+      <div class="section-head compact-head">
+        <div>
+          <h4>Unclaimed Players</h4>
+          <p class="muted small">Roster players not yet verified by a parent account.</p>
+        </div>
+      </div>
+      ${
+        unclaimed.length
+          ? `<div class="admin-request-list">
+              ${unclaimed
+                .map(
+                  (player) => `
+                    <div class="admin-request-row">
+                      <span>
+                        <strong>${escapeHTML(player.name)}</strong>
+                        <small>${player.number ? `#${escapeHTML(player.number)}` : "No jersey"}${player.position ? ` - ${escapeHTML(player.position)}` : ""}</small>
+                      </span>
+                    </div>
+                  `,
+                )
+                .join("")}
+            </div>`
+          : `<p class="muted small">Every roster player on this team has been claimed.</p>`
+      }
+    </div>
+  `;
+}
+
 function renderMyTeamAccessRequests() {
   const ownRequests = state.teamAccessRequests.filter((request) => request.userId === currentUserId());
   if (!ownRequests.length) return "";
@@ -3513,6 +3546,7 @@ function renderTeamRosterCard(options = {}) {
                               </div>
                             </div>
                             <div class="player-chip-row">${rosterContent}</div>
+                            ${renderUnclaimedRosterPlayers(roster)}
                             ${claimByNumberForm}
                           </div>
                           <form class="team-add-player-form" data-form="add-roster-player">
@@ -3593,6 +3627,12 @@ function renderMore() {
   const active = state.activeGame;
   const activePlayer = active ? gamePlayerSnapshot(active) : null;
   const helpExpanded = state.helpExpanded;
+  const activePlayerTeamName = state.player.team || teamById(state.player.teamId)?.name || "";
+  const activeTeamName = team?.name || "";
+  const teamMismatch = activeTeamName && activePlayerTeamName && activeTeamName !== activePlayerTeamName;
+  const gameDaySummary = teamMismatch
+    ? `Tracking ${playerTitle(state.player)} on ${activePlayerTeamName}. Managing ${activeTeamName}.`
+    : `${playerTitle(activePlayer || state.player)}${playerLine ? ` - ${playerLine}` : ""}`;
   const accountModeToggle = isReviewerAccount()
     ? `<div class="mode-toggle" role="group" aria-label="Admin view mode">
         <button class="mini-btn ${isPlatformReviewer() ? "" : "light"}" type="button" data-admin-view-mode="admin" aria-pressed="${isPlatformReviewer()}">Admin Mode</button>
@@ -3610,18 +3650,20 @@ function renderMore() {
       <section class="card pad more-card">
         <div>
           <h3>Game Day Manager</h3>
-          <p class="muted small">${escapeHTML(playerTitle(activePlayer || state.player))}${playerLine ? ` - ${escapeHTML(playerLine)}` : ""}</p>
+          <p class="muted small">${escapeHTML(gameDaySummary)}</p>
         </div>
         <div class="more-status-grid">
           <div class="more-status-cell">
             <span>Active player</span>
             <strong>${escapeHTML(playerTitle(state.player))}</strong>
+            ${activePlayerTeamName ? `<small>${escapeHTML(activePlayerTeamName)}</small>` : ""}
           </div>
           <div class="more-status-cell">
-            <span>Team</span>
-            <strong>${escapeHTML(team?.name || state.player.team || "Not connected")}</strong>
+            <span>Managing team</span>
+            <strong>${escapeHTML(activeTeamName || state.player.team || "Not connected")}</strong>
           </div>
         </div>
+        ${teamMismatch ? `<div class="notice-card compact-notice"><strong>Different team selected.</strong><p class="muted small">Use Manage Teams to add roster players for ${escapeHTML(activeTeamName)}, or use Players to switch who you are tracking.</p></div>` : ""}
         <div class="more-action-list">
           <button class="more-action" type="button" data-nav="${active ? "live" : "start"}">
             <span>${renderNavIcon("track")}</span>

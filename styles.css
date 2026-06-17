@@ -686,6 +686,14 @@ button:disabled {
   font-weight: 800;
 }
 
+.compact-notice {
+  margin-top: 10px;
+}
+
+.compact-notice p {
+  margin: 4px 0 0;
+}
+
 .error-card {
   border-color: rgba(232, 16, 16, 0.48);
   background: #ffe7e7;
@@ -1376,6 +1384,16 @@ button:disabled {
   color: var(--text);
   font-size: 0.9rem;
   line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.more-status-cell small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
