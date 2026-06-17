@@ -10,6 +10,8 @@ const STORAGE_KEYS = {
   teams: "laxhornet.teams",
   rosterPlayers: "laxhornet.rosterPlayers",
   activeTeamId: "laxhornet.activeTeamId",
+  teamAccessRequests: "laxhornet.teamAccessRequests",
+  playerClaims: "laxhornet.playerClaims",
 };
 
 const SUPABASE_CONFIG = {
@@ -18,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v68";
+const APP_VERSION = "v69";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -266,10 +268,13 @@ const state = {
   teams: normalizeTeams(loadJSON(STORAGE_KEYS.teams, [])),
   rosterPlayers: normalizeRosterPlayers(loadJSON(STORAGE_KEYS.rosterPlayers, [])),
   activeTeamId: loadJSON(STORAGE_KEYS.activeTeamId, ""),
+  teamAccessRequests: loadJSON(STORAGE_KEYS.teamAccessRequests, []),
+  playerClaims: loadJSON(STORAGE_KEYS.playerClaims, []),
   games: loadJSON(STORAGE_KEYS.games, []),
   activeGame: loadJSON(STORAGE_KEYS.activeGame, null),
   reviewGameId: loadJSON(STORAGE_KEYS.reviewGameId, null),
   authUser: null,
+  authUserId: "",
   userProfile: null,
   adminRequests: [],
   sharedGame: null,
@@ -370,6 +375,28 @@ function normalizeTeams(teams = []) {
   return [...merged.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function normalizeTeamAccessRequest(request = {}) {
+  return {
+    id: request.id || request.requestId || request.request_id || "",
+    teamId: request.teamId || request.team_id || "",
+    teamName: request.teamName || request.team_name || "",
+    userId: request.userId || request.user_id || "",
+    email: request.email || "",
+    requestedRole: normalizeTeamRole(request.requestedRole || request.requested_role || "viewer"),
+    status: String(request.status || "pending").trim().toLowerCase(),
+    createdAt: request.createdAt || request.created_at || null,
+  };
+}
+
+function normalizeTeamAccessRequests(requests = []) {
+  const merged = new Map();
+  (Array.isArray(requests) ? requests : []).forEach((request) => {
+    const normalized = normalizeTeamAccessRequest(request);
+    if (normalized.id) merged.set(normalized.id, { ...merged.get(normalized.id), ...normalized });
+  });
+  return [...merged.values()].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+}
+
 function normalizeRosterPlayer(player = {}) {
   const teamId = player.teamId || player.team_id || "";
   const id = player.id || player.rosterPlayerId || player.roster_player_id || (teamId ? uid("roster") : "");
@@ -397,6 +424,27 @@ function normalizeRosterPlayers(players = []) {
   });
 }
 
+function normalizePlayerClaim(claim = {}) {
+  return {
+    id: claim.id || claim.claimId || claim.claim_id || "",
+    teamId: claim.teamId || claim.team_id || "",
+    rosterPlayerId: claim.rosterPlayerId || claim.roster_player_id || "",
+    userId: claim.userId || claim.user_id || "",
+    createdAt: claim.createdAt || claim.created_at || null,
+  };
+}
+
+function normalizePlayerClaims(claims = []) {
+  const merged = new Map();
+  (Array.isArray(claims) ? claims : []).forEach((claim) => {
+    const normalized = normalizePlayerClaim(claim);
+    if (normalized.teamId && normalized.rosterPlayerId) {
+      merged.set(`${normalized.teamId}|${normalized.rosterPlayerId}`, { ...merged.get(`${normalized.teamId}|${normalized.rosterPlayerId}`), ...normalized });
+    }
+  });
+  return [...merged.values()];
+}
+
 function teamById(teamId) {
   return state.teams.find((team) => team.id === teamId) || null;
 }
@@ -413,12 +461,38 @@ function teamRoleLabel(role) {
 }
 
 function canEditTeam(teamId) {
+  if (isPlatformReviewer()) return true;
   return TEAM_EDIT_ROLES.includes(teamRole(teamId));
+}
+
+function canManageRoster(teamId) {
+  if (isPlatformReviewer()) return true;
+  return teamRole(teamId) === "admin";
+}
+
+function hasPlayerClaim(teamId, rosterPlayerId) {
+  if (!teamId || !rosterPlayerId) return false;
+  return state.playerClaims.some((claim) => claim.teamId === teamId && claim.rosterPlayerId === rosterPlayerId);
+}
+
+function canTrackRosterPlayer(teamId, rosterPlayerId) {
+  const role = teamRole(teamId);
+  if (!teamId) return true;
+  if (role === "admin") return true;
+  if (role === "tracker") return hasPlayerClaim(teamId, rosterPlayerId);
+  return false;
+}
+
+function canTrackPlayer(player = state.player) {
+  const normalized = normalizePlayer(player);
+  if (!isTeamPlayer(normalized)) return true;
+  return canTrackRosterPlayer(normalized.teamId, normalized.rosterPlayerId || normalized.id);
 }
 
 function canEditGame(game = {}) {
   const teamId = gameTeamId(game);
-  return !teamId || canEditTeam(teamId);
+  if (!teamId) return true;
+  return canTrackRosterPlayer(teamId, gameRosterPlayerId(game));
 }
 
 function activeTeam() {
@@ -935,7 +1009,7 @@ function normalizeGame(game = {}, fallbackPlayer = null) {
 
 function persistAll() {
   mergeRosterPlayersIntoPlayers();
-  ensureActiveTeamRosterPlayer();
+  if (!state.activePlayerId) ensureActiveTeamRosterPlayer();
   syncActivePlayer();
   saveJSON(STORAGE_KEYS.player, state.player);
   saveJSON(STORAGE_KEYS.players, state.players);
@@ -943,6 +1017,8 @@ function persistAll() {
   saveJSON(STORAGE_KEYS.teams, state.teams);
   saveJSON(STORAGE_KEYS.rosterPlayers, state.rosterPlayers);
   saveJSON(STORAGE_KEYS.activeTeamId, state.activeTeamId);
+  saveJSON(STORAGE_KEYS.teamAccessRequests, normalizeTeamAccessRequests(state.teamAccessRequests));
+  saveJSON(STORAGE_KEYS.playerClaims, normalizePlayerClaims(state.playerClaims));
   saveJSON(STORAGE_KEYS.deletedGames, uniqueIds(state.deletedGameIds));
   saveJSON(STORAGE_KEYS.deletedEvents, uniqueIds(state.deletedEventIds));
   saveJSON(STORAGE_KEYS.games, state.games);
@@ -952,6 +1028,29 @@ function persistAll() {
     localStorage.removeItem(STORAGE_KEYS.activeGame);
   }
   saveJSON(STORAGE_KEYS.reviewGameId, state.reviewGameId);
+}
+
+function resetCloudAccountState() {
+  state.teams = [];
+  state.rosterPlayers = [];
+  state.activeTeamId = "";
+  state.teamAccessRequests = [];
+  state.playerClaims = [];
+  state.userProfile = null;
+  state.adminRequests = [];
+  state.players = normalizePlayers(state.players.filter((player) => !player.teamId), legacyPlayer);
+  state.activePlayerId = state.players[0]?.id || "";
+  syncActivePlayer();
+  persistAll();
+}
+
+function setAuthUser(user) {
+  const nextUserId = user?.id || "";
+  if (nextUserId !== state.authUserId) {
+    resetCloudAccountState();
+    state.authUserId = nextUserId;
+  }
+  state.authUser = user || null;
 }
 
 function showToast(message) {
@@ -1736,6 +1835,29 @@ function rosterPlayerFromSupabaseRow(row = {}) {
   });
 }
 
+function teamAccessRequestFromSupabaseRow(row = {}) {
+  return normalizeTeamAccessRequest({
+    id: row.id,
+    teamId: row.team_id,
+    teamName: row.team_name || row.teams?.name || "",
+    userId: row.user_id,
+    email: row.email,
+    requestedRole: row.requested_role,
+    status: row.status,
+    createdAt: row.created_at,
+  });
+}
+
+function playerClaimFromSupabaseRow(row = {}) {
+  return normalizePlayerClaim({
+    id: row.id,
+    teamId: row.team_id,
+    rosterPlayerId: row.roster_player_id,
+    userId: row.user_id,
+    createdAt: row.created_at,
+  });
+}
+
 async function loadCloudTeams(options = {}) {
   if (!supabaseClient || !currentUserId()) return;
   const { data: memberRows, error: memberError } = await supabaseClient
@@ -1769,6 +1891,8 @@ async function loadCloudTeams(options = {}) {
 
     state.rosterPlayers = normalizeRosterPlayers([...state.rosterPlayers, ...(rosterRows || []).map(rosterPlayerFromSupabaseRow)]);
     await loadEditableTeamAccessCodes();
+    await loadPlayerClaims({ silent: true });
+    await loadTeamAccessRequests({ silent: true });
   }
 
   mergeRosterPlayersIntoPlayers();
@@ -1794,6 +1918,35 @@ async function loadEditableTeamAccessCodes() {
       },
     ]);
   }
+}
+
+async function loadTeamAccessRequests(options = {}) {
+  if (!supabaseClient || !currentUserId()) return [];
+  const editableTeamIds = state.teams.filter((team) => canManageRoster(team.id)).map((team) => team.id);
+  if (!editableTeamIds.length) {
+    state.teamAccessRequests = [];
+    return [];
+  }
+  const { data, error } = await supabaseClient.rpc("laxhornet_pending_team_access_requests");
+  if (error) {
+    if (!options.silent) reportTeamSetupError(error);
+    return [];
+  }
+  state.teamAccessRequests = normalizeTeamAccessRequests((Array.isArray(data) ? data : []).map(teamAccessRequestFromSupabaseRow));
+  if (!options.silent) render();
+  return state.teamAccessRequests;
+}
+
+async function loadPlayerClaims(options = {}) {
+  if (!supabaseClient || !currentUserId()) return [];
+  const { data, error } = await supabaseClient.rpc("laxhornet_my_player_claims");
+  if (error) {
+    if (!options.silent) reportTeamSetupError(error);
+    return [];
+  }
+  state.playerClaims = normalizePlayerClaims((Array.isArray(data) ? data : []).map(playerClaimFromSupabaseRow));
+  if (!options.silent) render();
+  return state.playerClaims;
 }
 
 async function loadCloudGames(options = {}) {
@@ -1871,7 +2024,7 @@ async function syncLocalGamesToCloud() {
   let uploaded = 0;
   for (const game of localGames.values()) {
     if (game.userId && game.userId !== currentUserId()) continue;
-    if (gameTeamId(game) && !canEditTeam(gameTeamId(game))) continue;
+    if (gameTeamId(game) && !canEditGame(game)) continue;
     const normalized = normalizeGame({ ...game, userId: currentUserId() });
     if (state.activeGame?.id === normalized.id) state.activeGame = normalized;
     const index = state.games.findIndex((item) => item.id === normalized.id);
@@ -1943,7 +2096,7 @@ async function handleAuthSubmit(formData) {
     return;
   }
 
-  state.authUser = result.data.user || result.data.session?.user || state.authUser;
+  setAuthUser(result.data.user || result.data.session?.user || state.authUser);
   if (state.authUser && authAction === "sign-up") await requestUserRole(requestedRole, { silent: true });
   if (state.authUser) await loadUserProfile({ silent: true });
   state.syncStatus = state.authUser ? "Signed in" : "Check email to confirm account";
@@ -1955,9 +2108,7 @@ async function handleAuthSubmit(formData) {
 async function signOut() {
   if (!supabaseClient) return;
   await supabaseClient.auth.signOut();
-  state.authUser = null;
-  state.userProfile = null;
-  state.adminRequests = [];
+  setAuthUser(null);
   state.syncStatus = "Signed out";
   render();
   showToast("Signed out");
@@ -2023,6 +2174,41 @@ async function reviewAdminRequest(userId, approved) {
   showToast(approved ? "Admin approved" : "Admin rejected");
 }
 
+async function reviewTeamAccessRequest(requestId, approved) {
+  if (!supabaseClient || !currentUserId()) return;
+  const { error } = await supabaseClient.rpc("laxhornet_review_team_access_request", {
+    request_id: requestId,
+    approve: Boolean(approved),
+  });
+  if (error) {
+    reportTeamSetupError(error);
+    return;
+  }
+  await loadCloudTeams({ silent: true });
+  render();
+  showToast(approved ? "Team access approved" : "Team access rejected");
+}
+
+async function claimRosterPlayer(rosterPlayerId) {
+  const player = state.rosterPlayers.find((item) => item.id === rosterPlayerId);
+  if (!player) return;
+  const { data, error } = await supabaseClient.rpc("laxhornet_claim_roster_player", {
+    p_team_id: player.teamId,
+    p_roster_player_id: player.id,
+  });
+  if (error) {
+    reportTeamSetupError(error);
+    return;
+  }
+  const claim = playerClaimFromSupabaseRow((Array.isArray(data) ? data[0] : data) || {});
+  state.playerClaims = normalizePlayerClaims([...state.playerClaims, claim]);
+  state.activePlayerId = player.id;
+  syncActivePlayer();
+  persistAll();
+  render();
+  showToast(`${playerTitle(rosterPlayerToPlayer(player))} verified as your child`);
+}
+
 async function createTeam(formData) {
   if (!supabaseClient || !currentUserId()) {
     showToast("Sign in to create a team");
@@ -2076,25 +2262,23 @@ async function joinTeam(formData) {
     showToast("Enter an invite or tracker code");
     return;
   }
-  const { data: joinRows, error: joinError } = await supabaseClient.rpc("laxhornet_join_team_by_code", {
+  const { data: requestRows, error: requestError } = await supabaseClient.rpc("laxhornet_request_team_access", {
     join_code: accessCode,
   });
-  if (joinError) {
-    reportTeamSetupError(joinError);
+  if (requestError) {
+    reportTeamSetupError(requestError);
     return;
   }
-  const joined = Array.isArray(joinRows) ? joinRows[0] : null;
-  if (!joined?.team_id) {
+  const requested = Array.isArray(requestRows) ? requestRows[0] : null;
+  if (!requested?.team_id) {
     showToast("Team code not found");
     return;
   }
 
-  state.activeTeamId = joined.team_id;
-  await loadCloudTeams({ silent: true });
-  await loadCloudGames({ silent: true });
-  const team = teamById(joined.team_id);
+  state.teamAccessRequests = normalizeTeamAccessRequests([...state.teamAccessRequests, teamAccessRequestFromSupabaseRow(requested)]);
+  persistAll();
   render();
-  showToast(`Joined ${team?.name || "team"} as ${teamRoleLabel(joined.role)}`);
+  showToast(`Access requested for ${requested.team_name || "team"}`);
 }
 
 async function addRosterPlayer(formData) {
@@ -2107,8 +2291,8 @@ async function addRosterPlayer(formData) {
     showToast("Sign in to add team players");
     return;
   }
-  if (!canEditTeam(team.id)) {
-    showToast("View-only team access");
+  if (!canManageRoster(team.id)) {
+    showToast("Team admin access required");
     return;
   }
   const rosterPlayer = normalizeRosterPlayer({
@@ -2146,8 +2330,8 @@ async function saveRosterPlayer(formData) {
     showToast("Pick a roster player first");
     return;
   }
-  if (!canEditTeam(player.teamId)) {
-    showToast("View-only team access");
+  if (!canManageRoster(player.teamId)) {
+    showToast("Team admin access required");
     return;
   }
 
@@ -2189,8 +2373,8 @@ async function removeRosterPlayer() {
     deleteActivePlayer();
     return;
   }
-  if (!canEditTeam(player.teamId)) {
-    showToast("View-only team access");
+  if (!canManageRoster(player.teamId)) {
+    showToast("Team admin access required");
     return;
   }
   if (!window.confirm(`Remove ${playerTitle(player)} from the team roster? Past games will stay saved.`)) return;
@@ -2218,7 +2402,7 @@ async function removeRosterPlayer() {
 async function syncGameToSupabase(game, options = {}) {
   if (!supabaseClient || !game) return false;
   if (isDeletedGame(game.id)) return false;
-  if (gameTeamId(game) && !canEditTeam(gameTeamId(game))) {
+  if (gameTeamId(game) && !canEditGame(game)) {
     state.syncStatus = "Team roster is view-only";
     return false;
   }
@@ -2586,6 +2770,44 @@ function renderPlayerSwitcher(options = {}) {
   `;
 }
 
+function renderTeamAccessRequests() {
+  const team = activeTeam();
+  if (!team || !canManageRoster(team.id)) return "";
+  const requests = state.teamAccessRequests.filter((request) => request.teamId === team.id && request.status === "pending");
+  return `
+    <div class="team-roster-block">
+      <div class="section-head compact-head">
+        <div>
+          <h4>Team Access Requests</h4>
+          <p class="muted small">Approve parents before they can see this roster or track a player.</p>
+        </div>
+      </div>
+      ${
+        requests.length
+          ? `<div class="admin-request-list">
+              ${requests
+                .map(
+                  (request) => `
+                    <div class="admin-request-row">
+                      <span>
+                        <strong>${escapeHTML(request.email || "Unknown email")}</strong>
+                        <small>${teamRoleLabel(request.requestedRole)} access requested</small>
+                      </span>
+                      <span class="event-actions">
+                        <button class="mini-btn" type="button" data-review-team-access="${request.id}" data-approved="true">Approve</button>
+                        <button class="mini-btn danger" type="button" data-review-team-access="${request.id}" data-approved="false">Reject</button>
+                      </span>
+                    </div>
+                  `,
+                )
+                .join("")}
+            </div>`
+          : `<p class="muted small">No pending team access requests.</p>`
+      }
+    </div>
+  `;
+}
+
 function renderTeamRosterCard(options = {}) {
   const compact = Boolean(options.compact);
   const expanded = compact ? state.teamRosterExpanded : true;
@@ -2601,6 +2823,7 @@ function renderTeamRosterCard(options = {}) {
   const team = activeTeam();
   const roster = activeTeamRoster();
   const editable = team ? canEditTeam(team.id) : false;
+  const manageRoster = team ? canManageRoster(team.id) : false;
   const roleCopy = team ? teamRoleLabel(team.role) : "";
   const teams = state.teams
     .map((item) => {
@@ -2618,11 +2841,16 @@ function renderTeamRosterCard(options = {}) {
         .map((item) => {
           const player = rosterPlayerToPlayer(item);
           const active = player.id === state.activePlayerId;
+          const claimed = hasPlayerClaim(item.teamId, item.id);
+          const canClaim = team && teamRole(team.id) !== "admin" && !claimed;
           return `
-            <button class="player-chip ${active ? "active" : ""}" type="button" data-player-select="${player.id}" aria-pressed="${active}">
-              <strong>${escapeHTML(player.name)}</strong>
-              <span>${item.number ? `#${escapeHTML(item.number)}` : "No jersey"}${item.position ? ` - ${escapeHTML(item.position)}` : ""}</span>
-            </button>
+            <div class="player-chip-wrap">
+              <button class="player-chip ${active ? "active" : ""}" type="button" data-player-select="${player.id}" aria-pressed="${active}">
+                <strong>${escapeHTML(player.name)}</strong>
+                <span>${item.number ? `#${escapeHTML(item.number)}` : "No jersey"}${item.position ? ` - ${escapeHTML(item.position)}` : ""}${claimed ? " - Verified child" : ""}</span>
+              </button>
+              ${canClaim ? `<button class="mini-btn light" type="button" data-claim-player="${item.id}">This is my child</button>` : ""}
+            </div>
           `;
         })
         .join("")
@@ -2636,9 +2864,9 @@ function renderTeamRosterCard(options = {}) {
           <p class="muted small">${
             team
               ? `Shared roster for ${escapeHTML(team.name)}. ${roleCopy} access. Viewer code: ${escapeHTML(team.inviteCode)}${
-                  editable && team.trackerCode ? ` Tracker code: ${escapeHTML(team.trackerCode)}` : ""
+                  manageRoster && team.trackerCode ? ` Tracker code: ${escapeHTML(team.trackerCode)}` : ""
                 }`
-              : "Create a team or join with an invite or tracker code."
+              : "Create a team or request access with an invite or tracker code."
           }</p>
         </div>
         ${
@@ -2660,7 +2888,7 @@ function renderTeamRosterCard(options = {}) {
               ${
                 teams
                   ? `<div class="team-chip-row">${teams}</div>`
-                  : `<p class="muted small">No teams yet. Create one for your roster or join with a code from another parent.</p>`
+                  : `<p class="muted small">No teams yet. Create one for your roster or request access with a code from another parent.</p>`
               }
 
               <div class="team-form-grid">
@@ -2677,10 +2905,10 @@ function renderTeamRosterCard(options = {}) {
                   }
                 </form>
                 <form class="inline-mini-form" data-form="join-team">
-                  <label for="inviteCode">Join team</label>
+                  <label for="inviteCode">Request team access</label>
                   <div class="inline-input-action">
                     <input id="inviteCode" name="inviteCode" placeholder="Invite or tracker code" autocapitalize="characters" />
-                    <button class="mini-btn" type="submit">Join</button>
+                    <button class="mini-btn" type="submit">Request</button>
                   </div>
                 </form>
               </div>
@@ -2702,7 +2930,7 @@ function renderTeamRosterCard(options = {}) {
                       <div class="player-chip-row">${rosterChips}</div>
                     </div>
                     ${
-                      editable
+                      manageRoster
                         ? `<form class="team-add-player-form" data-form="add-roster-player">
                             <div class="form-grid two">
                               <div class="field">
@@ -2719,7 +2947,12 @@ function renderTeamRosterCard(options = {}) {
                               <button class="mini-btn" type="submit">Add Player</button>
                             </div>
                           </form>`
-                        : `<p class="muted small team-note">Ask a team admin for tracker access if you should be able to enter roster players or shared stats.</p>`
+                        : `<p class="muted small team-note">${teamRole(team.id) === "tracker" ? "Verify your child above before tracking that player." : "Ask a team admin for tracker access if you should be able to enter shared stats."}</p>`
+                    }
+                    ${
+                      manageRoster
+                        ? renderTeamAccessRequests()
+                        : ""
                     }
                   `
                   : ""
@@ -2803,7 +3036,7 @@ function renderSettings() {
   const rosterPlayers = activeTeamRoster().map(rosterPlayerToPlayer);
   const gameCount = playerGameCount(state.activePlayerId);
   const selectedRosterPlayer = isTeamPlayer(state.player) ? normalizePlayer(state.player) : null;
-  const canEditSelectedRosterPlayer = selectedRosterPlayer ? canEditTeam(selectedRosterPlayer.teamId) : false;
+  const canEditSelectedRosterPlayer = selectedRosterPlayer ? canManageRoster(selectedRosterPlayer.teamId) : false;
   const rosterEditCard = selectedRosterPlayer
     ? canEditSelectedRosterPlayer
       ? `
@@ -2837,14 +3070,14 @@ function renderSettings() {
       : `
         <section class="card pad">
           <h3>${escapeHTML(selectedRosterPlayer.name)}</h3>
-          <p class="muted small">This roster player is view-only for your account. Ask a team admin for tracker access to edit roster details.</p>
+          <p class="muted small">This roster player is view-only for your account. Ask a team admin if roster details need to be changed.</p>
         </section>
       `
     : "";
   return renderShell(`
     <section class="screen-title">
       <h2>Player Settings</h2>
-      <p>Pick a player from the preloaded Team Roster. Roster edits require admin or tracker access.</p>
+      <p>Pick a player from the Team Roster. Roster edits require admin access; trackers must verify their child before tracking.</p>
     </section>
 
     <section class="stack">
@@ -2872,7 +3105,7 @@ function renderSettings() {
 }
 
 function renderStartGame() {
-  const viewOnlyTeamPlayer = isTeamPlayer(state.player) && !canEditTeam(state.player.teamId);
+  const viewOnlyTeamPlayer = isTeamPlayer(state.player) && !canTrackPlayer(state.player);
   return renderShell(`
     <section class="screen-title">
       <h2>Start New Game</h2>
@@ -2883,13 +3116,13 @@ function renderStartGame() {
       ${renderPlayerSwitcher({
         title: "Player For This Game",
         helper: viewOnlyTeamPlayer
-          ? "This shared roster player is view-only for your account."
+          ? "Verify this roster player as your child before tracking."
           : "Double-check this before the opening whistle.",
         inline: true,
       })}
       ${
         viewOnlyTeamPlayer
-          ? `<div class="notice-card">Viewer access can review roster stats, but cannot start a shared team game or enter stats.</div>`
+          ? `<div class="notice-card">Select your child in Team Roster before starting a shared team game.</div>`
           : ""
       }
       <div class="field">
@@ -3638,8 +3871,8 @@ function handleSubmit(event) {
   }
 
   if (form.dataset.form === "start-game") {
-    if (isTeamPlayer(state.player) && !canEditTeam(state.player.teamId)) {
-      showToast("This roster player is view-only");
+    if (isTeamPlayer(state.player) && !canTrackPlayer(state.player)) {
+      showToast("Verify your child before tracking");
       return;
     }
     if (state.activeGame && !window.confirm("Replace the current active game? Save it first if needed.")) {
@@ -3824,6 +4057,18 @@ function handleClick(event) {
     return;
   }
 
+  const reviewTeamAccess = event.target.closest("[data-review-team-access]");
+  if (reviewTeamAccess) {
+    reviewTeamAccessRequest(reviewTeamAccess.dataset.reviewTeamAccess, reviewTeamAccess.dataset.approved === "true");
+    return;
+  }
+
+  const claimPlayer = event.target.closest("[data-claim-player]");
+  if (claimPlayer) {
+    claimRosterPlayer(claimPlayer.dataset.claimPlayer);
+    return;
+  }
+
   const editEvent = event.target.closest("[data-edit-event]");
   if (editEvent) {
     const game = currentReviewGame();
@@ -3902,10 +4147,10 @@ function registerServiceWorker() {
 async function initApp() {
   if (supabaseClient) {
     const { data } = await supabaseClient.auth.getSession();
-    state.authUser = data.session?.user || null;
+    setAuthUser(data.session?.user || null);
     state.syncStatus = state.authUser ? "Signed in" : "Sign in for cloud sync";
     supabaseClient.auth.onAuthStateChange(async (_event, session) => {
-      state.authUser = session?.user || null;
+      setAuthUser(session?.user || null);
       state.syncStatus = state.authUser ? "Signed in" : "Signed out";
       if (state.authUser) {
         await loadUserProfile({ silent: true });

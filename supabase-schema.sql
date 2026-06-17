@@ -78,6 +78,28 @@ create table if not exists public.user_profiles (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.team_access_requests (
+  id text primary key,
+  team_id text not null references public.teams(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  email text not null default '',
+  requested_role text not null default 'viewer',
+  status text not null default 'pending',
+  created_at timestamptz not null default now(),
+  reviewed_by uuid references auth.users(id) on delete set null,
+  reviewed_at timestamptz,
+  constraint team_access_requests_team_user_key unique (team_id, user_id)
+);
+
+create table if not exists public.player_claims (
+  id text primary key,
+  team_id text not null references public.teams(id) on delete cascade,
+  roster_player_id text not null references public.roster_players(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  constraint player_claims_team_user_player_key unique (team_id, user_id, roster_player_id)
+);
+
 alter table public.games add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table public.games add column if not exists is_shared boolean not null default false;
 alter table public.games add column if not exists period_format text not null default 'quarters';
@@ -108,6 +130,11 @@ create index if not exists teams_created_by_idx on public.teams (created_by);
 create index if not exists team_members_team_id_idx on public.team_members (team_id);
 create index if not exists team_members_user_id_idx on public.team_members (user_id);
 create index if not exists roster_players_team_id_idx on public.roster_players (team_id);
+create index if not exists team_access_requests_team_id_idx on public.team_access_requests (team_id);
+create index if not exists team_access_requests_user_id_idx on public.team_access_requests (user_id);
+create index if not exists player_claims_team_id_idx on public.player_claims (team_id);
+create index if not exists player_claims_user_id_idx on public.player_claims (user_id);
+create index if not exists player_claims_roster_player_id_idx on public.player_claims (roster_player_id);
 create index if not exists user_profiles_email_idx on public.user_profiles (lower(email));
 create index if not exists user_profiles_admin_status_idx on public.user_profiles (admin_status);
 
@@ -123,6 +150,8 @@ grant select on public.roster_players to authenticated;
 grant insert, update, delete on public.roster_players to authenticated;
 grant select on public.user_profiles to authenticated;
 grant insert, update on public.user_profiles to authenticated;
+grant select, insert, update, delete on public.team_access_requests to authenticated;
+grant select, insert, update, delete on public.player_claims to authenticated;
 
 alter table public.games enable row level security;
 alter table public.events enable row level security;
@@ -130,6 +159,8 @@ alter table public.teams enable row level security;
 alter table public.team_members enable row level security;
 alter table public.roster_players enable row level security;
 alter table public.user_profiles enable row level security;
+alter table public.team_access_requests enable row level security;
+alter table public.player_claims enable row level security;
 
 create or replace function public.laxhornet_is_team_member(check_team_id text)
 returns boolean
@@ -459,6 +490,147 @@ begin
 end;
 $$;
 
+create or replace function public.laxhornet_request_team_access(join_code text)
+returns table(
+  id text,
+  team_id text,
+  team_name text,
+  user_id uuid,
+  email text,
+  requested_role text,
+  status text,
+  created_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public
+as $laxhornet_request_team_access$
+declare
+  matched_team public.teams%rowtype;
+  next_role text;
+  requester_email text;
+begin
+  if (select auth.uid()) is null then
+    raise exception 'Sign in required';
+  end if;
+
+  select *
+  into matched_team
+  from public.teams
+  where upper(invite_code) = upper(join_code)
+     or upper(coalesce(tracker_code, '')) = upper(join_code)
+  limit 1;
+
+  if not found then
+    return;
+  end if;
+
+  next_role := case
+    when upper(coalesce(matched_team.tracker_code, '')) = upper(join_code) then 'tracker'
+    else 'viewer'
+  end;
+  requester_email := lower(coalesce((auth.jwt() ->> 'email'), ''));
+
+  insert into public.team_access_requests (id, team_id, user_id, email, requested_role, status)
+  values (
+    'access-' || matched_team.id || '-' || (select auth.uid())::text,
+    matched_team.id,
+    (select auth.uid()),
+    requester_email,
+    next_role,
+    'pending'
+  )
+  on conflict on constraint team_access_requests_team_user_key do update
+  set email = excluded.email,
+      requested_role = excluded.requested_role,
+      status = case when public.team_access_requests.status = 'approved' then 'approved' else 'pending' end,
+      created_at = case when public.team_access_requests.status = 'approved' then public.team_access_requests.created_at else now() end;
+
+  return query
+  select
+    requests.id,
+    requests.team_id,
+    matched_team.name,
+    requests.user_id,
+    requests.email,
+    requests.requested_role,
+    requests.status,
+    requests.created_at
+  from public.team_access_requests requests
+  where requests.team_id = matched_team.id
+    and requests.user_id = (select auth.uid());
+end;
+$laxhornet_request_team_access$;
+
+create or replace function public.laxhornet_pending_team_access_requests()
+returns table(
+  id text,
+  team_id text,
+  team_name text,
+  user_id uuid,
+  email text,
+  requested_role text,
+  status text,
+  created_at timestamptz
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    requests.id,
+    requests.team_id,
+    teams.name as team_name,
+    requests.user_id,
+    requests.email,
+    requests.requested_role,
+    requests.status,
+    requests.created_at
+  from public.team_access_requests requests
+  join public.teams teams on teams.id = requests.team_id
+  where requests.status = 'pending'
+    and ((select public.laxhornet_is_platform_reviewer()) or (select public.laxhornet_team_role(requests.team_id)) = 'admin')
+  order by requests.created_at asc;
+$$;
+
+create or replace function public.laxhornet_review_team_access_request(request_id text, approve boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $laxhornet_review_team_access_request$
+declare
+  request_row public.team_access_requests%rowtype;
+begin
+  select *
+  into request_row
+  from public.team_access_requests
+  where id = request_id
+  limit 1;
+
+  if not found then
+    raise exception 'Team access request not found';
+  end if;
+
+  if not ((select public.laxhornet_is_platform_reviewer()) or (select public.laxhornet_team_role(request_row.team_id)) = 'admin') then
+    raise exception 'Team admin access required';
+  end if;
+
+  update public.team_access_requests
+  set status = case when approve then 'approved' else 'rejected' end,
+      reviewed_by = (select auth.uid()),
+      reviewed_at = now()
+  where id = request_id;
+
+  if approve then
+    insert into public.team_members (id, team_id, user_id, role)
+    values ('member-' || request_row.team_id || '-' || request_row.user_id::text, request_row.team_id, request_row.user_id, request_row.requested_role)
+    on conflict (team_id, user_id) do update
+    set role = excluded.role;
+  end if;
+end;
+$laxhornet_review_team_access_request$;
+
 create or replace function public.laxhornet_create_team(
   p_team_id text,
   p_team_name text,
@@ -667,6 +839,76 @@ begin
 end;
 $laxhornet_remove_roster_player$;
 
+create or replace function public.laxhornet_claim_roster_player(
+  p_team_id text,
+  p_roster_player_id text
+)
+returns table(
+  id text,
+  team_id text,
+  roster_player_id text,
+  user_id uuid,
+  created_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public
+as $laxhornet_claim_roster_player$
+begin
+  if (select auth.uid()) is null then
+    raise exception 'Sign in required';
+  end if;
+
+  if not (select public.laxhornet_is_team_member(p_team_id)) then
+    raise exception 'Approved team access required';
+  end if;
+
+  if not exists (
+    select 1
+    from public.roster_players
+    where roster_players.id = p_roster_player_id
+      and roster_players.team_id = p_team_id
+      and roster_players.active = true
+  ) then
+    raise exception 'Roster player not found';
+  end if;
+
+  return query
+  insert into public.player_claims (id, team_id, roster_player_id, user_id)
+  values ('claim-' || p_team_id || '-' || (select auth.uid())::text || '-' || p_roster_player_id, p_team_id, p_roster_player_id, (select auth.uid()))
+  on conflict on constraint player_claims_team_user_player_key do update
+  set created_at = public.player_claims.created_at
+  returning
+    player_claims.id,
+    player_claims.team_id,
+    player_claims.roster_player_id,
+    player_claims.user_id,
+    player_claims.created_at;
+end;
+$laxhornet_claim_roster_player$;
+
+create or replace function public.laxhornet_my_player_claims()
+returns table(
+  id text,
+  team_id text,
+  roster_player_id text,
+  user_id uuid,
+  created_at timestamptz
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select
+    claims.id,
+    claims.team_id,
+    claims.roster_player_id,
+    claims.user_id,
+    claims.created_at
+  from public.player_claims claims
+  where claims.user_id = (select auth.uid());
+$$;
+
 create or replace function public.laxhornet_team_access_codes(check_team_id text)
 returns table(invite_code text, tracker_code text)
 language sql
@@ -690,10 +932,15 @@ grant execute on function public.laxhornet_review_admin_request(uuid, boolean) t
 grant execute on function public.laxhornet_team_role(text) to authenticated;
 grant execute on function public.laxhornet_can_edit_team(text) to authenticated;
 grant execute on function public.laxhornet_join_team_by_code(text) to authenticated;
+grant execute on function public.laxhornet_request_team_access(text) to authenticated;
+grant execute on function public.laxhornet_pending_team_access_requests() to authenticated;
+grant execute on function public.laxhornet_review_team_access_request(text, boolean) to authenticated;
 grant execute on function public.laxhornet_create_team(text, text, text, text, text) to authenticated;
 grant execute on function public.laxhornet_create_roster_player(text, text, text, text, text) to authenticated;
 grant execute on function public.laxhornet_update_roster_player(text, text, text, text, text) to authenticated;
 grant execute on function public.laxhornet_remove_roster_player(text, text) to authenticated;
+grant execute on function public.laxhornet_claim_roster_player(text, text) to authenticated;
+grant execute on function public.laxhornet_my_player_claims() to authenticated;
 grant execute on function public.laxhornet_team_access_codes(text) to authenticated;
 
 drop policy if exists "laxhornet public read games" on public.games;
@@ -727,6 +974,11 @@ drop policy if exists "laxhornet delete roster players" on public.roster_players
 drop policy if exists "laxhornet read user profiles" on public.user_profiles;
 drop policy if exists "laxhornet insert user profiles" on public.user_profiles;
 drop policy if exists "laxhornet update user profiles" on public.user_profiles;
+drop policy if exists "laxhornet read team access requests" on public.team_access_requests;
+drop policy if exists "laxhornet insert team access requests" on public.team_access_requests;
+drop policy if exists "laxhornet update team access requests" on public.team_access_requests;
+drop policy if exists "laxhornet read player claims" on public.player_claims;
+drop policy if exists "laxhornet insert player claims" on public.player_claims;
 
 create policy "laxhornet read user profiles"
 on public.user_profiles for select
@@ -743,6 +995,40 @@ on public.user_profiles for update
 to authenticated
 using (user_id = (select auth.uid()) or (select public.laxhornet_is_platform_reviewer()))
 with check (user_id = (select auth.uid()) or (select public.laxhornet_is_platform_reviewer()));
+
+create policy "laxhornet read team access requests"
+on public.team_access_requests for select
+to authenticated
+using (
+  user_id = (select auth.uid())
+  or (select public.laxhornet_is_platform_reviewer())
+  or (select public.laxhornet_team_role(team_id)) = 'admin'
+);
+
+create policy "laxhornet insert team access requests"
+on public.team_access_requests for insert
+to authenticated
+with check (user_id = (select auth.uid()));
+
+create policy "laxhornet update team access requests"
+on public.team_access_requests for update
+to authenticated
+using ((select public.laxhornet_is_platform_reviewer()) or (select public.laxhornet_team_role(team_id)) = 'admin')
+with check ((select public.laxhornet_is_platform_reviewer()) or (select public.laxhornet_team_role(team_id)) = 'admin');
+
+create policy "laxhornet read player claims"
+on public.player_claims for select
+to authenticated
+using (
+  user_id = (select auth.uid())
+  or (select public.laxhornet_is_platform_reviewer())
+  or (select public.laxhornet_team_role(team_id)) = 'admin'
+);
+
+create policy "laxhornet insert player claims"
+on public.player_claims for insert
+to authenticated
+with check (user_id = (select auth.uid()) and (select public.laxhornet_is_team_member(team_id)));
 
 create policy "laxhornet read teams"
 on public.teams for select

@@ -485,6 +485,16 @@ button:disabled {
   gap: 10px;
 }
 
+.player-chip-wrap {
+  display: grid;
+  gap: 6px;
+  min-width: 132px;
+}
+
+.player-chip-wrap .player-chip {
+  width: 100%;
+}
+
 .compact-head {
   align-items: flex-end;
 }
