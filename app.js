@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v106";
+const APP_VERSION = "v107";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -3319,7 +3319,7 @@ function renderTeamRosterCard(options = {}) {
           ? `
             <div class="team-card-body">
               <div class="team-actions">
-                <button class="mini-btn light" type="button" data-action="sync-team-roster">Sync Teams</button>
+                <button class="mini-btn light" type="button" data-action="sync-team-roster">Sync</button>
                 <button class="mini-btn light" type="button" data-action="toggle-team-access">Request Access</button>
               </div>
               ${
