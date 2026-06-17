@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v113";
+const APP_VERSION = "v114";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -2287,7 +2287,10 @@ async function saveParentProfile(formData) {
   const firstName = formData.get("firstName")?.trim() || "";
   const lastName = formData.get("lastName")?.trim() || "";
   const phone = formData.get("phone")?.trim() || "";
-  const childJerseyNumber = formData.get("childJerseyNumber")?.trim() || "";
+  const hasChildJerseyField = formData.has("childJerseyNumber");
+  const childJerseyNumber = hasChildJerseyField
+    ? formData.get("childJerseyNumber")?.trim() || ""
+    : state.userProfile?.childJerseyNumber || "";
   const teamAccessCode = formData.get("teamAccessCode")?.trim().toUpperCase() || "";
 
   if (!firstName || !lastName) {
@@ -2313,7 +2316,7 @@ async function saveParentProfile(formData) {
     "first_name",
     "last_name",
     "phone",
-    "child_jersey_number",
+    ...(hasChildJerseyField ? ["child_jersey_number"] : []),
     "onboarding_completed",
     "updated_at",
   ]);
@@ -3606,11 +3609,11 @@ function renderProfileSetup() {
   const profile = state.userProfile || {};
   const signupDraft = !state.authUser && state.signupDraft;
   const email = signupDraft?.email || userEmail() || profile.email || "";
-  const requiresTeamRequest = Boolean(signupDraft);
+  const showAccessRequestFields = Boolean(signupDraft);
   return renderShell(`
     <section class="screen-title">
-      <h2>${signupDraft ? "Request Team Access" : "Finish Your Profile"}</h2>
-      <p>${signupDraft ? "Add your parent details, team code, and child jersey number. Your request will go to the LaxHornet admin for approval." : "Add your name and request team access. Your child is verified by jersey number during approval."}</p>
+      <h2>${signupDraft ? "Finish Your Profile" : "User Profile"}</h2>
+      <p>${signupDraft ? "Add your parent details, team code, and child jersey number. Your request will go to the LaxHornet admin for approval." : "Update your account details. Team access and player verification are managed from the Team page."}</p>
     </section>
 
     <form class="card pad form-grid profile-setup-card" data-form="profile-onboarding">
@@ -3635,21 +3638,23 @@ function renderProfileSetup() {
         <input id="phone" name="phone" value="${escapeHTML(profile.phone || "")}" type="tel" autocomplete="tel" placeholder="For team coordination" />
       </div>
 
-      <div class="form-grid two">
-        <div class="field">
-          <label for="teamAccessCode">Team code${requiresTeamRequest ? "" : ` <span class="optional-label">optional</span>`}</label>
-          <input id="teamAccessCode" name="teamAccessCode" placeholder="ABC123" autocapitalize="characters" ${requiresTeamRequest ? "required" : ""} />
+      ${showAccessRequestFields ? `
+        <div class="form-grid two">
+          <div class="field">
+            <label for="teamAccessCode">Team code</label>
+            <input id="teamAccessCode" name="teamAccessCode" placeholder="ABC123" autocapitalize="characters" required />
+          </div>
+          <div class="field">
+            <label for="childJerseyNumber">Child jersey #</label>
+            <input id="childJerseyNumber" name="childJerseyNumber" inputmode="numeric" placeholder="12" required />
+          </div>
         </div>
-        <div class="field">
-          <label for="childJerseyNumber">Child jersey #${requiresTeamRequest ? "" : ` <span class="optional-label">optional</span>`}</label>
-          <input id="childJerseyNumber" name="childJerseyNumber" value="${escapeHTML(profile.childJerseyNumber || "")}" inputmode="numeric" placeholder="12" ${requiresTeamRequest ? "required" : ""} />
-        </div>
-      </div>
 
-      <div class="notice-card">
-        <strong>Approval protects the roster.</strong>
-        <p class="muted small">When approved, this account will unlock only the rostered player matching the jersey number you submit.</p>
-      </div>
+        <div class="notice-card">
+          <strong>Approval protects the roster.</strong>
+          <p class="muted small">When approved, this account will unlock only the rostered player matching the jersey number you submit.</p>
+        </div>
+      ` : ""}
 
       ${state.cloudError ? `<div class="notice-card error-card"><strong>Could not submit request.</strong><p class="muted small">${escapeHTML(state.cloudError)}</p></div>` : ""}
 
