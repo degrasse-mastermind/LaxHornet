@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v71";
+const APP_VERSION = "v72";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -852,7 +852,7 @@ function requestedAdminPending() {
 }
 
 function canCreateTeams() {
-  return currentAppRole() === "admin";
+  return isPlatformReviewer() || (state.userProfile?.approvedRole === "admin" && state.userProfile?.adminStatus === "approved");
 }
 
 function authRedirectUrl() {
@@ -2932,7 +2932,9 @@ function renderTeamRosterCard(options = {}) {
               ? `Shared roster for ${escapeHTML(team.name)}. ${roleCopy} access. Viewer code: ${escapeHTML(team.inviteCode)}${
                   manageRoster && team.trackerCode ? ` Tracker code: ${escapeHTML(team.trackerCode)}` : ""
                 }`
-              : "Create a team or request access with an invite or tracker code."
+              : canCreateTeams()
+                ? "Create a team or request access with an invite or tracker code."
+                : "Request access with an invite or tracker code from your team admin."
           }</p>
         </div>
         ${
@@ -2954,7 +2956,11 @@ function renderTeamRosterCard(options = {}) {
               ${
                 teams
                   ? `<div class="team-chip-row">${teams}</div>`
-                  : `<p class="muted small">No teams yet. Create one for your roster or request access with a code from another parent.</p>`
+                  : `<p class="muted small">${
+                      canCreateTeams()
+                        ? "No teams yet. Create one for your roster or request access with a code from another parent."
+                        : "No approved teams yet. Request access with a code from your team admin."
+                    }</p>`
               }
               ${renderMyTeamAccessRequests()}
 

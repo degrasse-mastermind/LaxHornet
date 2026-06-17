@@ -220,6 +220,7 @@ as $$
         select approved_role
         from public.user_profiles
         where user_id = (select auth.uid())
+          and admin_status = 'approved'
         limit 1
       ),
       'viewer'
