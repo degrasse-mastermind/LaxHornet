@@ -1,4 +1,4 @@
-const CACHE_NAME = "laxhornet-v89";
+const CACHE_NAME = "laxhornet-v90";
 const APP_ASSETS = [
   "./",
   "./index.html",
