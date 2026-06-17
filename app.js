@@ -20,7 +20,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v86";
+const APP_VERSION = "v87";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -3344,23 +3344,18 @@ function renderTeamRosterCard(options = {}) {
   const claimByNumberForm = showClaimByNumber
     ? renderClaimByNumberForm(team.id, { suffix: "active-team" })
     : "";
+  const teamHeaderCopy = !team
+    ? canCreateTeams()
+      ? "Create a team or request access with a team code."
+      : "Request access with a team code from your team admin."
+    : "";
 
   return `
     <section class="card pad team-card ${compact && !expanded ? "collapsed" : ""}">
       <div class="collapsible-card-head">
         <div>
           <h3>Team</h3>
-          <p class="muted small">${
-            team
-              ? `${escapeHTML(team.name)}. Access: approved${
-                  manageRoster && team.inviteCode ? `. Team code: ${escapeHTML(team.inviteCode)}` : ""
-                }${
-                  manageRoster && team.trackerCode ? `. Parent code: ${escapeHTML(team.trackerCode)}` : ""
-                }`
-              : canCreateTeams()
-                ? "Create a team or request access with a team code."
-                : "Request access with a team code from your team admin."
-          }</p>
+          ${teamHeaderCopy ? `<p class="muted small">${escapeHTML(teamHeaderCopy)}</p>` : ""}
         </div>
         ${
           compact
