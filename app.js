@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v139";
+const APP_VERSION = "v140";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -498,6 +498,14 @@ function teamById(teamId) {
 function teamRole(teamId) {
   const role = normalizeTeamRole(teamById(teamId)?.role || "tracker");
   return !isPlatformReviewer() && role === "admin" ? "tracker" : role;
+}
+
+function locallyManagedAdminTeams() {
+  if (!isPlatformReviewer()) return [];
+  return state.teams.filter((team) => {
+    const normalized = normalizeTeam(team);
+    return normalized.id && (normalized.role === "admin" || normalized.createdBy === currentUserId());
+  });
 }
 
 function teamRoleLabel(role) {
@@ -2111,8 +2119,9 @@ async function loadCloudTeams(options = {}) {
     return;
   }
 
+  const localAdminTeams = locallyManagedAdminTeams();
   const cloudTeams = normalizeTeams((memberRows || []).map(teamFromSupabaseRows));
-  state.teams = cloudTeams;
+  state.teams = normalizeTeams([...localAdminTeams, ...cloudTeams]);
 
   if (isPlatformReviewer()) {
     const { data: ownedTeams, error: ownedTeamsError } = await supabaseClient
