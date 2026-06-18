@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v160";
+const APP_VERSION = "v161";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -1823,6 +1823,334 @@ function statWithExtraPossessions(value, extraPossessions) {
   const extra = Number(extraPossessions || 0);
   if (!extra) return value;
   return `${value} (${signedMetric(extra)} EP)`;
+}
+
+/**
+ * @typedef {Object} PlayerStats
+ * @property {number} [gamesPlayed]
+ * @property {number} goals
+ * @property {number} assists
+ * @property {number} shots
+ * @property {number} shotsOnGoal
+ * @property {number} shootingPct
+ * @property {number} groundBalls
+ * @property {number} faceoffWins
+ * @property {number} extraPossessions
+ * @property {number} clears
+ * @property {number} turnovers
+ * @property {number} causedTurnovers
+ * @property {number} defensiveStops
+ * @property {number} saves
+ * @property {number} goalsAllowed
+ * @property {number} savePct
+ * @property {number} failedClears
+ * @property {number} penalties
+ * @property {number} hustlePlays
+ * @property {number} backedUpShots
+ * @property {number} smartPlays
+ */
+
+/**
+ * @typedef {Object} DimensionScores
+ * @property {number} scoring
+ * @property {number} playmaking
+ * @property {number} possession
+ * @property {number} defense
+ * @property {number} goalie
+ * @property {number} hustle
+ * @property {number} mistakeCost
+ */
+
+/**
+ * @typedef {Object} ArchetypeResult
+ * @property {string} name
+ * @property {string} explanation
+ * @property {string} nextFocus
+ * @property {Array<string>} reasons
+ * @property {DimensionScores} scores
+ */
+
+const ARCHETYPE_SCORE_CAPS = {
+  scoring: 18,
+  playmaking: 10,
+  possession: 24,
+  defense: 12,
+  goalie: 18,
+  hustle: 18,
+  mistakeCost: 12,
+};
+
+const ARCHETYPE_DEFS = {
+  finisher: {
+    name: "Finisher",
+    explanation: "You made your biggest impact by finishing scoring chances.",
+    nextFocus: "Add assists or ground balls to become a more complete offensive threat.",
+  },
+  setupArtist: {
+    name: "Setup Artist",
+    explanation: "You created offense for teammates and helped the ball find the right player.",
+    nextFocus: "Look for moments to become a scoring threat too.",
+  },
+  possessionEngine: {
+    name: "Possession Engine",
+    explanation: "You helped your team get more chances by winning possessions and protecting the ball.",
+    nextFocus: "Turn more possession wins into transition chances.",
+  },
+  groundBallMagnet: {
+    name: "Ground Ball Magnet",
+    explanation: "You changed possessions by winning loose balls.",
+    nextFocus: "Turn more ground balls into clean clears or scoring chances.",
+  },
+  defensiveDisruptor: {
+    name: "Defensive Disruptor",
+    explanation: "You created problems for the other team and turned defense into possession.",
+    nextFocus: "Stay aggressive without taking penalties.",
+  },
+  twoWayForce: {
+    name: "Two-Way Force",
+    explanation: "You impacted both ends of the field and contributed in multiple ways.",
+    nextFocus: "Keep balancing offense, defense, and possession work.",
+  },
+  sparkPlug: {
+    name: "Spark Plug",
+    explanation: "You brought energy across the field and helped in several ways.",
+    nextFocus: "Channel that energy into controlled possessions and smart decisions.",
+  },
+  gluePlayer: {
+    name: "Glue Player",
+    explanation: "You helped connect the team by making steady plays in multiple areas.",
+    nextFocus: "Find one area to become dominant while keeping your balanced impact.",
+  },
+  theWall: {
+    name: "The Wall",
+    explanation: "You kept the team in the game with strong saves.",
+    nextFocus: "Improve outlet speed after saves to create transition chances.",
+  },
+  outletStarter: {
+    name: "Outlet Starter",
+    explanation: "You helped turn defensive stops into clean possessions.",
+    nextFocus: "Look for safe fast-break outlets after stops.",
+  },
+  growthProfile: {
+    name: "Growth Profile",
+    explanation: "You logged trackable moments that give a clear starting point for the next game.",
+    nextFocus: "Pick one stat to chase next game, then build from there.",
+  },
+};
+
+const ARCHETYPE_DIMENSION_LABELS = {
+  scoring: "Scoring",
+  playmaking: "Playmaking",
+  possession: "Possession",
+  defense: "Defense",
+  goalie: "Goalie",
+  hustle: "Hustle",
+  mistakeCost: "Mistake cost",
+};
+
+function statRate(playerStats, key) {
+  const games = Math.max(1, Number(playerStats.gamesPlayed || 1));
+  return Number(playerStats[key] || 0) / games;
+}
+
+function shootingPctBonus(playerStats) {
+  const shots = statRate(playerStats, "shots");
+  const pctValue = Number(playerStats.shootingPct || 0);
+  if (shots < 2) return 0;
+  if (pctValue >= 0.5) return 8;
+  if (pctValue >= 0.35) return 5;
+  if (pctValue >= 0.25) return 3;
+  return 0;
+}
+
+function savePctBonus(playerStats) {
+  const chances = statRate(playerStats, "saves") + statRate(playerStats, "goalsAllowed");
+  const pctValue = Number(playerStats.savePct || 0);
+  if (chances < 3) return 0;
+  if (pctValue >= 0.7) return 8;
+  if (pctValue >= 0.6) return 5;
+  if (pctValue >= 0.5) return 3;
+  return 0;
+}
+
+function activeArchetypeCategoryCount(playerStats) {
+  const categories = [
+    statRate(playerStats, "goals") + statRate(playerStats, "shotsOnGoal") > 0,
+    statRate(playerStats, "assists") + statRate(playerStats, "smartPlays") > 0,
+    statRate(playerStats, "groundBalls") + statRate(playerStats, "faceoffWins") + Math.max(0, statRate(playerStats, "extraPossessions")) > 0,
+    statRate(playerStats, "causedTurnovers") + statRate(playerStats, "defensiveStops") > 0,
+    statRate(playerStats, "saves") > 0,
+    statRate(playerStats, "hustlePlays") + statRate(playerStats, "backedUpShots") > 0,
+  ];
+  return categories.filter(Boolean).length;
+}
+
+function multiCategoryBonus(playerStats) {
+  return Math.max(0, activeArchetypeCategoryCount(playerStats) - 1) * 2;
+}
+
+function normalizeScore(value, cap) {
+  return Math.round(clampNumber((Number(value || 0) / cap) * 100, 0, 100));
+}
+
+function calculateRawDimensionScores(playerStats) {
+  const goals = statRate(playerStats, "goals");
+  const assists = statRate(playerStats, "assists");
+  const shotsOnGoal = statRate(playerStats, "shotsOnGoal");
+  const groundBalls = statRate(playerStats, "groundBalls");
+  const faceoffWins = statRate(playerStats, "faceoffWins");
+  const extraPossessionsCreated = Math.max(0, statRate(playerStats, "extraPossessions"));
+  const successfulClears = statRate(playerStats, "clears");
+  const turnovers = statRate(playerStats, "turnovers");
+  const causedTurnovers = statRate(playerStats, "causedTurnovers");
+  const defensiveStops = statRate(playerStats, "defensiveStops");
+  const saves = statRate(playerStats, "saves");
+  const goalsAllowed = statRate(playerStats, "goalsAllowed");
+  const failedClears = statRate(playerStats, "failedClears");
+  const penalties = statRate(playerStats, "penalties");
+  const hustlePlays = statRate(playerStats, "hustlePlays");
+  const backedUpShots = statRate(playerStats, "backedUpShots");
+  const smartPlays = statRate(playerStats, "smartPlays");
+
+  return {
+    scoring: goals * 5 + shotsOnGoal * 1 + shootingPctBonus(playerStats),
+    playmaking: assists * 4 + smartPlays * 0.5 - turnovers * 1,
+    possession: groundBalls * 2 + faceoffWins * 2 + extraPossessionsCreated * 3 + successfulClears * 1 - turnovers * 2,
+    defense: causedTurnovers * 3 + defensiveStops * 3,
+    goalie: saves * 3 + savePctBonus(playerStats) + successfulClears * 1 - goalsAllowed * 1,
+    hustle: groundBalls * 2 + backedUpShots * 2 + hustlePlays * 3 + multiCategoryBonus(playerStats),
+    mistakeCost: turnovers * 3 + failedClears * 2 + penalties * 2,
+  };
+}
+
+function normalizeDimensionScores(allPlayersRawScores) {
+  return allPlayersRawScores.map((rawScores) =>
+    Object.fromEntries(
+      Object.keys(ARCHETYPE_SCORE_CAPS).map((key) => [key, normalizeScore(rawScores[key], ARCHETYPE_SCORE_CAPS[key])]),
+    ),
+  );
+}
+
+function generateNextLevelFocus(archetype) {
+  return ARCHETYPE_DEFS[archetype]?.nextFocus || ARCHETYPE_DEFS.growthProfile.nextFocus;
+}
+
+function assignArchetype(playerStats, dimensionScores) {
+  const goals = statRate(playerStats, "goals");
+  const assists = statRate(playerStats, "assists");
+  const groundBalls = statRate(playerStats, "groundBalls");
+  const extraPossessionsCreated = Math.max(0, statRate(playerStats, "extraPossessions"));
+  const causedTurnovers = statRate(playerStats, "causedTurnovers");
+  const successfulClears = statRate(playerStats, "clears");
+  const turnovers = statRate(playerStats, "turnovers");
+  const activeCategories = activeArchetypeCategoryCount(playerStats);
+  const strongDimensions = ["scoring", "playmaking", "possession", "defense", "hustle"].filter((key) => dimensionScores[key] >= 60).length;
+  const lowMistakeCost = dimensionScores.mistakeCost <= 35;
+  const manageableMistakeCost = dimensionScores.mistakeCost <= 50;
+
+  let archetype = "growthProfile";
+  if (dimensionScores.scoring >= 75 && goals >= 2) archetype = "finisher";
+  else if (dimensionScores.playmaking >= 75 || assists >= 2) archetype = "setupArtist";
+  else if (dimensionScores.possession >= 75 && extraPossessionsCreated >= 3) archetype = "possessionEngine";
+  else if (groundBalls >= 3 && dimensionScores.possession >= 55 && dimensionScores.hustle >= 55) archetype = "groundBallMagnet";
+  else if (dimensionScores.defense >= 75 || causedTurnovers >= 2) archetype = "defensiveDisruptor";
+  else if (strongDimensions >= 3 && manageableMistakeCost) archetype = "twoWayForce";
+  else if (dimensionScores.hustle >= 75 && activeCategories >= 3) archetype = "sparkPlug";
+  else if (activeCategories >= 3 && lowMistakeCost) archetype = "gluePlayer";
+  else if (dimensionScores.goalie >= 75) archetype = "theWall";
+  else if (successfulClears >= 3 && turnovers <= 1) archetype = "outletStarter";
+
+  const definition = ARCHETYPE_DEFS[archetype];
+  return {
+    key: archetype,
+    name: definition.name,
+    explanation: definition.explanation,
+    nextFocus: generateNextLevelFocus(archetype),
+    reasons: generateReasons(playerStats, dimensionScores, archetype),
+    scores: dimensionScores,
+  };
+}
+
+function generateReasons(playerStats, dimensionScores, archetype) {
+  const reasons = [];
+  const addIf = (condition, reason) => {
+    if (condition && reasons.length < 3) reasons.push(reason);
+  };
+  const statLabel = (key, singular, plural = `${singular}s`) => {
+    const value = statRate(playerStats, key);
+    const label = value === 1 ? singular : plural;
+    return `${formatImpactNumber(value)} ${label}${Number(playerStats.gamesPlayed || 0) > 1 ? " per game" : ""}`;
+  };
+
+  addIf(statRate(playerStats, "goals") > 0, statLabel("goals", "goal"));
+  addIf(statRate(playerStats, "assists") > 0, statLabel("assists", "assist"));
+  addIf(statRate(playerStats, "groundBalls") > 0, statLabel("groundBalls", "ground ball"));
+  addIf(statRate(playerStats, "causedTurnovers") > 0, statLabel("causedTurnovers", "caused turnover"));
+  addIf(statRate(playerStats, "saves") > 0, statLabel("saves", "save"));
+  addIf(
+    Math.max(0, statRate(playerStats, "extraPossessions")) > 0,
+    `${signedMetric(Math.max(0, statRate(playerStats, "extraPossessions")))} extra possession impact${Number(playerStats.gamesPlayed || 0) > 1 ? " per game" : ""}`,
+  );
+  addIf(statRate(playerStats, "clears") > 0, statLabel("clears", "successful clear"));
+  addIf(activeArchetypeCategoryCount(playerStats) >= 3, `Contributed in ${activeArchetypeCategoryCount(playerStats)} tracked areas`);
+  addIf(dimensionScores.mistakeCost <= 35, "Kept mistake cost low for the role");
+
+  if (!reasons.length) {
+    reasons.push("This profile will sharpen as more game events are tracked.");
+  }
+
+  const leadingDimension = ["scoring", "playmaking", "possession", "defense", "goalie", "hustle"]
+    .map((key) => [key, dimensionScores[key]])
+    .sort((a, b) => b[1] - a[1])[0];
+  if (leadingDimension && leadingDimension[1] > 0 && reasons.length < 3) {
+    reasons.push(`${ARCHETYPE_DIMENSION_LABELS[leadingDimension[0]]} led the dimension profile at ${leadingDimension[1]}/100`);
+  }
+
+  return reasons;
+}
+
+function calculateArchetypeResult(playerStats) {
+  const rawScores = calculateRawDimensionScores(playerStats);
+  const scores = normalizeDimensionScores([rawScores])[0];
+  return assignArchetype(playerStats, scores);
+}
+
+function generateShareCard(player, archetypeResult) {
+  const scoreEntries = ["scoring", "playmaking", "possession", "defense", "goalie", "hustle"];
+  const badgeLabel = archetypeResult.name.replace(/^The\s+/i, "").split(" ")[0];
+  return `
+    <section class="card pad archetype-card">
+      <div class="section-head compact-head">
+        <div>
+          <p class="eyebrow">Player Archetype</p>
+          <h3>${escapeHTML(archetypeResult.name)}</h3>
+          <p class="muted small">${escapeHTML(playerTitle(player))} - not a permanent label, just this stat profile.</p>
+        </div>
+        <span class="archetype-badge">${escapeHTML(badgeLabel)}</span>
+      </div>
+      <p class="archetype-explanation">${escapeHTML(archetypeResult.explanation)}</p>
+      <div class="archetype-reasons">
+        ${archetypeResult.reasons.map((reason) => `<span>${escapeHTML(reason)}</span>`).join("")}
+      </div>
+      <div class="archetype-bars">
+        ${scoreEntries
+          .map(
+            (key) => `
+              <div class="archetype-bar">
+                <span>${escapeHTML(ARCHETYPE_DIMENSION_LABELS[key])}</span>
+                <div><i style="width: ${archetypeResult.scores[key]}%;"></i></div>
+                <strong>${archetypeResult.scores[key]}</strong>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+      <div class="archetype-focus">
+        <span>Next focus</span>
+        <strong>${escapeHTML(archetypeResult.nextFocus)}</strong>
+      </div>
+    </section>
+  `;
 }
 
 function impactWeightLabel(weight) {
@@ -5306,6 +5634,7 @@ function renderReview() {
 
   const player = gamePlayerSnapshot(game);
   const totals = calculateTotals(game.events, player);
+  const archetypeResult = calculateArchetypeResult(totals);
   const canEditCurrentGame = canEditGame(game);
   const editingEvent = state.editingEventId
     ? game.events.find((event) => event.id === state.editingEventId)
@@ -5331,6 +5660,7 @@ function renderReview() {
       </div>
       ${renderImpactBreakdown(totals)}
       ${renderPossessionImpact(totals)}
+      ${generateShareCard(player, archetypeResult)}
       ${canEditCurrentGame ? `
         <div class="review-tool-actions">
           ${canShowAddEvent ? `<button class="btn neutral" type="button" data-action="add-review-event">Add Event</button>` : ""}
@@ -5727,6 +6057,7 @@ function dashboardHeadlineMetrics(totals, player = state.player) {
 function renderDashboard() {
   const totals = calculateSeasonTotals();
   const headlineMetrics = dashboardHeadlineMetrics(totals, state.player);
+  const archetypeResult = calculateArchetypeResult(totals);
   return renderShell(`
     <section class="screen-title">
       <h2>Season Dashboard</h2>
@@ -5741,6 +6072,7 @@ function renderDashboard() {
       <div class="metric-grid">
         ${headlineMetrics.map(([value, label]) => metricTile(value, label)).join("")}
       </div>
+      ${generateShareCard(state.player, archetypeResult)}
       ${renderSeasonTotalsGroups(totals)}
     </section>
   `);

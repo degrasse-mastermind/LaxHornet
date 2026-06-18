@@ -1177,6 +1177,123 @@ button:disabled {
   line-height: 1;
 }
 
+.archetype-card {
+  display: grid;
+  gap: 12px;
+  border-color: rgba(232, 16, 16, 0.22);
+}
+
+.archetype-card .eyebrow {
+  margin: 0 0 2px;
+  color: var(--hornet-red);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.archetype-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(232, 16, 16, 0.35);
+  border-radius: 999px;
+  background: #fff4f4;
+  color: var(--hornet-red);
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.archetype-explanation {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.96rem;
+  line-height: 1.4;
+}
+
+.archetype-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.archetype-reasons span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f7f8f9;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.archetype-bars {
+  display: grid;
+  gap: 8px;
+}
+
+.archetype-bar {
+  display: grid;
+  grid-template-columns: minmax(72px, 0.8fr) minmax(96px, 1.4fr) 34px;
+  align-items: center;
+  gap: 8px;
+}
+
+.archetype-bar span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.archetype-bar div {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e6e8eb;
+}
+
+.archetype-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #111, var(--hornet-red));
+}
+
+.archetype-bar strong {
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 950;
+  text-align: right;
+}
+
+.archetype-focus {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border-left: 4px solid var(--hornet-red);
+  border-radius: 8px;
+  background: #fff7f7;
+}
+
+.archetype-focus span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.archetype-focus strong {
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
 .season-groups {
   display: grid;
   gap: 12px;
@@ -2556,7 +2673,7 @@ button:disabled {
   border-bottom-color: #d9dde3;
   color: var(--danger);
   font-size: 0.72rem;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   padding: 9px 12px 7px;
 }
 
