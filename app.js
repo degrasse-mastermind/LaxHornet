@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v145";
+const APP_VERSION = "v146";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -3917,7 +3917,7 @@ function renderTeamRosterCard(options = {}) {
             <div class="player-chip-wrap">
               <button class="player-chip ${active ? "active" : ""}" type="button" data-player-select="${player.id}" aria-pressed="${active}">
                 <strong>${escapeHTML(player.name)}</strong>
-                <span>${item.number ? `#${escapeHTML(item.number)}` : "No jersey"}${item.position ? ` - ${escapeHTML(item.position)}` : ""}${claimed ? " - Verified child" : ""}</span>
+                <span>${item.number ? `#${escapeHTML(item.number)}` : "No jersey"}${item.position ? ` - ${escapeHTML(item.position)}` : ""}${claimed ? " - Verified Player" : ""}</span>
               </button>
             </div>
           `;
