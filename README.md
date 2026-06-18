@@ -11,7 +11,7 @@ LaxHornet is a mobile-first offline PWA for tracking youth lacrosse stats during
 - Faceoff Win and Faceoff Loss tracking with faceoff win percentage
 - Grouped live stat buttons with high-frequency events first and specialty stats lower on the screen
 - Undo last event, save game, end game, review, and delete game actions
-- Game Impact Score calculated from each event
+- 0-100 Game Impact score for each game, with season Average Impact
 - Per-player season totals and averages from saved games
 - Offline-ready `manifest.json` and service worker
 - Optional user profiles with approved team access for parents
@@ -96,24 +96,28 @@ Use **Team** when multiple parents need to track or view stats for the same appr
 
 Best practice: choose one official Parent Tracker for each player/game. Multiple parents can sync and review the same stats, but two Parent Tracker accounts logging the same player at the same time can create duplicate events.
 
-## Stat Scoring
+## Game Impact Scoring
+
+Game Impact is a 0-100 score that estimates how much a player helped create possessions, convert possessions, protect possessions, and prevent opponent scoring chances. Game Review shows the Game Impact score for one game. Season Dashboard shows Average Impact across saved games.
+
+The raw event values behind the score are:
 
 - Goal: +5
-- Assist: +4
+- Assist: +3
 - Save: +3
-- Shot on Goal: +2
-- Shot: +1
-- Ground Ball: +3
+- Shot on Goal: +1
+- Missed Shot: -0.5
+- Ground Ball: +2
 - Caused Turnover: +3
 - Defensive Stop: +3
-- Successful Clear: +2
+- Successful Clear: +1
 - Backed Up Shot: +2
 - Hustle Play: +1
 - Smart Play: +1
 - Turnover: -2
 - Failed Clear: -2
-- Goal Allowed: -2
+- Goal Allowed: -1
 - Penalty: -2
 - Note: 0
 
-For dashboard percentages, `Shot on Goal` counts as both a shot and a shot on goal. The `Shot` button is best used for shots that are not on goal.
+For dashboard percentages, total shots are `Missed Shot` plus `Shot on Goal`.

@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v152";
+const APP_VERSION = "v153";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -38,14 +38,14 @@ const PERIOD_FORMATS = {
 
 const STAT_DEFS = [
   { key: "goal", label: "Goal", points: 5, tone: "offense", category: "Offense" },
-  { key: "assist", label: "Assist", points: 4, tone: "offense", category: "Offense" },
-  { key: "shot", label: "Shot", points: 1, tone: "neutral", category: "Offense" },
-  { key: "shotOnGoal", label: "Shot on Goal", points: 2, tone: "offense", category: "Offense" },
+  { key: "assist", label: "Assist", points: 3, tone: "offense", category: "Offense" },
+  { key: "shot", label: "Missed Shot", points: -0.5, tone: "neutral", category: "Offense" },
+  { key: "shotOnGoal", label: "Shot on Goal", points: 1, tone: "offense", category: "Offense" },
   { key: "goalieSave", label: "Save", points: 3, tone: "goalieSave", category: "Goalie" },
-  { key: "goalAllowed", label: "Goal Allowed", points: -2, tone: "goalieAllowed", category: "Goalie" },
+  { key: "goalAllowed", label: "Goal Allowed", points: -1, tone: "goalieAllowed", category: "Goalie" },
   { key: "faceoffWin", label: "Faceoff Win", points: 2, tone: "faceoffWin", category: "Faceoff" },
   { key: "faceoffLoss", label: "Faceoff Loss", points: -1, tone: "faceoffLoss", category: "Faceoff" },
-  { key: "groundBall", label: "Ground Ball", points: 3, tone: "effort", category: "Effort / IQ" },
+  { key: "groundBall", label: "Ground Ball", points: 2, tone: "effort", category: "Effort / IQ" },
   { key: "turnover", label: "Turnover", points: -2, tone: "negative", category: "Possession" },
   { key: "causedTurnover", label: "Caused Turnover", points: 3, tone: "defense", category: "Defense" },
   { key: "defensiveStop", label: "Defensive Stop", points: 3, tone: "defense", category: "Defense" },
@@ -59,6 +59,35 @@ const STAT_DEFS = [
 ];
 
 const STAT_BY_KEY = Object.fromEntries(STAT_DEFS.map((stat) => [stat.key, stat]));
+
+const IMPACT_PILLARS = [
+  { key: "scoring", label: "Scoring" },
+  { key: "possession", label: "Possession" },
+  { key: "defense", label: "Defense" },
+  { key: "goalie", label: "Goalie" },
+  { key: "effort", label: "Effort / Hustle" },
+];
+
+const IMPACT_RULES = {
+  goal: { pillar: "scoring", value: 5 },
+  assist: { pillar: "scoring", value: 3 },
+  shotOnGoal: { pillar: "scoring", value: 1 },
+  shot: { pillar: "scoring", value: -0.5 },
+  groundBall: { pillar: "possession", value: 2 },
+  faceoffWin: { pillar: "possession", value: 2 },
+  faceoffLoss: { pillar: "possession", value: -1 },
+  successfulClear: { pillar: "possession", value: 1 },
+  failedClear: { pillar: "possession", value: -2 },
+  turnover: { pillar: "possession", value: -2 },
+  causedTurnover: { pillar: "defense", value: 3 },
+  defensiveStop: { pillar: "defense", value: 3 },
+  penalty: { pillar: "defense", value: -2 },
+  goalieSave: { pillar: "goalie", value: 3 },
+  goalAllowed: { pillar: "goalie", value: -1 },
+  backedUpShot: { pillar: "effort", value: 2 },
+  hustlePlay: { pillar: "effort", value: 1 },
+  smartPlay: { pillar: "effort", value: 1 },
+};
 
 const LIVE_STAT_GROUPS = [
   {
@@ -1091,6 +1120,116 @@ function pointText(points) {
   return `${points}`;
 }
 
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function impactPositionGroup(player = {}) {
+  const position = String(player.position || "").toLowerCase();
+  if (position.includes("goalie") || position.includes("goal")) return "goalie";
+  if (position.includes("face") || position.includes("fogo")) return "faceoff";
+  if (position.includes("defense") || position.includes("lsm") || position.includes("ssdm")) return "defense";
+  return "field";
+}
+
+function impactScaleForPlayer(player = {}) {
+  const group = impactPositionGroup(player);
+  if (group === "goalie") return 3.5;
+  if (group === "faceoff") return 3.8;
+  if (group === "defense") return 3.4;
+  return 3;
+}
+
+function emptyImpactPillars() {
+  return Object.fromEntries(IMPACT_PILLARS.map((pillar) => [pillar.key, 0]));
+}
+
+function eventImpactRule(event = {}) {
+  return IMPACT_RULES[event.statType] || null;
+}
+
+function impactValueForEvent(event = {}) {
+  return Number(eventImpactRule(event)?.value || 0);
+}
+
+function impactPillarForEvent(event = {}) {
+  return eventImpactRule(event)?.pillar || "";
+}
+
+function distributeImpactScore(score, pillars) {
+  const positiveEntries = IMPACT_PILLARS.map((pillar) => ({
+    ...pillar,
+    raw: Math.max(0, Number(pillars[pillar.key] || 0)),
+  }));
+  const positiveTotal = positiveEntries.reduce((sum, item) => sum + item.raw, 0);
+  if (!score || !positiveTotal) {
+    return positiveEntries.map((item) => ({ ...item, score: 0 }));
+  }
+
+  const distributed = positiveEntries.map((item) => ({
+    ...item,
+    score: Math.round((score * item.raw) / positiveTotal),
+  }));
+  const diff = score - distributed.reduce((sum, item) => sum + item.score, 0);
+  if (diff) {
+    const strongest = distributed.reduce((bestIndex, item, index, items) => (item.raw > items[bestIndex].raw ? index : bestIndex), 0);
+    distributed[strongest].score += diff;
+  }
+  return distributed;
+}
+
+function calculateGameImpact(events = [], player = state.player) {
+  const pillars = emptyImpactPillars();
+  let raw = 0;
+  let scorableEvents = 0;
+
+  events.forEach((event) => {
+    const rule = eventImpactRule(event);
+    if (!rule) return;
+    const value = Number(rule.value || 0);
+    pillars[rule.pillar] += value;
+    raw += value;
+    scorableEvents += 1;
+  });
+
+  const score = scorableEvents ? clampNumber(Math.round(50 + raw * impactScaleForPlayer(player)), 0, 100) : 0;
+  const breakdown = distributeImpactScore(score, pillars).map((item) => ({
+    key: item.key,
+    label: item.label,
+    raw: Number(pillars[item.key] || 0),
+    score: item.score,
+  }));
+
+  return {
+    score,
+    raw,
+    pillars,
+    breakdown,
+    takeaway: impactTakeaway(events, breakdown),
+  };
+}
+
+function impactTakeaway(events = [], breakdown = []) {
+  const activeBreakdowns = breakdown.filter((item) => item.score > 0);
+  if (!events.length || !activeBreakdowns.length) return "Log game events to build a Game Impact profile.";
+  const biggest = activeBreakdowns.reduce((best, item) => (item.score > best.score ? item : best), activeBreakdowns[0]);
+  const count = (key) => events.filter((event) => event.statType === key).length;
+  const extraPossessions =
+    count("groundBall") +
+    count("faceoffWin") +
+    count("causedTurnover") +
+    count("backedUpShot") +
+    count("successfulClear");
+  const mistakes = count("turnover") + count("failedClear") + count("penalty") + count("goalAllowed");
+  const extraCopy = extraPossessions
+    ? `created ${extraPossessions} possession ${extraPossessions === 1 ? "play" : "plays"}`
+    : "limited possession-changing plays";
+  const mistakeCopy = mistakes
+    ? `with ${mistakes} mistake ${mistakes === 1 ? "event" : "events"} logged`
+    : "with no major negative events logged";
+  return `Biggest impact came from ${biggest.label.toLowerCase()}. The player ${extraCopy}, ${mistakeCopy}.`;
+}
+
 function periodFormatForGame(game = {}) {
   if (PERIOD_FORMATS[game.periodFormat]) return game.periodFormat;
   if (PERIOD_FORMATS[game.period_format]) return game.period_format;
@@ -1369,7 +1508,7 @@ function makeGame(formData) {
   };
 }
 
-function calculateTotals(events = []) {
+function calculateTotals(events = [], player = state.player) {
   const count = (key) => events.filter((event) => event.statType === key).length;
   const goals = count("goal");
   const assists = count("assist");
@@ -1378,7 +1517,9 @@ function calculateTotals(events = []) {
   const shots = shotOnly + shotsOnGoal;
   const successfulClears = count("successfulClear");
   const failedClears = count("failedClear");
-  const impact = events.reduce((sum, event) => sum + Number(event.pointValue || 0), 0);
+  const gameImpact = calculateGameImpact(events, player);
+  const impact = gameImpact.score;
+  const rawImpact = gameImpact.raw;
   const saves = count("goalieSave");
   const goalsAllowed = count("goalAllowed");
   const backedUpShots = count("backedUpShot");
@@ -1390,6 +1531,8 @@ function calculateTotals(events = []) {
 
   return {
     impact,
+    rawImpact,
+    gameImpact,
     eventCount: events.length,
     goals,
     assists,
@@ -1432,7 +1575,7 @@ function calculateSeasonTotalsForPlayer(player) {
 function calculateSeasonTotalsFromGames(games) {
   const totals = games.reduce(
     (acc, game) => {
-      const gameTotals = calculateTotals(game.events);
+      const gameTotals = calculateTotals(game.events, gamePlayerSnapshot(game));
       Object.keys(acc).forEach((key) => {
         if (key !== "gamesPlayed") acc[key] += gameTotals[key] || 0;
       });
@@ -1441,6 +1584,7 @@ function calculateSeasonTotalsFromGames(games) {
     {
       gamesPlayed: games.length,
       impact: 0,
+      rawImpact: 0,
       eventCount: 0,
       goals: 0,
       assists: 0,
@@ -1472,11 +1616,17 @@ function calculateSeasonTotalsFromGames(games) {
   totals.savePct = totals.saves + totals.goalsAllowed ? totals.saves / (totals.saves + totals.goalsAllowed) : 0;
   totals.faceoffPct = totals.faceoffAttempts ? totals.faceoffWins / totals.faceoffAttempts : 0;
   totals.averageImpact = totals.gamesPlayed ? totals.impact / totals.gamesPlayed : 0;
+  totals.averageRawImpact = totals.gamesPlayed ? totals.rawImpact / totals.gamesPlayed : 0;
   return totals;
 }
 
 function pct(value) {
   return `${Math.round(value * 100)}%`;
+}
+
+function formatImpactNumber(value) {
+  const number = Number(value || 0);
+  return Number.isInteger(number) ? String(number) : number.toFixed(1);
 }
 
 function visibleGames() {
@@ -1719,36 +1869,46 @@ function buildCSV() {
     "statLabel",
     "category",
     "pointValue",
+    "eventImpactValue",
+    "eventImpactPillar",
+    "gameImpactScore",
+    "gameImpactRaw",
     "tags",
     "note",
     "fieldZone",
   ];
-  const rows = state.games.flatMap((game) =>
-    normalizeGame(game).events.map((event) => {
-      const player = gamePlayerSnapshot(game);
+  const rows = state.games.flatMap((game) => {
+    const normalizedGame = normalizeGame(game);
+    const player = gamePlayerSnapshot(normalizedGame);
+    const totals = calculateTotals(normalizedGame.events, player);
+    return normalizedGame.events.map((event) => {
       return [
-      game.id,
-      gamePlayerId(game),
-      gameTeamId(game),
-      teamById(gameTeamId(game))?.name || player.team || "",
-      gameRosterPlayerId(game),
-      player.name,
-      player.number,
-      game.date,
-      game.opponent,
-      event.id,
-      event.timestamp,
-      event.quarter,
-      event.statType,
-      event.statLabel,
-      event.category,
-      event.pointValue,
-      event.tags,
-      event.note,
-      event.fieldZone,
-    ];
-    }),
-  );
+        normalizedGame.id,
+        gamePlayerId(normalizedGame),
+        gameTeamId(normalizedGame),
+        teamById(gameTeamId(normalizedGame))?.name || player.team || "",
+        gameRosterPlayerId(normalizedGame),
+        player.name,
+        player.number,
+        normalizedGame.date,
+        normalizedGame.opponent,
+        event.id,
+        event.timestamp,
+        event.quarter,
+        event.statType,
+        event.statLabel,
+        event.category,
+        event.pointValue,
+        impactValueForEvent(event),
+        impactPillarForEvent(event),
+        totals.impact,
+        formatImpactNumber(totals.rawImpact),
+        event.tags,
+        event.note,
+        event.fieldZone,
+      ];
+    });
+  });
   return [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
 }
 
@@ -1773,6 +1933,12 @@ function exportJSON() {
   const payload = {
     app: "LaxHornet",
     version: 3,
+    impactModel: {
+      version: "game-impact-v1",
+      scale: "0-100",
+      pillars: IMPACT_PILLARS,
+      rules: IMPACT_RULES,
+    },
     exportedAt: new Date().toISOString(),
     player: state.player,
     players: state.players,
@@ -4262,7 +4428,7 @@ function renderMore() {
             <button class="more-action" type="button" data-nav="help">
               <span>${renderNavIcon("season")}</span>
               <strong>Impact Help</strong>
-              <small>See how Impact Score and percentages work.</small>
+              <small>See how Game Impact, Average Impact, and percentages work.</small>
             </button>
           </div>
         ` : ""}
@@ -4647,7 +4813,7 @@ function renderLiveTracker() {
 
   const game = state.activeGame;
   const player = gamePlayerSnapshot(game);
-  const totals = calculateTotals(game.events);
+  const totals = calculateTotals(game.events, player);
   const recentEvents = [...game.events].reverse().slice(0, 5);
   const periods = periodsForGame(game);
   const details = `${escapeHTML(playerTitle(player))} - ${formatDate(game.date)} - ${periodFormatLabel(game)}${game.location ? ` - ${escapeHTML(game.location)}` : ""}`;
@@ -4669,7 +4835,7 @@ function renderLiveTracker() {
     </div>
 
     <section class="live-summary" aria-label="Live game summary">
-      <div class="live-pill"><strong>${totals.impact}</strong><span>Impact</span></div>
+      <div class="live-pill"><strong>${totals.impact}</strong><span>Game Impact</span></div>
       <div class="live-pill"><strong>${totals.points}</strong><span>Points</span></div>
       <div class="live-pill"><strong>${totals.eventCount}</strong><span>Events</span></div>
     </section>
@@ -4705,7 +4871,7 @@ function renderEventRow(event, options = {}) {
         <p>${formatTime(event.timestamp)} - ${escapeHTML(event.category || "General")}${event.note ? ` - ${escapeHTML(event.note)}` : ""}</p>
         ${renderTagChips(event.tags)}
       </span>
-      <span class="score">${pointText(event.pointValue)}</span>
+      <span class="score">${pointText(impactValueForEvent(event))}</span>
       ${
         options.editable
           ? `<span class="event-actions">
@@ -4885,8 +5051,8 @@ function renderReview() {
     `);
   }
 
-  const totals = calculateTotals(game.events);
   const player = gamePlayerSnapshot(game);
+  const totals = calculateTotals(game.events, player);
   const canEditCurrentGame = canEditGame(game);
   const canShowGameEdit = canEditCurrentGame && !state.editingGameDetails;
   const editingEvent = state.editingEventId
@@ -4903,11 +5069,12 @@ function renderReview() {
 
     <section class="stack">
       <div class="metric-grid">
-        <div class="metric"><strong>${totals.impact}</strong><span>Impact Score</span></div>
+        <div class="metric"><strong>${totals.impact}</strong><span>Game Impact</span></div>
         <div class="metric"><strong>${totals.points}</strong><span>Points</span></div>
         <div class="metric"><strong>${totals.goals}</strong><span>Goals</span></div>
         <div class="metric"><strong>${totals.assists}</strong><span>Assists</span></div>
       </div>
+      ${renderImpactBreakdown(totals)}
       ${canShowGameEdit ? `<button class="btn neutral" type="button" data-action="edit-game-details">Edit Game Details</button>` : ""}
       ${state.editingGameDetails && canEditCurrentGame ? renderGameEditForm(game) : ""}
       ${renderTotalsTable(totals)}
@@ -4947,7 +5114,7 @@ function renderSharedGame() {
   }
 
   const game = state.sharedGame;
-  const totals = calculateTotals(game.events);
+  const totals = calculateTotals(game.events, gamePlayerSnapshot(game));
   const events = [...game.events].reverse();
 
   return renderShell(`
@@ -4958,7 +5125,7 @@ function renderSharedGame() {
 
     <section class="stack">
       <div class="metric-grid">
-        <div class="metric"><strong>${totals.impact}</strong><span>Impact</span></div>
+        <div class="metric"><strong>${totals.impact}</strong><span>Game Impact</span></div>
         <div class="metric"><strong>${totals.points}</strong><span>Points</span></div>
         <div class="metric"><strong>${totals.goals}</strong><span>Goals</span></div>
         <div class="metric"><strong>${totals.assists}</strong><span>Assists</span></div>
@@ -5011,6 +5178,35 @@ function renderTotalsTable(totals) {
         </tbody>
       </table>
     </div>
+  `;
+}
+
+function renderImpactBreakdown(totals) {
+  const impact = totals.gameImpact || calculateGameImpact([]);
+  return `
+    <section class="card pad impact-card">
+      <div class="section-head compact-head">
+        <div>
+          <h3>Game Impact Breakdown</h3>
+          <p class="muted small">0-100 view of how this player affected scoring, possession, defense, goalie play, and effort.</p>
+        </div>
+        <span class="impact-score-badge">${impact.score}</span>
+      </div>
+      <div class="impact-breakdown-grid">
+        ${impact.breakdown
+          .map(
+            (item) => `
+              <div class="impact-breakdown-row">
+                <span>${escapeHTML(item.label)}</span>
+                <strong>${item.score}</strong>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+      <p class="impact-takeaway">${escapeHTML(impact.takeaway)}</p>
+      <p class="muted small">Raw event value: ${formatImpactNumber(impact.raw)}. Average Impact on the Season page averages these 0-100 game scores.</p>
+    </section>
   `;
 }
 
@@ -5144,15 +5340,15 @@ function renderPastGames() {
 }
 
 function renderGameListRow(game) {
-  const totals = calculateTotals(game.events);
   const player = gamePlayerSnapshot(game);
+  const totals = calculateTotals(game.events, player);
   const editable = canEditGame(game);
   return `
     <div class="list-row">
       <button class="brand" type="button" data-review="${game.id}" style="color: var(--text); text-align: left;">
         <span>
           <h3>${escapeHTML(game.opponent)}</h3>
-          <p>${escapeHTML(playerContextLine(player))} - ${formatDate(game.date)} - Impact ${totals.impact} - ${totals.goals}G ${totals.assists}A</p>
+          <p>${escapeHTML(playerContextLine(player))} - ${formatDate(game.date)} - Game Impact ${totals.impact} - ${totals.goals}G ${totals.assists}A</p>
         </span>
       </button>
       <div class="row-actions">
@@ -5264,23 +5460,23 @@ function renderHelp() {
 
     <section class="stack">
       <div class="card pad">
-        <h3>Game Impact Score</h3>
-        <p class="muted small">Every logged event gets an impact value. Positive plays add to the score, while turnovers, failed clears, and penalties subtract from it. The game total is the sum of all event values.</p>
+        <h3>Game Impact</h3>
+        <p class="muted small">Game Impact is a 0-100 score estimating how much a player helped create possessions, convert possessions, protect possessions, and prevent opponent chances. It is built from five pillars: scoring, possession, defense, goalie play, and effort.</p>
       </div>
 
       <div class="card pad">
-        <h3>Average Game Impact Score</h3>
-        <p class="muted small">Average Impact is the season's total Game Impact Score divided by games played. Example: 60 total impact across 5 games = 12.0 average impact.</p>
+        <h3>Average Impact</h3>
+        <p class="muted small">Average Impact appears on the Season page. It is the player's saved Game Impact scores averaged across games played. Example: game scores of 78, 84, and 69 create a 77.0 Average Impact.</p>
       </div>
 
       <div class="card pad">
         <h3>Points vs Impact</h3>
-        <p class="muted small">Lacrosse points are goals plus assists. Impact Score is broader: it also counts ground balls, clears, defensive stops, hustle plays, smart plays, and mistakes.</p>
+        <p class="muted small">Lacrosse points are goals plus assists. Game Impact is broader: it also counts ground balls, clears, defensive stops, faceoffs, goalie saves, backed up shots, hustle plays, smart plays, and mistakes.</p>
       </div>
 
       <div class="card pad">
         <h3>Backed Up Shot</h3>
-        <p class="muted small">A Backed Up Shot is when the player hustles to the endline or sideline to retain possession after a shot. It adds +2 to Game Impact Score.</p>
+        <p class="muted small">A Backed Up Shot is when the player hustles to the endline or sideline to retain possession after a shot. It adds +2 to the effort pillar behind Game Impact.</p>
       </div>
 
       <div class="card pad">
@@ -5290,14 +5486,14 @@ function renderHelp() {
 
       <div class="card table-card">
         <table class="stat-table">
-          <thead><tr><th>Event</th><th>Impact</th></tr></thead>
+          <thead><tr><th>Event</th><th>Raw Value</th></tr></thead>
           <tbody>${impactRows}</tbody>
         </table>
       </div>
 
       <div class="card pad">
         <h3>Shot Percentages</h3>
-        <p class="muted small">Shooting % is goals divided by total shots. Shot on goal % is shots on goal divided by total shots. In this app, a Shot on Goal counts as both a shot and a shot on goal.</p>
+        <p class="muted small">Shooting % is goals divided by total shots. Shot on goal % is shots on goal divided by total shots. Total shots are Missed Shots plus Shots on Goal.</p>
       </div>
 
       <div class="card pad">
@@ -5441,7 +5637,7 @@ function renderPromoDemoPage() {
     `);
   }
 
-  const impactTotal = PROMO_DEMO_STEPS.reduce((sum, step) => sum + (STAT_BY_KEY[step.stat]?.points || 0), 0);
+  const impactTotal = calculateGameImpact(PROMO_DEMO_STEPS.map((step) => ({ statType: step.stat }))).score;
   const lacrossePoints = PROMO_DEMO_STEPS.filter((step) => ["goal", "assist"].includes(step.stat)).length;
   const cycleStyle = `--promo-step-count: ${PROMO_DEMO_STEPS.length}; --promo-step-duration: ${PROMO_STEP_DURATION_SECONDS}s; --promo-cycle: ${PROMO_CYCLE_SECONDS}s;`;
 
@@ -5495,7 +5691,7 @@ function renderPromoDemoPage() {
             <button class="period-tab" type="button">Q4</button>
           </div>
           <section class="live-summary" aria-label="Demo game summary">
-            <div class="live-pill"><strong>${impactTotal}</strong><span>Impact</span></div>
+            <div class="live-pill"><strong>${impactTotal}</strong><span>Game Impact</span></div>
             <div class="live-pill"><strong>${lacrossePoints}</strong><span>Points</span></div>
             <div class="live-pill"><strong>${PROMO_DEMO_STEPS.length}</strong><span>Events</span></div>
           </section>
@@ -5668,7 +5864,7 @@ function renderTutorial() {
 
       <div class="card pad">
         <h3>8. Review, Correct, And Tag</h3>
-        <p class="muted small">After a game, open Game Review to edit events, correct notes, add tags, and check totals like Impact Score, Effort Score, Faceoff %, Save %, and shooting percentages. Season Dashboard and Past Games follow the active player, so switch players when you want another player's totals.</p>
+        <p class="muted small">After a game, open Game Review to edit events, correct notes, add tags, and check Game Impact, Effort Score, Faceoff %, Save %, and shooting percentages. Season Dashboard shows Average Impact across saved games. Past Games follows the active player, so switch players when you want another player's totals.</p>
       </div>
 
       <div class="card pad">
