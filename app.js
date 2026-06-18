@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v144";
+const APP_VERSION = "v145";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -2013,6 +2013,11 @@ function isTeamSetupError(error = {}) {
   return /teams|team_members|roster_players|tracker_code|laxhornet_|schema cache|relation|column|function|permission|policy/i.test(text);
 }
 
+function isMissingRpcError(error = {}) {
+  const text = supabaseErrorText(error);
+  return /could not find the function|schema cache|PGRST202|function .* does not exist/i.test(text);
+}
+
 function isPermissionError(error = {}) {
   const text = supabaseErrorText(error);
   return /admin approval required|row-level security|violates row-level security|permission denied|policy|not authorized|42501/i.test(text);
@@ -2145,34 +2150,81 @@ function playerClaimFromSupabaseRow(row = {}) {
   });
 }
 
-async function loadCloudTeams(options = {}) {
-  if (!supabaseClient || !currentUserId()) return;
+async function fetchVisibleCloudTeams() {
+  const rpcResult = await supabaseClient.rpc("laxhornet_my_teams");
+  if (!rpcResult.error && Array.isArray(rpcResult.data)) {
+    return {
+      teams: normalizeTeams(rpcResult.data.map(teamFromSupabaseRows)),
+      error: null,
+      source: "rpc",
+    };
+  }
+  if (rpcResult.error && !isMissingRpcError(rpcResult.error)) {
+    return { teams: [], error: rpcResult.error, source: "rpc" };
+  }
+
   const { data: memberRows, error: memberError } = await supabaseClient
     .from("team_members")
     .select("team_id, role, teams(id,name,invite_code,tracker_code,created_by,created_at)")
     .eq("user_id", currentUserId());
 
-  if (memberError) {
-    if (!options.silent) reportTeamSetupError(memberError);
-    return;
-  }
+  if (memberError) return { teams: [], error: memberError, source: "tables" };
 
-  const localAdminTeams = locallyManagedAdminTeams();
-  const cloudTeams = normalizeTeams((memberRows || []).map(teamFromSupabaseRows));
-  state.teams = normalizeTeams([...localAdminTeams, ...cloudTeams]);
-
+  let teams = normalizeTeams((memberRows || []).map(teamFromSupabaseRows));
   if (isPlatformReviewer()) {
     const { data: ownedTeams, error: ownedTeamsError } = await supabaseClient
       .from("teams")
       .select("id,name,invite_code,tracker_code,created_by,created_at")
       .eq("created_by", currentUserId());
-    if (!ownedTeamsError && Array.isArray(ownedTeams)) {
-      state.teams = normalizeTeams([
-        ...state.teams,
+    if (ownedTeamsError) return { teams, error: ownedTeamsError, source: "tables" };
+    if (Array.isArray(ownedTeams)) {
+      teams = normalizeTeams([
+        ...teams,
         ...ownedTeams.map((team) => teamFromSupabaseRows({ ...team, role: "admin" })),
       ]);
     }
   }
+  return { teams, error: null, source: "tables" };
+}
+
+async function fetchVisibleCloudRosterPlayers(teamIdsForSync = []) {
+  const ids = uniqueIds(teamIdsForSync);
+  const rpcResult = await supabaseClient.rpc("laxhornet_visible_roster_players");
+  if (!rpcResult.error && Array.isArray(rpcResult.data)) {
+    const rosterPlayers = normalizeRosterPlayers(rpcResult.data.map(rosterPlayerFromSupabaseRow))
+      .filter((player) => !ids.length || ids.includes(player.teamId));
+    return { rosterPlayers, error: null, source: "rpc" };
+  }
+  if (rpcResult.error && !isMissingRpcError(rpcResult.error)) {
+    return { rosterPlayers: [], error: rpcResult.error, source: "rpc" };
+  }
+  if (!ids.length) return { rosterPlayers: [], error: null, source: "tables" };
+
+  const { data: rosterRows, error: rosterError } = await supabaseClient
+    .from("roster_players")
+    .select("*")
+    .in("team_id", ids)
+    .order("number", { ascending: true });
+
+  if (rosterError) return { rosterPlayers: [], error: rosterError, source: "tables" };
+  return {
+    rosterPlayers: normalizeRosterPlayers((rosterRows || []).map(rosterPlayerFromSupabaseRow)),
+    error: null,
+    source: "tables",
+  };
+}
+
+async function loadCloudTeams(options = {}) {
+  if (!supabaseClient || !currentUserId()) return;
+  const localAdminTeams = locallyManagedAdminTeams();
+  const { teams: cloudTeams, error: teamReadError } = await fetchVisibleCloudTeams();
+
+  if (teamReadError) {
+    if (!options.silent) reportTeamSetupError(teamReadError);
+    return;
+  }
+
+  state.teams = normalizeTeams([...localAdminTeams, ...cloudTeams]);
 
   await loadTeamAccessRequests({ silent: true });
   const approvedRequestTeams = state.teamAccessRequests
@@ -2192,18 +2244,13 @@ async function loadCloudTeams(options = {}) {
 
   const ids = teamIds();
   if (ids.length) {
-    const { data: rosterRows, error: rosterError } = await supabaseClient
-      .from("roster_players")
-      .select("*")
-      .in("team_id", ids)
-      .order("number", { ascending: true });
+    const { rosterPlayers: cloudRosterPlayers, error: rosterError } = await fetchVisibleCloudRosterPlayers(ids);
 
     if (rosterError) {
       if (!options.silent) reportTeamSetupError(rosterError);
       return;
     }
 
-    const cloudRosterPlayers = normalizeRosterPlayers((rosterRows || []).map(rosterPlayerFromSupabaseRow));
     const cloudRosterKeys = new Set(cloudRosterPlayers.map((player) => `${player.teamId}|${player.id}`));
     const preservedRosterPlayers = state.rosterPlayers.filter((player) => {
       const normalized = normalizeRosterPlayer(player);
