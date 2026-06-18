@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v153";
+const APP_VERSION = "v154";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -49,7 +49,7 @@ const STAT_DEFS = [
   { key: "turnover", label: "Turnover", points: -2, tone: "negative", category: "Possession" },
   { key: "causedTurnover", label: "Caused Turnover", points: 3, tone: "defense", category: "Defense" },
   { key: "defensiveStop", label: "Defensive Stop", points: 3, tone: "defense", category: "Defense" },
-  { key: "successfulClear", label: "Successful Clear", points: 2, tone: "clear", category: "Clearing" },
+  { key: "successfulClear", label: "Successful Clear", points: 1, tone: "clear", category: "Clearing" },
   { key: "failedClear", label: "Failed Clear", points: -2, tone: "negative", category: "Clearing" },
   { key: "hustlePlay", label: "Hustle Play", points: 1, tone: "effort", category: "Effort / IQ" },
   { key: "backedUpShot", label: "Backed Up Shot", points: 2, tone: "effort", category: "Effort / IQ" },
