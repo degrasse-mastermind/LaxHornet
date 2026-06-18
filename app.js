@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v135";
+const APP_VERSION = "v136";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -1797,8 +1797,8 @@ function gameToSupabaseRow(game) {
   return {
     id: normalized.id,
     player_id: normalized.playerId || normalized.playerSnapshot?.id || "",
-    team_id: normalized.teamId || "",
-    roster_player_id: normalized.rosterPlayerId || "",
+    team_id: normalized.teamId || null,
+    roster_player_id: normalized.rosterPlayerId || null,
     user_id: userId,
     share_code: normalized.shareCode,
     is_shared: Boolean(normalized.isShared),
@@ -1826,8 +1826,8 @@ function eventToSupabaseRow(event) {
     id: normalized.id,
     game_id: normalized.gameId,
     user_id: userId,
-    team_id: normalized.teamId || game?.teamId || "",
-    roster_player_id: normalized.rosterPlayerId || game?.rosterPlayerId || "",
+    team_id: normalized.teamId || game?.teamId || null,
+    roster_player_id: normalized.rosterPlayerId || game?.rosterPlayerId || null,
     timestamp: normalized.timestamp,
     quarter: normalized.quarter,
     stat_type: normalized.statType,
@@ -1840,6 +1840,35 @@ function eventToSupabaseRow(event) {
     corrected_at: normalized.correctedAt || null,
     tags_updated_at: normalized.tagsUpdatedAt || null,
   };
+}
+
+function detachTeamFromGameForSync(game) {
+  const normalized = normalizeGame(game);
+  const playerSnapshot = {
+    ...(normalized.playerSnapshot || {}),
+    teamId: "",
+    rosterPlayerId: "",
+  };
+  return normalizeGame({
+    ...normalized,
+    teamId: "",
+    rosterPlayerId: "",
+    playerSnapshot,
+    events: normalized.events.map((event) => ({
+      ...event,
+      teamId: "",
+      rosterPlayerId: "",
+    })),
+  });
+}
+
+function detachTeamFromSupabaseRows(payload) {
+  const detach = (row) => ({
+    ...row,
+    team_id: null,
+    roster_player_id: null,
+  });
+  return Array.isArray(payload) ? payload.map(detach) : detach(payload);
 }
 
 function eventFromSupabaseRow(row) {
@@ -1918,6 +1947,11 @@ function supabaseErrorText(error = {}) {
 
 function readableSupabaseError(error = {}) {
   return supabaseErrorText(error).replace(/\s+/g, " ").slice(0, 220);
+}
+
+function isTeamForeignKeyError(error = {}) {
+  const text = supabaseErrorText(error);
+  return error.code === "23503" && /team_id|games_team_id_fkey|events_team_id_fkey|not present in table "teams"/i.test(text);
 }
 
 function isTeamSetupError(error = {}) {
@@ -2975,24 +3009,46 @@ async function syncGameToSupabase(game, options = {}) {
     state.syncStatus = "Sign in for cloud sync";
     return false;
   }
-  const normalized = normalizeGame({ ...game, userId: game.userId || userId });
-  const { error, skipped } = await upsertWithOptionalColumns("games", gameToSupabaseRow(normalized), [
+  let normalized = normalizeGame({ ...game, userId: game.userId || userId });
+  let detachedMissingTeam = false;
+  let { error, skipped } = await upsertWithOptionalColumns("games", gameToSupabaseRow(normalized), [
     "player_id",
     "team_id",
     "roster_player_id",
     "period_format",
   ]);
+  if (error && isTeamForeignKeyError(error)) {
+    normalized = detachTeamFromGameForSync(normalized);
+    detachedMissingTeam = true;
+    ({ error, skipped } = await upsertWithOptionalColumns("games", gameToSupabaseRow(normalized), [
+      "player_id",
+      "team_id",
+      "roster_player_id",
+      "period_format",
+    ]));
+  }
   if (error) {
     reportSyncError(error);
     return false;
   }
 
   if (options.includeEvents && normalized.events.length) {
-    const { error: eventsError, skipped: skippedEventColumns } = await upsertWithOptionalColumns(
+    let eventsPayload = normalized.events.map((event) => eventToSupabaseRow({ ...event, userId }));
+    if (detachedMissingTeam) eventsPayload = detachTeamFromSupabaseRows(eventsPayload);
+    let { error: eventsError, skipped: skippedEventColumns } = await upsertWithOptionalColumns(
       "events",
-      normalized.events.map((event) => eventToSupabaseRow({ ...event, userId })),
+      eventsPayload,
       ["tags", "team_id", "roster_player_id", "field_zone", "corrected_at", "tags_updated_at"],
     );
+    if (eventsError && isTeamForeignKeyError(eventsError)) {
+      eventsPayload = detachTeamFromSupabaseRows(eventsPayload);
+      ({ error: eventsError, skipped: skippedEventColumns } = await upsertWithOptionalColumns(
+        "events",
+        eventsPayload,
+        ["tags", "team_id", "roster_player_id", "field_zone", "corrected_at", "tags_updated_at"],
+      ));
+      detachedMissingTeam = true;
+    }
     if (eventsError) {
       reportSyncError(eventsError);
       return false;
@@ -3000,7 +3056,9 @@ async function syncGameToSupabase(game, options = {}) {
     skipped.push(...skippedEventColumns);
   }
 
-  state.syncStatus = skipped.length
+  state.syncStatus = detachedMissingTeam
+    ? "Synced without missing team link"
+    : skipped.length
     ? "Live Share synced; database update recommended"
     : "Live Share synced";
   return true;
@@ -3014,7 +3072,9 @@ async function syncLoggedEvent(game, event) {
   }
   const gameSynced = await syncGameToSupabase(game);
   if (!gameSynced) return;
-  const { error, skipped } = await upsertWithOptionalColumns("events", eventToSupabaseRow(event), [
+  let eventRow = eventToSupabaseRow(event);
+  let detachedMissingTeam = false;
+  let { error, skipped } = await upsertWithOptionalColumns("events", eventRow, [
     "tags",
     "team_id",
     "roster_player_id",
@@ -3022,10 +3082,24 @@ async function syncLoggedEvent(game, event) {
     "corrected_at",
     "tags_updated_at",
   ]);
+  if (error && isTeamForeignKeyError(error)) {
+    eventRow = detachTeamFromSupabaseRows(eventRow);
+    detachedMissingTeam = true;
+    ({ error, skipped } = await upsertWithOptionalColumns("events", eventRow, [
+      "tags",
+      "team_id",
+      "roster_player_id",
+      "field_zone",
+      "corrected_at",
+      "tags_updated_at",
+    ]));
+  }
   if (error) {
     reportSyncError(error);
   } else {
-    state.syncStatus = skipped.length
+    state.syncStatus = detachedMissingTeam
+      ? "Synced without missing team link"
+      : skipped.length
       ? "Live Share synced; database update recommended"
       : "Live Share synced";
   }
