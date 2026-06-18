@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v134";
+const APP_VERSION = "v135";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -5126,6 +5126,14 @@ const LAUNCH_KIT_GROUPS = [
     description: "Everything in one download.",
     files: [
       { label: "Download Full Launch Kit", meta: "ZIP bundle", href: "LaxHornet-launch-kit.zip", type: "download" },
+    ],
+  },
+  {
+    title: "Promo Video",
+    description: "Vertical demo video and thumbnail for sharing LaxHornet with parents.",
+    files: [
+      { label: "LaxHornet Promo Demo", meta: "MP4", href: "launch-kit/LaxHornet-promo-demo.mp4", type: "video" },
+      { label: "Promo Video Thumbnail", meta: "PNG", href: "launch-kit/LaxHornet-promo-demo-thumbnail.png", type: "image" },
     ],
   },
   {

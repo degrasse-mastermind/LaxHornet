@@ -13,6 +13,8 @@ https://degrasse-mastermind.github.io/LaxHornet/
 - `parent-email.eml`: Ready-to-open email draft with clickable links.
 - `invite-message.txt`: Longer email or team-app announcement.
 - `short-text-message.txt`: Short SMS/iMessage version.
+- `LaxHornet-promo-demo.mp4`: 30-second vertical promo demo video.
+- `LaxHornet-promo-demo-thumbnail.png`: Still image preview for the promo video.
 
 ## New Marketing And Sharing Files
 
