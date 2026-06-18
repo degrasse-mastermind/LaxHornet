@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v157";
+const APP_VERSION = "v158";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -1817,6 +1817,12 @@ function formatImpactNumber(value) {
 function signedMetric(value) {
   const formatted = formatImpactNumber(value);
   return Number(value || 0) > 0 ? `+${formatted}` : formatted;
+}
+
+function statWithExtraPossessions(value, extraPossessions) {
+  const extra = Number(extraPossessions || 0);
+  if (!extra) return value;
+  return `${value} (${signedMetric(extra)} EP)`;
 }
 
 function impactWeightLabel(weight) {
@@ -5048,7 +5054,7 @@ function renderLiveTracker() {
     <section class="live-summary" aria-label="Live game summary">
       <div class="live-pill"><strong>${totals.impact}</strong><span>Game Impact</span></div>
       <div class="live-pill"><strong>${totals.points}</strong><span>Points</span></div>
-      <div class="live-pill"><strong>${signedMetric(totals.extraPossessions)}</strong><span>Extra Poss</span></div>
+      <div class="live-pill"><strong>${game.events.length}</strong><span>Events</span></div>
     </section>
 
     ${renderLiveStatGroups()}
@@ -5319,9 +5325,9 @@ function renderReview() {
     <section class="stack">
       <div class="metric-grid">
         <div class="metric"><strong>${totals.impact}</strong><span>Game Impact</span></div>
-        <div class="metric"><strong>${signedMetric(totals.extraPossessions)}</strong><span>Extra Possessions</span></div>
         <div class="metric"><strong>${totals.points}</strong><span>Points</span></div>
         <div class="metric"><strong>${signedMetric(totals.possessionValue)}</strong><span>Possession Value</span></div>
+        <div class="metric"><strong>${totals.goals}</strong><span>Goals</span></div>
       </div>
       ${renderImpactBreakdown(totals)}
       ${renderPossessionImpact(totals)}
@@ -5405,23 +5411,22 @@ function renderTotalsTable(totals) {
     ["Shots on goal", totals.shotsOnGoal],
     ["Shooting %", pct(totals.shootingPct)],
     ["Shot on goal %", pct(totals.shotOnGoalPct)],
-    ["Saves", totals.saves],
+    ["Saves", statWithExtraPossessions(totals.saves, totals.saves)],
     ["Goals allowed", totals.goalsAllowed],
     ["Save %", pct(totals.savePct)],
-    ["Faceoff wins", totals.faceoffWins],
+    ["Faceoff wins", statWithExtraPossessions(totals.faceoffWins, totals.faceoffWins)],
     ["Faceoff losses", totals.faceoffLosses],
     ["Faceoff attempts", totals.faceoffAttempts],
     ["Faceoff win %", pct(totals.faceoffPct)],
-    ["Extra possessions", signedMetric(totals.extraPossessions)],
     ["Possession value", signedMetric(totals.possessionValue)],
-    ["Ground balls", totals.groundBalls],
-    ["Backed up shots", totals.backedUpShots],
+    ["Ground balls", statWithExtraPossessions(totals.groundBalls, totals.groundBalls)],
+    ["Backed up shots", statWithExtraPossessions(totals.backedUpShots, totals.backedUpShots)],
     ["Effort score", totals.effortScore],
-    ["Turnovers", totals.turnovers],
-    ["Caused turnovers", totals.causedTurnovers],
+    ["Turnovers", statWithExtraPossessions(totals.turnovers, -totals.turnovers)],
+    ["Caused turnovers", statWithExtraPossessions(totals.causedTurnovers, totals.causedTurnovers)],
     ["Defensive stops", totals.defensiveStops],
-    ["Successful clears", totals.clears],
-    ["Failed clears", totals.failedClears],
+    ["Successful clears", statWithExtraPossessions(totals.clears, totals.clears * 0.5)],
+    ["Failed clears", statWithExtraPossessions(totals.failedClears, -totals.failedClears)],
     ["Hustle plays", totals.hustlePlays],
     ["Smart plays", totals.smartPlays],
     ["Penalties", totals.penalties],
@@ -5511,15 +5516,14 @@ function renderSeasonTotalsGroups(totals) {
     {
       title: "Possession Impact",
       rows: [
-        ["Extra possessions", signedMetric(totals.extraPossessions)],
         ["Possession value", signedMetric(totals.possessionValue)],
         ["Avg possession value", signedMetric(totals.averagePossessionValue)],
-        ["Ground balls", totals.groundBalls],
-        ["Faceoff wins", totals.faceoffWins],
-        ["Caused turnovers", totals.causedTurnovers],
-        ["Successful clears", totals.clears],
-        ["Failed clears", totals.failedClears],
-        ["Turnovers", totals.turnovers],
+        ["Ground balls", statWithExtraPossessions(totals.groundBalls, totals.groundBalls)],
+        ["Faceoff wins", statWithExtraPossessions(totals.faceoffWins, totals.faceoffWins)],
+        ["Caused turnovers", statWithExtraPossessions(totals.causedTurnovers, totals.causedTurnovers)],
+        ["Successful clears", statWithExtraPossessions(totals.clears, totals.clears * 0.5)],
+        ["Failed clears", statWithExtraPossessions(totals.failedClears, -totals.failedClears)],
+        ["Turnovers", statWithExtraPossessions(totals.turnovers, -totals.turnovers)],
       ],
     },
     {
@@ -5648,7 +5652,7 @@ function renderGameListRow(game) {
       <button class="brand" type="button" data-review="${game.id}" style="color: var(--text); text-align: left;">
         <span>
           <h3>${escapeHTML(game.opponent)}</h3>
-          <p>${escapeHTML(playerContextLine(player))} - ${formatDate(game.date)} - Game Impact ${totals.impact} - Extra Poss ${signedMetric(totals.extraPossessions)} - Poss Value ${signedMetric(totals.possessionValue)}</p>
+          <p>${escapeHTML(playerContextLine(player))} - ${formatDate(game.date)} - Game Impact ${totals.impact} - Poss Value ${signedMetric(totals.possessionValue)}</p>
         </span>
       </button>
       <div class="row-actions">
@@ -5702,7 +5706,6 @@ function dashboardHeadlineMetrics(totals, player = state.player) {
   const metrics = [
     [totals.gamesPlayed, "Games Played"],
     [totals.averageImpact.toFixed(1), "Avg Impact"],
-    [signedMetric(totals.extraPossessions), "Extra Poss"],
     [signedMetric(totals.possessionValue), "Poss Value"],
     [totals.points, "Points"],
     [totals.goals, "Goals"],
