@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v156";
+const APP_VERSION = "v157";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -130,6 +130,18 @@ const IMPACT_POSITION_WEIGHTS = {
     goalie: 1.75,
     effort: 1,
   },
+};
+
+const POSSESSION_IMPACT_RULES = {
+  faceoffWin: { extra: 1, value: 1.0, label: "Faceoff / draw win" },
+  groundBall: { extra: 1, value: 1.2, label: "Ground ball won" },
+  causedTurnover: { extra: 1, value: 1.8, label: "Caused turnover" },
+  goalieSave: { extra: 1, value: 2.5, label: "Save retained" },
+  successfulClear: { extra: 0.5, value: 0.8, label: "Successful clear" },
+  backedUpShot: { extra: 1, value: 1.5, label: "Backed up shot" },
+  turnover: { extra: -1, value: -1.5, label: "Turnover" },
+  failedClear: { extra: -1, value: -2.0, label: "Failed clear" },
+  penalty: { extra: 0, value: -1.5, label: "Penalty" },
 };
 
 const LIVE_STAT_GROUPS = [
@@ -1199,6 +1211,57 @@ function impactPillarForEvent(event = {}) {
   return eventImpactRule(event)?.pillar || "";
 }
 
+function possessionRuleForEvent(event = {}) {
+  return POSSESSION_IMPACT_RULES[event.statType] || null;
+}
+
+function calculatePossessionImpact(events = []) {
+  const eventsByType = {};
+  let extraPossessions = 0;
+  let possessionValue = 0;
+  let positiveEvents = 0;
+  let negativeEvents = 0;
+
+  events.forEach((event) => {
+    const rule = possessionRuleForEvent(event);
+    if (!rule) return;
+    const extra = Number(rule.extra || 0);
+    const value = Number(rule.value || 0);
+    extraPossessions += extra;
+    possessionValue += value;
+    if (value > 0) positiveEvents += 1;
+    if (value < 0) negativeEvents += 1;
+    eventsByType[event.statType] = (eventsByType[event.statType] || 0) + 1;
+  });
+
+  return {
+    extraPossessions,
+    possessionValue,
+    positiveEvents,
+    negativeEvents,
+    eventsByType,
+    takeaway: possessionImpactTakeaway(extraPossessions, possessionValue, eventsByType),
+  };
+}
+
+function possessionImpactTakeaway(extraPossessions, possessionValue, eventsByType = {}) {
+  const formatValue = formatImpactNumber(possessionValue);
+  const highVolume = extraPossessions >= 4;
+  const highValue = possessionValue >= 5;
+  const costly = possessionValue < 0;
+  const protectedPossessions = (eventsByType.successfulClear || 0) + (eventsByType.backedUpShot || 0);
+  const wonPossessions = (eventsByType.groundBall || 0) + (eventsByType.causedTurnover || 0) + (eventsByType.faceoffWin || 0) + (eventsByType.goalieSave || 0);
+  const lostPossessions = (eventsByType.turnover || 0) + (eventsByType.failedClear || 0);
+
+  if (!extraPossessions && !possessionValue) return "No possession-changing events were logged yet.";
+  if (costly) return `Possession swings were costly: ${formatImpactNumber(extraPossessions)} extra possessions and ${formatValue} Possession Value, mainly from lost possessions or penalties.`;
+  if (highVolume && highValue) return `High-volume, high-value possession game: ${formatImpactNumber(extraPossessions)} extra possessions created and +${formatValue} Possession Value.`;
+  if (highVolume) return `High-volume possession winner: ${formatImpactNumber(extraPossessions)} extra possessions created, with +${formatValue} Possession Value.`;
+  if (highValue) return `High-leverage possession impact: fewer swings, but they were worth +${formatValue} Possession Value.`;
+  if (protectedPossessions > wonPossessions && protectedPossessions > lostPossessions) return `Best possession work came from protecting the ball: clears and backed-up shots helped preserve chances.`;
+  return `Helpful possession impact: ${formatImpactNumber(extraPossessions)} extra possessions created for +${formatValue} Possession Value.`;
+}
+
 function weightedImpactPillars(pillars, weights) {
   return Object.fromEntries(
     IMPACT_PILLARS.map((pillar) => {
@@ -1633,6 +1696,7 @@ function calculateTotals(events = [], player = state.player) {
   const successfulClears = count("successfulClear");
   const failedClears = count("failedClear");
   const gameImpact = calculateGameImpact(events, player);
+  const possessionImpact = calculatePossessionImpact(events);
   const impact = gameImpact.score;
   const rawImpact = gameImpact.raw;
   const saves = count("goalieSave");
@@ -1648,6 +1712,9 @@ function calculateTotals(events = [], player = state.player) {
     impact,
     rawImpact,
     gameImpact,
+    possessionImpact,
+    extraPossessions: possessionImpact.extraPossessions,
+    possessionValue: possessionImpact.possessionValue,
     eventCount: events.length,
     goals,
     assists,
@@ -1700,6 +1767,8 @@ function calculateSeasonTotalsFromGames(games) {
       gamesPlayed: games.length,
       impact: 0,
       rawImpact: 0,
+      extraPossessions: 0,
+      possessionValue: 0,
       eventCount: 0,
       goals: 0,
       assists: 0,
@@ -1732,6 +1801,7 @@ function calculateSeasonTotalsFromGames(games) {
   totals.faceoffPct = totals.faceoffAttempts ? totals.faceoffWins / totals.faceoffAttempts : 0;
   totals.averageImpact = totals.gamesPlayed ? totals.impact / totals.gamesPlayed : 0;
   totals.averageRawImpact = totals.gamesPlayed ? totals.rawImpact / totals.gamesPlayed : 0;
+  totals.averagePossessionValue = totals.gamesPlayed ? totals.possessionValue / totals.gamesPlayed : 0;
   return totals;
 }
 
@@ -1742,6 +1812,11 @@ function pct(value) {
 function formatImpactNumber(value) {
   const number = Number(value || 0);
   return Number.isInteger(number) ? String(number) : number.toFixed(1);
+}
+
+function signedMetric(value) {
+  const formatted = formatImpactNumber(value);
+  return Number(value || 0) > 0 ? `+${formatted}` : formatted;
 }
 
 function impactWeightLabel(weight) {
@@ -1999,6 +2074,8 @@ function buildCSV() {
     "eventImpactPillar",
     "gameImpactScore",
     "gameImpactRaw",
+    "extraPossessions",
+    "possessionValue",
     "tags",
     "note",
     "fieldZone",
@@ -2029,6 +2106,8 @@ function buildCSV() {
         impactPillarForEvent(event),
         totals.impact,
         formatImpactNumber(totals.rawImpact),
+        formatImpactNumber(totals.extraPossessions),
+        formatImpactNumber(totals.possessionValue),
         event.tags,
         event.note,
         event.fieldZone,
@@ -2065,6 +2144,11 @@ function exportJSON() {
       pillars: IMPACT_PILLARS,
       rules: IMPACT_RULES,
       positionWeights: IMPACT_POSITION_WEIGHTS,
+    },
+    possessionImpactModel: {
+      version: "possession-impact-v1",
+      metrics: ["extraPossessions", "possessionValue"],
+      rules: POSSESSION_IMPACT_RULES,
     },
     exportedAt: new Date().toISOString(),
     player: state.player,
@@ -4964,7 +5048,7 @@ function renderLiveTracker() {
     <section class="live-summary" aria-label="Live game summary">
       <div class="live-pill"><strong>${totals.impact}</strong><span>Game Impact</span></div>
       <div class="live-pill"><strong>${totals.points}</strong><span>Points</span></div>
-      <div class="live-pill"><strong>${totals.eventCount}</strong><span>Events</span></div>
+      <div class="live-pill"><strong>${signedMetric(totals.extraPossessions)}</strong><span>Extra Poss</span></div>
     </section>
 
     ${renderLiveStatGroups()}
@@ -5235,11 +5319,12 @@ function renderReview() {
     <section class="stack">
       <div class="metric-grid">
         <div class="metric"><strong>${totals.impact}</strong><span>Game Impact</span></div>
+        <div class="metric"><strong>${signedMetric(totals.extraPossessions)}</strong><span>Extra Possessions</span></div>
         <div class="metric"><strong>${totals.points}</strong><span>Points</span></div>
-        <div class="metric"><strong>${totals.goals}</strong><span>Goals</span></div>
-        <div class="metric"><strong>${totals.assists}</strong><span>Assists</span></div>
+        <div class="metric"><strong>${signedMetric(totals.possessionValue)}</strong><span>Possession Value</span></div>
       </div>
       ${renderImpactBreakdown(totals)}
+      ${renderPossessionImpact(totals)}
       ${canEditCurrentGame ? `
         <div class="review-tool-actions">
           ${canShowAddEvent ? `<button class="btn neutral" type="button" data-action="add-review-event">Add Event</button>` : ""}
@@ -5327,6 +5412,8 @@ function renderTotalsTable(totals) {
     ["Faceoff losses", totals.faceoffLosses],
     ["Faceoff attempts", totals.faceoffAttempts],
     ["Faceoff win %", pct(totals.faceoffPct)],
+    ["Extra possessions", signedMetric(totals.extraPossessions)],
+    ["Possession value", signedMetric(totals.possessionValue)],
     ["Ground balls", totals.groundBalls],
     ["Backed up shots", totals.backedUpShots],
     ["Effort score", totals.effortScore],
@@ -5383,6 +5470,33 @@ function renderImpactBreakdown(totals) {
   `;
 }
 
+function renderPossessionImpact(totals) {
+  const possession = totals.possessionImpact || calculatePossessionImpact([]);
+  return `
+    <section class="card pad possession-impact-card">
+      <div class="section-head compact-head">
+        <div>
+          <h3>Possession Impact</h3>
+          <p class="muted small">Who helped get or protect the ball, and how valuable those swings were.</p>
+        </div>
+      </div>
+      <div class="possession-impact-grid">
+        <div class="possession-impact-metric">
+          <span>Extra Possessions</span>
+          <strong>${signedMetric(possession.extraPossessions)}</strong>
+          <small>volume</small>
+        </div>
+        <div class="possession-impact-metric">
+          <span>Possession Value</span>
+          <strong>${signedMetric(possession.possessionValue)}</strong>
+          <small>quality</small>
+        </div>
+      </div>
+      <p class="impact-takeaway">${escapeHTML(possession.takeaway)}</p>
+    </section>
+  `;
+}
+
 function renderSeasonTotalsGroups(totals) {
   const groups = [
     {
@@ -5395,9 +5509,22 @@ function renderSeasonTotalsGroups(totals) {
       ],
     },
     {
-      title: "Possession & Effort",
+      title: "Possession Impact",
       rows: [
+        ["Extra possessions", signedMetric(totals.extraPossessions)],
+        ["Possession value", signedMetric(totals.possessionValue)],
+        ["Avg possession value", signedMetric(totals.averagePossessionValue)],
         ["Ground balls", totals.groundBalls],
+        ["Faceoff wins", totals.faceoffWins],
+        ["Caused turnovers", totals.causedTurnovers],
+        ["Successful clears", totals.clears],
+        ["Failed clears", totals.failedClears],
+        ["Turnovers", totals.turnovers],
+      ],
+    },
+    {
+      title: "Effort",
+      rows: [
         ["Backed up shots", totals.backedUpShots],
         ["Hustle plays", totals.hustlePlays],
         ["Smart plays", totals.smartPlays],
@@ -5521,7 +5648,7 @@ function renderGameListRow(game) {
       <button class="brand" type="button" data-review="${game.id}" style="color: var(--text); text-align: left;">
         <span>
           <h3>${escapeHTML(game.opponent)}</h3>
-          <p>${escapeHTML(playerContextLine(player))} - ${formatDate(game.date)} - Game Impact ${totals.impact} - ${totals.goals}G ${totals.assists}A</p>
+          <p>${escapeHTML(playerContextLine(player))} - ${formatDate(game.date)} - Game Impact ${totals.impact} - Extra Poss ${signedMetric(totals.extraPossessions)} - Poss Value ${signedMetric(totals.possessionValue)}</p>
         </span>
       </button>
       <div class="row-actions">
@@ -5575,6 +5702,8 @@ function dashboardHeadlineMetrics(totals, player = state.player) {
   const metrics = [
     [totals.gamesPlayed, "Games Played"],
     [totals.averageImpact.toFixed(1), "Avg Impact"],
+    [signedMetric(totals.extraPossessions), "Extra Poss"],
+    [signedMetric(totals.possessionValue), "Poss Value"],
     [totals.points, "Points"],
     [totals.goals, "Goals"],
     [totals.assists, "Assists"],
@@ -5646,6 +5775,12 @@ function renderHelp() {
       <div class="card pad">
         <h3>Points vs Impact</h3>
         <p class="muted small">Lacrosse points are goals plus assists. Game Impact is broader: it also counts ground balls, clears, defensive stops, faceoffs, goalie saves, backed up shots, hustle plays, smart plays, and mistakes.</p>
+      </div>
+
+      <div class="card pad">
+        <h3>Possession Impact</h3>
+        <p class="muted small">Possession Impact separates volume from value. Extra Possessions counts how many additional chances the player helped create or protect. Possession Value weights how important those possession-changing plays were.</p>
+        <p class="muted small">Examples: a ground ball adds +1 extra possession and +1.2 Possession Value. A caused turnover adds +1 and +1.8. A save retained by the team adds +1 and +2.5. Turnovers and failed clears subtract from both.</p>
       </div>
 
       <div class="card pad">

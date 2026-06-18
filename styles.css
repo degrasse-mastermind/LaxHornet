@@ -1136,6 +1136,47 @@ button:disabled {
   gap: 10px;
 }
 
+.possession-impact-card {
+  display: grid;
+  gap: 12px;
+}
+
+.possession-impact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.possession-impact-metric {
+  min-height: 72px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7f8f9;
+}
+
+.possession-impact-metric span,
+.possession-impact-metric strong,
+.possession-impact-metric small {
+  display: block;
+}
+
+.possession-impact-metric span,
+.possession-impact-metric small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.possession-impact-metric strong {
+  margin: 4px 0;
+  color: var(--text);
+  font-size: 1.5rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
 .season-groups {
   display: grid;
   gap: 12px;

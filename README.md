@@ -129,3 +129,22 @@ The raw event values behind the score are:
 - Note: 0
 
 For dashboard percentages, total shots are `Missed Shot` plus `Shot on Goal`.
+
+## Possession Impact
+
+Possession Impact separates two related ideas:
+
+- Extra Possessions: the count of additional chances created or protected.
+- Possession Value: the weighted value of those possession-changing plays.
+
+Current possession rules:
+
+- Faceoff / draw win: +1 extra possession, +1.0 value
+- Ground ball won: +1, +1.2
+- Caused turnover: +1, +1.8
+- Save retained by the team: +1, +2.5
+- Successful clear: +0.5, +0.8
+- Backed Up Shot: +1, +1.5
+- Turnover: -1, -1.5
+- Failed clear: -1, -2.0
+- Penalty: 0, -1.5
