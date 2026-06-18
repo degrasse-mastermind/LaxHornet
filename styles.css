@@ -2551,6 +2551,15 @@ button:disabled {
   text-transform: uppercase;
 }
 
+.stat-table .stat-section-row th {
+  background: #f2f3f5;
+  border-bottom-color: #d9dde3;
+  color: var(--danger);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  padding: 9px 12px 7px;
+}
+
 .stat-table td:last-child,
 .stat-table th:last-child {
   width: 34%;
@@ -2561,6 +2570,13 @@ button:disabled {
 .stat-table td:first-child,
 .stat-table th:first-child {
   width: 66%;
+}
+
+.stat-table .stat-section-row th:first-child,
+.stat-table .stat-section-row th:last-child {
+  width: auto;
+  text-align: left;
+  white-space: normal;
 }
 
 .empty {

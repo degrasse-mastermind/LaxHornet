@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v159";
+const APP_VERSION = "v160";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -5407,6 +5407,7 @@ function renderSharedGame() {
 
 function renderTotalsTable(totals) {
   const rows = [
+    { section: "Offense" },
     ["Goals", totals.goals],
     ["Assists", totals.assists],
     ["Points", totals.points],
@@ -5414,25 +5415,28 @@ function renderTotalsTable(totals) {
     ["Shots on goal", totals.shotsOnGoal],
     ["Shooting %", pct(totals.shootingPct)],
     ["Shot on goal %", pct(totals.shotOnGoalPct)],
-    ["Saves", statWithExtraPossessions(totals.saves, totals.saves)],
-    ["Goals allowed", totals.goalsAllowed],
-    ["Save %", pct(totals.savePct)],
+    { section: "Possession & Effort" },
+    ["Possession value", signedMetric(totals.possessionValue)],
+    ["Ground balls", statWithExtraPossessions(totals.groundBalls, totals.groundBalls)],
+    ["Backed up shots", statWithExtraPossessions(totals.backedUpShots, totals.backedUpShots)],
+    ["Successful clears", statWithExtraPossessions(totals.clears, totals.clears * 0.5)],
+    ["Failed clears", statWithExtraPossessions(totals.failedClears, -totals.failedClears)],
+    ["Turnovers", statWithExtraPossessions(totals.turnovers, -totals.turnovers)],
+    ["Hustle plays", totals.hustlePlays],
+    ["Smart plays", totals.smartPlays],
+    ["Effort score", totals.effortScore],
+    { section: "Defense" },
+    ["Caused turnovers", statWithExtraPossessions(totals.causedTurnovers, totals.causedTurnovers)],
+    ["Defensive stops", totals.defensiveStops],
+    ["Penalties", totals.penalties],
+    { section: "Specialty" },
     ["Faceoff wins", statWithExtraPossessions(totals.faceoffWins, totals.faceoffWins)],
     ["Faceoff losses", totals.faceoffLosses],
     ["Faceoff attempts", totals.faceoffAttempts],
     ["Faceoff win %", pct(totals.faceoffPct)],
-    ["Possession value", signedMetric(totals.possessionValue)],
-    ["Ground balls", statWithExtraPossessions(totals.groundBalls, totals.groundBalls)],
-    ["Backed up shots", statWithExtraPossessions(totals.backedUpShots, totals.backedUpShots)],
-    ["Effort score", totals.effortScore],
-    ["Turnovers", statWithExtraPossessions(totals.turnovers, -totals.turnovers)],
-    ["Caused turnovers", statWithExtraPossessions(totals.causedTurnovers, totals.causedTurnovers)],
-    ["Defensive stops", totals.defensiveStops],
-    ["Successful clears", statWithExtraPossessions(totals.clears, totals.clears * 0.5)],
-    ["Failed clears", statWithExtraPossessions(totals.failedClears, -totals.failedClears)],
-    ["Hustle plays", totals.hustlePlays],
-    ["Smart plays", totals.smartPlays],
-    ["Penalties", totals.penalties],
+    ["Saves", statWithExtraPossessions(totals.saves, totals.saves)],
+    ["Goals allowed", totals.goalsAllowed],
+    ["Save %", pct(totals.savePct)],
   ];
 
   return `
@@ -5440,7 +5444,13 @@ function renderTotalsTable(totals) {
       <table class="stat-table">
         <thead><tr><th>Stat</th><th>Total</th></tr></thead>
         <tbody>
-          ${rows.map(([label, value]) => `<tr><td>${label}</td><td>${value}</td></tr>`).join("")}
+          ${rows
+            .map((row) =>
+              row.section
+                ? `<tr class="stat-section-row"><th colspan="2">${escapeHTML(row.section)}</th></tr>`
+                : `<tr><td>${row[0]}</td><td>${row[1]}</td></tr>`,
+            )
+            .join("")}
         </tbody>
       </table>
     </div>
@@ -5508,8 +5518,11 @@ function renderPossessionImpact(totals) {
 function renderSeasonTotalsGroups(totals) {
   const groups = [
     {
-      title: "Scoring",
+      title: "Offense",
       rows: [
+        ["Goals", totals.goals],
+        ["Assists", totals.assists],
+        ["Points", totals.points],
         ["Shots", totals.shots],
         ["Shots on goal", totals.shotsOnGoal],
         ["Shooting %", pct(totals.shootingPct)],
@@ -5517,51 +5530,36 @@ function renderSeasonTotalsGroups(totals) {
       ],
     },
     {
-      title: "Possession Impact",
+      title: "Possession & Effort",
       rows: [
         ["Possession value", signedMetric(totals.possessionValue)],
         ["Avg possession value", signedMetric(totals.averagePossessionValue)],
         ["Ground balls", statWithExtraPossessions(totals.groundBalls, totals.groundBalls)],
-        ["Faceoff wins", statWithExtraPossessions(totals.faceoffWins, totals.faceoffWins)],
-        ["Caused turnovers", statWithExtraPossessions(totals.causedTurnovers, totals.causedTurnovers)],
+        ["Backed up shots", statWithExtraPossessions(totals.backedUpShots, totals.backedUpShots)],
         ["Successful clears", statWithExtraPossessions(totals.clears, totals.clears * 0.5)],
         ["Failed clears", statWithExtraPossessions(totals.failedClears, -totals.failedClears)],
         ["Turnovers", statWithExtraPossessions(totals.turnovers, -totals.turnovers)],
-      ],
-    },
-    {
-      title: "Effort",
-      rows: [
-        ["Backed up shots", totals.backedUpShots],
         ["Hustle plays", totals.hustlePlays],
         ["Smart plays", totals.smartPlays],
         ["Effort score", totals.effortScore],
       ],
     },
     {
-      title: "Defense & Clears",
+      title: "Defense",
       rows: [
-        ["Caused turnovers", totals.causedTurnovers],
+        ["Caused turnovers", statWithExtraPossessions(totals.causedTurnovers, totals.causedTurnovers)],
         ["Defensive stops", totals.defensiveStops],
-        ["Successful clears", totals.clears],
-        ["Failed clears", totals.failedClears],
-        ["Turnovers", totals.turnovers],
         ["Penalties", totals.penalties],
       ],
     },
     {
-      title: "Faceoff",
+      title: "Specialty",
       rows: [
-        ["Faceoff wins", totals.faceoffWins],
+        ["Faceoff wins", statWithExtraPossessions(totals.faceoffWins, totals.faceoffWins)],
         ["Faceoff losses", totals.faceoffLosses],
         ["Faceoff attempts", totals.faceoffAttempts],
         ["Faceoff win %", pct(totals.faceoffPct)],
-      ],
-    },
-    {
-      title: "Goalie",
-      rows: [
-        ["Saves", totals.saves],
+        ["Saves", statWithExtraPossessions(totals.saves, totals.saves)],
         ["Goals allowed", totals.goalsAllowed],
         ["Save %", pct(totals.savePct)],
       ],
