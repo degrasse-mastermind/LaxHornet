@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v137";
+const APP_VERSION = "v138";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -2148,9 +2148,17 @@ async function loadCloudTeams(options = {}) {
       return;
     }
 
+    const cloudRosterPlayers = normalizeRosterPlayers((rosterRows || []).map(rosterPlayerFromSupabaseRow));
+    const cloudRosterKeys = new Set(cloudRosterPlayers.map((player) => `${player.teamId}|${player.id}`));
+    const preservedRosterPlayers = state.rosterPlayers.filter((player) => {
+      const normalized = normalizeRosterPlayer(player);
+      if (!ids.includes(normalized.teamId)) return true;
+      if (!canManageRoster(normalized.teamId)) return false;
+      return !cloudRosterKeys.has(`${normalized.teamId}|${normalized.id}`);
+    });
     state.rosterPlayers = normalizeRosterPlayers([
-      ...state.rosterPlayers.filter((player) => !ids.includes(player.teamId)),
-      ...(rosterRows || []).map(rosterPlayerFromSupabaseRow),
+      ...preservedRosterPlayers,
+      ...cloudRosterPlayers,
     ]);
     await loadEditableTeamAccessCodes();
   }
