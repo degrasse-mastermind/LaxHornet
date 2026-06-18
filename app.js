@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v138";
+const APP_VERSION = "v139";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -522,7 +522,7 @@ function hasPlayerClaim(teamId, rosterPlayerId) {
 function canTrackRosterPlayer(teamId, rosterPlayerId) {
   const role = teamRole(teamId);
   if (!teamId) return true;
-  if (isPlatformReviewer() && role === "admin") return true;
+  if (isPlatformReviewer()) return true;
   if (role === "tracker") return hasPlayerClaim(teamId, rosterPlayerId);
   return false;
 }
@@ -991,9 +991,17 @@ function canCreateTeams() {
 function setAdminViewMode(mode) {
   if (!isReviewerAccount()) return;
   state.adminViewMode = mode === "tracker" ? "tracker" : "admin";
-  mergeRosterPlayersIntoPlayers();
-  ensureActiveTeamRosterPlayer();
-  syncActivePlayer();
+  if (isPlatformReviewer()) {
+    mergeRosterPlayersIntoPlayers();
+    ensureActiveTeamRosterPlayer();
+    syncActivePlayer();
+  } else {
+    const firstVisible = visiblePlayers()[0];
+    if (firstVisible) {
+      state.activePlayerId = firstVisible.id;
+      state.player = firstVisible;
+    }
+  }
   persistAll();
   render();
   showToast(state.adminViewMode === "tracker" ? "Tracker mode on" : "Admin mode on");
