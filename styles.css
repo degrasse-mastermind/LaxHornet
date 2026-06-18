@@ -707,6 +707,26 @@ button:disabled {
   box-shadow: none;
 }
 
+.add-player-block {
+  gap: 8px;
+}
+
+.add-player-block.collapsed {
+  padding-bottom: 2px;
+}
+
+.add-player-block .collapsible-card-head {
+  min-height: 48px;
+}
+
+.add-player-block .collapsible-card-head h4 {
+  margin: 0 0 2px;
+}
+
+.add-player-block .team-add-player-form.roster-edit-card.inline {
+  margin: 0;
+}
+
 .roster-edit-card.inline .section-head {
   align-items: start;
 }

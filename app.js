@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v147";
+const APP_VERSION = "v148";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -290,6 +290,7 @@ const state = {
   deletedEventIds: initialStoredState.deletedEventIds,
   watchShareExpanded: false,
   teamRosterExpanded: true,
+  teamAddPlayerExpanded: false,
   teamAccessExpanded: false,
   exportToolsExpanded: false,
   helpExpanded: false,
@@ -3692,6 +3693,43 @@ function renderRosterPlayerEditForm(selectedRosterPlayer, options = {}) {
   `;
 }
 
+function renderAddRosterPlayerBlock() {
+  const expanded = state.teamAddPlayerExpanded;
+  return `
+    <div class="team-roster-block add-player-block ${expanded ? "expanded" : "collapsed"}">
+      <div class="collapsible-card-head compact-head">
+        <div>
+          <h4>Add Player</h4>
+          <p class="muted small">${expanded ? "Add a roster player by name, jersey number, and position." : "Tap to add another roster player."}</p>
+        </div>
+        <button class="collapse-icon" type="button" data-action="toggle-add-player" aria-expanded="${expanded}" aria-label="${expanded ? "Minimize Add Player" : "Expand Add Player"}">
+          <span aria-hidden="true">${expanded ? "v" : ">"}</span>
+        </button>
+      </div>
+      ${
+        expanded
+          ? `<form class="team-add-player-form roster-edit-card inline" data-form="add-roster-player">
+              <div class="form-grid two">
+                <div class="field">
+                  <label for="rosterName">Player name</label>
+                  <input id="rosterName" name="rosterName" placeholder="Player name" required />
+                </div>
+                <div class="field roster-number-field">
+                  <label for="rosterNumber">Jersey #</label>
+                  <input id="rosterNumber" name="rosterNumber" inputmode="numeric" placeholder="12" />
+                </div>
+              </div>
+              ${renderPositionPicker({ name: "rosterPosition", label: "Positions" })}
+              <div class="team-form-actions">
+                <button class="mini-btn" type="submit">Add Player</button>
+              </div>
+            </form>`
+          : ""
+      }
+    </div>
+  `;
+}
+
 function renderTeamAccessRequests() {
   const team = activeTeam();
   if (!team || !canManageRoster(team.id)) return "";
@@ -3999,22 +4037,7 @@ function renderTeamRosterCard(options = {}) {
                             ${renderUnclaimedRosterPlayers(fullTeamRoster)}
                             ${claimByNumberForm}
                           </div>
-                          <form class="team-add-player-form" data-form="add-roster-player">
-                            <div class="form-grid two">
-                              <div class="field">
-                                <label for="rosterName">Player name</label>
-                                <input id="rosterName" name="rosterName" placeholder="Player name" required />
-                              </div>
-                              <div class="field">
-                                <label for="rosterNumber">Jersey #</label>
-                                <input id="rosterNumber" name="rosterNumber" inputmode="numeric" placeholder="12" />
-                              </div>
-                            </div>
-                            ${renderPositionPicker({ name: "rosterPosition", label: "Positions" })}
-                            <div class="team-form-actions">
-                              <button class="mini-btn" type="submit">Add Player</button>
-                            </div>
-                          </form>`
+                          ${renderAddRosterPlayerBlock()}`
                         : `${claimByNumberForm}`
                     }
                     ${
@@ -5949,6 +5972,10 @@ function handleClick(event) {
     }
     if (action.dataset.action === "toggle-team-roster") {
       state.teamRosterExpanded = !state.teamRosterExpanded;
+      render();
+    }
+    if (action.dataset.action === "toggle-add-player") {
+      state.teamAddPlayerExpanded = !state.teamAddPlayerExpanded;
       render();
     }
     if (action.dataset.action === "toggle-team-access") {
