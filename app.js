@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v146";
+const APP_VERSION = "v147";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -3664,7 +3664,7 @@ function renderRosterPlayerEditForm(selectedRosterPlayer, options = {}) {
   if (!isTeamPlayer(player) || !canManageRoster(player.teamId)) return "";
   const prefix = options.idPrefix || "editRoster";
   return `
-    <form class="card pad form-grid roster-edit-card" data-form="roster-player-edit">
+    <form class="card pad form-grid roster-edit-card ${options.inline ? "inline" : ""}" data-form="roster-player-edit">
       <input type="hidden" name="rosterPlayerId" value="${escapeHTML(player.rosterPlayerId || player.id)}" />
       <input type="hidden" name="teamId" value="${escapeHTML(player.teamId)}" />
       <div class="section-head compact-head">
@@ -3995,7 +3995,7 @@ function renderTeamRosterCard(options = {}) {
                               </div>
                             </div>
                             <div class="player-chip-row">${rosterContent}</div>
-                            ${selectedTeamRosterPlayer ? renderRosterPlayerEditForm(selectedTeamRosterPlayer, { idPrefix: "teamRosterEdit" }) : ""}
+                            ${selectedTeamRosterPlayer ? renderRosterPlayerEditForm(selectedTeamRosterPlayer, { idPrefix: "teamRosterEdit", inline: true }) : ""}
                             ${renderUnclaimedRosterPlayers(fullTeamRoster)}
                             ${claimByNumberForm}
                           </div>

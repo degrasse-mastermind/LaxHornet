@@ -699,6 +699,29 @@ button:disabled {
   align-items: start;
 }
 
+.roster-edit-card.inline {
+  margin: 6px 0 16px;
+  padding: 12px;
+  border: 1px solid #dfe2e6;
+  background: #f7f8fa;
+  box-shadow: none;
+}
+
+.roster-edit-card.inline .section-head {
+  align-items: start;
+}
+
+.roster-edit-card.inline h3 {
+  margin: 0 0 2px;
+  font-size: 1rem;
+  line-height: 1.15;
+}
+
+.roster-edit-card.inline .muted.small {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
 .roster-number-field {
   width: min(132px, 100%);
 }
@@ -713,6 +736,12 @@ button:disabled {
 .team-add-player-form {
   display: grid;
   gap: 10px;
+}
+
+.team-roster-block + .team-roster-block {
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
 }
 
 .team-requests-card {
