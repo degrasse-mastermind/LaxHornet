@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v141";
+const APP_VERSION = "v142";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -517,6 +517,19 @@ function locallyManagedAdminTeams() {
     });
   }).filter(Boolean);
   return normalizeTeams([...existingTeams, ...playerTeams]);
+}
+
+function recoverAdminTeamContext() {
+  const recoveredTeams = locallyManagedAdminTeams();
+  if (!recoveredTeams.length) return;
+  state.teams = normalizeTeams([...state.teams, ...recoveredTeams]);
+  const activePlayer = normalizePlayer(state.player);
+  if ((!state.activeTeamId || !state.teams.some((team) => team.id === state.activeTeamId)) && activePlayer.teamId) {
+    state.activeTeamId = activePlayer.teamId;
+  }
+  if (!state.activeTeamId || !state.teams.some((team) => team.id === state.activeTeamId)) {
+    state.activeTeamId = state.teams[0]?.id || "";
+  }
 }
 
 function teamRoleLabel(role) {
@@ -5574,6 +5587,7 @@ function render() {
   if (state.authUser && needsParentProfileSetup() && !["profileSetup", "shared", "help", "tutorial", "authSuccess", "requestSubmitted"].includes(state.screen)) {
     state.screen = "profileSetup";
   }
+  if (state.authUser) recoverAdminTeamContext();
   const screens = {
     home: renderHome,
     authSuccess: renderAuthSuccess,
