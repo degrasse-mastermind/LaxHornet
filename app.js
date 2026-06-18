@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v140";
+const APP_VERSION = "v141";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -502,10 +502,21 @@ function teamRole(teamId) {
 
 function locallyManagedAdminTeams() {
   if (!isPlatformReviewer()) return [];
-  return state.teams.filter((team) => {
+  const existingTeams = state.teams.filter((team) => {
     const normalized = normalizeTeam(team);
     return normalized.id && (normalized.role === "admin" || normalized.createdBy === currentUserId());
   });
+  const playerTeams = [state.player, ...state.players].map((player) => {
+    const normalized = normalizePlayer(player);
+    if (!normalized.teamId) return null;
+    return normalizeTeam({
+      id: normalized.teamId,
+      name: normalized.team || "Team",
+      role: "admin",
+      createdBy: currentUserId(),
+    });
+  }).filter(Boolean);
+  return normalizeTeams([...existingTeams, ...playerTeams]);
 }
 
 function teamRoleLabel(role) {
