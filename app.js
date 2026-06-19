@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v166";
+const APP_VERSION = "v167";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -1037,7 +1037,7 @@ function deleteActivePlayer() {
   const activeGameMatches = state.activeGame && gamePlayerId(state.activeGame) === state.activePlayerId;
   const savedGames = playerGameCount(state.activePlayerId);
   if (activeGameMatches || savedGames) {
-    showToast("Delete this player's games first");
+    showToast("Remove this player's saved games first");
     return;
   }
   const removedName = state.player.name;
@@ -3810,10 +3810,10 @@ async function removeClaimedRosterPlayer() {
     return;
   }
   if (playerHasAnyGames(player)) {
-    showToast("Delete this player's games first");
+    showToast("Saved games must be deleted before removing this player from your account");
     return;
   }
-  if (!window.confirm(`Remove ${playerTitle(player)} from your account? This will not delete the team roster player for other parents.`)) return;
+  if (!window.confirm(`Remove ${playerTitle(player)} from your account? This does not remove the player from the team roster. It only removes your access to this player.`)) return;
 
   const { error } = await supabaseClient.rpc("laxhornet_delete_player_claim", {
     p_team_id: player.teamId,
@@ -4463,7 +4463,7 @@ function renderRosterPlayerEditForm(selectedRosterPlayer, options = {}) {
         ${renderPositionPicker({ name: "position", selected: player.position, label: "Positions" })}
       </div>
       <div class="inline-input-action">
-        <button class="mini-btn danger" type="button" data-action="remove-roster-player">Delete Player</button>
+        <button class="mini-btn danger" type="button" data-action="remove-roster-player">Remove from Roster</button>
         <button class="mini-btn" type="submit">Save Player</button>
       </div>
     </form>
@@ -5272,14 +5272,14 @@ function renderPlayerPage() {
     ? canRemoveClaimedRosterPlayer
       ? `<section class="card pad">
           <h3>Remove Player From My Account</h3>
-          <p class="muted small">This removes your access to ${escapeHTML(playerTitle(selectedRosterPlayer))}. It will not delete the team roster player for other parents.</p>
-          <button class="btn danger" type="button" data-action="remove-claimed-player">Remove from My Account</button>
+          <p class="muted small">This does not remove ${escapeHTML(playerTitle(selectedRosterPlayer))} from the team roster. It only removes your access to this player.</p>
+          <button class="btn danger" type="button" data-action="remove-claimed-player">Remove Player From My Account</button>
         </section>`
       : ""
     : `<section class="card pad">
-        <h3>Delete Player</h3>
-        <p class="muted small">Remove this locally saved player from this device.</p>
-        <button class="btn danger" type="button" data-action="delete-player">Delete Player</button>
+        <h3>Remove Local Player</h3>
+        <p class="muted small">This only removes the locally saved player from this device. It does not affect any team roster.</p>
+        <button class="btn danger" type="button" data-action="delete-player">Remove Local Player</button>
       </section>`;
   return renderShell(`
     <section class="screen-title">
