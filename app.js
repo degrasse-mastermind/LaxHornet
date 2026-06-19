@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v163";
+const APP_VERSION = "v164";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -894,9 +894,19 @@ function playerSubline(player = state.player) {
   return [normalized.team, normalized.position].filter(Boolean).join(" - ") || "Add player details before the next game.";
 }
 
+function playerTeamCode(player = state.player) {
+  const normalized = normalizePlayer(player);
+  return normalized.teamId ? teamById(normalized.teamId)?.inviteCode || "" : "";
+}
+
+function playerTeamCodeLabel(player = state.player) {
+  const code = playerTeamCode(player);
+  return code ? `Team Code: ${code}` : "";
+}
+
 function playerContextLine(player = state.player) {
   const normalized = normalizePlayer(player);
-  const context = [normalized.team, normalized.position].filter(Boolean).join(" - ");
+  const context = [normalized.team, playerTeamCodeLabel(normalized), normalized.position].filter(Boolean).join(" - ");
   return [playerTitle(normalized), context].filter(Boolean).join(" - ");
 }
 
@@ -4318,10 +4328,12 @@ function renderPlayerSwitcher(options = {}) {
   const chips = players
     .map((player) => {
       const active = player.id === state.activePlayerId;
+      const teamCodeLabel = playerTeamCodeLabel(player);
       return `
         <button class="player-chip ${active ? "active" : ""}" type="button" data-player-select="${player.id}" aria-pressed="${active}">
           <strong>${escapeHTML(player.name || "Player")}</strong>
           ${player.number ? `<span>#${escapeHTML(player.number)}</span>` : ""}
+          ${teamCodeLabel ? `<span class="player-chip-code">${escapeHTML(teamCodeLabel)}</span>` : ""}
           ${showPlayerSubline ? `<span>${escapeHTML(playerSubline(player))}</span>` : ""}
         </button>
       `;
@@ -4356,6 +4368,7 @@ function renderCompactPlayerContext(options = {}) {
       <div>
         <p class="eyebrow">${escapeHTML(title)}</p>
         <h3>${escapeHTML(playerTitle(state.player))}</h3>
+        ${playerTeamCodeLabel(state.player) ? `<p class="muted tiny player-card-code">${escapeHTML(playerTeamCodeLabel(state.player))}</p>` : ""}
         <p class="muted small">${escapeHTML(playerSubline(state.player))}</p>
         ${helper ? `<p class="muted tiny">${escapeHTML(helper)}</p>` : ""}
       </div>
@@ -4369,11 +4382,13 @@ function renderPlayerAssignmentCard(player) {
   const active = normalized.id === state.activePlayerId;
   const totals = calculateSeasonTotalsForPlayer(normalized);
   const subline = playerSubline(normalized);
+  const teamCodeLabel = playerTeamCodeLabel(normalized);
   return `
     <section class="player-assignment-card ${active ? "active" : ""}">
       <div class="player-assignment-main">
         <div>
           <h3>${escapeHTML(playerTitle(normalized))}</h3>
+          ${teamCodeLabel ? `<p class="player-card-code">${escapeHTML(teamCodeLabel)}</p>` : ""}
           <p>${escapeHTML(subline)}</p>
         </div>
         ${active ? `<span class="status-pill">Selected</span>` : `<button class="mini-btn light" type="button" data-player-select="${escapeHTML(normalized.id)}">Select</button>`}
@@ -4740,11 +4755,13 @@ function renderTeamRosterCard(options = {}) {
           const active = player.id === state.activePlayerId;
           const claimed = hasPlayerClaim(item.teamId, item.id);
           const statusLabel = claimed ? "Verified Player" : "Unverified Player";
+          const teamCodeLabel = playerTeamCodeLabel(player);
           return `
             <div class="player-chip-wrap">
               <button class="player-chip ${active ? "active" : ""}" type="button" data-player-select="${player.id}" aria-pressed="${active}">
                 <strong>${escapeHTML(player.name)}</strong>
                 <span class="player-chip-meta">${item.number ? `#${escapeHTML(item.number)}` : "No jersey"}${item.position ? ` - ${escapeHTML(item.position)}` : ""}</span>
+                ${teamCodeLabel ? `<span class="player-chip-code">${escapeHTML(teamCodeLabel)}</span>` : ""}
                 <span class="player-chip-status ${claimed ? "verified" : "unverified"}">${statusLabel}</span>
               </button>
             </div>

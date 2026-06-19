@@ -472,6 +472,18 @@ button:disabled {
   font-weight: 850;
 }
 
+.player-chip .player-chip-code,
+.player-card-code {
+  color: var(--hornet-red);
+  font-size: 0.74rem;
+  font-weight: 950;
+  letter-spacing: 0.02em;
+}
+
+.player-card-code {
+  margin: 2px 0 0;
+}
+
 .player-chip .player-chip-status {
   color: #52606c;
   font-size: 0.68rem;
