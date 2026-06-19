@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v161";
+const APP_VERSION = "v162";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -469,6 +469,8 @@ function normalizePlayer(player = {}, options = {}) {
 
 function normalizeTeam(team = {}) {
   const id = team.id || team.teamId || team.team_id || "";
+  const cloudBacked = team.cloudBacked ?? team.cloud_backed;
+  const localRecovered = team.localRecovered ?? team.local_recovered;
   return {
     id,
     name: String(team.name || "").trim() || "Team",
@@ -477,6 +479,8 @@ function normalizeTeam(team = {}) {
     role: normalizeTeamRole(team.role || "tracker"),
     createdBy: team.createdBy || team.created_by || "",
     createdAt: team.createdAt || team.created_at || new Date().toISOString(),
+    cloudBacked: Boolean(cloudBacked),
+    localRecovered: Boolean(localRecovered),
   };
 }
 
@@ -498,6 +502,8 @@ function normalizeTeams(teams = []) {
         inviteCode: normalized.inviteCode || existing?.inviteCode || "",
         trackerCode: normalized.trackerCode || existing?.trackerCode || "",
         role: TEAM_MANAGE_ROLES.includes(existing?.role) && normalized.role === "tracker" ? existing.role : normalized.role,
+        cloudBacked: Boolean(existing?.cloudBacked || normalized.cloudBacked),
+        localRecovered: Boolean(!existing?.cloudBacked && !normalized.cloudBacked && (existing?.localRecovered || normalized.localRecovered)),
       });
     }
   });
@@ -592,7 +598,7 @@ function locallyManagedAdminTeams() {
   const existingTeams = state.teams.filter((team) => {
     const normalized = normalizeTeam(team);
     return normalized.id && (normalized.role === "admin" || normalized.createdBy === currentUserId());
-  });
+  }).map((team) => ({ ...team, cloudBacked: false, localRecovered: true }));
   const playerTeams = [state.player, ...state.players].map((player) => {
     const normalized = normalizePlayer(player);
     if (!normalized.teamId) return null;
@@ -601,6 +607,8 @@ function locallyManagedAdminTeams() {
       name: normalized.team || "Team",
       role: "admin",
       createdBy: currentUserId(),
+      cloudBacked: false,
+      localRecovered: true,
     });
   }).filter(Boolean);
   const gameTeams = [state.activeGame, ...state.games].map((game) => {
@@ -614,6 +622,8 @@ function locallyManagedAdminTeams() {
       name: teamName || "Team",
       role: "admin",
       createdBy: currentUserId(),
+      cloudBacked: false,
+      localRecovered: true,
     });
   }).filter(Boolean);
   return normalizeTeams([...existingTeams, ...playerTeams, ...gameTeams]);
@@ -639,11 +649,20 @@ function teamRoleLabel(role) {
 }
 
 function canEditTeam(teamId) {
-  return isPlatformReviewer() && TEAM_MANAGE_ROLES.includes(teamRole(teamId));
+  return isPlatformReviewer() && isCloudBackedTeam(teamId) && TEAM_MANAGE_ROLES.includes(teamRole(teamId));
 }
 
 function canManageRoster(teamId) {
-  return isPlatformReviewer() && teamRole(teamId) === "admin";
+  return isPlatformReviewer() && isCloudBackedTeam(teamId) && teamRole(teamId) === "admin";
+}
+
+function canDeleteTeam(teamId) {
+  const team = teamById(teamId);
+  return isPlatformReviewer() && Boolean(team) && (teamRole(teamId) === "admin" || team.createdBy === currentUserId());
+}
+
+function isCloudBackedTeam(teamId) {
+  return Boolean(teamById(teamId)?.cloudBacked);
 }
 
 function hasPlayerClaim(teamId, rosterPlayerId) {
@@ -2760,6 +2779,26 @@ function reportTeamCreateError(error) {
   reportTeamSetupError(error);
 }
 
+function markTeamAsLocalOnly(teamId) {
+  if (!teamId) return;
+  state.teams = normalizeTeams(state.teams.map((team) =>
+    team.id === teamId
+      ? { ...team, cloudBacked: false, localRecovered: true, role: team.role || "admin" }
+      : team,
+  ));
+  persistAll();
+}
+
+function handleMissingCloudTeam(error, team, actionLabel = "edit this roster") {
+  if (!team || !isTeamForeignKeyError(error)) return false;
+  markTeamAsLocalOnly(team.id);
+  state.syncStatus = "Team exists locally only";
+  state.cloudError = `${team.name} is missing from the cloud team table. Delete the local copy or recreate the team before you ${actionLabel}.`;
+  render();
+  showToast("Team missing from cloud");
+  return true;
+}
+
 function missingSupabaseColumn(error) {
   const message = supabaseErrorText(error);
   return (
@@ -2821,6 +2860,8 @@ function teamFromSupabaseRows(memberRow = {}) {
     role: memberRow.role || team.role || "tracker",
     createdBy: team.created_by,
     createdAt: team.created_at,
+    cloudBacked: true,
+    localRecovered: false,
   });
 }
 
@@ -3611,7 +3652,7 @@ async function addRosterPlayer(formData) {
     return;
   }
   if (!canManageRoster(team.id)) {
-    showToast("Team admin access required");
+    showToast(team.localRecovered ? "Recreate this cloud team before adding players" : "Team admin access required");
     return;
   }
   const position = positionValueFromForm(formData, "rosterPosition");
@@ -3634,6 +3675,7 @@ async function addRosterPlayer(formData) {
     p_position: rosterPlayer.position,
   });
   if (error) {
+    if (handleMissingCloudTeam(error, team, "add roster players")) return;
     reportTeamSetupError(error);
     return;
   }
@@ -3662,7 +3704,8 @@ async function saveRosterPlayer(formData) {
     return;
   }
   if (!canManageRoster(player.teamId)) {
-    showToast("Team admin access required");
+    const team = teamById(player.teamId);
+    showToast(team?.localRecovered ? "Recreate this cloud team before editing players" : "Team admin access required");
     return;
   }
   const position = positionValueFromForm(formData, "position");
@@ -3688,6 +3731,7 @@ async function saveRosterPlayer(formData) {
     p_position: rosterPlayer.position,
   });
   if (error) {
+    if (handleMissingCloudTeam(error, teamById(rosterPlayer.teamId), "edit roster players")) return;
     reportTeamSetupError(error);
     return;
   }
@@ -3793,18 +3837,22 @@ async function deleteActiveTeam() {
     showToast("Pick a team first");
     return;
   }
-  if (!canManageRoster(team.id)) {
+  if (!canDeleteTeam(team.id)) {
     showToast("Admin mode required");
     return;
   }
   if (!window.confirm(`Delete ${team.name}? This removes the team roster, access requests, and parent access. Saved games will stay in history.`)) return;
 
-  const { error } = await supabaseClient.rpc("laxhornet_delete_team", {
-    p_team_id: team.id,
-  });
-  if (error) {
-    reportTeamSetupError(error);
-    return;
+  if (team.cloudBacked) {
+    const { error } = await supabaseClient.rpc("laxhornet_delete_team", {
+      p_team_id: team.id,
+    });
+    if (error) {
+      if (!handleMissingCloudTeam(error, team, "delete this team")) {
+        reportTeamSetupError(error);
+        return;
+      }
+    }
   }
 
   const deletedTeamId = team.id;
@@ -4668,10 +4716,13 @@ function renderTeamRosterCard(options = {}) {
   const fullTeamRoster = team ? teamRosterPlayers(team.id) : [];
   const editable = team ? canManageRoster(team.id) : false;
   const manageRoster = team ? canManageRoster(team.id) : false;
+  const deletableTeam = team ? canDeleteTeam(team.id) : false;
   const teams = state.teams
     .map((item) => {
       const active = item.id === state.activeTeamId;
-      const accessCopy = item.role === "admin" && canCreateTeams()
+      const accessCopy = item.localRecovered && !item.cloudBacked
+        ? "Local copy"
+        : item.role === "admin" && canCreateTeams()
         ? `${item.inviteCode ? `Team code: ${item.inviteCode}` : "Access: approved"}`
         : "Access: approved";
       return `
@@ -4747,7 +4798,7 @@ function renderTeamRosterCard(options = {}) {
               <div class="team-actions">
                 <button class="mini-btn light" type="button" data-action="sync-team-roster">Sync</button>
                 ${canCreateTeams() ? "" : `<button class="mini-btn light" type="button" data-action="toggle-team-access">Request Access</button>`}
-                ${manageRoster ? `<button class="mini-btn danger" type="button" data-action="delete-team">Delete Team</button>` : ""}
+                ${deletableTeam ? `<button class="mini-btn danger" type="button" data-action="delete-team">Delete Team</button>` : ""}
               </div>
               ${
                 teams
@@ -4758,6 +4809,8 @@ function renderTeamRosterCard(options = {}) {
                         : "No approved teams yet. Request access with a code from your team admin."
                     }</p>`
               }
+              ${team?.localRecovered && !team.cloudBacked ? `<div class="notice-card error-card compact-notice"><strong>Local copy only.</strong><p class="muted small">This team was recovered from saved local data but is missing from the cloud team table. Delete the local copy or recreate the team before adding roster players.</p></div>` : ""}
+              ${state.cloudError ? `<div class="notice-card error-card compact-notice"><strong>Last Supabase error</strong><p class="muted small">${escapeHTML(state.cloudError)}</p></div>` : ""}
               ${manageRoster ? renderUnclaimedRosterPlayers(fullTeamRoster) : ""}
               ${manageRoster ? renderTeamAccessRequests() : ""}
 
@@ -5095,7 +5148,25 @@ function renderProfileSetup() {
 }
 
 function renderTeamAccessTools() {
-  if (canCreateTeams()) return "";
+  if (canCreateTeams()) {
+    return `
+      <section class="card pad">
+        <div class="section-head compact-head">
+          <div>
+            <h3>Create Team</h3>
+            <p class="muted small">Admin-only setup for preloading an official roster.</p>
+          </div>
+        </div>
+        <form class="inline-mini-form" data-form="create-team">
+          <label for="teamName">Team name</label>
+          <div class="inline-input-action">
+            <input id="teamName" name="teamName" placeholder="Team name" />
+            <button class="mini-btn" type="submit">Create</button>
+          </div>
+        </form>
+      </section>
+    `;
+  }
   const team = activeTeam();
   const requestList = renderMyTeamAccessRequests();
   const expanded = state.teamAccessExpanded;
@@ -5127,26 +5198,6 @@ function renderTeamAccessTools() {
         }
       </section>
 
-      ${
-        canCreateTeams()
-          ? `<section class="card pad">
-              <div class="section-head compact-head">
-                <div>
-                  <h3>Create Team</h3>
-                  <p class="muted small">Admin-only setup for preloading the official roster.</p>
-                </div>
-              </div>
-              <form class="inline-mini-form" data-form="create-team">
-                <label for="teamName">Team name</label>
-                <div class="inline-input-action">
-                  <input id="teamName" name="teamName" placeholder="Team name" />
-                  <button class="mini-btn" type="submit">Create</button>
-                </div>
-              </form>
-            </section>`
-          : ""
-      }
-
       <section class="card pad team-requests-card">
         ${
           requestList ||
@@ -5167,7 +5218,7 @@ function renderTeamPage() {
   return renderShell(`
     <section class="screen-title">
       <h2>${admin ? "Team" : "Team Access"}</h2>
-      <p>${admin ? "Sync team data, request access with a team code, and manage roster tools in one place." : "Request team access, sync approvals, and verify your child by jersey number."}</p>
+      <p>${admin ? "Create teams, sync parent approvals, and manage roster tools in one place." : "Request team access, sync approvals, and verify your player by jersey number."}</p>
     </section>
 
     <section class="stack">
