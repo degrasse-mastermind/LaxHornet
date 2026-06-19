@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v165";
+const APP_VERSION = "v166";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -901,7 +901,9 @@ function playerTeamCode(player = state.player) {
 
 function playerTeamCodeLabel(player = state.player) {
   const code = playerTeamCode(player);
-  return code ? `Team Code: ${code}` : "";
+  if (code) return `Team Code: ${code}`;
+  const normalized = normalizePlayer(player);
+  return normalized.team ? "Team Code: Not linked" : "";
 }
 
 function playerContextLine(player = state.player) {
