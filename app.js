@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v168";
+const APP_VERSION = "v169";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -4377,8 +4377,8 @@ function renderPlayerSwitcher(options = {}) {
         <button class="player-chip ${active ? "active" : ""}" type="button" data-player-select="${player.id}" aria-pressed="${active}">
           <strong>${escapeHTML(player.name || "Player")}</strong>
           ${player.number ? `<span>#${escapeHTML(player.number)}</span>` : ""}
-          ${teamCodeLabel ? `<span class="player-chip-code">${escapeHTML(teamCodeLabel)}</span>` : ""}
           ${showPlayerSubline ? `<span>${escapeHTML(playerSubline(player))}</span>` : ""}
+          ${teamCodeLabel ? `<span class="player-chip-code">${escapeHTML(teamCodeLabel)}</span>` : ""}
         </button>
       `;
     })
@@ -4412,8 +4412,8 @@ function renderCompactPlayerContext(options = {}) {
       <div>
         <p class="eyebrow">${escapeHTML(title)}</p>
         <h3>${escapeHTML(playerTitle(state.player))}</h3>
-        ${playerTeamCodeLabel(state.player) ? `<p class="muted tiny player-card-code">${escapeHTML(playerTeamCodeLabel(state.player))}</p>` : ""}
         <p class="muted small">${escapeHTML(playerSubline(state.player))}</p>
+        ${playerTeamCodeLabel(state.player) ? `<p class="muted tiny player-card-code">${escapeHTML(playerTeamCodeLabel(state.player))}</p>` : ""}
         ${helper ? `<p class="muted tiny">${escapeHTML(helper)}</p>` : ""}
       </div>
       <button class="mini-btn light" type="button" data-nav="player">Switch</button>
@@ -4432,8 +4432,8 @@ function renderPlayerAssignmentCard(player) {
       <div class="player-assignment-main">
         <div>
           <h3>${escapeHTML(playerTitle(normalized))}</h3>
-          ${teamCodeLabel ? `<p class="player-card-code">${escapeHTML(teamCodeLabel)}</p>` : ""}
           <p>${escapeHTML(subline)}</p>
+          ${teamCodeLabel ? `<p class="player-card-code">${escapeHTML(teamCodeLabel)}</p>` : ""}
         </div>
         ${active ? `<span class="status-pill">Selected</span>` : `<button class="mini-btn light" type="button" data-player-select="${escapeHTML(normalized.id)}">Select</button>`}
       </div>

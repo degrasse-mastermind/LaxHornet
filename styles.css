@@ -476,7 +476,7 @@ button:disabled {
 .player-card-code {
   color: var(--hornet-red);
   font-size: 0.74rem;
-  font-weight: 950;
+  font-weight: 500;
   letter-spacing: 0.02em;
 }
 
