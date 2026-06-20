@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v170";
+const APP_VERSION = "v169";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -2221,199 +2221,6 @@ function generateShareCard(player, archetypeResult) {
         <span>Next focus</span>
         <strong>${escapeHTML(archetypeResult.nextFocus)}</strong>
       </div>
-    </section>
-  `;
-}
-
-const DEVELOPMENT_DRILL_BUNDLES = {
-  shootingAccuracy: {
-    title: "Shooting Accuracy",
-    stat: (totals) => `SOG rate: ${pct(totals.shotOnGoalPct)}`,
-    why: "Build cleaner shot selection and more shots that force a save.",
-    drills: [
-      "10 corner targets from 6-8 yards before moving back.",
-      "Catch, set feet, shoot: 5 reps each side.",
-      "One-dodge shot with a target call before release.",
-    ],
-  },
-  finishing: {
-    title: "Finishing Touch",
-    stat: (totals) => `Shooting: ${pct(totals.shootingPct)}`,
-    why: "Turn good looks into goals without rushing the release.",
-    drills: [
-      "Inside quick-stick finishes from both hands.",
-      "Fake high, finish low: 8 reps each side.",
-      "One-more-pass to finish from the crease area.",
-    ],
-  },
-  playmaking: {
-    title: "Playmaking",
-    stat: (totals) => `${formatImpactNumber(statRate(totals, "assists"))} assists/game`,
-    why: "Add passing reads so offensive impact is not only shot-based.",
-    drills: [
-      "Dodge, draw, dump to a moving target.",
-      "Feed after two cradle limits.",
-      "Skip-pass accuracy from both hands.",
-    ],
-  },
-  possession: {
-    title: "Possession Wins",
-    stat: (totals) => `${signedMetric(totals.extraPossessions)} extra possessions`,
-    why: "Create more chances by winning loose balls and protecting clears.",
-    drills: [
-      "Ground ball through contact, then pass on the run.",
-      "Box-out scoop: body first, ball second.",
-      "Clear under pressure with one safe outlet.",
-    ],
-  },
-  ballSecurity: {
-    title: "Ball Security",
-    stat: (totals) => `${totals.turnovers} turnovers`,
-    why: "Keep good possessions alive with cleaner decisions under pressure.",
-    drills: [
-      "Pressure cradle through cones with a defender shadow.",
-      "Catch-turn-protect before passing.",
-      "Two safe outlets before every dodge.",
-    ],
-  },
-  defense: {
-    title: "Defensive Pressure",
-    stat: (totals) => `${totals.causedTurnovers + totals.defensiveStops} stops/CTs`,
-    why: "Turn good positioning into more stops and possession changes.",
-    drills: [
-      "Approach, break down, and force weak hand.",
-      "Mirror footwork for 10-second holds.",
-      "Lift/check only after feet are in position.",
-    ],
-  },
-  clears: {
-    title: "Clear Decisions",
-    stat: (totals) => `${totals.clears} clears, ${totals.failedClears} failed`,
-    why: "Make defensive stops count by turning them into clean possessions.",
-    drills: [
-      "Three-pass clear with a pressure rider.",
-      "Goalie/defender outlet to the safest side.",
-      "Sideline escape: rollback, protect, move it.",
-    ],
-  },
-  hustle: {
-    title: "Effort Plays",
-    stat: (totals) => `Effort score: ${totals.effortScore}`,
-    why: "Raise impact through plays that do not always show up as goals.",
-    drills: [
-      "Endline shot backup race, 6 reps each side.",
-      "Ride for 5 seconds after every shot.",
-      "Loose-ball sprint, scoop, and immediate outlet.",
-    ],
-  },
-  faceoff: {
-    title: "Faceoff Reps",
-    stat: (totals) => `Faceoff: ${pct(totals.faceoffPct)}`,
-    why: "Improve first move, exits, and wing help after the whistle.",
-    drills: [
-      "Clamp-pop-exit to both sides.",
-      "Wing pickup: scoop and move in one motion.",
-      "Lost clamp recovery into defensive position.",
-    ],
-  },
-  goalie: {
-    title: "Goalie Save + Outlet",
-    stat: (totals) => `Save rate: ${pct(totals.savePct)}`,
-    why: "Pair saves with quick, safe outlets to start transition.",
-    drills: [
-      "Step-to-ball save set: 10 high, 10 low.",
-      "Save, find outlet, pass within 3 seconds.",
-      "Rebound control and quick reset.",
-    ],
-  },
-};
-
-function developmentPositionFlags(player = state.player) {
-  const position = String(player.position || "").toLowerCase();
-  return {
-    goalie: position.includes("goalie") || position.includes("goal"),
-    faceoff: position.includes("face") || position.includes("fogo"),
-    defense: position.includes("defense") || position.includes("lsm"),
-  };
-}
-
-function buildDevelopmentCandidates(totals, archetypeResult, player = state.player) {
-  const scores = archetypeResult.scores || {};
-  const position = developmentPositionFlags(player);
-  const games = Number(totals.gamesPlayed || 0);
-  const perGame = (key) => statRate(totals, key);
-  const addCandidate = (items, key, priority, condition = true) => {
-    if (condition && DEVELOPMENT_DRILL_BUNDLES[key]) items.push({ key, priority });
-  };
-  const candidates = [];
-
-  addCandidate(candidates, "shootingAccuracy", 100 - Number(scores.scoring || 0), totals.shots >= 3 && totals.shotOnGoalPct < 0.55 && !position.goalie);
-  addCandidate(candidates, "finishing", 92 - Number(scores.scoring || 0), totals.shots >= 3 && totals.shootingPct < 0.25 && !position.goalie);
-  addCandidate(candidates, "playmaking", 85 - Number(scores.playmaking || 0), !position.goalie && perGame("assists") < 0.5 && (totals.goals || totals.shots || totals.smartPlays));
-  addCandidate(candidates, "possession", 100 - Number(scores.possession || 0), perGame("groundBalls") < 2 && !position.goalie);
-  addCandidate(candidates, "ballSecurity", 70 + Number(scores.mistakeCost || 0), totals.turnovers + totals.failedClears >= Math.max(2, games));
-  addCandidate(candidates, "defense", 92 - Number(scores.defense || 0), !position.goalie && (position.defense || perGame("causedTurnovers") + perGame("defensiveStops") < 1));
-  addCandidate(candidates, "clears", 80 + totals.failedClears * 8, totals.failedClears > 0 || (position.defense && totals.clears < games));
-  addCandidate(candidates, "hustle", 85 - Number(scores.hustle || 0), totals.effortScore < Math.max(3, games * 2));
-  addCandidate(candidates, "faceoff", 95 - totals.faceoffPct * 100, position.faceoff || totals.faceoffAttempts > 0);
-  addCandidate(candidates, "goalie", 95 - totals.savePct * 100, position.goalie || totals.saves + totals.goalsAllowed > 0);
-
-  return candidates
-    .sort((a, b) => b.priority - a.priority)
-    .filter((item, index, all) => all.findIndex((candidate) => candidate.key === item.key) === index);
-}
-
-function generatePracticePlan(totals, archetypeResult, player = state.player) {
-  if (!Number(totals.gamesPlayed || 0)) {
-    return {
-      intro: "Track one or two games to unlock a practice plan based on real game trends.",
-      bundles: [],
-    };
-  }
-  const candidates = buildDevelopmentCandidates(totals, archetypeResult, player);
-  const selected = (candidates.length ? candidates : [{ key: "hustle" }, { key: "possession" }])
-    .slice(0, 3)
-    .map((candidate) => DEVELOPMENT_DRILL_BUNDLES[candidate.key])
-    .filter(Boolean);
-  return {
-    intro: `Based on ${totals.gamesPlayed} saved game${totals.gamesPlayed === 1 ? "" : "s"}, here are a few practice ideas for the next week.`,
-    bundles: selected,
-  };
-}
-
-function renderPracticePlan(totals, archetypeResult, player = state.player) {
-  const plan = generatePracticePlan(totals, archetypeResult, player);
-  return `
-    <section class="card pad practice-plan-card">
-      <div class="section-head compact-head">
-        <div>
-          <p class="eyebrow">Practice Focus</p>
-          <h3>Drill Bundle</h3>
-          <p class="muted small">${escapeHTML(plan.intro)}</p>
-        </div>
-      </div>
-      ${
-        plan.bundles.length
-          ? `<div class="practice-bundle-list">
-              ${plan.bundles
-                .map(
-                  (bundle) => `
-                    <article class="practice-bundle">
-                      <div>
-                        <h4>${escapeHTML(bundle.title)}</h4>
-                        <span>${escapeHTML(bundle.stat(totals))}</span>
-                      </div>
-                      <p>${escapeHTML(bundle.why)}</p>
-                      <ul>
-                        ${bundle.drills.map((drill) => `<li>${escapeHTML(drill)}</li>`).join("")}
-                      </ul>
-                    </article>
-                  `,
-                )
-                .join("")}
-            </div>`
-          : `<p class="muted small">Once saved games exist, LaxHornet will suggest small drill bundles from the player&apos;s actual game patterns.</p>`
-      }
     </section>
   `;
 }
@@ -6382,7 +6189,6 @@ function renderDashboard() {
         ${headlineMetrics.map(([value, label]) => metricTile(value, label)).join("")}
       </div>
       ${generateShareCard(state.player, archetypeResult)}
-      ${renderPracticePlan(totals, archetypeResult, state.player)}
       ${renderSeasonTotalsGroups(totals)}
     </section>
   `);
