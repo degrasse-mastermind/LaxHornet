@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v174";
+const APP_VERSION = "v175";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -4259,6 +4259,7 @@ function renderShell(content, options = {}) {
           <span class="brand-logo-wrap">
             <img class="brand-logo" src="assets/laxhornet-logo.png" alt="LaxHornet" />
             <h1 class="sr-only">LaxHornet</h1>
+            <span class="app-version-chip">App version: ${escapeHTML(APP_VERSION)}</span>
           </span>
         </button>
         <span class="topbar-actions">
@@ -4336,7 +4337,6 @@ function renderAccountCard() {
       <section class="card pad">
         <h3>User Profile</h3>
         <p class="muted small">Supabase is not available, so this device is using local-only storage.</p>
-        <p class="muted small">App version: ${escapeHTML(APP_VERSION)}</p>
       </section>
     `;
   }
@@ -4356,7 +4356,6 @@ function renderAccountCard() {
         <p class="muted small">${escapeHTML(userEmail())}</p>
         <p class="muted small">Role: ${escapeHTML(isReviewerAccount() ? `Reviewer / ${appRoleLabel(role)}` : appRoleLabel(role))}</p>
         <p class="muted small">${escapeHTML(state.syncStatus)}</p>
-        <p class="muted small">App version: ${escapeHTML(APP_VERSION)}</p>
         ${state.cloudError ? `<p class="muted small">Last Supabase error: ${escapeHTML(state.cloudError)}</p>` : ""}
         ${modeToggle}
         <div class="account-actions">
@@ -4373,7 +4372,6 @@ function renderAccountCard() {
     <form class="card pad form-grid account-card" data-form="auth">
       <h3>Sign in or create account</h3>
       <p class="muted small">Use your account to request team access, verify your player, and keep stats separate from other parents on this device.</p>
-      <p class="muted small">App version: ${escapeHTML(APP_VERSION)}</p>
       <div class="field">
         <label for="authEmail">Email</label>
         <input id="authEmail" name="email" type="email" autocomplete="email" required />

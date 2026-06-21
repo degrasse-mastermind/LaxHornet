@@ -126,7 +126,8 @@ button:disabled {
 }
 
 .brand-logo-wrap {
-  display: block;
+  display: grid;
+  gap: 2px;
   min-width: 0;
   text-align: left;
 }
@@ -140,6 +141,17 @@ button:disabled {
   object-fit: contain;
   object-position: left center;
   filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.24));
+  transform: translateX(-10.2%);
+}
+
+.app-version-chip {
+  display: block;
+  margin-left: 2px;
+  color: #4b4f55;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
   transform: translateX(-10.2%);
 }
 
