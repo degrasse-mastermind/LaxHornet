@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v173";
+const APP_VERSION = "v174";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -5203,11 +5203,6 @@ function renderWelcome() {
       <div class="welcome-copy">
         <h2>Fast stats for a fast game.</h2>
         <p>LaxHornet helps parents track youth lacrosse stats live, share game updates, and keep each player&apos;s season organized.</p>
-      </div>
-      <div class="welcome-actions">
-        <button class="btn positive" type="button" data-action="focus-auth">Sign In</button>
-        <button class="btn secondary" type="button" data-action="focus-auth">Create Account</button>
-        <button class="btn neutral" type="button" data-action="install-app">Save to Home Screen</button>
       </div>
     </section>
 

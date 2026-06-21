@@ -243,12 +243,6 @@ button:disabled {
   line-height: 1.48;
 }
 
-.welcome-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
 .welcome-stack {
   gap: 12px;
 }
