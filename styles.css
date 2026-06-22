@@ -1495,6 +1495,24 @@ button:disabled {
   background: linear-gradient(180deg, var(--neutral), var(--neutral-dark));
 }
 
+.faq-card .action-grid.compact .btn.neutral,
+.faq-card .action-grid.compact .btn.secondary {
+  border: 1px solid rgba(232, 16, 16, 0.72);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.faq-card .action-grid.compact .btn.neutral {
+  background:
+    linear-gradient(90deg, var(--hornet-red) 0 6px, transparent 6px),
+    linear-gradient(180deg, #2a3038, #13161a);
+}
+
+.faq-card .action-grid.compact .btn.secondary {
+  background:
+    linear-gradient(90deg, var(--hornet-red) 0 6px, transparent 6px),
+    #ffffff;
+}
+
 .btn.brand.neutral {
   background:
     linear-gradient(90deg, var(--hornet-red) 0 6px, transparent 6px),
