@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v186";
+const APP_VERSION = "v187";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -4385,6 +4385,7 @@ function renderAccountCard() {
         <button class="btn secondary auth-create" type="submit" name="authAction" value="sign-up" ${state.authBusy ? "disabled" : ""}>${state.authBusy ? "Sending..." : "Create Account"}</button>
       </div>
       ${renderInstallCard({ compact: true })}
+      <p class="auth-legal muted small"><a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a></p>
     </form>
   `;
 }
@@ -5118,6 +5119,11 @@ function renderMore() {
             <strong>Updates</strong>
             <small>Check for the newest app version.</small>
           </button>
+          <a class="more-action" href="privacy.html" target="_blank" rel="noopener">
+            <span>${renderNavIcon("games")}</span>
+            <strong>Privacy Policy</strong>
+            <small>Review how LaxHornet handles accounts, teams, players, and game data.</small>
+          </a>
           <button class="more-action danger-link" type="button" data-action="sign-out">
             <span>${renderNavIcon("more")}</span>
             <strong>Sign Out</strong>

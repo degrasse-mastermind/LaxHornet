@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0c0e" />
+    <meta name="description" content="LaxHornet Privacy Policy for youth lacrosse stat tracking, team access, live sharing, local storage, and cloud sync." />
+    <title>LaxHornet Privacy Policy</title>
+    <link rel="manifest" href="manifest.json?v=187" />
+    <link rel="icon" href="assets/LHicon.png?v=1" type="image/png" />
+    <link rel="apple-touch-icon" href="assets/LHicon.png?v=1" />
+    <style>
+      :root { color-scheme: dark; --black: #070707; --carbon: #151515; --panel: #f7f8fa; --text: #111318; --muted: #5b6470; --line: #d9dde3; --brand: #e81010; --white: #ffffff; }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; min-height: 100vh; font-family: Arial, Helvetica, sans-serif; background: #0b0b0b url("assets/honeycombblack.png?v=1") top center / 520px auto repeat; color: var(--white); }
+      body::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(7,7,7,.72), rgba(7,7,7,.94)); }
+      .policy-shell { position: relative; z-index: 1; }
+      .topbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px clamp(18px, 4vw, 46px); border-bottom: 1px solid rgba(255,255,255,.12); background: rgba(8,8,8,.78); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 5; }
+      .brand img { display: block; width: min(230px, 56vw); height: auto; }
+      .top-links { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+      .top-links a, .print-btn { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid rgba(255,255,255,.22); padding: 10px 14px; color: var(--white); background: rgba(255,255,255,.08); text-decoration: none; font-weight: 800; font-size: 14px; }
+      .top-links a.primary { border-color: var(--brand); box-shadow: inset 4px 0 0 var(--brand); }
+      .print-btn { cursor: pointer; font: inherit; }
+      .hero { padding: 44px clamp(18px, 4vw, 46px) 24px; max-width: 1080px; margin: 0 auto; }
+      .hero h1 { margin: 0; font-size: clamp(38px, 7vw, 74px); line-height: .95; letter-spacing: 0; max-width: 760px; }
+      .hero p { max-width: 780px; color: #d7d9dd; font-size: 18px; line-height: 1.55; }
+      .meta-card { margin-top: 22px; padding: 18px; border: 1px solid rgba(232,16,16,.42); border-radius: 10px; background: rgba(255,255,255,.08); box-shadow: 0 18px 42px rgba(0,0,0,.34); }
+      .meta-card ul { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); list-style: none; padding: 0; margin: 0; }
+      .meta-card li { display: grid; gap: 4px; }
+      .meta-card span { color: #b9bec6; font-size: 12px; font-weight: 900; text-transform: uppercase; }
+      .meta-card strong { color: var(--white); font-size: 15px; }
+      .policy-wrap { max-width: 1080px; margin: 0 auto; padding: 0 clamp(18px, 4vw, 46px) 70px; }
+      .policy-grid { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 22px; align-items: start; }
+      .toc { position: sticky; top: 92px; border-radius: 10px; background: var(--panel); color: var(--text); padding: 18px; border: 1px solid var(--line); }
+      .toc h2 { margin: 0 0 12px; font-size: 20px; }
+      .toc nav { display: grid; gap: 8px; }
+      .toc a { color: #20252c; font-weight: 800; font-size: 13px; line-height: 1.25; text-decoration: none; }
+      .toc a:hover { color: var(--brand); }
+      .policy-card { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: clamp(20px, 4vw, 34px); box-shadow: 0 22px 60px rgba(0,0,0,.34); }
+      .policy-section { padding: 24px 0; border-top: 1px solid var(--line); scroll-margin-top: 110px; }
+      .policy-section:first-child { border-top: 0; padding-top: 0; }
+      .policy-section h2 { margin: 0 0 14px; font-size: clamp(24px, 4vw, 34px); line-height: 1.05; color: #111318; }
+      .policy-section h3 { margin: 20px 0 8px; font-size: 17px; color: #20252c; }
+      .policy-section p { margin: 0 0 13px; color: #303741; line-height: 1.62; font-size: 16px; }
+      .policy-section ul { margin: 0 0 16px 20px; padding: 0; color: #303741; }
+      .policy-section li { margin: 7px 0; line-height: 1.5; }
+      .policy-section a { color: #b80c0c; font-weight: 800; overflow-wrap: anywhere; }
+      .footer { max-width: 1080px; margin: 0 auto; padding: 0 clamp(18px, 4vw, 46px) 34px; color: #aeb4bd; }
+      @media (max-width: 820px) { .topbar { align-items: flex-start; flex-direction: column; } .top-links { width: 100%; justify-content: flex-start; } .policy-grid { grid-template-columns: 1fr; } .toc { position: static; } }
+      @media (max-width: 520px) { .hero { padding-top: 34px; } .top-links a, .print-btn { flex: 1 1 auto; } .policy-card { border-radius: 8px; } }
+      @media print { body { background: white; color: black; } body::before, .topbar, .toc, .footer { display: none; } .policy-wrap, .hero { max-width: none; padding: 0; } .hero h1 { color: black; font-size: 34px; } .hero p { color: black; } .meta-card, .policy-card { box-shadow: none; border-color: #999; background: white; color: black; } }
+    </style>
+  </head>
+  <body>
+    <div class="policy-shell">
+      <header class="topbar"><a class="brand" href="/" aria-label="LaxHornet home"><img src="assets/LHbanner.png?v=3" alt="LaxHornet" /></a><div class="top-links"><a href="/">Home</a><a class="primary" href="app.html">Open App</a><button class="print-btn" type="button" onclick="window.print()">Print</button></div></header>
+      <main><section class="hero"><h1>LaxHornet Privacy Policy</h1><p>This page explains how LaxHornet handles account, team, player, game, live sharing, local storage, and cloud sync information.</p><div class="meta-card" aria-label="Policy details"><ul><li><span>Effective Date</span><strong>June 21, 2026</strong></li>
+<li><span>Last Updated</span><strong>June 21, 2026</strong></li>
+<li><span>Operator</span><strong>David DeGrasse and LaxHornet developers</strong></li>
+<li><span>App/Website</span><strong>laxhornet.mybranford.com</strong></li>
+<li><span>Privacy Contact</span><strong>degrassed@gmail.com</strong></li></ul></div></section><section class="policy-wrap"><div class="policy-grid"><aside class="toc" aria-label="Policy contents"><h2>Contents</h2><nav><a href="#introduction">1. Introduction</a>
+<a href="#who-laxhornet-is-for">2. Who LaxHornet Is For</a>
+<a href="#information-we-collect">3. Information We Collect</a>
+<a href="#how-we-use-information">4. How We Use Information</a>
+<a href="#youth-player-and-children-s-privacy">5. Youth Player and Children’s Privacy</a>
+<a href="#connecticut-privacy-rights">6. Connecticut Privacy Rights</a>
+<a href="#team-access-roles-and-roster-controls">7. Team Access, Roles, and Roster Controls</a>
+<a href="#live-share-links">8. Live Share Links</a>
+<a href="#local-storage-offline-use-and-cloud-sync">9. Local Storage, Offline Use, and Cloud Sync</a>
+<a href="#service-providers">10. Service Providers</a>
+<a href="#when-we-share-information">11. When We Share Information</a>
+<a href="#we-do-not-sell-personal-information">12. We Do Not Sell Personal Information</a>
+<a href="#data-retention">13. Data Retention</a>
+<a href="#your-choices-and-requests">14. Your Choices and Requests</a>
+<a href="#security">15. Security</a>
+<a href="#exports-backups-and-imports">16. Exports, Backups, and Imports</a>
+<a href="#notes-tags-and-user-entered-content">17. Notes, Tags, and User-Entered Content</a>
+<a href="#communications">18. Communications</a>
+<a href="#analytics-and-advertising">19. Analytics and Advertising</a>
+<a href="#international-users">20. International Users</a>
+<a href="#changes-to-this-privacy-policy">21. Changes to This Privacy Policy</a>
+<a href="#contact-us">22. Contact Us</a></nav></aside><article class="policy-card"><section class="policy-section" id="introduction">
+      <h2>1. Introduction</h2>
+      <p>LaxHornet is a mobile-first youth lacrosse stat tracking progressive web app operated by David DeGrasse a Connecticut-based operator/developer. This Privacy Policy explains how we collect, use, store, share, and protect information when you use LaxHornet, including our website, progressive web app, account features, team access tools, game tracking, live sharing, launch materials, exports, backups, and related services.</p>
+<p>By using LaxHornet, you agree to the collection and use of information described in this Privacy Policy. If you do not agree with this Privacy Policy, do not use LaxHornet.</p>
+    </section>
+<section class="policy-section" id="who-laxhornet-is-for">
+      <h2>2. Who LaxHornet Is For</h2>
+      <p>LaxHornet is intended for use by parents, guardians, adult family members, team administrators, coaches, and other authorized adults involved in youth lacrosse.</p>
+<p>LaxHornet is not intended for children to create accounts. Children under 13 may not create an account or submit personal information directly to LaxHornet.</p>
+<p>Youth player information in LaxHornet should only be entered by a parent, legal guardian, team administrator, coach, or another adult who has permission to manage or track that player’s lacrosse information.</p>
+<p>By entering, approving, uploading, syncing, exporting, or sharing player information, you represent that you have the authority or permission to do so.</p>
+    </section>
+<section class="policy-section" id="information-we-collect">
+      <h2>3. Information We Collect</h2>
+      <p>We collect information needed to operate LaxHornet and provide stat tracking, team access, cloud sync, live sharing, game review, exports, and support.</p>
+<h3>Account Information</h3>
+<ul>
+<li>Name</li>
+<li>Email address</li>
+<li>Login credentials or authentication information</li>
+<li>User profile information</li>
+<li>Account role, such as Parent Tracker or Admin</li>
+<li>Team access request information</li>
+<li>Approval status</li>
+<li>App settings and preferences</li>
+<li>Support messages and account-related communications</li>
+</ul>
+<h3>Team and Player Information</h3>
+<h3>Team admins or authorized users may enter or manage</h3>
+<ul>
+<li>Team name</li>
+<li>Team code</li>
+<li>Rostered player name</li>
+<li>Jersey number</li>
+<li>Player position or position profile</li>
+<li>Team assignment</li>
+<li>Parent/player access relationships</li>
+<li>Access requests and approval or rejection status</li>
+<li>Unclaimed player and roster-management information</li>
+</ul>
+<h3>Game and Stat Information</h3>
+<h3>When using the tracker, LaxHornet may collect and store</h3>
+<ul>
+<li>Game details, such as opponent, date, team, player, game format, and period format</li>
+<li>Tracked game events, such as goals, assists, shots, ground balls, turnovers, clears, saves, faceoffs, penalties, hustle plays, smart plays, notes, and tags</li>
+<li>Period, timestamp, field zone, team ID, player ID, game ID, category, point value, and other event metadata</li>
+<li>Game review information, including event timelines, totals, corrections, edits, deletes, tags, and post-game notes</li>
+<li>Season dashboard information, including totals, percentages, Game Impact, possession metrics, and performance summaries</li>
+<li>Player archetype and development-oriented summary information</li>
+<li>Export, import, backup, and sync metadata</li>
+<li>Deleted game and deleted event records used to keep cloud sync from restoring deleted items</li>
+</ul>
+<h3>Live Share Information</h3>
+<p>When you create a Live Share link or code, LaxHornet may make selected game information available in read-only format to anyone who has the link or code. Live Share may include game timeline information, player or team context, event types, period and timing information, game status updates, notes, and tags if those items are included in shared events.</p>
+<p>Do not include sensitive or private information in notes or tags if you do not want it visible through Live Share, exports, synced data, or game review screens.</p>
+<h3>Device, Usage, and Technical Information</h3>
+<p>We may collect limited technical information needed to operate, secure, and improve the app, such as browser type, device type, operating system, app version, login activity, sync activity, error logs, service worker/cache status, local storage status, and general usage activity within the app.</p>
+<p>LaxHornet is a progressive web app, so certain information may be stored locally on your device to support offline use and faster sideline tracking.</p>
+    </section>
+<section class="policy-section" id="how-we-use-information">
+      <h2>4. How We Use Information</h2>
+      <h3>We use information to</h3>
+<ul>
+<li>Create and manage user accounts</li>
+<li>Authenticate users</li>
+<li>Let parents or guardians request team/player access</li>
+<li>Let admins approve or reject access requests</li>
+<li>Verify player access using team codes, jersey numbers, and admin approval</li>
+<li>Display only the player/team contexts a user is approved to access</li>
+<li>Track live game events</li>
+<li>Save, edit, delete, export, import, and sync game data</li>
+<li>Generate game reviews, season summaries, Game Impact scores, possession metrics, player archetypes, and plain-English takeaways</li>
+<li>Provide Live Share links and read-only game timelines</li>
+<li>Maintain app functionality, offline support, service-worker updates, and cloud sync</li>
+<li>Troubleshoot errors and improve reliability</li>
+<li>Protect account, team, and player data</li>
+<li>Communicate with users about account, team, support, security, or app updates</li>
+<li>Enforce our terms, policies, and security rules</li>
+<li>Comply with applicable legal obligations</li>
+</ul>
+<p>Game Impact, possession metrics, player archetypes, and related summaries are intended as developmental and informational tools. They are not intended to make eligibility, scholarship, employment, admission, disciplinary, financial, legal, or similarly significant automated decisions about any player.</p>
+    </section>
+<section class="policy-section" id="youth-player-and-children-s-privacy">
+      <h2>5. Youth Player and Children’s Privacy</h2>
+      <p>LaxHornet is designed for adults managing youth lacrosse tracking. Children are not allowed to create LaxHornet accounts.</p>
+<p>Player information may include information about youth athletes, such as name, jersey number, team, position, and game statistics. This information should only be submitted by parents, legal guardians, team administrators, coaches, or other authorized adults.</p>
+<p>We do not knowingly allow children under 13 to create accounts. If we learn that a child under 13 has created an account or directly provided personal information without appropriate parental involvement, we will take steps to delete or disable that account information.</p>
+<p>Parents or guardians may contact us to ask what player information we maintain, request correction of player information, request deletion of player information, remove their own account’s access to a player, or ask questions about how player data is used or shared.</p>
+<p>LaxHornet does not use youth player information for targeted advertising, and we do not sell youth player information.</p>
+<p>Please do not enter medical information, health information, disciplinary information, school-record information, or other sensitive personal details into event notes, tags, player records, or support messages unless you are authorized to do so and understand how that information may be stored, synced, exported, or shared.</p>
+    </section>
+<section class="policy-section" id="connecticut-privacy-rights">
+      <h2>6. Connecticut Privacy Rights</h2>
+      <p>LaxHornet is created and operated from Connecticut. Connecticut’s privacy law, commonly known as the Connecticut Data Privacy Act or CTDPA, gives Connecticut residents certain privacy rights and establishes obligations for covered businesses and controllers.</p>
+<p>Whether the CTDPA applies to LaxHornet may depend on LaxHornet’s size, user base, data practices, whether sensitive data is processed, whether personal data is sold, and other current legal requirements. To the extent the CTDPA or another applicable privacy law applies, Connecticut residents and other eligible users may have rights to:</p>
+<ul>
+<li>Confirm whether we process personal data about them</li>
+<li>Access personal data we process about them</li>
+<li>Correct inaccuracies in their personal data</li>
+<li>Delete personal data provided by or obtained about them</li>
+<li>Obtain a copy of personal data in a portable and readily usable format where required</li>
+<li>Opt out of the sale of personal data</li>
+<li>Opt out of processing personal data for targeted advertising</li>
+<li>Opt out of certain profiling that produces legal or similarly significant effects</li>
+</ul>
+<p>We do not sell personal information, and we do not use youth player information for targeted advertising. If we later add features or practices that require additional notices, consents, opt-outs, or recognition of universal opt-out preference signals, we will update this Privacy Policy and our practices as required.</p>
+<p>Where allowed or required by law, a parent or legal guardian may exercise privacy rights on behalf of a child or minor player.</p>
+<p>To submit a privacy request, contact us at degrassed@gmail.com. We may need to verify your identity and your authority to act on behalf of a player, team, or account before completing a request.</p>
+<p>If applicable law requires an appeal process and we deny your privacy request, you may appeal by replying to our decision or contacting degrassed@gmail.com with the subject line “Privacy Appeal.”</p>
+    </section>
+<section class="policy-section" id="team-access-roles-and-roster-controls">
+      <h2>7. Team Access, Roles, and Roster Controls</h2>
+      <p>LaxHornet uses team codes, roster verification, and admin approval to limit access to player data.</p>
+<p>Parent Trackers may request access to a team using a team code and the child’s jersey number. Once approved, the parent’s account is linked only to the approved player/team context.</p>
+<p>Parent Trackers do not receive general access to the full roster unless that access is provided through an admin role. Removing a player from a parent account does not automatically delete the player from the team roster.</p>
+<p>Admins are responsible for entering accurate roster information, managing team codes, reviewing access requests, approving or rejecting access, and approving only authorized parents, guardians, coaches, or trackers.</p>
+<p>Admins may have access to broader team, roster, and access-request information than Parent Trackers. Admins should protect team codes and avoid sharing roster or player information with unauthorized people.</p>
+    </section>
+<section class="policy-section" id="live-share-links">
+      <h2>8. Live Share Links</h2>
+      <p>LaxHornet allows users to create Live Share links or codes so family members and others can follow a read-only game timeline.</p>
+<p>Anyone with the Live Share link or code may be able to view the shared game information. You should only share Live Share links with people you trust.</p>
+<p>Live Share viewers cannot edit the game, roster, player profile, or stats.</p>
+<p>We may disable, expire, limit, or restrict Live Share links to protect privacy, security, player safety, or app integrity.</p>
+    </section>
+<section class="policy-section" id="local-storage-offline-use-and-cloud-sync">
+      <h2>9. Local Storage, Offline Use, and Cloud Sync</h2>
+      <p>LaxHornet stores certain data locally on your device so the app can work quickly during games and continue core tracking when offline.</p>
+<p>Local data may include player context, game data, event data, app settings, sync status, cached app files, and service-worker data.</p>
+<p>If you use LaxHornet with an account, some data may also sync to our cloud database provider so your roster, player claims, games, events, deletes, and profile information can be backed up and synchronized across sessions or devices.</p>
+<p>If you clear your browser data, uninstall the PWA, use a different device, or use LaxHornet without cloud sync, some locally stored data may be lost.</p>
+    </section>
+<section class="policy-section" id="service-providers">
+      <h2>10. Service Providers</h2>
+      <p>We use third-party service providers to operate LaxHornet. These providers may process information on our behalf for purposes such as authentication, database hosting, cloud sync, storage, app hosting, security, email, and technical support.</p>
+<h3>Current or expected service providers may include</h3>
+<ul>
+<li>Supabase for authentication, database, cloud sync, and related backend services</li>
+<li>Resend for email services</li>
+</ul>
+<p>We expect service providers to use information only as needed to provide services to us and to protect the information they process.</p>
+    </section>
+<section class="policy-section" id="when-we-share-information">
+      <h2>11. When We Share Information</h2>
+      <h3>We may share information in the following limited situations</h3>
+<h3>With Approved Users</h3>
+<p>Player, team, and game information may be visible to approved users connected to the relevant team or player, depending on role and permissions.</p>
+<h3>With Live Share Viewers</h3>
+<p>Read-only game information may be visible to anyone with a Live Share link or code.</p>
+<h3>With Service Providers</h3>
+<p>We may share information with vendors that help us operate, secure, host, sync, or support LaxHornet.</p>
+<h3>For Legal or Safety Reasons</h3>
+<p>We may disclose information if we believe it is necessary to comply with law, regulation, subpoena, court order, or legal process; protect the rights, safety, or security of users, players, teams, or LaxHornet; investigate fraud, abuse, unauthorized access, or security incidents; or enforce our terms or policies.</p>
+<h3>Business Transfers</h3>
+<p>If LaxHornet is involved in a merger, acquisition, financing, reorganization, or sale of assets, information may be transferred as part of that transaction, subject to appropriate protections.</p>
+    </section>
+<section class="policy-section" id="we-do-not-sell-personal-information">
+      <h2>12. We Do Not Sell Personal Information</h2>
+      <p>We do not sell personal information.</p>
+<p>We do not sell youth player information.</p>
+<p>We do not use youth player information for targeted advertising.</p>
+<p>We do not allow third-party advertising networks to use youth player information for behavioral advertising.</p>
+    </section>
+<section class="policy-section" id="data-retention">
+      <h2>13. Data Retention</h2>
+      <p>We keep information only as long as reasonably necessary to provide LaxHornet, maintain accurate game and season history, support sync, comply with legal obligations, resolve disputes, prevent fraud or abuse, and enforce our agreements.</p>
+<h3>Examples</h3>
+<ul>
+<li>Account information is kept while the account is active.</li>
+<li>Team, roster, and player access information may be kept while the team or player context is active.</li>
+<li>Game and stat history may be kept while a user or team uses LaxHornet and needs season history or backup access.</li>
+<li>Deleted games and deleted events may be temporarily retained as deletion records so cloud sync does not restore deleted data.</li>
+<li>Backup, export, or import files may remain on the user’s own device or wherever the user stores them.</li>
+<li>Support messages may be retained as needed to resolve the issue and maintain business records.</li>
+<li>Some information may remain in backups for a limited period before deletion is fully reflected.</li>
+</ul>
+<p>You may request deletion by contacting degrassed@gmail.com. Some information may be retained when necessary for security, legal compliance, backup integrity, dispute resolution, or legitimate operational purposes.</p>
+    </section>
+<section class="policy-section" id="your-choices-and-requests">
+      <h2>14. Your Choices and Requests</h2>
+      <h3>You may be able to</h3>
+<ul>
+<li>Update account profile information</li>
+<li>Request correction of team or player information</li>
+<li>Remove your own account’s access to a player where the app allows it</li>
+<li>Request deletion of your account or certain personal information</li>
+<li>Export or back up certain game data where tools are available</li>
+<li>Ask questions about how information is used or shared</li>
+</ul>
+<p>To make a request, contact us at degrassed@gmail.com. We may need to verify your identity before fulfilling certain requests. If the request involves a youth player, we may also need to verify that you are the parent, legal guardian, team admin, coach, or otherwise authorized adult connected to that player.</p>
+<p>Certain requests may be limited if fulfilling the request would interfere with legal obligations, security, fraud prevention, backup integrity, team records, or the rights and privacy of other users.</p>
+    </section>
+<section class="policy-section" id="security">
+      <h2>15. Security</h2>
+      <p>We use reasonable administrative, technical, and organizational safeguards to protect information. These may include account authentication, role-based access controls, team/player access restrictions, limited data visibility based on approved permissions, cloud-provider security features, and app-level controls designed to reduce unauthorized access.</p>
+<p>No system is completely secure. Users should protect their login credentials, avoid sharing team codes publicly, and share Live Share links only with trusted people.</p>
+<p>If you believe your account, team code, Live Share link, or player data has been accessed without authorization, contact us at degrassed@gmail.com.</p>
+    </section>
+<section class="policy-section" id="exports-backups-and-imports">
+      <h2>16. Exports, Backups, and Imports</h2>
+      <p>LaxHornet may allow users to export or back up game, event, player, team, tag, and sync data in formats such as CSV or JSON.</p>
+<p>Once you export data from LaxHornet, you are responsible for storing, protecting, and sharing that exported file. Exported files may contain player names, jersey numbers, team details, notes, tags, and game statistics.</p>
+<p>Use caution before sending exported files by email, text, cloud drive, or team chat.</p>
+    </section>
+<section class="policy-section" id="notes-tags-and-user-entered-content">
+      <h2>17. Notes, Tags, and User-Entered Content</h2>
+      <p>LaxHornet may allow users to add notes, tags, custom labels, or other user-entered content to game events.</p>
+<p>Do not enter sensitive personal information, medical information, health information, disciplinary information, school-record information, or private comments into notes or tags unless you are authorized to do so and understand that this information may appear in game review, exports, synced data, or Live Share views.</p>
+<p>We may remove or restrict content that violates privacy, safety, legal, or app integrity requirements.</p>
+    </section>
+<section class="policy-section" id="communications">
+      <h2>18. Communications</h2>
+      <p>We may send account-related, team-related, security-related, or service-related messages, such as login or authentication messages, access request updates, admin approval notifications, app update notices, support replies, and policy updates.</p>
+<p>If we add marketing emails in the future, users will be given a way to opt out of promotional communications where required by law.</p>
+    </section>
+<section class="policy-section" id="analytics-and-advertising">
+      <h2>19. Analytics and Advertising</h2>
+      <p>LaxHornet does not use third-party advertising networks or marketing pixels.</p>
+<p>LaxHornet does not use youth player information for targeted advertising.</p>
+<p>If we add analytics tools, advertising tools, marketing pixels, or similar technologies in the future, we will update this Privacy Policy before using those tools in a way that materially changes how information is collected, used, or shared.</p>
+    </section>
+<section class="policy-section" id="international-users">
+      <h2>20. International Users</h2>
+      <p>LaxHornet is currently intended for users in the United States.</p>
+<p>If you use LaxHornet from outside the United States, your information may be processed in the United States or other countries where our service providers operate. Privacy laws in those countries may differ from the laws where you live.</p>
+<p>If LaxHornet later expands to users in the European Economic Area, United Kingdom, Canada, or other jurisdictions with additional privacy requirements, we will update this Privacy Policy as needed.</p>
+    </section>
+<section class="policy-section" id="changes-to-this-privacy-policy">
+      <h2>21. Changes to This Privacy Policy</h2>
+      <p>We may update this Privacy Policy from time to time.</p>
+<p>When we make changes, we will update the “Last Updated” date above. If the changes are material, we may provide additional notice in the app, by email, or through another reasonable method.</p>
+<p>Your continued use of LaxHornet after an updated Privacy Policy becomes effective means you accept the updated policy, to the extent permitted by law.</p>
+    </section>
+<section class="policy-section" id="contact-us">
+      <h2>22. Contact Us</h2>
+      <p>For privacy questions, access requests, correction requests, deletion requests, appeal requests, or children’s privacy questions, contact:</p>
+<p>Email: degrassed@gmail.com</p>
+    </section></article></div></section></main>
+      <footer class="footer">&copy; 2026 LaxHornet. For privacy questions, contact degrassed@gmail.com.</footer>
+    </div>
+  </body>
+</html>

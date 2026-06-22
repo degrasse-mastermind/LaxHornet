@@ -428,6 +428,12 @@ a {
   font-weight: 800;
 }
 
+.site-footer a {
+  color: #ffffff;
+  text-decoration-color: rgba(232, 16, 16, 0.7);
+  text-underline-offset: 4px;
+}
+
 @media (max-width: 820px) {
   .site-header {
     align-items: flex-start;
