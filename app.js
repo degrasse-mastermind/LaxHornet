@@ -21,7 +21,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v183";
+const APP_VERSION = "v184";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -7309,15 +7309,53 @@ async function checkForAppUpdate(options = {}) {
   }
 }
 
-function applyAppUpdate() {
-  if (!waitingServiceWorker) {
-    window.location.reload();
-    return;
-  }
+function reloadWithFreshMarker() {
+  const url = new URL(window.location.href);
+  url.searchParams.set("fresh", `${APP_VERSION}-update-${Date.now()}`);
+  window.location.replace(url.toString());
+}
+
+async function clearLaxHornetCaches() {
+  if (!("caches" in window)) return;
+  const keys = await caches.keys();
+  await Promise.all(keys.filter((key) => key.startsWith("laxhornet-")).map((key) => caches.delete(key)));
+}
+
+async function applyAppUpdate() {
   state.updateAvailable = true;
   state.updateInstalling = true;
   render();
-  waitingServiceWorker.postMessage({ type: "SKIP_WAITING" });
+
+  try {
+    const registration = serviceWorkerRegistration || (await navigator.serviceWorker?.getRegistration?.());
+    if (registration) {
+      serviceWorkerRegistration = registration;
+      await registration.update().catch(() => {});
+      const worker = waitingServiceWorker || registration.waiting;
+      if (worker) {
+        waitingServiceWorker = worker;
+        worker.postMessage({ type: "SKIP_WAITING" });
+        window.setTimeout(() => {
+          if (!reloadingForUpdate) {
+            reloadingForUpdate = true;
+            reloadWithFreshMarker();
+          }
+        }, 1500);
+        return;
+      }
+    }
+
+    await clearLaxHornetCaches();
+    const registrations = await navigator.serviceWorker?.getRegistrations?.();
+    if (registrations?.length) {
+      await Promise.all(registrations.map((registration) => registration.unregister().catch(() => false)));
+    }
+  } catch {
+    // If the service worker update path fails, a fresh URL reload is still the safest user action.
+  }
+
+  reloadingForUpdate = true;
+  reloadWithFreshMarker();
 }
 
 async function initApp() {
