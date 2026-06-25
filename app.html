@@ -12,7 +12,22 @@
     <link rel="stylesheet" href="styles.css?v=187" />
   </head>
   <body>
-    <noscript>LaxHornet needs JavaScript enabled to track games.</noscript>
+    <noscript>
+      <section class="noscript-fallback">
+        <img src="assets/LHbanner.png?v=3" alt="LaxHornet" />
+        <div class="card pad">
+          <h1>LaxHornet needs JavaScript to run.</h1>
+          <p>
+            Game tracking, offline saves, account saves, and Live Share require JavaScript.
+            Please enable JavaScript or open LaxHornet in Safari, Chrome, or another modern browser.
+          </p>
+          <div class="account-actions">
+            <a class="btn brand positive" href="/">Back to LaxHornet Home</a>
+            <a class="btn brand neutral" href="privacy.html">Get Help</a>
+          </div>
+        </div>
+      </section>
+    </noscript>
     <div id="app" class="app-shell"></div>
     <script src="assets/supabase.min.js?v=187" defer></script>
     <script src="app.js?v=187" defer></script>

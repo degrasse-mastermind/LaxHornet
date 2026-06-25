@@ -1567,6 +1567,23 @@ button:focus-visible,
   text-transform: uppercase;
 }
 
+.field-help,
+.safety-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.safety-note {
+  color: rgba(241, 245, 249, 0.7);
+}
+
+.card .safety-note {
+  color: var(--muted);
+}
+
 .field input,
 .field textarea,
 .field select {
@@ -2871,6 +2888,41 @@ button:focus-visible,
   padding: 18px;
   color: var(--muted);
   text-align: center;
+}
+
+.empty-state-card {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  text-align: left;
+}
+
+.empty-state-card h3,
+.empty-state-card p {
+  margin: 0;
+}
+
+.noscript-fallback {
+  min-height: 100vh;
+  padding: 24px;
+  display: grid;
+  align-content: center;
+  gap: 18px;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(255, 255, 255, 0.055), transparent 24rem),
+    linear-gradient(180deg, #1b1b1b 0%, #121212 42%, #0b0b0b 100%);
+}
+
+.noscript-fallback img {
+  width: min(260px, 72vw);
+  height: auto;
+}
+
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
 }
 
 .bottom-nav {
