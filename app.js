@@ -22,7 +22,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v188";
+const APP_VERSION = "v189";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -177,6 +177,8 @@ const LIVE_DEFAULT_STAT_KEYS = {
   faceoff: ["faceoffWin", "faceoffLoss", "groundBall", "turnover", "causedTurnover", "hustlePlay", "smartPlay", "note"],
   default: ["goal", "assist", "shotOnGoal", "shot", "groundBall", "turnover", "causedTurnover", "successfulClear", "failedClear", "hustlePlay", "smartPlay", "note"],
 };
+
+const FIELD_ZONE_OPTIONS = ["", "Offensive end", "Midfield", "Defensive end", "Sideline", "Endline", "Crease"];
 
 const TAG_SUGGESTIONS = {
   goal: [
@@ -2142,7 +2144,7 @@ const ARCHETYPE_DIMENSION_LABELS = {
   defense: "Defense",
   goalie: "Goalie",
   hustle: "Hustle",
-  mistakeCost: "Mistake cost",
+  mistakeCost: "Care of the Ball",
 };
 
 function statRate(playerStats, key) {
@@ -2290,7 +2292,7 @@ function generateReasons(playerStats, dimensionScores, archetype) {
   );
   addIf(statRate(playerStats, "clears") > 0, statLabel("clears", "successful clear"));
   addIf(activeArchetypeCategoryCount(playerStats) >= 3, `Contributed in ${activeArchetypeCategoryCount(playerStats)} tracked areas`);
-  addIf(dimensionScores.mistakeCost <= 35, "Kept mistake cost low for the role");
+  addIf(dimensionScores.mistakeCost <= 35, "Protected possessions well for the role");
 
   if (!reasons.length) {
     reasons.push("This profile will sharpen as more game events are tracked.");
@@ -2312,22 +2314,31 @@ function calculateArchetypeResult(playerStats) {
   return assignArchetype(playerStats, scores);
 }
 
-function generateShareCard(player, archetypeResult) {
+function generateShareCard(player, archetypeResult, options = {}) {
   const scoreEntries = ["scoring", "playmaking", "possession", "defense", "goalie", "hustle"];
   const badgeLabel = archetypeResult.name.replace(/^The\s+/i, "").split(" ")[0];
+  const profileLabel = options.profileLabel || "Today's Player Profile";
+  const patternScope = options.patternScope || "game";
+  const whyCopy = archetypeResult.reasons.length
+    ? archetypeResult.reasons.join(". ")
+    : archetypeResult.explanation;
   return `
     <section class="card pad archetype-card">
       <div class="section-head compact-head">
         <div>
-          <p class="eyebrow">Player Archetype</p>
+          <p class="eyebrow">${escapeHTML(profileLabel)}</p>
           <h3>${escapeHTML(archetypeResult.name)}</h3>
-          <p class="muted small">${escapeHTML(playerTitle(player))} - not a permanent label, just this stat profile.</p>
+          <p class="muted small">This is not a fixed label - it describes this ${escapeHTML(patternScope)}'s pattern.</p>
         </div>
         <span class="archetype-badge">${escapeHTML(badgeLabel)}</span>
       </div>
-      <p class="archetype-explanation">${escapeHTML(archetypeResult.explanation)}</p>
-      <div class="archetype-reasons">
-        ${archetypeResult.reasons.map((reason) => `<span>${escapeHTML(reason)}</span>`).join("")}
+      <div class="archetype-story">
+        <strong>Why:</strong>
+        <p>${escapeHTML(whyCopy)}.</p>
+      </div>
+      <div class="archetype-story">
+        <strong>Next focus:</strong>
+        <p>${escapeHTML(archetypeResult.nextFocus)}</p>
       </div>
       <div class="archetype-bars">
         ${scoreEntries
@@ -2341,10 +2352,6 @@ function generateShareCard(player, archetypeResult) {
             `,
           )
           .join("")}
-      </div>
-      <div class="archetype-focus">
-        <span>Next focus</span>
-        <strong>${escapeHTML(archetypeResult.nextFocus)}</strong>
       </div>
     </section>
   `;
@@ -6020,7 +6027,7 @@ function renderEventRow(event, options = {}) {
       <span class="badge">${escapeHTML(event.quarter)}</span>
       <span>
         <strong>${escapeHTML(event.statLabel)}</strong>
-        <p>${formatTime(event.timestamp)} - ${escapeHTML(event.category || "General")}${event.note ? ` - ${escapeHTML(event.note)}` : ""}</p>
+        <p>${formatTime(event.timestamp)} - ${escapeHTML(event.category || "General")}${event.fieldZone ? ` - ${escapeHTML(event.fieldZone)}` : ""}${event.note ? ` - ${escapeHTML(event.note)}` : ""}</p>
         ${renderTagChips(event.tags)}
       </span>
       <span class="score">${pointText(impactValueForEvent(event))}</span>
@@ -6068,6 +6075,9 @@ function renderEventEditForm(game, event) {
   const periodOptions = [...new Set([...periodsForGame(game), event.quarter])].filter(Boolean).map(
     (period) => `<option value="${period}" ${event.quarter === period ? "selected" : ""}>${period}</option>`,
   ).join("");
+  const zoneOptions = FIELD_ZONE_OPTIONS.map(
+    (zone) => `<option value="${escapeHTML(zone)}" ${event.fieldZone === zone ? "selected" : ""}>${escapeHTML(zone || "Not set")}</option>`,
+  ).join("");
 
   return `
     <form class="card pad form-grid edit-event-form" data-form="event-edit" data-game-id="${game.id}" data-event-id="${event.id}">
@@ -6081,11 +6091,15 @@ function renderEventEditForm(game, event) {
           <label for="editQuarter">Period</label>
           <select id="editQuarter" name="quarter">${periodOptions}</select>
         </div>
+        <div class="field">
+          <label for="editFieldZone">Field zone</label>
+          <select id="editFieldZone" name="fieldZone">${zoneOptions}</select>
+        </div>
       </div>
       <div class="field">
         <label for="editNote">Note</label>
         <textarea id="editNote" name="note" placeholder="Optional correction note">${escapeHTML(event.note || "")}</textarea>
-        <p class="field-help">Avoid private, medical, or sensitive information in notes.</p>
+        <p class="field-help">Avoid private, medical, or sensitive information in notes. Notes may appear in reviews, exports, or Live Share.</p>
       </div>
       <div class="edit-actions">
         <button class="btn positive" type="submit">Save Correction</button>
@@ -6104,6 +6118,9 @@ function renderEventAddForm(game) {
   const periodOptions = periods.map(
     (period) => `<option value="${period}" ${period === defaultPeriod ? "selected" : ""}>${period}</option>`,
   ).join("");
+  const zoneOptions = FIELD_ZONE_OPTIONS.map(
+    (zone) => `<option value="${escapeHTML(zone)}">${escapeHTML(zone || "Not set")}</option>`,
+  ).join("");
 
   return `
     <form class="card pad form-grid edit-event-form" data-form="event-add" data-game-id="${game.id}">
@@ -6118,11 +6135,15 @@ function renderEventAddForm(game) {
           <label for="addQuarter">Period</label>
           <select id="addQuarter" name="quarter">${periodOptions}</select>
         </div>
+        <div class="field">
+          <label for="addFieldZone">Field zone</label>
+          <select id="addFieldZone" name="fieldZone">${zoneOptions}</select>
+        </div>
       </div>
       <div class="field">
         <label for="addNote">Note</label>
         <textarea id="addNote" name="note" placeholder="Optional correction note"></textarea>
-        <p class="field-help">Avoid private, medical, or sensitive information in notes.</p>
+        <p class="field-help">Avoid private, medical, or sensitive information in notes. Notes may appear in reviews, exports, or Live Share.</p>
       </div>
       <div class="edit-actions">
         <button class="btn positive" type="submit">Add Event</button>
@@ -6196,7 +6217,7 @@ function renderTagEditor(game, event) {
     <section class="card pad tag-editor" data-tag-editor="${event.id}">
       <h3>Edit Tags</h3>
       <p class="muted small">${escapeHTML(event.statLabel)} - ${escapeHTML(event.category || "General")} - ${formatTime(event.timestamp)}</p>
-      <p class="safety-note">Tags and notes may appear in game reviews, exports, or shared views.</p>
+      <p class="safety-note">Avoid private, medical, or sensitive information in notes. Notes may appear in reviews, exports, or Live Share.</p>
       <div class="tag-editor-block">
         <strong class="tag-editor-label">Selected tags</strong>
         ${
@@ -6226,6 +6247,125 @@ function renderTagEditor(game, event) {
         <button class="btn positive" type="button" data-action="save-tags" data-game-id="${game.id}" data-event-id="${event.id}">Save Tag Changes</button>
         <button class="btn secondary" type="button" data-action="cancel-tags">Cancel</button>
       </div>
+    </section>
+  `;
+}
+
+function insightCard(label, value, helper = "") {
+  return `
+    <div class="insight-card">
+      <span>${escapeHTML(label)}</span>
+      <div class="insight-value">${value}</div>
+      ${helper ? `<small>${escapeHTML(helper)}</small>` : ""}
+    </div>
+  `;
+}
+
+function topContributionForTotals(totals) {
+  const options = [
+    {
+      label: "Scoring",
+      value: totals.points * 4 + totals.shotsOnGoal,
+      display: `${totals.points} points`,
+      helper: `${totals.goals}G ${totals.assists}A`,
+    },
+    {
+      label: "Possession",
+      value: Math.max(0, totals.extraPossessions) * 4 + Math.max(0, totals.possessionValue),
+      display: `${signedMetric(totals.possessionValue)} value`,
+      helper: `${signedMetric(totals.extraPossessions)} extra chances`,
+    },
+    {
+      label: "Defense",
+      value: totals.causedTurnovers * 4 + totals.defensiveStops * 3,
+      display: `${totals.causedTurnovers + totals.defensiveStops} plays`,
+      helper: `${totals.causedTurnovers} CTO, ${totals.defensiveStops} stops`,
+    },
+    {
+      label: "Goalie",
+      value: totals.saves * 4,
+      display: `${totals.saves} saves`,
+      helper: `${pct(totals.savePct)} save rate`,
+    },
+    {
+      label: "Hustle",
+      value: totals.effortScore * 2,
+      display: `${totals.effortScore} effort plays`,
+      helper: `${totals.groundBalls} GB, ${totals.hustlePlays} hustle`,
+    },
+  ].filter((item) => item.value > 0);
+
+  if (!options.length) {
+    return {
+      label: "Building profile",
+      display: "More plays needed",
+      helper: "Track events to reveal the pattern.",
+    };
+  }
+
+  return options.sort((a, b) => b.value - a.value)[0];
+}
+
+function seasonStrengthBullets(totals, player = state.player) {
+  const bullets = [];
+  const add = (condition, text) => {
+    if (condition && bullets.length < 4) bullets.push(text);
+  };
+  add(totals.points > 0, `${playerTitle(player)} has created ${totals.points} total points through goals and assists.`);
+  add(totals.possessionValue > 0, `Possession Impact is positive at ${signedMetric(totals.possessionValue)}, showing helpful possession-changing plays.`);
+  add(totals.groundBalls > 0, `${totals.groundBalls} ground balls are helping turn loose balls into team chances.`);
+  add(totals.causedTurnovers + totals.defensiveStops > 0, `${totals.causedTurnovers + totals.defensiveStops} defensive impact plays are helping prevent opponent chances.`);
+  add(totals.saves > 0, `${totals.saves} saves are contributing to goalie impact and helping keep games within reach.`);
+  add(totals.effortScore > 0, `${totals.effortScore} effort plays show hustle through ground balls, backed up shots, and hustle plays.`);
+  add(totals.gamesPlayed === 0, "Track a game to start building a clear season story.");
+  return bullets.length ? bullets : ["Keep tracking games to reveal this player's strongest contribution patterns."];
+}
+
+function nextLevelFocusForSeason(totals, archetypeResult) {
+  if (!totals.gamesPlayed) return "Track the first game, then look for one skill to build from the first pattern.";
+  if (totals.turnovers > totals.groundBalls + totals.clears) return "Focus on cleaner catches, safer outlets, and protecting possessions under pressure.";
+  if (totals.shots > 0 && totals.shotOnGoalPct < 0.5) return "Work on getting more shots on cage before increasing shot volume.";
+  if (totals.possessionValue <= 0) return "Look for one extra possession play each game: a ground ball, clear, ride, or backed up shot.";
+  return archetypeResult.nextFocus;
+}
+
+function renderReviewSummarySection(game, player, totals, archetypeResult) {
+  const topContribution = topContributionForTotals(totals);
+  return `
+    <section class="review-section">
+      <div class="section-head compact-head">
+        <div>
+          <h3>Game Summary</h3>
+          <p class="muted small">${escapeHTML(playerTitle(player))} vs ${escapeHTML(game.opponent)} - ${formatDate(game.date)}</p>
+        </div>
+      </div>
+      <div class="insight-grid">
+        ${insightCard("Game Impact", renderImpactGrade(totals.impact), "Snapshot, not a coach grade")}
+        ${insightCard("Top Contribution", escapeHTML(topContribution.display), topContribution.label)}
+        ${insightCard("Possession Impact", escapeHTML(signedMetric(totals.possessionValue)), `${signedMetric(totals.extraPossessions)} extra chances`)}
+        ${insightCard("Key Takeaway", escapeHTML(totals.gameImpact?.takeaway || "Track more plays to build the takeaway."), "Plain-English read")}
+      </div>
+      <div class="explainer-card">
+        <strong>Game Impact</strong>
+        <p>Game Impact is a quick snapshot of how this player helped create, protect, finish, or defend possessions. It is not a coach grade or a permanent label.</p>
+      </div>
+      ${generateShareCard(player, archetypeResult, { profileLabel: "Today's Player Profile", patternScope: "game" })}
+    </section>
+  `;
+}
+
+function renderReviewStatsSection(totals) {
+  return `
+    <section class="review-section">
+      <div class="section-head compact-head">
+        <div>
+          <h3>Stats</h3>
+          <p class="muted small">Totals update automatically when plays are added, edited, tagged, or deleted.</p>
+        </div>
+      </div>
+      ${renderImpactBreakdown(totals)}
+      ${renderPossessionImpact(totals)}
+      ${renderTotalsTable(totals)}
     </section>
   `;
 }
@@ -6266,28 +6406,13 @@ function renderReview() {
     </section>
 
     <section class="stack">
-      <div class="metric-grid">
-        <div class="metric">${renderImpactGrade(totals.impact)}<span>Game Impact</span></div>
-        <div class="metric"><strong>${totals.points}</strong><span>Points</span></div>
-        <div class="metric"><strong>${totals.goals}</strong><span>Goals</span></div>
-        <div class="metric"><strong>${totals.assists}</strong><span>Assists</span></div>
-      </div>
-      ${renderImpactBreakdown(totals)}
-      ${renderPossessionImpact(totals)}
-      ${generateShareCard(player, archetypeResult)}
-      ${canEditCurrentGame ? `
-        <div class="review-tool-actions">
-          ${canShowAddEvent ? `<button class="btn neutral" type="button" data-action="add-review-event">Add Event</button>` : ""}
-          ${canShowGameEdit ? `<button class="btn secondary" type="button" data-action="edit-game-details">Edit Game Details</button>` : ""}
-        </div>
-      ` : ""}
-      ${state.addingReviewEvent && canEditCurrentGame ? renderEventAddForm(game) : ""}
-      ${state.editingGameDetails && canEditCurrentGame ? renderGameEditForm(game) : ""}
-      ${renderTotalsTable(totals)}
-      ${editingEvent && canEditCurrentGame ? renderEventEditForm(game, editingEvent) : ""}
-      ${tagEditingEvent && canEditCurrentGame ? renderTagEditor(game, tagEditingEvent) : ""}
-      <div class="card pad">
-        <h3>Event Log</h3>
+      ${renderReviewSummarySection(game, player, totals, archetypeResult)}
+      ${renderReviewStatsSection(totals)}
+      <section class="review-section">
+        <div class="card pad">
+          <h3>Every tracked play</h3>
+          <p class="muted small">Tap an event to edit the note, tag, field zone, or stat type.</p>
+          <p class="safety-note">Avoid private, medical, or sensitive information in notes. Notes may appear in reviews, exports, or Live Share.</p>
         ${
           game.events.length
             ? `<div class="event-list">${[...game.events]
@@ -6296,7 +6421,28 @@ function renderReview() {
                 .join("")}</div>`
             : `<p class="muted small">No events were logged for this game.</p>`
         }
-      </div>
+        </div>
+      </section>
+      ${canEditCurrentGame ? `
+        <section class="review-section">
+          <div class="card pad edit-tools-card">
+            <h3>Edit Tools</h3>
+            <p class="safety-note">Changes update this game&apos;s totals, Game Impact, possession metrics, tags, and season dashboard.</p>
+            ${
+              canShowAddEvent || canShowGameEdit
+                ? `<div class="review-tool-actions">
+                    ${canShowAddEvent ? `<button class="btn neutral" type="button" data-action="add-review-event">Add Event</button>` : ""}
+                    ${canShowGameEdit ? `<button class="btn secondary" type="button" data-action="edit-game-details">Edit Game Details</button>` : ""}
+                  </div>`
+                : ""
+            }
+          </div>
+          ${state.addingReviewEvent && canEditCurrentGame ? renderEventAddForm(game) : ""}
+          ${state.editingGameDetails && canEditCurrentGame ? renderGameEditForm(game) : ""}
+          ${editingEvent && canEditCurrentGame ? renderEventEditForm(game, editingEvent) : ""}
+          ${tagEditingEvent && canEditCurrentGame ? renderTagEditor(game, tagEditingEvent) : ""}
+        </section>
+      ` : ""}
     </section>
   `);
 }
@@ -6409,7 +6555,7 @@ function renderImpactBreakdown(totals) {
       <div class="section-head compact-head">
         <div>
           <h3>Game Impact Breakdown</h3>
-          <p class="muted small">0-100 view weighted for ${escapeHTML(profile.label || "this position")}.</p>
+          <p class="muted small">Quick snapshot weighted for ${escapeHTML(profile.label || "this position")}.</p>
         </div>
         <span class="impact-score-badge">${renderImpactGrade(impact.score)}</span>
       </div>
@@ -6427,6 +6573,7 @@ function renderImpactBreakdown(totals) {
           .join("")}
       </div>
       <p class="impact-takeaway">${escapeHTML(impact.takeaway)}</p>
+      <p class="muted small">Game Impact is a quick snapshot of how this player helped create, protect, finish, or defend possessions. It is not a coach grade or a permanent label.</p>
       <p class="muted small">Raw event value: ${formatImpactNumber(impact.raw)}. Weighted event value: ${formatImpactNumber(impact.weightedRaw)}. Average Impact on the Season page averages these 0-100 game scores.</p>
     </section>
   `;
@@ -6439,7 +6586,7 @@ function renderPossessionImpact(totals) {
       <div class="section-head compact-head">
         <div>
           <h3>Possession Impact</h3>
-          <p class="muted small">Who helped get or protect the ball, and how valuable those swings were.</p>
+          <p class="muted small">Possession Impact shows how the player helped create extra chances, protect the ball, or prevent opponent chances. Ground balls, caused turnovers, saves, clears, turnovers, and failed clears all affect this view.</p>
         </div>
       </div>
       <div class="possession-impact-grid">
@@ -6602,7 +6749,7 @@ function renderGameListRow(game) {
       <button class="brand" type="button" data-review="${game.id}" style="color: var(--text); text-align: left;">
         <span>
           <h3>${escapeHTML(game.opponent)}</h3>
-          <p>${escapeHTML(playerContextLine(player))} - ${formatDate(game.date)} - Game Impact ${escapeHTML(impactSummary)} - Poss Value ${signedMetric(totals.possessionValue)}</p>
+          <p>${escapeHTML(playerContextLine(player))} - ${formatDate(game.date)} - Game Impact ${escapeHTML(impactSummary)} - Possession Value ${signedMetric(totals.possessionValue)}</p>
         </span>
       </button>
       <div class="row-actions">
@@ -6681,7 +6828,7 @@ function dashboardHeadlineMetrics(totals, player = state.player) {
   const metrics = [
     [totals.gamesPlayed, "Games Played"],
     [totals.averageImpact.toFixed(1), "Avg Impact"],
-    [signedMetric(totals.possessionValue), "Poss Value"],
+    [signedMetric(totals.possessionValue), "Possession Value"],
     [totals.points, "Points"],
     [totals.goals, "Goals"],
     [totals.assists, "Assists"],
@@ -6700,11 +6847,12 @@ function dashboardHeadlineMetrics(totals, player = state.player) {
 
 function renderDashboard() {
   const totals = calculateSeasonTotals();
-  const headlineMetrics = dashboardHeadlineMetrics(totals, state.player);
   const archetypeResult = calculateArchetypeResult(totals);
+  const strengths = seasonStrengthBullets(totals, state.player);
+  const nextFocus = nextLevelFocusForSeason(totals, archetypeResult);
   return renderShell(`
     <section class="screen-title">
-      <h2>Season Dashboard</h2>
+      <h2>Season Snapshot</h2>
       <p>Totals for ${escapeHTML(playerContextLine(state.player))}.</p>
     </section>
 
@@ -6713,11 +6861,36 @@ function renderDashboard() {
         title: "Season For",
         helper: "Switch players to see another season dashboard.",
       })}
-      <div class="metric-grid">
-        ${headlineMetrics.map(([value, label]) => metricTile(value, label)).join("")}
+      <div class="explainer-card">
+        <strong>Season Snapshot</strong>
+        <p>Season Snapshot shows how this player is contributing across scoring, possession, defense, goalie play, hustle, and decision-making. Position matters, so players are not evaluated the same way across every role.</p>
       </div>
-      ${generateShareCard(state.player, archetypeResult)}
-      ${renderSeasonTotalsGroups(totals)}
+      <div class="insight-grid">
+        ${insightCard("Games Tracked", escapeHTML(String(totals.gamesPlayed)), "Saved games")}
+        ${insightCard("Total Points", escapeHTML(String(totals.points)), `${totals.goals}G ${totals.assists}A`)}
+        ${insightCard("Possession Impact", escapeHTML(signedMetric(totals.possessionValue)), `${signedMetric(totals.extraPossessions)} extra chances`)}
+        ${insightCard("Average Game Impact", renderImpactGrade(totals.averageImpact), "Across saved games")}
+      </div>
+      <section class="card pad development-card">
+        <h3>What ${escapeHTML(playerTitle(state.player))} is doing well</h3>
+        <ul class="insight-list">
+          ${strengths.map((item) => `<li>${escapeHTML(item)}</li>`).join("")}
+        </ul>
+      </section>
+      <section class="card pad development-card">
+        <h3>Next-level focus</h3>
+        <p>${escapeHTML(nextFocus)}</p>
+      </section>
+      ${generateShareCard(state.player, archetypeResult, { profileLabel: "Season Player Profile", patternScope: "season" })}
+      <section class="review-section">
+        <div class="section-head compact-head">
+          <div>
+            <h3>Full Stat Table</h3>
+            <p class="muted small">Detailed totals behind the season snapshot.</p>
+          </div>
+        </div>
+        ${renderSeasonTotalsGroups(totals)}
+      </section>
     </section>
   `);
 }
@@ -6912,7 +7085,7 @@ function renderDemoPage() {
           <div class="metric">${renderImpactGrade(totals.impact)}<span>Game Impact</span></div>
           <div class="metric"><strong>${totals.points}</strong><span>Points</span></div>
           <div class="metric"><strong>${statWithExtraPossessions(totals.groundBalls, totals.possessionImpact.eventsByType.groundBall || 0)}</strong><span>Ground Balls</span></div>
-          <div class="metric"><strong>${signedMetric(totals.possessionValue)}</strong><span>Poss Value</span></div>
+          <div class="metric"><strong>${signedMetric(totals.possessionValue)}</strong><span>Possession Value</span></div>
         </div>
         <div class="event-list">${game.events.slice(-5).reverse().map(renderEventRow).join("")}</div>
       </section>
@@ -6922,7 +7095,7 @@ function renderDemoPage() {
         <div class="metric-grid compact-demo-grid">
           ${headlineMetrics.map(([value, label]) => metricTile(value, label)).join("")}
         </div>
-        ${generateShareCard(DEMO_PLAYER, archetypeResult)}
+        ${generateShareCard(DEMO_PLAYER, archetypeResult, { profileLabel: "Season Player Profile", patternScope: "season" })}
       </section>
 
       <section class="card pad">
@@ -7455,7 +7628,7 @@ function handleSubmit(event) {
       pointValue: stat.points,
       tags: [],
       note: formData.get("note")?.trim() || "",
-      fieldZone: "",
+      fieldZone: formData.get("fieldZone") || "",
       correctedAt: new Date().toISOString(),
     };
 
@@ -7489,7 +7662,7 @@ function handleSubmit(event) {
       category: stat.category,
       pointValue: stat.points,
       tags: uniqueTags(updatedEvents[eventIndex].tags),
-      fieldZone: updatedEvents[eventIndex].fieldZone || "",
+      fieldZone: formData.get("fieldZone") || "",
       correctedAt: new Date().toISOString(),
     };
 

@@ -1240,6 +1240,72 @@ button:focus-visible,
   text-transform: uppercase;
 }
 
+.review-section {
+  display: grid;
+  gap: 10px;
+}
+
+.insight-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.insight-card {
+  min-height: 104px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+}
+
+.insight-card span,
+.insight-card small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.insight-value {
+  display: block;
+  margin: 7px 0 5px;
+  color: var(--text);
+  font-size: clamp(1rem, 4.4vw, 1.45rem);
+  font-weight: 950;
+  line-height: 1.08;
+}
+
+.insight-value .impact-grade strong {
+  margin: 0;
+  font-size: clamp(1.35rem, 6vw, 1.9rem);
+}
+
+.explainer-card {
+  display: grid;
+  gap: 4px;
+  padding: 11px 12px;
+  border: 1px solid rgba(232, 16, 16, 0.22);
+  border-left: 4px solid var(--hornet-red);
+  border-radius: var(--radius);
+  background: #fffafa;
+  color: var(--text);
+}
+
+.explainer-card strong {
+  font-size: 0.86rem;
+  font-weight: 950;
+}
+
+.explainer-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.38;
+}
+
 .impact-card {
   display: grid;
   gap: 12px;
@@ -1402,6 +1468,25 @@ button:focus-visible,
   line-height: 1.4;
 }
 
+.archetype-story {
+  display: grid;
+  gap: 3px;
+}
+
+.archetype-story strong {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.archetype-story p {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.38;
+}
+
 .archetype-reasons {
   display: flex;
   flex-wrap: wrap;
@@ -1495,6 +1580,30 @@ button:focus-visible,
 
 .season-stat-group h3 {
   margin: 0;
+}
+
+.development-card {
+  display: grid;
+  gap: 8px;
+}
+
+.development-card h3,
+.development-card p {
+  margin: 0;
+}
+
+.development-card p,
+.insight-list {
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.insight-list {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-left: 18px;
 }
 
 .stat-mini-grid {
