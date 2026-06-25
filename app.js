@@ -1,4 +1,4 @@
-const STORAGE_KEYS = {
+﻿const STORAGE_KEYS = {
   player: "laxhornet.playerSettings",
   players: "laxhornet.players",
   activePlayerId: "laxhornet.activePlayerId",
@@ -168,6 +168,15 @@ const LIVE_STAT_GROUPS = [
     compact: true,
   },
 ];
+
+const LIVE_DEFAULT_STAT_KEYS = {
+  attack: ["goal", "assist", "shotOnGoal", "shot", "groundBall", "turnover", "hustlePlay", "smartPlay", "note"],
+  midfield: ["groundBall", "goal", "assist", "shotOnGoal", "causedTurnover", "successfulClear", "failedClear", "turnover", "hustlePlay", "smartPlay"],
+  defense: ["groundBall", "causedTurnover", "defensiveStop", "successfulClear", "failedClear", "turnover", "hustlePlay", "smartPlay", "note"],
+  goalie: ["goalieSave", "goalAllowed", "successfulClear", "failedClear", "groundBall", "turnover", "smartPlay", "note"],
+  faceoff: ["faceoffWin", "faceoffLoss", "groundBall", "turnover", "causedTurnover", "hustlePlay", "smartPlay", "note"],
+  default: ["goal", "assist", "shotOnGoal", "shot", "groundBall", "turnover", "causedTurnover", "successfulClear", "failedClear", "hustlePlay", "smartPlay", "note"],
+};
 
 const TAG_SUGGESTIONS = {
   goal: [
@@ -407,6 +416,11 @@ const state = {
   installInstructionsVisible: false,
   isOffline: window.navigator.onLine === false,
   pendingDeleteGameId: "",
+  lastEventConfirmation: null,
+  morePlaysExpanded: false,
+  pendingEndGame: false,
+  gameSavedSummaryId: "",
+  liveSharePromptGameId: "",
 };
 
 mergeRosterPlayersIntoPlayers();
@@ -1287,6 +1301,20 @@ function impactPositionGroup(player = {}) {
   return "midfield";
 }
 
+function liveTrackerPositionGroup(player = {}) {
+  const position = String(player.position || "").toLowerCase();
+  if (position.includes("goalie") || position.includes("goal")) return "goalie";
+  if (position.includes("face") || position.includes("fogo")) return "faceoff";
+  if (position.includes("attack")) return "attack";
+  if (position.includes("mid")) return "midfield";
+  if (position.includes("defense") || position.includes("lsm") || position.includes("ssdm")) return "defense";
+  return "default";
+}
+
+function liveDefaultStatKeysForPlayer(player = {}) {
+  return LIVE_DEFAULT_STAT_KEYS[liveTrackerPositionGroup(player)] || LIVE_DEFAULT_STAT_KEYS.default;
+}
+
 function impactWeightProfileForPlayer(player = {}) {
   const group = impactPositionGroup(player);
   return IMPACT_POSITION_WEIGHTS[group] || IMPACT_POSITION_WEIGHTS.midfield;
@@ -1798,6 +1826,9 @@ function updateReviewGame(gameId, updater, message = "Game updated") {
 
 function makeGame(formData) {
   const periodFormat = PERIOD_FORMATS[formData.get("periodFormat")] ? formData.get("periodFormat") : "quarters";
+  const periods = PERIOD_FORMATS[periodFormat].periods;
+  const requestedStart = formData.get("startingPeriod") || PERIOD_FORMATS[periodFormat].start;
+  const currentQuarter = periods.includes(requestedStart) ? requestedStart : PERIOD_FORMATS[periodFormat].start;
   const player = { ...state.player };
   const teamId = player.teamId || "";
   const rosterPlayerId = player.rosterPlayerId || (teamId ? player.id : "");
@@ -1808,14 +1839,14 @@ function makeGame(formData) {
     rosterPlayerId,
     shareCode: makeShareCode(),
     userId: currentUserId() || "",
-    isShared: false,
+    isShared: formData.get("liveShare") === "on",
     periodFormat,
     opponent: formData.get("opponent")?.trim() || "Opponent",
     date: formData.get("date") || todayISO(),
     location: formData.get("location")?.trim() || "",
     gameType: formData.get("gameType") || "Regular season",
     playerSnapshot: player,
-    currentQuarter: PERIOD_FORMATS[periodFormat].start,
+    currentQuarter,
     events: [],
     status: "in-progress",
     createdAt: new Date().toISOString(),
@@ -2407,6 +2438,13 @@ function logEvent(statKey) {
 
   state.activeGame.events.push(event);
   state.activeGame.savedAt = new Date().toISOString();
+  state.lastEventConfirmation = {
+    gameId: state.activeGame.id,
+    eventId: event.id,
+    label: stat.label,
+    quarter: event.quarter,
+    timestamp: event.timestamp,
+  };
   persistAll();
   syncLoggedEvent(state.activeGame, event);
   render();
@@ -7723,3 +7761,4 @@ window.addEventListener("offline", () => {
 });
 registerServiceWorker();
 initApp();
+
