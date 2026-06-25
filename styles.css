@@ -929,6 +929,26 @@ button:focus-visible,
   background: #f7f8fa;
 }
 
+.admin-tool-group {
+  padding: 10px 12px;
+  border: 1px solid rgba(232, 16, 16, 0.18);
+  border-radius: var(--radius);
+  background: #fffafa;
+}
+
+.admin-tool-group h4,
+.admin-tool-group p {
+  margin: 0;
+}
+
+.admin-tool-group h4 {
+  font-size: 0.94rem;
+}
+
+.team-safety-group {
+  background: #fff7f7;
+}
+
 .unclaimed-summary-head {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1125,6 +1145,92 @@ button:focus-visible,
   background: #fff4f4;
   font-size: 0.86rem;
   font-weight: 800;
+}
+
+.home-next-card,
+.game-day-status-card,
+.quick-actions-card {
+  display: grid;
+  gap: 12px;
+}
+
+.home-next-card h3,
+.game-day-status-card h3,
+.quick-actions-card h3 {
+  margin: 0;
+}
+
+.status-row-list {
+  display: grid;
+  gap: 7px;
+}
+
+.status-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7f8f9;
+}
+
+.status-row span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.status-row strong {
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 950;
+  text-align: right;
+}
+
+.quick-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.quick-action {
+  display: grid;
+  gap: 7px;
+  min-height: 74px;
+  align-content: center;
+  justify-items: start;
+  padding: 10px;
+  border: 1px solid rgba(232, 16, 16, 0.18);
+  border-radius: var(--radius);
+  color: var(--text);
+  background:
+    linear-gradient(90deg, rgba(232, 16, 16, 0.94) 0 5px, transparent 5px),
+    #f7f8f9;
+  text-align: left;
+}
+
+.quick-action span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 999px;
+  color: #ffffff;
+  background: var(--hornet-red);
+}
+
+.quick-action svg {
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
+}
+
+.quick-action strong {
+  font-size: 0.86rem;
+  line-height: 1.12;
 }
 
 .install-card {
@@ -2483,6 +2589,28 @@ button:focus-visible,
 
 .admin-tools-card {
   border-color: rgba(232, 16, 16, 0.2);
+}
+
+.admin-tool-groups {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-tool-groups > div {
+  padding: 10px;
+  border: 1px solid rgba(17, 19, 23, 0.1);
+  border-radius: var(--radius);
+  background: #f7f8f9;
+}
+
+.admin-tool-groups h4,
+.admin-tool-groups p {
+  margin: 0;
+}
+
+.admin-tool-groups h4 {
+  color: var(--text);
+  font-size: 0.9rem;
 }
 
 .launch-kit-hero-card {

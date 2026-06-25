@@ -22,7 +22,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v189";
+const APP_VERSION = "v190";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -423,6 +423,7 @@ const state = {
   pendingEndGame: false,
   gameSavedSummaryId: "",
   liveSharePromptGameId: "",
+  pendingTeamAccessReview: null,
 };
 
 mergeRosterPlayersIntoPlayers();
@@ -1271,6 +1272,32 @@ function escapeHTML(value = "") {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function displaySyncStatus(status = state.syncStatus) {
+  const text = String(status || "").trim();
+  if (state.isOffline) return "Will sync when online";
+  if (state.cloudError) return "Sync issue — tap to fix";
+  if (/synced|signed in|watching live/i.test(text)) return "Synced to your account";
+  if (/saved on this phone|ready|no saved account games|signed out|account features unavailable/i.test(text)) return "Saved on this phone";
+  if (/offline|waiting|will sync/i.test(text)) return "Will sync when online";
+  if (/issue|error|failed|needs attention|setup|missing|approval required/i.test(text)) return "Sync issue — tap to fix";
+  return text || "Saved on this phone";
+}
+
+function gameDayCloudStatus() {
+  if (state.isOffline) return "Will sync when online";
+  return displaySyncStatus();
+}
+
+function gameDayLiveShareStatus() {
+  if (state.activeGame?.isShared) return "Active";
+  return "Off";
+}
+
+function playerAccessStatus(player = state.player) {
+  if (isTeamPlayer(player)) return canTrackPlayer(player) ? "Approved" : "Waiting for approval";
+  return visiblePlayers().length ? "Approved" : "No approved player yet";
 }
 
 function formatDate(value) {
@@ -3018,7 +3045,7 @@ function reportTeamSetupError(error) {
   const now = Date.now();
   if (now - lastSyncErrorAt > 8000) {
     lastSyncErrorAt = now;
-    showToast(state.cloudError ? `Team setup error: ${state.cloudError}` : "Team setup needs attention");
+    showToast(state.cloudError ? `Sync issue: ${state.cloudError}` : "Sync issue — tap to fix");
   } else {
     render();
   }
@@ -3415,7 +3442,7 @@ async function loadCloudGames(options = {}) {
     render();
     showToast(
       cloudGames.length
-        ? `Synced. Showing ${playerTitle(state.player)}.`
+        ? `Synced to your account. Showing ${playerTitle(state.player)}.`
         : "No saved games found for this account",
     );
   }
@@ -3759,6 +3786,18 @@ async function reviewAdminRequest(userId, approved) {
   await loadAdminRequests({ silent: true });
   render();
   showToast(approved ? "Admin approved" : "Admin rejected");
+}
+
+function beginTeamAccessReview(requestId, approved) {
+  state.pendingTeamAccessReview = { requestId, approved: Boolean(approved) };
+  render();
+}
+
+async function confirmTeamAccessReview() {
+  const pending = state.pendingTeamAccessReview;
+  if (!pending) return;
+  state.pendingTeamAccessReview = null;
+  await reviewTeamAccessRequest(pending.requestId, pending.approved);
 }
 
 async function reviewTeamAccessRequest(requestId, approved) {
@@ -4407,6 +4446,28 @@ async function copyFamilySummary(gameId) {
   }
 }
 
+async function copyRosterSummary() {
+  const team = activeTeam();
+  if (!team || !canManageRoster(team.id)) return;
+  const roster = teamRosterPlayers(team.id);
+  const lines = [
+    `${team.name} roster`,
+    team.inviteCode ? `Team Code: ${team.inviteCode}` : "",
+    "",
+    ...roster.map((player) => {
+      const claimed = hasPlayerClaim(player.teamId, player.id) ? "Verified" : "Unverified";
+      return `${player.number ? `#${player.number} ` : ""}${player.name}${player.position ? ` - ${player.position}` : ""} - ${claimed}`;
+    }),
+  ].filter((line, index, list) => line || list[index - 1] !== "");
+  const summary = lines.join("\n");
+  try {
+    await navigator.clipboard.writeText(summary);
+    showToast("Roster copied");
+  } catch {
+    window.prompt("Copy roster", summary);
+  }
+}
+
 async function installApp() {
   if (isStandaloneApp()) {
     state.installInstructionsVisible = true;
@@ -4468,6 +4529,7 @@ function renderShell(content, options = {}) {
     ${renderEndGameModal()}
     ${renderGameSavedModal()}
     ${renderLiveShareModal()}
+    ${renderTeamAccessReviewModal()}
     ${renderDeleteGameModal()}
     ${options.hideNav ? "" : renderBottomNav()}
     ${state.toast ? `<div class="toast" role="status">${escapeHTML(state.toast)}</div>` : ""}
@@ -4566,6 +4628,39 @@ function renderLiveShareModal() {
   `;
 }
 
+function requestedRosterPlayerForAccess(request = {}) {
+  const jersey = String(request.childJerseyNumber || "").trim();
+  if (!request.teamId || !jersey) return null;
+  return teamRosterPlayers(request.teamId).find((player) => String(player.number || "").trim() === jersey) || null;
+}
+
+function renderTeamAccessReviewModal() {
+  const pending = state.pendingTeamAccessReview;
+  if (!pending) return "";
+  const request = state.teamAccessRequests.find((item) => item.id === pending.requestId);
+  if (!request) return "";
+  const rosterPlayer = requestedRosterPlayerForAccess(request);
+  const playerName = rosterPlayer?.name || "this player";
+  const jersey = request.childJerseyNumber || rosterPlayer?.number || "";
+  const approving = Boolean(pending.approved);
+  return `
+    <section class="modal-backdrop" role="presentation">
+      <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="teamAccessReviewTitle">
+        <h3 id="teamAccessReviewTitle">${approving ? `Approve this parent for ${escapeHTML(playerName)}${jersey ? ` #${escapeHTML(jersey)}` : ""}?` : "Reject this access request?"}</h3>
+        <p class="muted small">${
+          approving
+            ? "They will be able to track this player's games and view this player's saved stats for this team. They will not be able to edit the team roster."
+            : "The parent will not be linked to this player. They can request again if the team code or jersey number was entered incorrectly."
+        }</p>
+        <div class="edit-actions">
+          <button class="btn secondary" type="button" data-action="cancel-team-access-review">Cancel</button>
+          <button class="btn ${approving ? "positive" : "danger"}" type="button" data-action="confirm-team-access-review">${approving ? "Approve Parent Access" : "Reject Request"}</button>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function renderUpdateBanner() {
   if (!state.updateAvailable) return "";
   return `
@@ -4589,7 +4684,7 @@ function renderBottomNav() {
     { screen: trackTarget, label: state.activeGame ? "Live" : "Track", icon: "track", active: ["start", "live"].includes(state.screen) },
     { screen: "past", label: "Review", icon: "games", active: ["past", "review"].includes(state.screen) },
     { screen: "dashboard", label: "Season", icon: "season", active: state.screen === "dashboard" },
-    { screen: "more", label: isPlatformReviewer() ? "Manage" : "More", icon: "manage", active: ["more", "player", "settings", "team", "teamAccess", "profileSetup", "tutorial", "help", "launchKit", "promoDemo", "demo"].includes(state.screen) },
+    { screen: "more", label: "More", icon: "manage", active: ["more", "player", "settings", "team", "teamAccess", "profileSetup", "tutorial", "help", "launchKit", "promoDemo", "demo"].includes(state.screen) },
   ];
   return `
     <nav class="bottom-nav" aria-label="Primary">
@@ -4645,8 +4740,8 @@ function renderAccountCard() {
         <p class="muted small">${escapeHTML([state.userProfile?.firstName, state.userProfile?.lastName].filter(Boolean).join(" ") || userEmail())}</p>
         <p class="muted small">${escapeHTML(userEmail())}</p>
         <p class="muted small">Access: ${escapeHTML(isReviewerAccount() ? `Reviewer / ${appRoleLabel(role)}` : appRoleLabel(role))}</p>
-        <p class="muted small">${escapeHTML(state.syncStatus)}</p>
-        ${state.cloudError ? `<p class="muted small">Last setup error: ${escapeHTML(state.cloudError)}</p>` : ""}
+        <p class="muted small">${escapeHTML(displaySyncStatus())}</p>
+        ${state.cloudError ? `<p class="muted small">Sync issue: ${escapeHTML(state.cloudError)}</p>` : ""}
         ${modeToggle}
         <div class="account-actions">
           <button class="btn neutral" type="button" data-action="sync-cloud-games">Sync</button>
@@ -4703,6 +4798,7 @@ function renderWatchSharedGameForm(options = {}) {
                 <input id="shareCode" name="shareCode" value="${escapeHTML(state.sharedCode)}" placeholder="ABC123" autocapitalize="characters" />
               </div>
               <button class="btn neutral" type="submit">Watch Live</button>
+              <p class="muted small">Anyone with this link can view the live game timeline. Only share it with people you trust.</p>
             </div>`
           : ""
       }
@@ -4832,7 +4928,7 @@ function renderPlayerAssignmentCard(player) {
       </div>
       <div class="player-assignment-actions">
         <button class="mini-btn" type="button" data-player-go="${escapeHTML(normalized.id)}" data-target-screen="start">Track</button>
-        <button class="mini-btn light" type="button" data-player-go="${escapeHTML(normalized.id)}" data-target-screen="past">Games</button>
+        <button class="mini-btn light" type="button" data-player-go="${escapeHTML(normalized.id)}" data-target-screen="past">Review</button>
         <button class="mini-btn light" type="button" data-player-go="${escapeHTML(normalized.id)}" data-target-screen="dashboard">Season</button>
       </div>
     </section>
@@ -4984,8 +5080,8 @@ function renderTeamAccessRequests() {
                           <small>${escapeHTML(parentName || "This parent")} is requesting access to #${escapeHTML(request.childJerseyNumber || "not provided")} on ${escapeHTML(request.teamName || team?.name || "this team")}.</small>
                       </span>
                       <span class="event-actions">
-                        <button class="mini-btn" type="button" data-review-team-access="${request.id}" data-approved="true">Approve</button>
-                        <button class="mini-btn danger" type="button" data-review-team-access="${request.id}" data-approved="false">Reject</button>
+                        <button class="mini-btn" type="button" data-review-team-access="${request.id}" data-approved="true">Approve Access</button>
+                        <button class="mini-btn danger" type="button" data-review-team-access="${request.id}" data-approved="false">Reject Request</button>
                       </span>
                     </div>
                   `;
@@ -5006,7 +5102,7 @@ function renderAdminTeamRequestInbox() {
     <section class="card pad admin-review-card">
       <div class="section-head compact-head">
         <div>
-          <h3>Pending Parent Requests</h3>
+          <h3>Parent Requests</h3>
           <p class="muted small">Approve team and player access across every roster.</p>
         </div>
         <button class="mini-btn light" type="button" data-action="sync-team-roster">Sync</button>
@@ -5025,8 +5121,8 @@ function renderAdminTeamRequestInbox() {
                           <small>${escapeHTML(parentName || "This parent")} is requesting access to #${escapeHTML(request.childJerseyNumber || "not provided")} on ${escapeHTML(request.teamName || "this team")}.</small>
                         </span>
                         <span class="event-actions">
-                          <button class="mini-btn" type="button" data-review-team-access="${request.id}" data-approved="true">Approve</button>
-                          <button class="mini-btn danger" type="button" data-review-team-access="${request.id}" data-approved="false">Reject</button>
+                          <button class="mini-btn" type="button" data-review-team-access="${request.id}" data-approved="true">Approve Access</button>
+                          <button class="mini-btn danger" type="button" data-review-team-access="${request.id}" data-approved="false">Reject Request</button>
                         </span>
                       </div>
                     `;
@@ -5250,8 +5346,8 @@ function renderTeamRosterCard(options = {}) {
               <div class="team-actions">
                 <button class="mini-btn light" type="button" data-action="sync-team-roster">Sync</button>
                 ${canCreateTeams() ? "" : `<button class="mini-btn light" type="button" data-action="toggle-team-access">Request Access</button>`}
-                ${deletableTeam ? `<button class="mini-btn danger" type="button" data-action="delete-team">Delete Team</button>` : ""}
               </div>
+              ${manageRoster ? `<div class="admin-tool-group team-setup-group"><h4>Team Setup</h4><p class="muted small">Create team, team code, and basic team settings. Use Sync after roster or access changes.</p></div>` : ""}
               ${
                 teams
                   ? `<div class="team-chip-row">${teams}</div>`
@@ -5262,9 +5358,8 @@ function renderTeamRosterCard(options = {}) {
                     }</p>`
               }
               ${team?.localRecovered && !team.cloudBacked ? `<div class="notice-card error-card compact-notice"><strong>Team needs attention.</strong><p class="muted small">This team was recovered from this device, but it is not connected to your account. Remove it or recreate the team before adding roster players.</p></div>` : ""}
-              ${state.cloudError ? `<div class="notice-card error-card compact-notice"><strong>Last setup error</strong><p class="muted small">${escapeHTML(state.cloudError)}</p></div>` : ""}
+              ${state.cloudError ? `<div class="notice-card error-card compact-notice"><strong>Sync issue — tap to fix</strong><p class="muted small">${escapeHTML(state.cloudError)}</p></div>` : ""}
               ${manageRoster ? renderUnclaimedRosterPlayers(fullTeamRoster) : ""}
-              ${manageRoster ? renderTeamAccessRequests() : ""}
 
               ${
                 team
@@ -5274,7 +5369,7 @@ function renderTeamRosterCard(options = {}) {
                         ? `<div class="team-roster-block">
                             <div class="section-head compact-head">
                               <div>
-                                <h4>Manage Team Players</h4>
+                                <h4>Roster</h4>
                                 <p class="muted small">Admin-only roster tools for preloading players by name and jersey number.</p>
                               </div>
                             </div>
@@ -5282,7 +5377,15 @@ function renderTeamRosterCard(options = {}) {
                             ${claimByNumberForm}
                           </div>
                           ${selectedTeamRosterPlayer ? renderEditRosterPlayerBlock(selectedTeamRosterPlayer) : ""}
-                          ${renderAddRosterPlayerBlock()}`
+                          ${renderAddRosterPlayerBlock()}
+                          <div class="team-roster-block admin-tool-group team-safety-group">
+                            <h4>Team Safety</h4>
+                            <p class="muted small">Export roster details, delete teams, and manage access carefully.</p>
+                            <div class="team-actions">
+                              <button class="mini-btn light" type="button" data-action="copy-roster-summary">Export Roster</button>
+                              ${deletableTeam ? `<button class="mini-btn danger" type="button" data-action="delete-team">Delete Team</button>` : ""}
+                            </div>
+                          </div>`
                         : `${claimByNumberForm}`
                     }
                   `
@@ -5300,35 +5403,25 @@ function renderHome() {
   if (!state.authUser) return renderWelcome();
 
   const season = calculateSeasonTotals();
-  const active = state.activeGame;
-  const activePlayer = active ? gamePlayerSnapshot(active) : null;
+  const hasApprovedPlayer = visiblePlayers().length > 0 && playerAccessStatus(state.player) === "Approved";
 
   return renderShell(`
     <section class="screen-title home-title">
-      <h2>Track your player&apos;s full impact.</h2>
-      <p>Fast sideline stats. Live family updates. Real lacrosse impact.</p>
+      <h2>What should I do next?</h2>
+      <p>Start tracking, review a game, or check the season story.</p>
     </section>
 
     <section class="stack">
       ${renderApprovedPlayerCallout()}
-      ${renderPlayerSwitcher({
-        helper: false,
-      })}
+      ${hasApprovedPlayer ? renderHomeReadyCard() : renderNoApprovedPlayerHome()}
+      ${renderGameDayStatusCard()}
+      ${renderHomeQuickActions()}
 
       <div class="metric-grid">
         <div class="metric"><strong>${season.gamesPlayed}</strong><span>Games</span></div>
         <div class="metric"><strong>${season.averageImpact.toFixed(1)}</strong><span>Avg Impact</span></div>
         <div class="metric"><strong>${season.goals}</strong><span>Goals</span></div>
         <div class="metric"><strong>${season.assists}</strong><span>Assists</span></div>
-      </div>
-
-      <div class="action-grid home-action-grid">
-        ${
-          active
-            ? `<button class="btn brand positive" type="button" data-nav="live">Resume ${escapeHTML(playerTitle(activePlayer))}</button>`
-            : `<button class="btn brand positive" type="button" data-nav="start">Track New Game</button>`
-        }
-        <button class="btn brand neutral" type="button" data-nav="past">Review Games</button>
       </div>
     </section>
   `);
@@ -5357,10 +5450,33 @@ function renderMore() {
     ? `
       <section class="card pad more-card admin-tools-card">
         <div>
-          <h3>Admin Tools</h3>
-          <p class="muted small">Launch materials, team setup files, and sharing templates.</p>
+          <h3>Team Admin Tools</h3>
+          <p class="muted small">Create teams, manage rosters, approve parent requests, and handle team safety tools.</p>
         </div>
-        <div class="more-action-list">
+        <div class="admin-tool-groups">
+          <div>
+            <h4>Team Setup</h4>
+            <p class="muted small">Create team, team code, and basic team settings.</p>
+          </div>
+          <div>
+            <h4>Roster</h4>
+            <p class="muted small">Add and edit players from Manage Teams.</p>
+          </div>
+          <div>
+            <h4>Parent Requests</h4>
+            <p class="muted small">Approve or reject access from the Team page.</p>
+          </div>
+          <div>
+            <h4>Team Safety</h4>
+            <p class="muted small">Export roster details, delete teams, and manage access.</p>
+          </div>
+        </div>
+        <div class="more-action-list compact-actions">
+          <button class="more-action" type="button" data-nav="team">
+            <span>${renderNavIcon("team")}</span>
+            <strong>Open Team Admin Tools</strong>
+            <small>Manage team setup, roster, requests, and safety.</small>
+          </button>
           <button class="more-action" type="button" data-nav="launchKit">
             <span>${renderNavIcon("games")}</span>
             <strong>Launch Kit</strong>
@@ -5373,7 +5489,7 @@ function renderMore() {
 
   return renderShell(`
     <section class="screen-title">
-      <h2>${isPlatformReviewer() ? "Manage" : "More"}</h2>
+      <h2>More</h2>
       <p>Quick access to tracking, player details, team tools, account, watching, and help.</p>
     </section>
 
@@ -5386,7 +5502,7 @@ function renderMore() {
         <div class="more-status-grid">
           <div class="more-status-cell">
             <span>Sync</span>
-            <strong>${escapeHTML(state.syncStatus || "Signed in")}</strong>
+            <strong>${escapeHTML(displaySyncStatus())}</strong>
           </div>
           <div class="more-status-cell">
             <span>Version</span>
@@ -5395,7 +5511,7 @@ function renderMore() {
         </div>
         ${renderAccountSyncMessage()}
         ${accountModeToggle}
-        ${state.cloudError ? `<div class="notice-card error-card"><strong>Last setup error</strong><p class="muted small">${escapeHTML(state.cloudError)}</p></div>` : ""}
+        ${state.cloudError ? `<div class="notice-card error-card"><strong>Sync issue — tap to fix</strong><p class="muted small">${escapeHTML(state.cloudError)}</p></div>` : ""}
         <div class="more-action-list compact-actions">
           <button class="more-action" type="button" data-nav="profileSetup">
             <span>${renderNavIcon("more")}</span>
@@ -5591,7 +5707,7 @@ function renderProfileSetup() {
 
         <div class="notice-card">
           <strong>Player privacy matters.</strong>
-          <p class="muted small">Parents only see the player and team access approved by a team admin. Live Share links are read-only.</p>
+          <p class="muted small">Parents only see the player/team access approved by a team admin. Live Share links are read-only.</p>
         </div>
       ` : ""}
 
@@ -5612,8 +5728,8 @@ function renderTeamAccessTools() {
       <section class="card pad">
         <div class="section-head compact-head">
           <div>
-            <h3>Create Team</h3>
-            <p class="muted small">Admin-only setup for preloading an official roster.</p>
+            <h3>Team Setup</h3>
+            <p class="muted small">Create team, team code, and basic team settings.</p>
           </div>
         </div>
         <form class="inline-mini-form" data-form="create-team">
@@ -5658,6 +5774,7 @@ function renderTeamAccessTools() {
                 <div class="team-form-actions">
                   <button class="mini-btn" type="submit">Request Player Access</button>
                 </div>
+                ${renderPrivacyReassurance()}
                 <p class="muted small">Once approved, only the matching roster player will appear for this account.</p>
               </form>`
             : ""
@@ -5684,12 +5801,13 @@ function renderTeamPage() {
   const showNoTeamCodeCard = !admin && !activeTeam();
   return renderShell(`
     <section class="screen-title">
-      <h2>${admin ? "Team" : "Team Access"}</h2>
+      <h2>${admin ? "Team Admin Tools" : "Team Access"}</h2>
       <p>${admin ? "Create teams, sync parent approvals, and manage roster tools in one place." : "Request team access, sync approvals, and verify your player by jersey number."}</p>
     </section>
 
     <section class="stack">
       ${renderAdminTeamRequestInbox()}
+      ${admin ? "" : renderPrivacyReassurance()}
       ${showNoTeamCodeCard ? renderNoTeamCodeCard() : ""}
       ${renderTeamRosterCard()}
       ${renderTeamAccessTools()}
@@ -5709,6 +5827,111 @@ function renderNoTeamCodeCard() {
 
 function renderTeamAccess() {
   return renderTeamPage();
+}
+
+function renderPrivacyReassurance() {
+  return `
+    <div class="notice-card compact-notice privacy-reassurance">
+      <strong>Player privacy matters.</strong>
+      <p class="muted small">Parents only see the player/team access approved by a team admin. Live Share links are read-only.</p>
+    </div>
+  `;
+}
+
+function latestVisibleGame() {
+  return [...visibleGames()].sort((a, b) => {
+    const aTime = Date.parse(a.endedAt || a.savedAt || a.date || a.createdAt || 0) || 0;
+    const bTime = Date.parse(b.endedAt || b.savedAt || b.date || b.createdAt || 0) || 0;
+    return bTime - aTime;
+  })[0] || null;
+}
+
+function playerReadySubcopy(player = state.player) {
+  const teamName = player.team || teamById(player.teamId)?.name || "Team not linked";
+  const jersey = player.number ? `#${player.number}` : "No jersey";
+  const position = player.position || "Position not set";
+  return `${teamName} · ${jersey} · ${position}`;
+}
+
+function renderNoApprovedPlayerHome() {
+  return `
+    <section class="card pad empty-state-card">
+      <h3>No approved player yet</h3>
+      <p class="muted small">Request access with your team code and jersey number. Once your team admin approves it, you can start tracking games.</p>
+      <div class="action-grid compact">
+        <button class="btn positive" type="button" data-nav="team">Request Player Access</button>
+        <button class="btn secondary" type="button" data-nav="tutorial">Help / Tracker Guide</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderHomeReadyCard() {
+  const lastGame = latestVisibleGame();
+  return `
+    <section class="card pad home-next-card">
+      <div>
+        <h3>Ready to track ${escapeHTML(playerTitle(state.player))}?</h3>
+        <p class="muted small">${escapeHTML(playerReadySubcopy(state.player))}</p>
+      </div>
+      <div class="action-grid compact">
+        <button class="btn brand positive" type="button" data-nav="start">Start New Game</button>
+        <button class="btn brand neutral" type="button" ${lastGame ? `data-review="${escapeHTML(lastGame.id)}"` : `data-nav="past"`}>Review Last Game</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderGameDayStatusCard() {
+  const rows = [
+    ["Offline tracking", "Ready"],
+    ["Cloud sync", gameDayCloudStatus()],
+    ["Live Share", gameDayLiveShareStatus()],
+    ["Player access", playerAccessStatus(state.player)],
+  ];
+  return `
+    <section class="card pad game-day-status-card">
+      <h3>Game-day status</h3>
+      <div class="status-row-list">
+        ${rows
+          .map(
+            ([label, value]) => `
+              <div class="status-row">
+                <span>${escapeHTML(label)}</span>
+                <strong>${escapeHTML(value)}</strong>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderHomeQuickActions() {
+  const actions = [
+    { label: "Season Dashboard", screen: "dashboard", icon: "season", show: visiblePlayers().length > 0 },
+    { label: "Past Games", screen: "past", icon: "games", show: visiblePlayers().length > 0 },
+    { label: "Manage Players", screen: "player", icon: "player", show: state.authUser },
+    { label: "Help / Tracker Guide", screen: "tutorial", icon: "games", show: true },
+  ].filter((item) => item.show);
+  return `
+    <section class="card pad quick-actions-card">
+      <h3>Quick actions</h3>
+      <div class="quick-action-grid">
+        ${actions
+          .map(
+            (item) => `
+              <button class="quick-action" type="button" data-nav="${item.screen}">
+                <span>${renderNavIcon(item.icon)}</span>
+                <strong>${escapeHTML(item.label)}</strong>
+              </button>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
 }
 
 function renderPlayerPage() {
@@ -5910,11 +6133,8 @@ function renderLiveStatGroups(options = {}) {
 }
 
 function liveSyncChipLabel() {
-  if (state.isOffline) return "Will sync when online";
   if (!currentUserId()) return "Saved on this phone";
-  if (state.syncStatus === "Saved on this phone") return "Will sync when online";
-  if (state.syncStatus === "Synced") return "Synced to your account";
-  return "Saved on this phone";
+  return displaySyncStatus();
 }
 
 function renderLiveStatusChips(game) {
@@ -6472,7 +6692,7 @@ function renderSharedGame() {
   return renderShell(`
     <section class="screen-title">
       <h2>${escapeHTML(game.opponent)}</h2>
-      <p>Shared live game - ${formatDate(game.date)} - ${escapeHTML(state.syncStatus)}</p>
+      <p>Shared live game - ${formatDate(game.date)} - ${escapeHTML(displaySyncStatus())}</p>
     </section>
 
     <section class="stack">
@@ -6984,11 +7204,18 @@ function renderApprovedPlayerCallout() {
 }
 
 function renderAccountSyncMessage() {
-  if (state.syncStatus === "Synced") {
-    return `<div class="notice-card compact-notice"><strong>Synced</strong><p class="muted small">Your latest game data is saved to your account.</p></div>`;
+  const label = displaySyncStatus();
+  if (label === "Synced to your account") {
+    return `<div class="notice-card compact-notice"><strong>Synced to your account</strong><p class="muted small">Your latest game data is saved to your account.</p></div>`;
   }
-  if (state.syncStatus === "Saved on this phone") {
+  if (label === "Will sync when online") {
+    return `<div class="notice-card compact-notice"><strong>Will sync when online</strong><p class="muted small">Events are saved on this device and will sync when your connection returns.</p></div>`;
+  }
+  if (label === "Saved on this phone") {
     return `<div class="notice-card compact-notice"><strong>Saved on this phone</strong><p class="muted small">We&apos;ll sync this game when your connection returns.</p></div>`;
+  }
+  if (label === "Sync issue — tap to fix") {
+    return `<div class="notice-card error-card compact-notice"><strong>Sync issue — tap to fix</strong><p class="muted small">Open Sync to refresh games, teams, and player access.</p></div>`;
   }
   return "";
 }
@@ -7845,6 +8072,11 @@ function handleClick(event) {
     if (action.dataset.action === "copy-share-link") copyShareLink();
     if (action.dataset.action === "confirm-copy-share-link") copyLiveShareLinkNow(action.dataset.gameId);
     if (action.dataset.action === "turn-off-live-share") turnOffLiveShare(action.dataset.gameId);
+    if (action.dataset.action === "cancel-team-access-review") {
+      state.pendingTeamAccessReview = null;
+      render();
+    }
+    if (action.dataset.action === "confirm-team-access-review") confirmTeamAccessReview();
     if (action.dataset.action === "install-app") installApp();
     if (action.dataset.action === "add-note-last-event") addNoteToLastEvent();
     if (action.dataset.action === "toggle-more-plays") {
@@ -7873,6 +8105,7 @@ function handleClick(event) {
     if (action.dataset.action === "sync-cloud-games") loadCloudGames();
     if (action.dataset.action === "check-app-update") checkForAppUpdate({ manual: true });
     if (action.dataset.action === "sync-team-roster") loadCloudTeams();
+    if (action.dataset.action === "copy-roster-summary") copyRosterSummary();
     if (action.dataset.action === "add-player") addPlayer();
     if (action.dataset.action === "delete-player") deleteActivePlayer();
     if (action.dataset.action === "remove-roster-player") removeRosterPlayer();
@@ -7928,7 +8161,7 @@ function handleClick(event) {
 
   const reviewTeamAccess = event.target.closest("[data-review-team-access]");
   if (reviewTeamAccess) {
-    reviewTeamAccessRequest(reviewTeamAccess.dataset.reviewTeamAccess, reviewTeamAccess.dataset.approved === "true");
+    beginTeamAccessReview(reviewTeamAccess.dataset.reviewTeamAccess, reviewTeamAccess.dataset.approved === "true");
     return;
   }
 
@@ -8188,7 +8421,7 @@ window.addEventListener("online", async () => {
   if (state.authUser) {
     await loadCloudGames({ silent: true });
     state.syncStatus = "Synced";
-    showToast("Synced");
+    showToast("Synced to your account");
     return;
   }
   if (state.syncStatus === "Saved on this phone") state.syncStatus = "Synced";
