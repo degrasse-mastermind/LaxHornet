@@ -23,7 +23,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v203";
+const APP_VERSION = "v204";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -5114,8 +5114,9 @@ function renderPlayerAssignmentCard(player) {
   `;
 }
 
-function renderMyPlayersList() {
+function renderMyPlayersList(options = {}) {
   const players = visiblePlayers();
+  const showHeaderAction = options.showHeaderAction !== false;
   if (!players.length) {
     return `
       <section class="card pad">
@@ -5132,7 +5133,7 @@ function renderMyPlayersList() {
           <h3>My Players</h3>
           <p class="muted small">Each tile is a separate player/team tracking context.</p>
         </div>
-        <button class="mini-btn light" type="button" data-nav="team">Players & Teams</button>
+        ${showHeaderAction ? `<button class="mini-btn light" type="button" data-nav="player">Players & Teams</button>` : ""}
       </div>
       <div class="player-assignment-list">
         ${players.map(renderPlayerAssignmentCard).join("")}
@@ -5808,7 +5809,7 @@ function renderMore() {
             <strong>${escapeHTML(activeTeamName || state.player.team || "Not connected")}</strong>
           </div>
         </div>
-        ${teamMismatch ? `<div class="notice-card compact-notice"><strong>Different team selected.</strong><p class="muted small">Use Manage Teams to add roster players for ${escapeHTML(activeTeamName)}, or use Players to switch who you are tracking.</p></div>` : ""}
+        ${teamMismatch ? `<div class="notice-card compact-notice"><strong>Different team selected.</strong><p class="muted small">Open Players &amp; Teams to switch who you are tracking or add another player.</p></div>` : ""}
         <div class="more-action-list">
           <button class="more-action" type="button" data-nav="${active ? "live" : "start"}">
             <span>${renderNavIcon("track")}</span>
@@ -5817,13 +5818,8 @@ function renderMore() {
           </button>
           <button class="more-action" type="button" data-nav="player">
             <span>${renderNavIcon("player")}</span>
-            <strong>Manage Players</strong>
-            <small>Choose who to track and review each player/team context.</small>
-          </button>
-          <button class="more-action" type="button" data-nav="team">
-            <span>${renderNavIcon("team")}</span>
-            <strong>Manage Teams</strong>
-            <small>View verified players, sync updates, or add another player.</small>
+            <strong>Players &amp; Teams</strong>
+            <small>Choose who to track, view team context, or add another player.</small>
           </button>
         </div>
       </section>
@@ -5996,14 +5992,16 @@ function renderTeamAccessTools() {
   const team = activeTeam();
   const requestList = renderMyTeamAccessRequests();
   const expanded = state.teamAccessExpanded;
+  const hasVerifiedPlayers = visiblePlayers().length > 0;
+  const addPlayerTitle = hasVerifiedPlayers ? "Add Another Player" : "Add Player";
   return `
       <section class="card pad add-player-access-card ${expanded ? "" : "collapsed"}">
         <div class="collapsible-card-head">
           <div>
-            <h3>Add Another Player</h3>
-            <p class="muted small">${escapeHTML(team ? "Use a team code and jersey number to connect another player." : "Ask your coach, team admin, or parent coordinator for the team code.")}</p>
+            <h3>${escapeHTML(addPlayerTitle)}</h3>
+            <p class="muted small">${escapeHTML(team ? "Use a team code and jersey number to connect a player." : "Ask your coach, team admin, or parent coordinator for the team code.")}</p>
           </div>
-          <button class="collapse-icon" type="button" data-action="toggle-team-access" aria-expanded="${expanded}" aria-label="${expanded ? "Minimize Add Another Player" : "Expand Add Another Player"}">
+          <button class="collapse-icon" type="button" data-action="toggle-team-access" aria-expanded="${expanded}" aria-label="${expanded ? `Minimize ${addPlayerTitle}` : `Expand ${addPlayerTitle}`}">
             <span aria-hidden="true">${expanded ? "v" : ">"}</span>
           </button>
         </div>
@@ -6041,14 +6039,70 @@ function renderTeamAccessTools() {
               <p class="muted small">No player steps need attention right now.</p>
             </div>
           </div>
-          <p class="muted small">Verified players are listed above. Add another player only when you need to track a different child or team.</p>`
+          <p class="muted small">${hasVerifiedPlayers ? "Verified players are listed above. Add another player only when you need to track a different child or team." : "Add a player above to start the approval and verification process."}</p>`
         }
       </section>
   `;
 }
 
+function renderCurrentTrackingPlayerCard() {
+  const player = normalizePlayer(state.player);
+  const hasPlayer = visiblePlayers().some((item) => item.id === player.id);
+  if (!hasPlayer || !isTeamPlayer(player)) return "";
+  const lastGame = latestVisibleGame();
+  return `
+    <section class="card pad current-player-manage-card">
+      <div class="section-head compact-head">
+        <div>
+          <h3>Current Tracking Player</h3>
+          <p class="muted small">This is the player used for new games, reviews, and season totals.</p>
+        </div>
+        <span class="status-pill">Selected</span>
+      </div>
+      <div class="player-context-panel">
+        <strong>${escapeHTML(playerTitle(player))}</strong>
+        <span>${escapeHTML(playerSubline(player))}</span>
+        ${playerTeamCodeLabel(player) ? `<small>${escapeHTML(playerTeamCodeLabel(player))}</small>` : ""}
+      </div>
+      <div class="player-assignment-actions">
+        <button class="mini-btn" type="button" data-nav="start">Track Game</button>
+        <button class="mini-btn light" type="button" ${lastGame ? `data-review="${escapeHTML(lastGame.id)}"` : `data-nav="past"`}>Review</button>
+        <button class="mini-btn light" type="button" data-nav="dashboard">Season</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderPlayerAccountRemovalCard() {
+  const selectedRosterPlayer = isTeamPlayer(state.player) ? normalizePlayer(state.player) : null;
+  const canEditSelectedRosterPlayer = selectedRosterPlayer ? canManageRoster(selectedRosterPlayer.teamId) : false;
+  const canRemoveClaimedRosterPlayer = selectedRosterPlayer
+    ? !canEditSelectedRosterPlayer && hasPlayerClaim(selectedRosterPlayer.teamId, selectedRosterPlayer.rosterPlayerId || selectedRosterPlayer.id)
+    : false;
+  if (selectedRosterPlayer && canRemoveClaimedRosterPlayer) {
+    return `
+      <section class="card pad player-account-tools-card">
+        <h3>Player Account Tools</h3>
+        <p class="muted small">Remove ${escapeHTML(playerTitle(selectedRosterPlayer))} from this parent account only. This does not delete saved games and does not remove the player from the team roster.</p>
+        <button class="btn danger" type="button" data-action="remove-claimed-player">Remove Player From My Account</button>
+      </section>
+    `;
+  }
+  if (!selectedRosterPlayer) {
+    return `
+      <section class="card pad player-account-tools-card">
+        <h3>Local Player Tools</h3>
+        <p class="muted small">This only removes the locally saved player from this device. It does not affect any team roster.</p>
+        <button class="btn danger" type="button" data-action="delete-player">Remove Local Player</button>
+      </section>
+    `;
+  }
+  return "";
+}
+
 function renderTeamPage() {
   const admin = canCreateTeams();
+  if (!admin) return renderPlayersTeamsPage();
   const showNoTeamCodeCard = !admin && !activeTeam();
   return renderShell(`
     <section class="screen-title">
@@ -6063,6 +6117,24 @@ function renderTeamPage() {
       ${renderAdminTeamRequestInbox()}
     </section>
   `, { hideNav: admin });
+}
+
+function renderPlayersTeamsPage() {
+  if (canCreateTeams()) return renderTeamPage();
+  const hasPlayers = visiblePlayers().length > 0;
+  return renderShell(`
+    <section class="screen-title">
+      <h2>Players &amp; Teams</h2>
+      <p>Choose who you are tracking, see each player&apos;s team context, or add a player with a team code.</p>
+    </section>
+
+    <section class="stack">
+      ${renderCurrentTrackingPlayerCard()}
+      ${renderMyPlayersList({ showHeaderAction: false })}
+      ${renderTeamAccessTools()}
+      ${hasPlayers ? renderPlayerAccountRemovalCard() : ""}
+    </section>
+  `);
 }
 
 function renderAdminPortal() {
@@ -6243,7 +6315,7 @@ function renderHomeQuickActions() {
   const actions = [
     { label: "Season Dashboard", screen: "dashboard", icon: "season", show: visiblePlayers().length > 0 },
     { label: "Past Games", screen: "past", icon: "games", show: visiblePlayers().length > 0 },
-    { label: "Manage Players", screen: "player", icon: "player", show: state.authUser },
+    { label: "Players & Teams", screen: "player", icon: "player", show: state.authUser },
     { label: "Help / Tracker Guide", screen: "tutorial", icon: "games", show: true },
   ].filter((item) => item.show);
   return `
@@ -6266,6 +6338,7 @@ function renderHomeQuickActions() {
 }
 
 function renderPlayerPage() {
+  if (!canCreateTeams()) return renderPlayersTeamsPage();
   const team = activeTeam();
   const selectedRosterPlayer = isTeamPlayer(state.player) ? normalizePlayer(state.player) : null;
   const canEditSelectedRosterPlayer = selectedRosterPlayer ? canManageRoster(selectedRosterPlayer.teamId) : false;

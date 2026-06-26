@@ -741,6 +741,49 @@ button:focus-visible,
   gap: 8px;
 }
 
+.current-player-manage-card,
+.player-account-tools-card {
+  display: grid;
+  gap: 12px;
+}
+
+.player-context-panel {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid rgba(232, 16, 16, 0.2);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(90deg, rgba(232, 16, 16, 0.08), transparent 42%),
+    #f7f8f9;
+}
+
+.player-context-panel strong,
+.player-context-panel span,
+.player-context-panel small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.player-context-panel strong {
+  color: var(--text);
+  font-size: 1.05rem;
+  line-height: 1.15;
+}
+
+.player-context-panel span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
+.player-context-panel small {
+  color: var(--hornet-red);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
 .team-card {
   display: grid;
   gap: 14px;
