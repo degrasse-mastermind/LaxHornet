@@ -6,13 +6,13 @@
     <meta name="theme-color" content="#0b0c0e" />
     <meta
       name="description"
-      content="LaxHornet is a mobile-first youth lacrosse stat tracker for parents, coaches, teams, and live game sharing."
+      content="LaxHornet is a mobile-first youth lacrosse stat tracker for parents, coaches, teams, live game sharing, offline tracking, and season review."
     />
     <title>LaxHornet | Track full lacrosse impact</title>
-    <link rel="manifest" href="manifest.json?v=219" />
+    <link rel="manifest" href="manifest.json?v=221" />
     <link rel="icon" href="assets/LHicon.png?v=1" type="image/png" />
     <link rel="apple-touch-icon" href="assets/LHicon.png?v=1" />
-    <link rel="stylesheet" href="landing.css?v=219" />
+    <link rel="stylesheet" href="landing.css?v=221" />
   </head>
   <body>
     <header class="site-header" aria-label="LaxHornet landing navigation">
@@ -24,7 +24,7 @@
         <a href="#parents">For Parents</a>
         <a href="#teams">For Teams</a>
         <a href="privacy.html">Privacy</a>
-        <a href="terms.html">Terms</a>
+        <a href="terms.html">Terms of Service</a>
         <a class="nav-cta" href="app.html">Start Tracking</a>
       </nav>
     </header>
@@ -32,10 +32,11 @@
     <main>
       <section class="hero">
         <div class="hero-copy">
+          <div class="hero-kicker">Live stat tracking for youth lacrosse families</div>
           <h1>Track your player&apos;s full lacrosse impact from the sideline.</h1>
           <p>
             LaxHornet helps parents quickly log goals, assists, ground balls, saves,
-            clears, faceoffs, turnovers, hustle plays, and smart plays — then turns the
+            clears, faceoffs, turnovers, hustle plays, and smart plays - then turns the
             game into simple stats, live family updates, and season-long development insights.
           </p>
           <div class="hero-actions">
@@ -48,6 +49,20 @@
             <span>Live family sharing</span>
             <span>Parent-approved player access</span>
           </div>
+          <div class="hero-stats" aria-label="Highlighted LaxHornet features">
+            <div>
+              <strong>15+</strong>
+              <span>lacrosse events</span>
+            </div>
+            <div>
+              <strong>Live</strong>
+              <span>family updates</span>
+            </div>
+            <div>
+              <strong>A-</strong>
+              <span>impact grades</span>
+            </div>
+          </div>
         </div>
 
         <div class="phone-wrap" aria-label="LaxHornet app preview">
@@ -56,41 +71,96 @@
             <div class="phone-screen">
               <div class="preview-top">
                 <span>Live Game</span>
-                <strong>Q2</strong>
+                <strong>Q2 - 6:14</strong>
               </div>
               <div class="preview-player">
                 <strong>August Wells</strong>
-                <span>#11 - Attack</span>
+                <span>#11 - Attack vs. North Shore</span>
+              </div>
+              <div class="preview-context">
+                <span>Impact + possession</span>
+                <strong>3 G - 1 A - 5 GB</strong>
               </div>
               <div class="preview-grid">
                 <button>Goal</button>
                 <button>Assist</button>
                 <button>Ground Ball</button>
                 <button>Caused TO</button>
-                <button>Save</button>
+                <button>Clear</button>
                 <button>Faceoff Win</button>
+                <button>Save</button>
+                <button>Smart Play</button>
               </div>
               <div class="preview-impact">
                 <span>Game Impact</span>
                 <strong>A-</strong>
                 <small>91 score</small>
               </div>
+              <div class="preview-feed" aria-label="Recent game events">
+                <span>12:04 - Ground ball won</span>
+                <span>11:38 - Assist logged</span>
+                <span>10:52 - Clear completed</span>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="parents" class="section light">
+      <section id="parents" class="section light spotlight-section">
         <div class="section-heading">
           <h2>Built for real game speed.</h2>
-          <p>Lacrosse moves fast. LaxHornet keeps the tracker focused with large, one-handed buttons for the plays parents actually see from the sideline — scoring, possession, defense, goalie play, faceoffs, hustle, and notes.</p>
+          <p>Lacrosse moves fast. LaxHornet keeps the tracker focused with large, one-handed buttons for the plays parents actually see from the sideline - scoring, possession, defense, goalie play, faceoffs, hustle, and notes.</p>
+        </div>
+        <div class="spotlight-grid" aria-label="What LaxHornet highlights after games">
+          <div><span>Possession</span><strong>Clears, rides, turnovers, and ground balls</strong></div>
+          <div><span>Production</span><strong>Goals, assists, shots, saves, and faceoffs</strong></div>
+          <div><span>Development</span><strong>Hustle plays, smart plays, notes, and trends</strong></div>
+        </div>
+      </section>
+
+      <section class="section light detail-section" aria-labelledby="tracking-detail-heading">
+        <div class="section-heading compact-heading">
+          <h2 id="tracking-detail-heading">Track the pieces that decide a lacrosse game.</h2>
+          <p>Most stat apps stop at goals. LaxHornet is built around the full game story: who created possessions, who protected the ball, who handled pressure, and what changed quarter by quarter.</p>
+        </div>
+        <div class="detail-matrix" aria-label="Detailed lacrosse tracking categories">
+          <article>
+            <span>Scoring</span>
+            <strong>Goals, assists, shots, shot quality, and points</strong>
+            <p>Keep production visible without losing the context around how chances were created.</p>
+          </article>
+          <article>
+            <span>Possession</span>
+            <strong>Ground balls, clears, rides, turnovers, and extra possessions</strong>
+            <p>Capture the hidden work that changes momentum and gives the offense more chances.</p>
+          </article>
+          <article>
+            <span>Defense</span>
+            <strong>Caused turnovers, takeaways, pressure plays, and recovery notes</strong>
+            <p>Show defensive impact with more detail than a basic box score can carry.</p>
+          </article>
+          <article>
+            <span>Specialists</span>
+            <strong>Saves, goalie clears, faceoff wins, losses, and wing support</strong>
+            <p>Give goalie and faceoff work its own space instead of burying it in general notes.</p>
+          </article>
+          <article>
+            <span>Development</span>
+            <strong>Hustle plays, smart plays, penalties, tags, and coachable moments</strong>
+            <p>Turn observations from a fast sideline into review points after the game.</p>
+          </article>
+          <article>
+            <span>Season Review</span>
+            <strong>Game Impact, timelines, trends, and shareable summaries</strong>
+            <p>Review each game on its own, then compare the player's growth across the season.</p>
+          </article>
         </div>
       </section>
 
       <section id="how-it-works" class="section light">
         <div class="section-heading">
           <h2>How it works.</h2>
-          <p>Set the player, tap the play, and review the full game story after the whistle.</p>
+          <p>Set the player, tap the play, share the live view, and review the full game story after the whistle.</p>
         </div>
         <div class="feature-list">
           <article>
@@ -105,6 +175,11 @@
           </article>
           <article>
             <span class="feature-number">03</span>
+            <h3>Share the live view</h3>
+            <p>Send a read-only link so family can follow the timeline, score context, and player impact without editing the game log.</p>
+          </article>
+          <article>
+            <span class="feature-number">04</span>
             <h3>Review the impact</h3>
             <p>After the game, see totals, timeline, Game Impact, possession value, takeaways, tags, and season trends.</p>
           </article>
@@ -141,12 +216,17 @@
             <strong>Approved</strong>
             <small>Stats sync to the correct team and player.</small>
           </div>
+          <div class="mini-card">
+            <span>Review</span>
+            <strong>Controlled by admins</strong>
+            <small>Access requests are reviewed before a parent can track a rostered player.</small>
+          </div>
         </div>
       </section>
 
       <section class="section light install-section">
         <div>
-          <h2>Use it like an app — no app store needed.</h2>
+          <h2>Use it like an app - no app store needed.</h2>
           <p>
             Open LaxHornet in Safari, add it to your iPhone Home Screen, and launch it like an app on game day.
             Core tracking stays fast even when the sideline connection is unreliable.
@@ -160,7 +240,7 @@
       <img src="assets/LHbanner.png?v=3" alt="LaxHornet" />
       <span>Youth lacrosse stat tracking for fast game-day decisions.</span>
       <a href="privacy.html">Privacy Policy</a>
-      <a href="terms.html">Terms of Use</a>
+      <a href="terms.html">Terms of Service</a>
     </footer>
   </body>
 </html>
