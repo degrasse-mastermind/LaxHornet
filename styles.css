@@ -41,16 +41,19 @@
   --lh-accent-surface: #f2f3f5;
   --lh-accent-surface-strong: #e8ebef;
   --lh-honeycomb-surface:
-    linear-gradient(90deg, rgba(5, 6, 7, 0.76), rgba(5, 6, 7, 0.86)),
+    radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.07), transparent 28rem),
+    linear-gradient(90deg, rgba(5, 6, 7, 0.78), rgba(5, 6, 7, 0.9)),
     url("assets/honeycombblack.png?v=1") center / cover no-repeat,
     var(--lh-black);
   --lh-honeycomb-card:
     linear-gradient(90deg, rgba(8, 10, 12, 0.84), rgba(8, 10, 12, 0.92)),
     url("assets/honeycombblack.png?v=1") center / cover no-repeat,
     linear-gradient(180deg, var(--lh-carbon-800), var(--lh-carbon-900));
+  --lh-edge-accent: linear-gradient(90deg, rgba(5, 6, 7, 0.9) 0 5px, transparent 5px);
+  --lh-edge-accent-thin: linear-gradient(90deg, rgba(5, 6, 7, 0.9) 0 4px, transparent 4px);
   --lh-command-gradient:
     var(--lh-honeycomb-card);
-  --lh-red-glow: 0 12px 28px rgba(232, 16, 16, 0.16);
+  --lh-red-glow: 0 12px 28px rgba(0, 0, 0, 0.16);
   --lh-font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
   --navy-950: var(--lh-carbon-950);
@@ -94,10 +97,10 @@
   --hornet-yellow-soft: var(--hornet-red-soft);
   --brand-red: var(--lh-red);
   --brand-dark-button:
-    linear-gradient(90deg, var(--hornet-red) 0 6px, transparent 6px),
+    var(--lh-edge-accent),
     linear-gradient(180deg, #252a31, #121519);
   --brand-light-button:
-    linear-gradient(90deg, var(--hornet-red) 0 6px, transparent 6px),
+    var(--lh-edge-accent),
     #ffffff;
   --shadow: var(--lh-shadow-card);
   --shadow-soft: var(--lh-shadow-soft);
@@ -118,10 +121,7 @@ html {
 body {
   min-height: 100%;
   margin: 0;
-  background:
-    radial-gradient(circle at 16% -8%, rgba(255, 255, 255, 0.07), transparent 22rem),
-    radial-gradient(circle at 90% 8%, rgba(232, 16, 16, 0.09), transparent 20rem),
-    linear-gradient(180deg, var(--lh-carbon-800) 0%, var(--lh-carbon-900) 42%, var(--lh-black) 100%);
+  background: var(--lh-honeycomb-surface);
   color: var(--surface);
   font-family:
     Inter, ui-sans-serif, system-ui, var(--lh-font),
@@ -283,7 +283,7 @@ button:focus-visible,
   border-radius: 999px;
   color: #ffffff;
   background:
-    radial-gradient(circle at 50% 46%, rgba(232, 16, 16, 0.18), transparent 62%),
+    radial-gradient(circle at 50% 46%, rgba(255, 255, 255, 0.12), transparent 62%),
     rgba(255, 255, 255, 0.08);
   font-size: 1.02rem;
   font-weight: 950;
@@ -874,7 +874,7 @@ button:focus-visible,
 .player-chip.active {
   border-color: rgba(232, 16, 16, 0.72);
   background:
-    linear-gradient(90deg, var(--hornet-red) 0 5px, transparent 5px),
+    var(--lh-edge-accent),
     linear-gradient(180deg, #ffffff, #f8f9fa);
   box-shadow: inset 0 0 0 1px rgba(232, 16, 16, 0.14), 0 8px 18px rgba(17, 19, 23, 0.08);
 }
@@ -917,7 +917,7 @@ button:focus-visible,
 .player-assignment-card.active {
   border-color: rgba(232, 16, 16, 0.72);
   background:
-    linear-gradient(90deg, var(--hornet-red) 0 5px, transparent 5px),
+    var(--lh-edge-accent),
     #f7f8f9;
   box-shadow: inset 0 0 0 1px rgba(232, 16, 16, 0.12);
 }
@@ -1187,7 +1187,7 @@ button:focus-visible,
 .team-chip.active {
   border-color: rgba(232, 16, 16, 0.68);
   background:
-    linear-gradient(90deg, var(--hornet-red) 0 5px, transparent 5px),
+    var(--lh-edge-accent),
     #f7f8f9;
   box-shadow: inset 0 0 0 1px rgba(232, 16, 16, 0.12), 0 8px 18px rgba(17, 19, 23, 0.08);
 }
@@ -1569,7 +1569,7 @@ button:focus-visible,
 .position-option input:checked + span {
   border-color: rgba(232, 16, 16, 0.72);
   background:
-    linear-gradient(90deg, var(--hornet-red) 0 5px, transparent 5px),
+    var(--lh-edge-accent),
     #f7f8f9;
 }
 
@@ -1682,7 +1682,7 @@ button:focus-visible,
   border-radius: var(--radius);
   color: var(--text);
   background:
-    linear-gradient(90deg, rgba(232, 16, 16, 0.9) 0 5px, transparent 5px),
+    var(--lh-edge-accent),
     linear-gradient(180deg, #ffffff, var(--lh-surface));
   text-align: left;
   box-shadow: inset 0 0 0 1px rgba(17, 19, 23, 0.02);
@@ -2128,7 +2128,7 @@ button:focus-visible,
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #111, var(--hornet-red));
+  background: linear-gradient(90deg, #111, #30363d);
 }
 
 .archetype-bar strong {
@@ -2310,7 +2310,7 @@ button:focus-visible,
 .btn.warning {
   border: 1px solid rgba(236, 139, 34, 0.72);
   background:
-    linear-gradient(90deg, var(--hornet-red) 0 6px, transparent 6px),
+    var(--lh-edge-accent),
     linear-gradient(180deg, #6e3a18, #351b0d);
 }
 
@@ -2403,8 +2403,7 @@ button:focus-visible,
 .period-tab.active {
   border-color: rgba(232, 16, 16, 0.62);
   color: #ffffff;
-  background:
-    linear-gradient(180deg, rgba(232, 16, 16, 0.18), rgba(255, 255, 255, 0.07));
+  background: var(--lh-honeycomb-card);
   box-shadow: inset 0 -2px 0 var(--hornet-red);
 }
 
@@ -3061,7 +3060,7 @@ button:focus-visible,
   border-radius: var(--radius);
   color: var(--text);
   background:
-    linear-gradient(90deg, rgba(232, 16, 16, 0.88) 0 5px, transparent 5px),
+    var(--lh-edge-accent),
     linear-gradient(180deg, #ffffff, var(--lh-surface));
   text-align: left;
   text-decoration: none;
@@ -3368,7 +3367,7 @@ button:focus-visible,
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 14px;
   background:
-    radial-gradient(circle at 72% 18%, rgba(232, 16, 16, 0.12), transparent 18rem),
+    var(--lh-honeycomb-card),
     linear-gradient(180deg, #181818, #090909);
   box-shadow: var(--shadow);
 }
@@ -4192,7 +4191,7 @@ form.account-card .account-actions {
 .btn.secondary,
 .mini-btn.light {
   background:
-    linear-gradient(90deg, var(--hornet-red) 0 5px, transparent 5px),
+    var(--lh-edge-accent),
     linear-gradient(180deg, #ffffff, #f6f7f8);
 }
 
@@ -4246,7 +4245,7 @@ form.account-card .account-actions {
 .more-action {
   border-color: rgba(232, 16, 16, 0.2);
   background:
-    linear-gradient(90deg, var(--hornet-red) 0 5px, transparent 5px),
+    var(--lh-edge-accent),
     linear-gradient(180deg, #ffffff, #f6f7f8);
   box-shadow: inset 0 0 0 1px rgba(17, 19, 23, 0.03);
 }
@@ -4841,6 +4840,7 @@ a.btn {
 
 /* Professional refinement pass */
 .app-shell {
+  background: var(--lh-honeycomb-surface);
   padding-bottom: calc(96px + var(--safe-bottom));
 }
 
@@ -4996,7 +4996,7 @@ form.account-card::before,
 .more-action {
   border-color: rgba(17, 19, 23, 0.12);
   background:
-    linear-gradient(90deg, rgba(232, 16, 16, 0.86) 0 4px, transparent 4px),
+    var(--lh-edge-accent-thin),
     linear-gradient(180deg, #ffffff, #f5f6f8);
 }
 
