@@ -23,7 +23,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v207";
+const APP_VERSION = "v208";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -4891,6 +4891,7 @@ function renderNavIcon(icon) {
     games: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a1.5 1.5 0 0 1 1.5 1.5v13A1.5 1.5 0 0 1 19 20H5a1.5 1.5 0 0 1-1.5-1.5v-13A1.5 1.5 0 0 1 5 4Zm1.8 4.2h10.4V6.8H6.8v1.4Zm0 4.1h10.4v-1.4H6.8v1.4Zm0 4.1h6.8V15H6.8v1.4Z"/></svg>`,
     help: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.4a8.6 8.6 0 1 0 0 17.2 8.6 8.6 0 0 0 0-17.2Zm0 15.2a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4Zm1.2-4.2h-2.1v-.7c0-1.1.6-1.8 1.6-2.5.8-.6 1.3-1 1.3-1.8 0-.9-.7-1.4-1.8-1.4-1 0-1.8.4-2.5 1.1L8.5 7.6A5 5 0 0 1 12.3 6c2.4 0 4 1.3 4 3.3 0 1.7-.9 2.5-2 3.2-.8.5-1.1.9-1.1 1.6v.3Z"/></svg>`,
     season: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19h14v1.7H5V19Zm1.3-7.2h3v5.6h-3v-5.6Zm4.2-6.6h3v12.2h-3V5.2Zm4.2 3.9h3v8.3h-3V9.1Z"/></svg>`,
+    share: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.2 15.2a3.1 3.1 0 0 0-2.4 1.1L9.4 12.8c.1-.3.1-.5.1-.8s0-.5-.1-.8l6.4-3.5a3.1 3.1 0 1 0-.9-1.8L8.5 9.4a3.1 3.1 0 1 0 0 5.2l6.4 3.5a3.1 3.1 0 1 0 3.3-2.9Z"/></svg>`,
     player: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.2a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 9.8c4.2 0 7.6 2.4 7.6 5.4v.4H4.4v-.4c0-3 3.4-5.4 7.6-5.4Z"/></svg>`,
     team: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.2 2.7h1.6v3.2h-1.6V2.7Zm-5 1.6 1.3-.9 1.6 2.6-1.3.9-1.6-2.6Zm10.3 1.7 1.6-2.6 1.3.9-1.6 2.6-1.3-.9ZM8.1 9.2l2.4 2.2c.7.7 1.9.7 2.6 0l2.3-2.2c.5-.5 1.4-.5 1.9 0l.7.7-4.8 4.6c-.7.7-1.8.7-2.5 0L6 9.9l.7-.7c.4-.5 1.2-.5 1.4 0Zm-3.9 2.2 6 5.9c1.2 1.2 3.1 1.2 4.3 0l5.9-5.9 1.7 1.7-6 5.9c-2.1 2-5.4 2-7.5 0l-6-5.9 1.6-1.7ZM2.6 14.8 7.9 20l-1.6 1.6-5.3-5.2 1.6-1.6Zm18.8 0 1.6 1.6-5.3 5.2-1.6-1.6 5.3-5.2Z"/></svg>`,
     manage: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.2h8.2a2.6 2.6 0 0 1 5 0H20v1.9h-2.8a2.6 2.6 0 0 1-5 0H4V6.2Zm10.7-1a1 1 0 1 0 0 2.1 1 1 0 0 0 0-2.1ZM4 11.1h2.8a2.6 2.6 0 0 1 5 0H20V13h-8.2a2.6 2.6 0 0 1-5 0H4v-1.9Zm5.3-1a1 1 0 1 0 0 2.1 1 1 0 0 0 0-2.1ZM4 16h8.2a2.6 2.6 0 0 1 5 0H20v1.9h-2.8a2.6 2.6 0 0 1-5 0H4V16Zm10.7-1a1 1 0 1 0 0 2.1 1 1 0 0 0 0-2.1Z"/></svg>`,
@@ -4982,6 +4983,20 @@ function renderWatchSharedGameForm(options = {}) {
             </div>`
           : ""
       }
+    </form>
+  `;
+}
+
+function renderWatchSharedGameInline() {
+  if (!state.watchShareExpanded) return "";
+  return `
+    <form class="more-inline-form share-watch-inline-form" data-form="watch-share">
+      <div class="field">
+        <label for="shareCodeMore">Share code</label>
+        <input id="shareCodeMore" name="shareCode" value="${escapeHTML(state.sharedCode)}" placeholder="ABC123" autocapitalize="characters" />
+      </div>
+      <button class="mini-btn" type="submit">Watch Live</button>
+      <p class="muted small">Anyone with this link can view the live game timeline. Only share it with people you trust.</p>
     </form>
   `;
 }
@@ -5680,7 +5695,6 @@ function renderMore() {
   const profileName = [state.userProfile?.firstName, state.userProfile?.lastName].filter(Boolean).join(" ");
   const active = state.activeGame;
   const activePlayer = active ? gamePlayerSnapshot(active) : null;
-  const helpExpanded = state.helpExpanded;
   const activePlayerTeamName = state.player.team || teamById(state.player.teamId)?.name || "";
   const activeTeamName = team?.name || "";
   const teamMismatch = activeTeamName && activePlayerTeamName && activeTeamName !== activePlayerTeamName;
@@ -5691,12 +5705,16 @@ function renderMore() {
     `Active player: ${playerTitle(state.player)}${activePlayerTeamName ? ` (${activePlayerTeamName})` : ""}`,
     `Team: ${activeTeamName || state.player.team || "Not connected"}`,
   ];
-  const accountAdminPortalAction = isReviewerAccount()
-    ? `<button class="more-action" type="button" data-action="${isPlatformReviewer() ? "open-tracker-view" : "open-admin-portal"}">
-        <span>${renderNavIcon(isPlatformReviewer() ? "home" : "team")}</span>
-        <strong>${isPlatformReviewer() ? "Parent Tracker App" : "Team Admin Portal"}</strong>
-        <small>${isPlatformReviewer() ? "Use the parent-facing tracker screens." : "Manage teams, rosters, and parent access."}</small>
-      </button>`
+  const adminPortalEntry = isReviewerAccount()
+    ? `
+      <section class="card pad admin-portal-entry-card">
+        <div>
+          <h3>Team Admin Portal</h3>
+          <p class="muted small">Separate entryway for roster setup, parent approvals, and team management tools.</p>
+        </div>
+        <button class="btn brand positive admin-portal-entry-button" type="button" data-action="open-admin-portal">Open Team Admin Portal</button>
+      </section>
+    `
     : "";
   const adminTools = isPlatformReviewer()
     ? `
@@ -5746,13 +5764,42 @@ function renderMore() {
     </section>
 
     <section class="stack">
+      <section class="card pad more-card primary-manage-card">
+        <div>
+          <h3>Game Day Manager</h3>
+          <p class="muted small">Game setup, tracking, sharing, and player context.</p>
+        </div>
+        ${teamMismatch ? `<div class="notice-card compact-notice"><strong>Different team selected.</strong><p class="muted small">Open Players &amp; Teams to switch who you are tracking or add another player.</p></div>` : ""}
+        <div class="more-action-list">
+          <button class="more-action" type="button" data-nav="player">
+            <span>${renderNavIcon("player")}</span>
+            <strong>Players &amp; Teams</strong>
+            <small>Choose who to track, view team context, or add another player.</small>
+          </button>
+          <button class="more-action" type="button" data-nav="${active ? "live" : "start"}">
+            <span>${renderNavIcon("track")}</span>
+            <strong>${active ? "Resume Live Game" : "Track New Game"}</strong>
+            <small>${active ? `Continue tracking ${escapeHTML(playerTitle(activePlayer))}.` : "Open the game setup screen."}</small>
+          </button>
+          <button class="more-action" type="button" data-action="toggle-watch-share">
+            <span>${renderNavIcon("share")}</span>
+            <strong>Watch Shared Game</strong>
+            <small>Enter a family share code for a read-only live game.</small>
+          </button>
+        </div>
+        ${renderWatchSharedGameInline()}
+        <div class="more-helper-text" aria-label="Game day details">
+          <p>${escapeHTML(gameDaySummary)}</p>
+          ${gameDayContext.map((line) => `<p>${escapeHTML(line)}</p>`).join("")}
+        </div>
+      </section>
+
       <section class="card pad more-card account-tools-card">
         <div>
           <h3>Account & App</h3>
           <p class="muted small">${escapeHTML(profileName || "Signed in")}${userEmail() ? ` - ${escapeHTML(userEmail())}` : ""}</p>
         </div>
         <div class="more-action-list compact-actions">
-          ${accountAdminPortalAction}
           <button class="more-action" type="button" data-nav="profileSetup">
             <span>${renderNavIcon("more")}</span>
             <strong>User Profile</strong>
@@ -5767,6 +5814,11 @@ function renderMore() {
             <span>${renderNavIcon("manage")}</span>
             <strong>Updates</strong>
             <small>Check for the newest app version.</small>
+          </button>
+          <button class="more-action" type="button" data-nav="tutorial">
+            <span>${renderNavIcon("help")}</span>
+            <strong>Help / Tracker Guide</strong>
+            <small>Learn the game-day flow and sharing tools.</small>
           </button>
           <a class="more-action" href="privacy.html" target="_blank" rel="noopener">
             <span>${renderNavIcon("games")}</span>
@@ -5787,59 +5839,9 @@ function renderMore() {
         ${renderAccountAppHelper()}
       </section>
 
-      <section class="card pad more-card primary-manage-card">
-        <div>
-          <h3>Game Day Manager</h3>
-          <p class="muted small">Game setup, tracking, and player context.</p>
-        </div>
-        ${teamMismatch ? `<div class="notice-card compact-notice"><strong>Different team selected.</strong><p class="muted small">Open Players &amp; Teams to switch who you are tracking or add another player.</p></div>` : ""}
-        <div class="more-action-list">
-          <button class="more-action" type="button" data-nav="${active ? "live" : "start"}">
-            <span>${renderNavIcon("track")}</span>
-            <strong>${active ? "Resume Live Game" : "Track New Game"}</strong>
-            <small>${active ? `Continue tracking ${escapeHTML(playerTitle(activePlayer))}.` : "Open the game setup screen."}</small>
-          </button>
-          <button class="more-action" type="button" data-nav="player">
-            <span>${renderNavIcon("player")}</span>
-            <strong>Players &amp; Teams</strong>
-            <small>Choose who to track, view team context, or add another player.</small>
-          </button>
-        </div>
-        <div class="more-helper-text" aria-label="Game day details">
-          <p>${escapeHTML(gameDaySummary)}</p>
-          ${gameDayContext.map((line) => `<p>${escapeHTML(line)}</p>`).join("")}
-        </div>
-      </section>
-
       ${adminTools}
 
-      ${renderWatchSharedGameForm()}
-
-      <section class="card pad more-card ${helpExpanded ? "" : "collapsed"}">
-        <div class="collapsible-card-head">
-          <div>
-            <h3>Help</h3>
-            <p class="muted small">Quick guide and scoring help.</p>
-          </div>
-          <button class="collapse-icon" type="button" data-action="toggle-help-card" aria-expanded="${helpExpanded}" aria-label="${helpExpanded ? "Minimize Help" : "Expand Help"}">
-            <span aria-hidden="true">${helpExpanded ? "v" : ">"}</span>
-          </button>
-        </div>
-        ${helpExpanded ? `
-          <div class="more-action-list">
-            <button class="more-action" type="button" data-nav="tutorial">
-              <span>${renderNavIcon("games")}</span>
-              <strong>Quick Guide</strong>
-              <small>Learn the game-day flow and sharing tools.</small>
-            </button>
-            <button class="more-action" type="button" data-nav="help">
-              <span>${renderNavIcon("season")}</span>
-              <strong>Impact Help</strong>
-              <small>See how Game Impact, Average Impact, and percentages work.</small>
-            </button>
-          </div>
-        ` : ""}
-      </section>
+      ${adminPortalEntry}
     </section>
   `);
 }
