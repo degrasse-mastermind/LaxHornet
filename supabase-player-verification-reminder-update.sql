@@ -146,9 +146,72 @@ begin
 end;
 $laxhornet_send_player_verification_reminder$;
 
+create or replace function public.laxhornet_repair_approved_player_claims()
+returns table(
+  id text,
+  team_id text,
+  roster_player_id text,
+  user_id uuid,
+  created_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public
+as $laxhornet_repair_approved_player_claims$
+begin
+  return query
+  with repairable as (
+    select
+      requests.team_id,
+      requests.user_id,
+      roster_player.id as roster_player_id
+    from public.team_access_requests requests
+    join lateral (
+      select players.id
+      from public.roster_players players
+      where players.team_id = requests.team_id
+        and players.active = true
+        and trim(players.number) = trim(requests.child_jersey_number)
+      order by players.created_at asc
+      limit 1
+    ) roster_player on true
+    where requests.status = 'approved'
+      and trim(coalesce(requests.child_jersey_number, '')) <> ''
+      and (
+        requests.user_id = (select auth.uid())
+        or (select public.laxhornet_is_platform_reviewer())
+        or (select public.laxhornet_team_role(requests.team_id)) = 'admin'
+      )
+      and not exists (
+        select 1
+        from public.player_claims claims
+        where claims.team_id = requests.team_id
+          and claims.user_id = requests.user_id
+      )
+  )
+  insert into public.player_claims (id, team_id, roster_player_id, user_id)
+  select
+    'claim-' || repairable.team_id || '-' || repairable.user_id::text,
+    repairable.team_id,
+    repairable.roster_player_id,
+    repairable.user_id
+  from repairable
+  on conflict on constraint player_claims_team_user_key do update
+  set roster_player_id = excluded.roster_player_id
+  returning
+    player_claims.id,
+    player_claims.team_id,
+    player_claims.roster_player_id,
+    player_claims.user_id,
+    player_claims.created_at;
+end;
+$laxhornet_repair_approved_player_claims$;
+
 revoke execute on function public.laxhornet_send_player_verification_reminder(text) from public, anon;
+revoke execute on function public.laxhornet_repair_approved_player_claims() from public, anon;
 grant execute on function public.laxhornet_pending_team_access_requests() to authenticated;
 grant execute on function public.laxhornet_send_player_verification_reminder(text) to authenticated;
+grant execute on function public.laxhornet_repair_approved_player_claims() to authenticated;
 
 notify pgrst, 'reload schema';
 

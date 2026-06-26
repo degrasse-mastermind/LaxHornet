@@ -1,4 +1,4 @@
-﻿const STORAGE_KEYS = {
+const STORAGE_KEYS = {
   player: "laxhornet.playerSettings",
   players: "laxhornet.players",
   activePlayerId: "laxhornet.activePlayerId",
@@ -22,7 +22,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v193";
+const APP_VERSION = "v194";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -733,6 +733,14 @@ function playerClaimForRequest(request = {}) {
 
 function requestNeedsPlayerVerification(request = {}) {
   return request.status === "approved" && !playerClaimForRequest(request);
+}
+
+function teamAccessStatusCopy(request = {}) {
+  if (request.status === "pending") return "Waiting for team admin approval";
+  if (requestNeedsPlayerVerification(request)) return "Team access approved - verify player";
+  if (request.status === "approved") return "Player access verified";
+  if (request.status === "rejected") return "Request not approved";
+  return request.status || "Request";
 }
 
 function canTrackRosterPlayer(teamId, rosterPlayerId) {
@@ -3274,6 +3282,8 @@ async function loadCloudTeams(options = {}) {
   state.teams = normalizeTeams([...localAdminTeams, ...cloudTeams]);
 
   await loadTeamAccessRequests({ silent: true });
+  await repairApprovedPlayerClaims({ silent: true });
+  await loadTeamAccessRequests({ silent: true });
   const approvedRequestTeams = state.teamAccessRequests
     .filter((request) => request.status === "approved" && request.teamId)
     .map((request) => ({
@@ -3365,6 +3375,16 @@ async function loadTeamAccessRequests(options = {}) {
   state.teamAccessRequests = normalizeTeamAccessRequests(requestRows.map(teamAccessRequestFromSupabaseRow));
   if (!options.silent) render();
   return state.teamAccessRequests;
+}
+
+async function repairApprovedPlayerClaims(options = {}) {
+  if (!supabaseClient || !currentUserId()) return [];
+  const { data, error } = await supabaseClient.rpc("laxhornet_repair_approved_player_claims");
+  if (error) {
+    if (!isMissingRpcError(error) && !options.silent) reportTeamSetupError(error);
+    return [];
+  }
+  return Array.isArray(data) ? data : [];
 }
 
 async function loadPlayerClaims(options = {}) {
@@ -5102,6 +5122,13 @@ function renderParentRequestRow(request = {}, options = {}) {
   const playerCopy = rosterPlayer
     ? `${rosterPlayer.name}${jersey ? ` #${jersey}` : ""}`
     : `${jersey ? `#${jersey}` : "the requested jersey"}`;
+  const detailCopy = request.status === "pending"
+    ? `${displayName} is requesting access to ${playerCopy} on ${teamName}.`
+    : requestNeedsPlayerVerification(request)
+      ? `Team access is approved for ${playerCopy} on ${teamName}. The parent still needs verified player access.`
+      : request.status === "approved"
+        ? `${displayName} has verified player access for ${playerCopy} on ${teamName}.`
+        : `${displayName} requested access to ${playerCopy} on ${teamName}.`;
   const showApprovalActions = request.status === "pending" && options.showReviewActions !== false;
   const showReminder = requestNeedsPlayerVerification(request) && options.showReminder !== false;
   const reminderBusy = state.reminderBusyId === request.id;
@@ -5112,7 +5139,7 @@ function renderParentRequestRow(request = {}, options = {}) {
           <strong>${escapeHTML(displayName)}</strong>
           ${renderParentRequestStatus(request)}
         </div>
-        <small>${escapeHTML(displayName)} is requesting access to ${escapeHTML(playerCopy)} on ${escapeHTML(teamName)}.</small>
+        <small>${escapeHTML(detailCopy)}</small>
         ${request.email ? `<small class="request-email">${escapeHTML(request.email)}</small>` : ""}
       </div>
       <div class="event-actions request-actions">
@@ -5306,7 +5333,7 @@ function renderMyTeamAccessRequests() {
                 <div class="admin-request-row">
                   <span>
                     <strong>${escapeHTML(request.teamName || "Team")}</strong>
-                    <small>Access: ${escapeHTML(request.status)}</small>
+                    <small>${escapeHTML(teamAccessStatusCopy(request))}</small>
                   </span>
                 </div>
                 ${needsClaim ? renderPlayerVerificationBlock(request.teamId, { teamName: request.teamName, suffix: request.id || request.teamId }) : ""}
@@ -8519,4 +8546,3 @@ window.addEventListener("offline", () => {
 });
 registerServiceWorker();
 initApp();
-
