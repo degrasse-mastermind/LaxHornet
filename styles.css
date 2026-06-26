@@ -49,8 +49,8 @@
     linear-gradient(90deg, rgba(8, 10, 12, 0.84), rgba(8, 10, 12, 0.92)),
     url("assets/honeycombblack.png?v=1") center / cover no-repeat,
     linear-gradient(180deg, var(--lh-carbon-800), var(--lh-carbon-900));
-  --lh-edge-accent: linear-gradient(90deg, rgba(5, 6, 7, 0.9) 0 5px, transparent 5px);
-  --lh-edge-accent-thin: linear-gradient(90deg, rgba(5, 6, 7, 0.9) 0 4px, transparent 4px);
+  --lh-edge-accent: linear-gradient(90deg, var(--hornet-red) 0 5px, transparent 5px);
+  --lh-edge-accent-thin: linear-gradient(90deg, rgba(232, 16, 16, 0.86) 0 4px, transparent 4px);
   --lh-command-gradient:
     var(--lh-honeycomb-card);
   --lh-red-glow: 0 12px 28px rgba(0, 0, 0, 0.16);
@@ -97,10 +97,10 @@
   --hornet-yellow-soft: var(--hornet-red-soft);
   --brand-red: var(--lh-red);
   --brand-dark-button:
-    var(--lh-edge-accent),
+    linear-gradient(90deg, var(--hornet-red) 0 6px, transparent 6px),
     linear-gradient(180deg, #252a31, #121519);
   --brand-light-button:
-    var(--lh-edge-accent),
+    linear-gradient(90deg, var(--hornet-red) 0 6px, transparent 6px),
     #ffffff;
   --shadow: var(--lh-shadow-card);
   --shadow-soft: var(--lh-shadow-soft);
