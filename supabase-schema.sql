@@ -1531,6 +1531,32 @@ as $$
     and ((select public.laxhornet_is_platform_reviewer()) or (select public.laxhornet_team_role(check_team_id)) = 'admin');
 $$;
 
+alter default privileges in schema public revoke execute on functions from public;
+alter default privileges in schema public revoke execute on functions from anon;
+
+do $$
+declare
+  fn record;
+begin
+  for fn in
+    select
+      n.nspname as schema_name,
+      p.proname as function_name,
+      pg_get_function_identity_arguments(p.oid) as identity_args
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname like 'laxhornet\_%' escape '\'
+  loop
+    execute format(
+      'revoke execute on function %I.%I(%s) from public, anon, authenticated',
+      fn.schema_name,
+      fn.function_name,
+      fn.identity_args
+    );
+  end loop;
+end $$;
+
 grant execute on function public.laxhornet_is_team_member(text) to authenticated;
 grant execute on function public.laxhornet_is_platform_reviewer() to authenticated;
 grant execute on function public.laxhornet_approved_app_role() to authenticated;
@@ -1560,6 +1586,7 @@ grant execute on function public.laxhornet_my_roster_players() to authenticated;
 grant execute on function public.laxhornet_my_teams() to authenticated;
 grant execute on function public.laxhornet_visible_roster_players() to authenticated;
 grant execute on function public.laxhornet_team_access_codes(text) to authenticated;
+revoke execute on function public.laxhornet_handle_new_user() from public, anon, authenticated;
 
 drop policy if exists "laxhornet public read games" on public.games;
 drop policy if exists "laxhornet public insert games" on public.games;
