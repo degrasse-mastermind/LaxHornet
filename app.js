@@ -23,7 +23,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v209";
+const APP_VERSION = "v212";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -6865,10 +6865,14 @@ function renderTagEditor(game, event) {
 }
 
 function insightCard(label, value, helper = "") {
+  const isCopyCard = label.toLowerCase().includes("takeaway");
+  const cardClass = isCopyCard ? "insight-card insight-card-copy" : "insight-card";
+  const valueClass = isCopyCard ? "insight-value insight-value-copy" : "insight-value";
+
   return `
-    <div class="insight-card">
+    <div class="${cardClass}">
       <span>${escapeHTML(label)}</span>
-      <div class="insight-value">${value}</div>
+      <div class="${valueClass}">${value}</div>
       ${helper ? `<small>${escapeHTML(helper)}</small>` : ""}
     </div>
   `;
@@ -6956,7 +6960,7 @@ function renderReviewSummarySection(game, player, totals, archetypeResult) {
         ${insightCard("Game Impact", renderImpactGrade(totals.impact), "Snapshot, not a coach grade")}
         ${insightCard("Top Contribution", escapeHTML(topContribution.display), topContribution.label)}
         ${insightCard("Possession Impact", escapeHTML(signedMetric(totals.possessionValue)), `${signedMetric(totals.extraPossessions)} extra chances`)}
-        ${insightCard("Key Takeaway", escapeHTML(totals.gameImpact?.takeaway || "Track more plays to build the takeaway."), "Plain-English read")}
+        ${insightCard("Key Takeaway", escapeHTML(totals.gameImpact?.takeaway || "Track more plays to build the takeaway."))}
       </div>
       <div class="explainer-card">
         <strong>Game Impact</strong>
