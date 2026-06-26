@@ -685,6 +685,30 @@ button:focus-visible,
   text-transform: uppercase;
 }
 
+.status-pill.warning {
+  border-color: rgba(187, 111, 0, 0.2);
+  color: #7c4c00;
+  background: #fff4dc;
+}
+
+.status-pill.success {
+  border-color: rgba(11, 121, 65, 0.2);
+  color: #075f34;
+  background: #e9f8ef;
+}
+
+.status-pill.danger {
+  border-color: rgba(232, 16, 16, 0.22);
+  color: var(--hornet-red);
+  background: var(--hornet-red-soft);
+}
+
+.status-pill.muted {
+  border-color: #dfe2e6;
+  color: var(--muted);
+  background: #f6f7f8;
+}
+
 .player-assignment-stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -749,6 +773,44 @@ button:focus-visible,
 .team-card-body {
   display: grid;
   gap: 14px;
+}
+
+.admin-team-snapshot,
+.admin-mini-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-mini-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-team-snapshot div,
+.admin-mini-stats div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #dfe2e6;
+  border-radius: var(--radius);
+  background: #f7f8fa;
+}
+
+.admin-team-snapshot span,
+.admin-mini-stats span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.admin-team-snapshot strong,
+.admin-mini-stats strong {
+  color: var(--text);
+  font-size: 1.35rem;
+  line-height: 1;
 }
 
 .team-actions {
@@ -1032,6 +1094,29 @@ button:focus-visible,
   background: #ffffff;
 }
 
+.access-request-row.detailed {
+  align-items: start;
+  padding: 10px;
+}
+
+.access-request-row.needs-verification {
+  border-color: rgba(232, 16, 16, 0.22);
+  background:
+    linear-gradient(90deg, rgba(232, 16, 16, 0.06), transparent 48%),
+    #ffffff;
+}
+
+.request-main {
+  min-width: 0;
+}
+
+.request-title-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
 .access-request-row strong,
 .access-request-row small {
   display: block;
@@ -1039,6 +1124,19 @@ button:focus-visible,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.access-request-row.detailed small {
+  margin-top: 4px;
+  white-space: normal;
+}
+
+.request-email {
+  overflow-wrap: anywhere;
+}
+
+.request-actions {
+  justify-content: flex-end;
 }
 
 .access-request-row strong {
@@ -3558,6 +3656,38 @@ a.btn {
 @media (max-width: 430px) {
   .status-chip {
     display: none;
+  }
+
+  .admin-team-snapshot {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .admin-team-snapshot div,
+  .admin-mini-stats div {
+    padding: 8px;
+  }
+
+  .admin-team-snapshot span,
+  .admin-mini-stats span {
+    font-size: 0.66rem;
+  }
+
+  .admin-team-snapshot strong,
+  .admin-mini-stats strong {
+    font-size: 1.12rem;
+  }
+
+  .access-request-row {
+    grid-template-columns: 1fr;
+  }
+
+  .request-actions {
+    justify-content: stretch;
+  }
+
+  .request-actions .mini-btn {
+    flex: 1 1 100%;
   }
 
   .stat-group-head span {

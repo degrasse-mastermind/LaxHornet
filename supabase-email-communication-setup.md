@@ -46,6 +46,7 @@ The schema writes these event types to `public.notification_queue`:
 - `team_access_requested_admin`
 - `team_access_approved`
 - `team_access_rejected`
+- `player_verification_reminder`
 
 Those rows are not emails yet. They need a sender, such as:
 
@@ -105,6 +106,20 @@ Hi [First Name],
 Your LaxHornet access request was not approved.
 
 If the team code or jersey number was entered incorrectly, you can submit a new request or contact your team admin.
+```
+
+Recommended player verification reminder email:
+
+```text
+Subject: Verify your LaxHornet player
+
+Hi [First Name],
+
+Your LaxHornet access for [Team Name] was approved.
+
+Please sign in and verify jersey #[Jersey Number] so your player's tracker opens on your device.
+
+If you already verified your player, no action is needed.
 ```
 
 ## 3. Verification Checks

@@ -22,7 +22,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v192";
+const APP_VERSION = "v193";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -415,6 +415,7 @@ const state = {
   updateAvailable: false,
   updateInstalling: false,
   authBusy: false,
+  reminderBusyId: "",
   installInstructionsVisible: false,
   isOffline: window.navigator.onLine === false,
   pendingDeleteGameId: "",
@@ -723,6 +724,15 @@ function isCloudBackedTeam(teamId) {
 function hasPlayerClaim(teamId, rosterPlayerId) {
   if (!teamId || !rosterPlayerId) return false;
   return state.playerClaims.some((claim) => claim.teamId === teamId && claim.rosterPlayerId === rosterPlayerId);
+}
+
+function playerClaimForRequest(request = {}) {
+  if (!request.teamId || !request.userId) return null;
+  return state.playerClaims.find((claim) => claim.teamId === request.teamId && claim.userId === request.userId) || null;
+}
+
+function requestNeedsPlayerVerification(request = {}) {
+  return request.status === "approved" && !playerClaimForRequest(request);
 }
 
 function canTrackRosterPlayer(teamId, rosterPlayerId) {
@@ -3749,12 +3759,16 @@ async function loadUserProfile(options = {}) {
     return null;
   }
   let row = Array.isArray(data) ? data[0] : data;
-  const { data: profileRow, error: profileError } = await supabaseClient
-    .from("user_profiles")
-    .select("*")
-    .eq("user_id", currentUserId())
-    .maybeSingle();
-  if (!profileError && profileRow) row = profileRow;
+  try {
+    const { data: profileRow, error: profileError } = await supabaseClient
+      .from("user_profiles")
+      .select("*")
+      .eq("user_id", currentUserId())
+      .maybeSingle();
+    if (!profileError && profileRow) row = profileRow;
+  } catch (profileError) {
+    console.warn("Profile fallback skipped.", profileError);
+  }
   state.userProfile = normalizeUserProfile(row || {});
   if (isPlatformReviewer()) await loadAdminRequests({ silent: true });
   if (!options.silent) render();
@@ -3813,6 +3827,24 @@ async function reviewTeamAccessRequest(requestId, approved) {
   await loadCloudTeams({ silent: true });
   render();
   showToast(approved ? "Team access approved" : "Team access rejected");
+}
+
+async function sendPlayerVerificationReminder(requestId) {
+  if (!supabaseClient || !currentUserId() || !requestId) return;
+  state.reminderBusyId = requestId;
+  render();
+  const { error } = await supabaseClient.rpc("laxhornet_send_player_verification_reminder", {
+    reminder_request_id: requestId,
+  });
+  state.reminderBusyId = "";
+  if (error) {
+    reportTeamSetupError(error);
+    render();
+    return;
+  }
+  await loadTeamAccessRequests({ silent: true });
+  render();
+  showToast("Verification reminder queued");
 }
 
 async function claimRosterPlayer(formData) {
@@ -5053,41 +5085,74 @@ function renderAddRosterPlayerBlock() {
   `;
 }
 
+function renderParentRequestStatus(request = {}) {
+  if (request.status === "pending") return `<span class="status-pill warning">Pending approval</span>`;
+  if (requestNeedsPlayerVerification(request)) return `<span class="status-pill danger">Needs player verification</span>`;
+  if (request.status === "approved") return `<span class="status-pill success">Approved</span>`;
+  return `<span class="status-pill muted">${escapeHTML(request.status || "Request")}</span>`;
+}
+
+function renderParentRequestRow(request = {}, options = {}) {
+  const team = teamById(request.teamId);
+  const parentName = [request.firstName, request.lastName].filter(Boolean).join(" ");
+  const displayName = parentName || request.email || "Unknown parent";
+  const rosterPlayer = requestedRosterPlayerForAccess(request);
+  const jersey = request.childJerseyNumber || rosterPlayer?.number || "";
+  const teamName = request.teamName || team?.name || "this team";
+  const playerCopy = rosterPlayer
+    ? `${rosterPlayer.name}${jersey ? ` #${jersey}` : ""}`
+    : `${jersey ? `#${jersey}` : "the requested jersey"}`;
+  const showApprovalActions = request.status === "pending" && options.showReviewActions !== false;
+  const showReminder = requestNeedsPlayerVerification(request) && options.showReminder !== false;
+  const reminderBusy = state.reminderBusyId === request.id;
+  return `
+    <div class="access-request-row detailed ${showReminder ? "needs-verification" : ""}">
+      <div class="request-main">
+        <div class="request-title-line">
+          <strong>${escapeHTML(displayName)}</strong>
+          ${renderParentRequestStatus(request)}
+        </div>
+        <small>${escapeHTML(displayName)} is requesting access to ${escapeHTML(playerCopy)} on ${escapeHTML(teamName)}.</small>
+        ${request.email ? `<small class="request-email">${escapeHTML(request.email)}</small>` : ""}
+      </div>
+      <div class="event-actions request-actions">
+        ${
+          showApprovalActions
+            ? `<button class="mini-btn" type="button" data-review-team-access="${request.id}" data-approved="true">Approve Access</button>
+               <button class="mini-btn danger" type="button" data-review-team-access="${request.id}" data-approved="false">Reject Request</button>`
+            : ""
+        }
+        ${
+          showReminder
+            ? `<button class="mini-btn light" type="button" data-action="send-verification-reminder" data-request-id="${escapeHTML(request.id)}" ${reminderBusy ? "disabled" : ""}>${reminderBusy ? "Sending..." : "Email Reminder"}</button>`
+            : ""
+        }
+      </div>
+    </div>
+  `;
+}
+
 function renderTeamAccessRequests() {
   const team = activeTeam();
   if (!team || !canManageRoster(team.id)) return "";
-  const requests = state.teamAccessRequests.filter((request) => request.teamId === team.id && request.status === "pending");
+  const requests = state.teamAccessRequests.filter(
+    (request) => request.teamId === team.id && (request.status === "pending" || requestNeedsPlayerVerification(request)),
+  );
+  const reminderCount = requests.filter(requestNeedsPlayerVerification).length;
   return `
-    <div class="team-roster-block unclaimed-summary-block access-summary-block">
+    <div class="team-roster-block unclaimed-summary-block access-summary-block admin-workflow-panel">
       <div class="unclaimed-summary-head">
         <div>
-          <h4>Team Access Requests</h4>
-          <p class="muted small">${requests.length ? "Pending parents need approval before they can see the roster or track a verified player." : "No parents are waiting for access to this team."}</p>
+          <h4>Parent Requests</h4>
+          <p class="muted small">${requests.length ? "Approve new requests or remind approved parents to verify their player." : "No parent requests need action for this team."}</p>
         </div>
         <strong>${requests.length}</strong>
       </div>
+      ${reminderCount ? `<p class="muted small unclaimed-meta">${reminderCount} approved parent${reminderCount === 1 ? "" : "s"} still need player verification.</p>` : ""}
       ${
         requests.length
           ? `<div class="access-request-list">
-              ${requests
-                .map(
-                  (request) => {
-                    const parentName = [request.firstName, request.lastName].filter(Boolean).join(" ");
-                    return `
-                    <div class="access-request-row">
-                      <span>
-                        <strong>${escapeHTML(parentName || request.email || "Unknown parent")}</strong>
-                          <small>${escapeHTML(parentName || "This parent")} is requesting access to #${escapeHTML(request.childJerseyNumber || "not provided")} on ${escapeHTML(request.teamName || team?.name || "this team")}.</small>
-                      </span>
-                      <span class="event-actions">
-                        <button class="mini-btn" type="button" data-review-team-access="${request.id}" data-approved="true">Approve Access</button>
-                        <button class="mini-btn danger" type="button" data-review-team-access="${request.id}" data-approved="false">Reject Request</button>
-                      </span>
-                    </div>
-                  `;
-                  },
-                )
-                .join("")}
+              ${requests.map((request) => renderParentRequestRow(request)).join("")}
             </div>`
           : `<p class="muted small unclaimed-meta">Share the team code when a parent needs access.</p>`
       }
@@ -5097,40 +5162,30 @@ function renderTeamAccessRequests() {
 
 function renderAdminTeamRequestInbox() {
   if (!isPlatformReviewer()) return "";
-  const requests = state.teamAccessRequests.filter((request) => request.status === "pending");
+  const activeTeamId = activeTeam()?.id || "";
+  const requests = state.teamAccessRequests.filter(
+    (request) => (request.status === "pending" || requestNeedsPlayerVerification(request)) && (!activeTeamId || request.teamId !== activeTeamId),
+  );
+  if (!requests.length) return "";
+  const pendingCount = requests.filter((request) => request.status === "pending").length;
+  const reminderCount = requests.filter(requestNeedsPlayerVerification).length;
   return `
-    <section class="card pad admin-review-card">
+    <section class="card pad admin-review-card admin-workflow-card">
       <div class="section-head compact-head">
         <div>
-          <h3>Parent Requests</h3>
-          <p class="muted small">Approve team and player access across every roster.</p>
+          <h3>Other Team Requests</h3>
+          <p class="muted small">Requests needing action for teams other than the selected team.</p>
         </div>
         <button class="mini-btn light" type="button" data-action="sync-team-roster">Sync</button>
       </div>
+      <div class="admin-mini-stats">
+        <div><span>Pending</span><strong>${pendingCount}</strong></div>
+        <div><span>Needs verification</span><strong>${reminderCount}</strong></div>
+      </div>
       ${
-        requests.length
-          ? `<div class="admin-request-list">
-              ${requests
-                .map(
-                  (request) => {
-                    const parentName = [request.firstName, request.lastName].filter(Boolean).join(" ");
-                    return `
-                      <div class="admin-request-row detailed">
-                        <span>
-                          <strong>${escapeHTML(parentName || request.email || "Unknown parent")}</strong>
-                          <small>${escapeHTML(parentName || "This parent")} is requesting access to #${escapeHTML(request.childJerseyNumber || "not provided")} on ${escapeHTML(request.teamName || "this team")}.</small>
-                        </span>
-                        <span class="event-actions">
-                          <button class="mini-btn" type="button" data-review-team-access="${request.id}" data-approved="true">Approve Access</button>
-                          <button class="mini-btn danger" type="button" data-review-team-access="${request.id}" data-approved="false">Reject Request</button>
-                        </span>
-                      </div>
-                    `;
-                  },
-                )
-                .join("")}
+        `<div class="admin-request-list">
+              ${requests.map((request) => renderParentRequestRow(request)).join("")}
             </div>`
-          : `<p class="muted small">No pending parent requests.</p>`
       }
     </section>
   `;
@@ -5200,6 +5255,29 @@ function renderUnclaimedRosterPlayers(roster = []) {
             </div>`
           : `<p class="muted small unclaimed-meta">${claimedCount} verified player${claimedCount === 1 ? "" : "s"} on this roster.</p>`
       }
+    </div>
+  `;
+}
+
+function renderAdminTeamSnapshot(team, roster = []) {
+  if (!team || !canManageRoster(team.id)) return "";
+  const verifiedCount = roster.filter((player) => hasPlayerClaim(player.teamId, player.id)).length;
+  const requests = state.teamAccessRequests.filter((request) => request.teamId === team.id);
+  const needsActionCount = requests.filter((request) => request.status === "pending" || requestNeedsPlayerVerification(request)).length;
+  return `
+    <div class="admin-team-snapshot">
+      <div>
+        <span>Roster</span>
+        <strong>${roster.length}</strong>
+      </div>
+      <div>
+        <span>Verified</span>
+        <strong>${verifiedCount}</strong>
+      </div>
+      <div>
+        <span>Needs action</span>
+        <strong>${needsActionCount}</strong>
+      </div>
     </div>
   `;
 }
@@ -5347,7 +5425,6 @@ function renderTeamRosterCard(options = {}) {
                 <button class="mini-btn light" type="button" data-action="sync-team-roster">Sync</button>
                 ${canCreateTeams() ? "" : `<button class="mini-btn light" type="button" data-action="toggle-team-access">Request Access</button>`}
               </div>
-              ${manageRoster ? `<div class="admin-tool-group team-setup-group"><h4>Team Setup</h4><p class="muted small">Create team, team code, and basic team settings. Use Sync after roster or access changes.</p></div>` : ""}
               ${
                 teams
                   ? `<div class="team-chip-row">${teams}</div>`
@@ -5359,7 +5436,9 @@ function renderTeamRosterCard(options = {}) {
               }
               ${team?.localRecovered && !team.cloudBacked ? `<div class="notice-card error-card compact-notice"><strong>Team needs attention.</strong><p class="muted small">This team was recovered from this device, but it is not connected to your account. Remove it or recreate the team before adding roster players.</p></div>` : ""}
               ${state.cloudError ? `<div class="notice-card error-card compact-notice"><strong>Sync issue — tap to fix</strong><p class="muted small">${escapeHTML(state.cloudError)}</p></div>` : ""}
+              ${manageRoster ? renderAdminTeamSnapshot(team, fullTeamRoster) : ""}
               ${manageRoster ? renderUnclaimedRosterPlayers(fullTeamRoster) : ""}
+              ${manageRoster ? renderTeamAccessRequests() : ""}
 
               ${
                 team
@@ -5806,11 +5885,11 @@ function renderTeamPage() {
     </section>
 
     <section class="stack">
-      ${renderAdminTeamRequestInbox()}
       ${admin ? "" : renderPrivacyReassurance()}
       ${showNoTeamCodeCard ? renderNoTeamCodeCard() : ""}
-      ${renderTeamRosterCard()}
       ${renderTeamAccessTools()}
+      ${renderTeamRosterCard()}
+      ${renderAdminTeamRequestInbox()}
     </section>
   `);
 }
@@ -8111,6 +8190,7 @@ function handleClick(event) {
     if (action.dataset.action === "sync-cloud-games") loadCloudGames();
     if (action.dataset.action === "check-app-update") checkForAppUpdate({ manual: true });
     if (action.dataset.action === "sync-team-roster") loadCloudTeams();
+    if (action.dataset.action === "send-verification-reminder") sendPlayerVerificationReminder(action.dataset.requestId);
     if (action.dataset.action === "copy-roster-summary") copyRosterSummary();
     if (action.dataset.action === "add-player") addPlayer();
     if (action.dataset.action === "delete-player") deleteActivePlayer();
