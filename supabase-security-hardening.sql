@@ -45,38 +45,64 @@ begin
 end $$;
 
 -- Grant only the signed-in RPC/function access LaxHornet currently needs.
-grant execute on function public.laxhornet_is_team_member(text) to authenticated;
-grant execute on function public.laxhornet_is_platform_reviewer() to authenticated;
-grant execute on function public.laxhornet_approved_app_role() to authenticated;
-grant execute on function public.laxhornet_can_create_team() to authenticated;
-grant execute on function public.laxhornet_request_user_role(text) to authenticated;
-grant execute on function public.laxhornet_my_profile() to authenticated;
-grant execute on function public.laxhornet_pending_admin_requests() to authenticated;
-grant execute on function public.laxhornet_review_admin_request(uuid, boolean) to authenticated;
-grant execute on function public.laxhornet_team_role(text) to authenticated;
-grant execute on function public.laxhornet_can_edit_team(text) to authenticated;
-grant execute on function public.laxhornet_can_track_roster_player(text, text) to authenticated;
-grant execute on function public.laxhornet_join_team_by_code(text) to authenticated;
-grant execute on function public.laxhornet_request_team_access(text) to authenticated;
-grant execute on function public.laxhornet_request_team_player_access(text, text) to authenticated;
-grant execute on function public.laxhornet_pending_team_access_requests() to authenticated;
-grant execute on function public.laxhornet_my_team_access_requests() to authenticated;
-grant execute on function public.laxhornet_review_team_access_request(text, boolean) to authenticated;
-grant execute on function public.laxhornet_create_team(text, text, text, text, text) to authenticated;
-grant execute on function public.laxhornet_delete_team(text) to authenticated;
-grant execute on function public.laxhornet_create_roster_player(text, text, text, text, text) to authenticated;
-grant execute on function public.laxhornet_update_roster_player(text, text, text, text, text) to authenticated;
-grant execute on function public.laxhornet_remove_roster_player(text, text) to authenticated;
-grant execute on function public.laxhornet_claim_roster_player(text, text) to authenticated;
-grant execute on function public.laxhornet_delete_player_claim(text, text) to authenticated;
-grant execute on function public.laxhornet_my_player_claims() to authenticated;
-grant execute on function public.laxhornet_my_roster_players() to authenticated;
-grant execute on function public.laxhornet_my_teams() to authenticated;
-grant execute on function public.laxhornet_visible_roster_players() to authenticated;
-grant execute on function public.laxhornet_team_access_codes(text) to authenticated;
+-- Some beta databases may not have every optional helper yet, so this block
+-- skips missing functions instead of failing the whole hardening run.
+do $$
+declare
+  function_signature text;
+  function_oid regprocedure;
+begin
+  foreach function_signature in array array[
+    'public.laxhornet_is_team_member(text)',
+    'public.laxhornet_is_platform_reviewer()',
+    'public.laxhornet_approved_app_role()',
+    'public.laxhornet_can_create_team()',
+    'public.laxhornet_request_user_role(text)',
+    'public.laxhornet_my_profile()',
+    'public.laxhornet_pending_admin_requests()',
+    'public.laxhornet_review_admin_request(uuid, boolean)',
+    'public.laxhornet_team_role(text)',
+    'public.laxhornet_can_edit_team(text)',
+    'public.laxhornet_can_track_roster_player(text, text)',
+    'public.laxhornet_join_team_by_code(text)',
+    'public.laxhornet_request_team_access(text)',
+    'public.laxhornet_request_team_player_access(text, text)',
+    'public.laxhornet_pending_team_access_requests()',
+    'public.laxhornet_my_team_access_requests()',
+    'public.laxhornet_review_team_access_request(text, boolean)',
+    'public.laxhornet_create_team(text, text, text, text, text)',
+    'public.laxhornet_delete_team(text)',
+    'public.laxhornet_create_roster_player(text, text, text, text, text)',
+    'public.laxhornet_update_roster_player(text, text, text, text, text)',
+    'public.laxhornet_remove_roster_player(text, text)',
+    'public.laxhornet_claim_roster_player(text, text)',
+    'public.laxhornet_delete_player_claim(text, text)',
+    'public.laxhornet_my_player_claims()',
+    'public.laxhornet_my_roster_players()',
+    'public.laxhornet_my_teams()',
+    'public.laxhornet_visible_roster_players()',
+    'public.laxhornet_team_access_codes(text)'
+  ]
+  loop
+    function_oid := to_regprocedure(function_signature);
+    if function_oid is not null then
+      execute format('grant execute on function %s to authenticated', function_oid);
+    else
+      raise notice 'Skipping missing LaxHornet function: %', function_signature;
+    end if;
+  end loop;
+end $$;
 
 -- This function is fired by an auth.users trigger. It should not be callable
 -- directly through /rest/v1/rpc.
-revoke execute on function public.laxhornet_handle_new_user() from public, anon, authenticated;
+do $$
+declare
+  function_oid regprocedure;
+begin
+  function_oid := to_regprocedure('public.laxhornet_handle_new_user()');
+  if function_oid is not null then
+    execute format('revoke execute on function %s from public, anon, authenticated', function_oid);
+  end if;
+end $$;
 
 commit;
