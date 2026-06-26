@@ -1409,7 +1409,9 @@ as $$
     claims.user_id,
     claims.created_at
   from public.player_claims claims
-  where claims.user_id = (select auth.uid());
+  where claims.user_id = (select auth.uid())
+    or (select public.laxhornet_is_platform_reviewer())
+    or (select public.laxhornet_team_role(claims.team_id)) = 'admin';
 $$;
 
 create or replace function public.laxhornet_my_roster_players()

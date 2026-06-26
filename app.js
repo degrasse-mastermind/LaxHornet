@@ -22,7 +22,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v191";
+const APP_VERSION = "v192";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -7624,20 +7624,25 @@ function renderRequestSubmitted() {
   return renderShell(`
     <section class="screen-title">
       <h2>Request sent. Your team admin needs to approve access.</h2>
-      <p>Once approved, you will be able to track this player&apos;s games and review their stats. While you wait, you can explore a demo game or read the quick tracker guide.</p>
+      <p>Check your email for the LaxHornet verification link. Once your email is verified and your team admin approves access, this player&apos;s tracker will open automatically after sign-in.</p>
     </section>
 
     <section class="stack">
       <div class="card pad account-success-card">
         <h3>What Happens Next</h3>
         <p class="muted small">A team admin will review your team code and player jersey number. Once approved, this account will only show the rostered player matching that request.</p>
+        <div class="welcome-step-list compact-steps">
+          <div><strong>1</strong><span>Confirm your email from the LaxHornet message.</span></div>
+          <div><strong>2</strong><span>Your team admin approves the player request.</span></div>
+          <div><strong>3</strong><span>Sign in and start tracking the verified player.</span></div>
+        </div>
         <div class="request-summary">
           ${summary.email ? `<div><span>Email</span><strong>${escapeHTML(summary.email)}</strong></div>` : ""}
           ${fullName ? `<div><span>Name</span><strong>${escapeHTML(fullName)}</strong></div>` : ""}
           ${summary.teamAccessCode ? `<div><span>Team code</span><strong>${escapeHTML(summary.teamAccessCode)}</strong></div>` : ""}
           ${summary.childJerseyNumber ? `<div><span>Jersey #</span><strong>${escapeHTML(summary.childJerseyNumber)}</strong></div>` : ""}
         </div>
-        <p class="muted small">Check your inbox for account verification. After approval, log in with this email and password to open your player&apos;s tracker.</p>
+        <p class="muted small">While you wait, you can explore a sample game or read the quick tracker guide.</p>
         <div class="account-actions">
           <button class="btn positive" type="button" data-nav="demo">View Demo Game</button>
           <button class="btn secondary" type="button" data-nav="tutorial">Open Tracker Guide</button>

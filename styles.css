@@ -293,6 +293,10 @@ button:focus-visible,
   gap: 10px;
 }
 
+.welcome-step-list.compact-steps {
+  margin: 1rem 0;
+}
+
 .welcome-step-list div {
   display: grid;
   grid-template-columns: 32px 1fr;
