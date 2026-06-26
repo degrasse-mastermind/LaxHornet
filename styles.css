@@ -40,9 +40,16 @@
   --lh-panel-gradient: linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%);
   --lh-accent-surface: #f2f3f5;
   --lh-accent-surface-strong: #e8ebef;
-  --lh-command-gradient:
-    linear-gradient(135deg, rgba(232, 16, 16, 0.16), transparent 48%),
+  --lh-honeycomb-surface:
+    linear-gradient(90deg, rgba(5, 6, 7, 0.76), rgba(5, 6, 7, 0.86)),
+    url("assets/honeycombblack.png?v=1") center / cover no-repeat,
+    var(--lh-black);
+  --lh-honeycomb-card:
+    linear-gradient(90deg, rgba(8, 10, 12, 0.84), rgba(8, 10, 12, 0.92)),
+    url("assets/honeycombblack.png?v=1") center / cover no-repeat,
     linear-gradient(180deg, var(--lh-carbon-800), var(--lh-carbon-900));
+  --lh-command-gradient:
+    var(--lh-honeycomb-card);
   --lh-red-glow: 0 12px 28px rgba(232, 16, 16, 0.16);
   --lh-font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
@@ -173,10 +180,7 @@ button:focus-visible,
   z-index: 20;
   margin: -18px -14px 14px;
   padding: calc(14px + env(safe-area-inset-top, 0px)) 14px 12px;
-  background:
-    linear-gradient(90deg, rgba(5, 6, 7, 0.74), rgba(5, 6, 7, 0.84)),
-    url("assets/honeycombblack.png?v=1") center / cover no-repeat,
-    var(--lh-black);
+  background: var(--lh-honeycomb-surface);
   border-bottom: 1px solid var(--lh-line-dark);
   backdrop-filter: blur(14px);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
@@ -446,9 +450,7 @@ button:focus-visible,
 .lh-command-card {
   border: 1px solid rgba(232, 16, 16, 0.26);
   color: var(--lh-text-light);
-  background:
-    linear-gradient(90deg, rgba(232, 16, 16, 0.18), transparent 42%),
-    linear-gradient(180deg, var(--lh-carbon-800), var(--lh-carbon-900));
+  background: var(--lh-honeycomb-card);
   box-shadow: var(--lh-shadow-card);
 }
 
@@ -1611,9 +1613,7 @@ button:focus-visible,
 .live-player-card {
   border-color: rgba(232, 16, 16, 0.28);
   color: var(--lh-text-light);
-  background:
-    linear-gradient(90deg, rgba(232, 16, 16, 0.14), transparent 48%),
-    linear-gradient(180deg, var(--lh-carbon-800), var(--lh-carbon-900));
+  background: var(--lh-honeycomb-card);
   box-shadow: var(--lh-shadow-card);
 }
 
@@ -3158,9 +3158,7 @@ button:focus-visible,
   border: 1px solid rgba(232, 16, 16, 0.36);
   border-radius: var(--radius);
   color: #ffffff;
-  background:
-    linear-gradient(135deg, rgba(232, 16, 16, 0.24), transparent 48%),
-    linear-gradient(180deg, var(--lh-carbon-800), var(--lh-carbon-900));
+  background: var(--lh-honeycomb-card);
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
 }
 
@@ -3209,9 +3207,7 @@ button:focus-visible,
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius);
   color: #ffffff;
-  background:
-    linear-gradient(90deg, rgba(232, 16, 16, 0.78) 0 5px, transparent 5px),
-    var(--lh-surface-dark);
+  background: var(--lh-honeycomb-card);
 }
 
 .admin-portal-metrics span,
@@ -4204,18 +4200,14 @@ form.account-card .account-actions {
 .primary-manage-card,
 .live-player-card {
   background: var(--lh-command-gradient);
-  box-shadow: var(--lh-shadow-card), var(--lh-red-glow);
+  box-shadow: var(--lh-shadow-card);
 }
 
 .home-next-card::before,
 .primary-manage-card::before,
 .live-player-card::before,
 .admin-portal-hero::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 5px;
-  background: var(--hornet-red);
+  content: none;
   pointer-events: none;
 }
 
@@ -4489,9 +4481,7 @@ form.account-card .account-actions {
 
 .admin-portal-metrics div {
   border-radius: 10px;
-  background:
-    linear-gradient(90deg, var(--hornet-red) 0 5px, transparent 5px),
-    linear-gradient(180deg, #1b1f24, #101214);
+  background: var(--lh-honeycomb-card);
 }
 
 .admin-tool-groups > div {
@@ -4967,7 +4957,7 @@ form.account-card::before,
 .live-player-card::before,
 .admin-portal-hero::before,
 .admin-portal-entry-card::before {
-  opacity: 0.9;
+  opacity: 0;
 }
 
 .empty-state-card {

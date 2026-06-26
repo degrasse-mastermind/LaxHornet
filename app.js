@@ -23,7 +23,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v221";
+const APP_VERSION = "v223";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -4955,6 +4955,7 @@ function renderNavIcon(icon) {
     help: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.4a8.6 8.6 0 1 0 0 17.2 8.6 8.6 0 0 0 0-17.2Zm0 15.2a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4Zm1.2-4.2h-2.1v-.7c0-1.1.6-1.8 1.6-2.5.8-.6 1.3-1 1.3-1.8 0-.9-.7-1.4-1.8-1.4-1 0-1.8.4-2.5 1.1L8.5 7.6A5 5 0 0 1 12.3 6c2.4 0 4 1.3 4 3.3 0 1.7-.9 2.5-2 3.2-.8.5-1.1.9-1.1 1.6v.3Z"/></svg>`,
     season: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19h14v1.7H5V19Zm1.3-7.2h3v5.6h-3v-5.6Zm4.2-6.6h3v12.2h-3V5.2Zm4.2 3.9h3v8.3h-3V9.1Z"/></svg>`,
     share: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.2 15.2a3.1 3.1 0 0 0-2.4 1.1L9.4 12.8c.1-.3.1-.5.1-.8s0-.5-.1-.8l6.4-3.5a3.1 3.1 0 1 0-.9-1.8L8.5 9.4a3.1 3.1 0 1 0 0 5.2l6.4 3.5a3.1 3.1 0 1 0 3.3-2.9Z"/></svg>`,
+    lock: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V8.1a5 5 0 0 1 10 0V10h1.1c.9 0 1.6.7 1.6 1.6v7.1c0 .9-.7 1.6-1.6 1.6H5.9c-.9 0-1.6-.7-1.6-1.6v-7.1c0-.9.7-1.6 1.6-1.6H7Zm2.2 0h5.6V8.1a2.8 2.8 0 0 0-5.6 0V10Zm2.8 6.6a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/></svg>`,
     player: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.2a4 4 0 1 1 0 8 4 4 0 0 1 0-8Zm0 9.8c4.2 0 7.6 2.4 7.6 5.4v.4H4.4v-.4c0-3 3.4-5.4 7.6-5.4Z"/></svg>`,
     team: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.2 2.7h1.6v3.2h-1.6V2.7Zm-5 1.6 1.3-.9 1.6 2.6-1.3.9-1.6-2.6Zm10.3 1.7 1.6-2.6 1.3.9-1.6 2.6-1.3-.9ZM8.1 9.2l2.4 2.2c.7.7 1.9.7 2.6 0l2.3-2.2c.5-.5 1.4-.5 1.9 0l.7.7-4.8 4.6c-.7.7-1.8.7-2.5 0L6 9.9l.7-.7c.4-.5 1.2-.5 1.4 0Zm-3.9 2.2 6 5.9c1.2 1.2 3.1 1.2 4.3 0l5.9-5.9 1.7 1.7-6 5.9c-2.1 2-5.4 2-7.5 0l-6-5.9 1.6-1.7ZM2.6 14.8 7.9 20l-1.6 1.6-5.3-5.2 1.6-1.6Zm18.8 0 1.6 1.6-5.3 5.2-1.6-1.6 5.3-5.2Z"/></svg>`,
     manage: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.2h8.2a2.6 2.6 0 0 1 5 0H20v1.9h-2.8a2.6 2.6 0 0 1-5 0H4V6.2Zm10.7-1a1 1 0 1 0 0 2.1 1 1 0 0 0 0-2.1ZM4 11.1h2.8a2.6 2.6 0 0 1 5 0H20V13h-8.2a2.6 2.6 0 0 1-5 0H4v-1.9Zm5.3-1a1 1 0 1 0 0 2.1 1 1 0 0 0 0-2.1ZM4 16h8.2a2.6 2.6 0 0 1 5 0H20v1.9h-2.8a2.6 2.6 0 0 1-5 0H4V16Zm10.7-1a1 1 0 1 0 0 2.1 1 1 0 0 0 0-2.1Z"/></svg>`,
@@ -5886,7 +5887,7 @@ function renderMore() {
             <small>Learn the game-day flow and sharing tools.</small>
           </button>
           <a class="more-action" href="privacy.html" target="_blank" rel="noopener">
-            <span>${renderNavIcon("games")}</span>
+            <span>${renderNavIcon("lock")}</span>
             <strong>Privacy Policy</strong>
             <small>Review how LaxHornet handles accounts, teams, players, and game data.</small>
           </a>
