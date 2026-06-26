@@ -4606,26 +4606,82 @@ function turnOffLiveShare(gameId) {
 }
 
 async function copyFamilySummary(gameId) {
-  const game = state.games.find((item) => item.id === gameId);
+  copyGameFamilyRecap(gameId);
+}
+
+function gameForFamilyRecap(gameId) {
+  return (state.activeGame?.id === gameId ? state.activeGame : null) || state.games.find((item) => item.id === gameId) || currentReviewGame();
+}
+
+async function copyGameFamilyRecap(gameId) {
+  const game = gameForFamilyRecap(gameId);
   if (!game) return;
   const player = gamePlayerSnapshot(game);
-  const totals = calculateTotals(game.events, player);
-  const summary = [
-    `LaxHornet game summary for ${playerTitle(player)} vs ${game.opponent}`,
-    `Game Impact: ${impactLetterGrade(totals.impact)} (${formatImpactNumber(totals.impact)})`,
-    `Goals: ${totals.goals}`,
-    `Assists: ${totals.assists}`,
-    `Ground Balls: ${totals.groundBalls}`,
-    `Caused Turnovers: ${totals.causedTurnovers}`,
-    `Saves: ${totals.saves}`,
-    `Possession Value: ${signedMetric(totals.possessionValue)}`,
-  ].join("\n");
+  const recap = buildFamilyRecap(game, game.events || [], player, calculateTotals(game.events || [], player));
   try {
-    await navigator.clipboard.writeText(summary);
-    showToast("Family summary copied");
+    await writeTextToClipboard(recap.text);
+    showToast("Family recap copied.");
   } catch {
-    window.prompt("Copy family summary", summary);
+    showToast("Couldn't copy recap. Please try again.");
   }
+}
+
+async function shareGameFamilyRecap(gameId) {
+  const game = gameForFamilyRecap(gameId);
+  if (!game) return;
+  const player = gamePlayerSnapshot(game);
+  const recap = buildFamilyRecap(game, game.events || [], player, calculateTotals(game.events || [], player));
+  if (!canShareFamilyRecap()) {
+    try {
+      await writeTextToClipboard(recap.text);
+      showToast("Sharing is not available here, so the recap was copied instead.");
+    } catch {
+      showToast("Couldn't copy recap. Please try again.");
+    }
+    return;
+  }
+
+  try {
+    await navigator.share({ title: recap.title, text: recap.text });
+    showToast("Family recap shared.");
+  } catch (error) {
+    if (error?.name === "AbortError") return;
+    try {
+      await writeTextToClipboard(recap.text);
+      showToast("Sharing is not available here, so the recap was copied instead.");
+    } catch {
+      showToast("Couldn't copy recap. Please try again.");
+    }
+  }
+}
+
+async function writeTextToClipboard(text) {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // Fall through to the textarea method for older iOS/browser contexts.
+    }
+  }
+
+  if (typeof document === "undefined") throw new Error("Clipboard unavailable");
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.top = "-1000px";
+  textarea.style.left = "-1000px";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  const copied = document.execCommand("copy");
+  document.body.removeChild(textarea);
+  if (!copied) throw new Error("Clipboard unavailable");
+}
+
+function canShareFamilyRecap() {
+  return typeof navigator !== "undefined" && typeof navigator.share === "function";
 }
 
 async function copyRosterSummary() {
@@ -4791,7 +4847,7 @@ function renderGameSavedModal() {
         <p class="muted small">The game is saved in Past Games and can be reopened for corrections.</p>
         <div class="edit-actions">
           <button class="btn positive" type="button" data-action="open-saved-review" data-game-id="${escapeHTML(game.id)}">Open Game Review</button>
-          <button class="btn secondary" type="button" data-action="copy-family-summary" data-game-id="${escapeHTML(game.id)}">Copy Family Summary</button>
+          <button class="btn secondary" type="button" data-action="copy-family-summary" data-game-id="${escapeHTML(game.id)}">Copy Family Recap</button>
           <button class="btn ghost modal-ghost" type="button" data-action="close-saved-game">Back Home</button>
         </div>
       </div>
@@ -6970,6 +7026,152 @@ function topContributionForTotals(totals) {
   return options.sort((a, b) => b.value - a.value)[0];
 }
 
+const FAMILY_RECAP_STATS_BY_POSITION = {
+  attack: ["goals", "assists", "shotsOnGoal", "groundBalls", "backedUpShots", "smartPlays", "hustlePlays"],
+  midfield: ["goals", "assists", "groundBalls", "causedTurnovers", "clears", "backedUpShots", "hustlePlays", "smartPlays"],
+  defense: ["causedTurnovers", "defensiveStops", "groundBalls", "clears", "backedUpShots", "hustlePlays", "smartPlays"],
+  goalie: ["saves", "goalsAllowed", "clears", "groundBalls", "smartPlays"],
+  faceoff: ["faceoffWins", "faceoffLosses", "groundBalls", "causedTurnovers", "hustlePlays", "smartPlays"],
+  default: ["goals", "assists", "groundBalls", "causedTurnovers", "clears", "saves", "faceoffWins", "hustlePlays", "smartPlays"],
+};
+
+const FAMILY_RECAP_STAT_LABELS = {
+  goals: ["goal", "goals"],
+  assists: ["assist", "assists"],
+  shotsOnGoal: ["shot on goal", "shots on goal"],
+  groundBalls: ["ground ball", "ground balls"],
+  causedTurnovers: ["caused turnover", "caused turnovers"],
+  defensiveStops: ["defensive stop", "defensive stops"],
+  clears: ["successful clear", "successful clears"],
+  saves: ["save", "saves"],
+  goalsAllowed: ["goal allowed", "goals allowed"],
+  faceoffWins: ["faceoff win", "faceoff wins"],
+  faceoffLosses: ["faceoff loss", "faceoff losses"],
+  backedUpShots: ["backed up shot", "backed up shots"],
+  hustlePlays: ["hustle play", "hustle plays"],
+  smartPlays: ["smart play", "smart plays"],
+};
+
+function countPhrase(value, singular, plural = `${singular}s`) {
+  const count = Number(value || 0);
+  if (!count) return "";
+  return `${formatImpactNumber(count)} ${count === 1 ? singular : plural}`;
+}
+
+function familyRecapOpponentLabel(game = {}) {
+  const opponent = String(game.opponent || "").trim();
+  if (!opponent || opponent.toLowerCase() === "opponent") return "- today's game";
+  return `vs ${opponent}`;
+}
+
+function familyRecapStatLine(totals = {}, player = {}) {
+  const positionGroup = impactPositionGroup(player);
+  const orderedKeys = [...(FAMILY_RECAP_STATS_BY_POSITION[positionGroup] || FAMILY_RECAP_STATS_BY_POSITION.default), ...FAMILY_RECAP_STATS_BY_POSITION.default];
+  const seen = new Set();
+  const phrases = [];
+
+  orderedKeys.forEach((key) => {
+    if (seen.has(key) || phrases.length >= 6) return;
+    seen.add(key);
+    const labels = FAMILY_RECAP_STAT_LABELS[key];
+    const phrase = labels ? countPhrase(totals[key], labels[0], labels[1]) : "";
+    if (phrase) phrases.push(phrase);
+  });
+
+  return phrases.join(", ");
+}
+
+function familyRecapTopContribution(totals = {}, player = {}) {
+  const positionGroup = impactPositionGroup(player);
+  if (positionGroup === "goalie" && totals.saves) return "Goalie play";
+  if (positionGroup === "faceoff" && totals.faceoffWins) return "Faceoff / possession";
+  if (positionGroup === "defense" && totals.causedTurnovers + totals.defensiveStops > 0) return "Defense";
+  if (positionGroup === "attack" && totals.points > 0) return "Scoring";
+  const topContribution = topContributionForTotals(totals);
+  if (!topContribution || topContribution.label === "Building profile") return "";
+  return topContribution.label;
+}
+
+function familyRecapTakeaway(totals = {}, player = {}, topContribution = "") {
+  const name = playerTitle(player);
+  const positionGroup = impactPositionGroup(player);
+  const hasPossessionImpact = Number(totals.extraPossessions || 0) > 0 || Number(totals.possessionValue || 0) > 0;
+
+  if (Number(totals.eventCount || 0) < 3) return "A short recap is available once more plays are tracked.";
+  if (positionGroup === "goalie" && totals.saves) {
+    return `${name} made a strong contribution in goal with ${countPhrase(totals.saves, "save", "saves")}. Next focus: turn more saves into quick, clean outlets.`;
+  }
+  if (positionGroup === "faceoff" && totals.faceoffWins) {
+    return `${name} helped create extra chances at the faceoff spot. Next focus: turn more wins into clean ground balls and settled possessions.`;
+  }
+  if (topContribution === "Scoring" && totals.points) {
+    return `${name} made the biggest impact by helping finish scoring chances. Next focus: keep adding possession plays so the impact shows up beyond the box score.`;
+  }
+  if (topContribution === "Defense" || totals.causedTurnovers + totals.defensiveStops >= 2) {
+    return `${name} helped the team by turning defense into possession. Next focus: stay aggressive while keeping clears and decisions clean.`;
+  }
+  if (topContribution === "Possession" || hasPossessionImpact) {
+    return `${name} made an impact beyond the box score by creating and protecting possessions. Next focus: keep turning those extra chances into clean shot opportunities.`;
+  }
+  if (topContribution === "Hustle" || totals.effortScore >= 2) {
+    return `${name} showed hustle in several parts of the field. Next focus: channel that effort into controlled possessions and smart decisions.`;
+  }
+  return `${name} contributed to the team story in this game. Next focus: track a few more plays next game to reveal the clearest impact pattern.`;
+}
+
+function buildFamilyRecap(game = {}, events = [], playerContext = {}, computedStats = null) {
+  const player = playerContext || {};
+  const totals = computedStats || calculateTotals(events || [], player);
+  const title = `${playerTitle(player)} ${familyRecapOpponentLabel(game)}`;
+
+  if (Number(totals.eventCount || events?.length || 0) < 3) {
+    const body = "A short recap is available once more plays are tracked.";
+    return {
+      title,
+      body,
+      text: `${title}\n${body}`,
+    };
+  }
+
+  const topContribution = familyRecapTopContribution(totals, player);
+  const statLine = familyRecapStatLine(totals, player);
+  const hasPossessionStory = Number(totals.possessionValue || 0) !== 0 || Number(totals.extraPossessions || 0) !== 0;
+  const lines = [];
+
+  if (game.date) lines.push(`Date: ${formatDate(game.date)}`);
+  lines.push(`Game Impact: ${impactLetterGrade(totals.impact)} / ${formatImpactNumber(totals.impact)} score`);
+  if (topContribution) lines.push(`Top contribution: ${topContribution}`);
+  if (statLine) lines.push(`Stats: ${statLine}`);
+  if (hasPossessionStory) lines.push(`Possession story: ${signedMetric(totals.possessionValue)} possession value and ${signedMetric(totals.extraPossessions)} extra chances`);
+  lines.push(`Takeaway: ${familyRecapTakeaway(totals, player, topContribution)}`);
+
+  const body = lines.join("\n");
+  return {
+    title,
+    body,
+    text: `${title}\n${body}`,
+  };
+}
+
+function renderFamilyRecapSection(game, player, totals) {
+  const recap = buildFamilyRecap(game, game.events || [], player, totals);
+  return `
+    <section class="card pad lh-family-recap-card">
+      <div class="section-head compact-head">
+        <div>
+          <h3>Family Recap</h3>
+          <p class="muted small">Copy a short, positive recap to share with family after the game.</p>
+        </div>
+      </div>
+      <div class="lh-family-recap-text" aria-label="Family recap preview">${escapeHTML(recap.text).replace(/\n/g, "<br>")}</div>
+      <div class="lh-family-recap-actions">
+        <button class="btn secondary" type="button" data-action="copy-family-recap" data-game-id="${escapeHTML(game.id)}">Copy Family Recap</button>
+        ${canShareFamilyRecap() ? `<button class="btn neutral" type="button" data-action="share-family-recap" data-game-id="${escapeHTML(game.id)}">Share Family Recap</button>` : ""}
+      </div>
+    </section>
+  `;
+}
+
 function seasonStrengthBullets(totals, player = state.player) {
   const bullets = [];
   const add = (condition, text) => {
@@ -7009,6 +7211,7 @@ function renderReviewSummarySection(game, player, totals, archetypeResult) {
         ${insightCard("Possession Impact", escapeHTML(signedMetric(totals.possessionValue)), `${signedMetric(totals.extraPossessions)} extra chances`)}
         ${insightCard("Key Takeaway", renderTakeawayValue(totals.gameImpact?.takeaway))}
       </div>
+      ${renderFamilyRecapSection(game, player, totals)}
       <div class="explainer-card">
         <strong>Game Impact</strong>
         <p>Game Impact is a quick snapshot of how this player helped create, protect, finish, or defend possessions. It is not a coach grade or a permanent label.</p>
@@ -8472,6 +8675,8 @@ function handleClick(event) {
       navigate("review");
     }
     if (action.dataset.action === "copy-family-summary") copyFamilySummary(action.dataset.gameId);
+    if (action.dataset.action === "copy-family-recap") copyGameFamilyRecap(action.dataset.gameId);
+    if (action.dataset.action === "share-family-recap") shareGameFamilyRecap(action.dataset.gameId);
     if (action.dataset.action === "close-saved-game") {
       state.gameSavedSummaryId = "";
       navigate("home");
