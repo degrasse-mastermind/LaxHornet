@@ -1015,6 +1015,39 @@ button:focus-visible,
   background: #fff7f7;
 }
 
+.add-player-access-card {
+  border-color: rgba(232, 16, 16, 0.18);
+  background:
+    linear-gradient(90deg, rgba(232, 16, 16, 0.06), transparent 44%),
+    #ffffff;
+}
+
+.add-player-access-card.collapsed {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.compact-status-card {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  border-color: rgba(17, 19, 23, 0.1);
+  background: #f7f8fa;
+  box-shadow: none;
+}
+
+.compact-status-card h3,
+.compact-status-card h4,
+.compact-status-card p,
+.access-status-block h4,
+.access-status-block p {
+  margin: 0;
+}
+
+.access-status-block {
+  padding: 0;
+  border: 0;
+}
+
 .unclaimed-summary-head {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

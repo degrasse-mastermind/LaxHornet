@@ -23,7 +23,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v202";
+const APP_VERSION = "v203";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -5120,8 +5120,8 @@ function renderMyPlayersList() {
     return `
       <section class="card pad">
         <h3>No approved player yet</h3>
-        <p class="muted small">Request access with your team code and jersey number. Once your team admin approves it, you can start tracking games.</p>
-        <button class="mini-btn" type="button" data-nav="team">Request Player Access</button>
+        <p class="muted small">Add a player with your team code and jersey number. Once your team admin approves it, you can start tracking games.</p>
+        <button class="mini-btn" type="button" data-nav="team">Add Player</button>
       </section>
     `;
   }
@@ -5132,7 +5132,7 @@ function renderMyPlayersList() {
           <h3>My Players</h3>
           <p class="muted small">Each tile is a separate player/team tracking context.</p>
         </div>
-        <button class="mini-btn light" type="button" data-nav="team">Team Access</button>
+        <button class="mini-btn light" type="button" data-nav="team">Players & Teams</button>
       </div>
       <div class="player-assignment-list">
         ${players.map(renderPlayerAssignmentCard).join("")}
@@ -5445,11 +5445,11 @@ function renderMyTeamAccessRequests() {
   });
   if (!ownRequests.length) return "";
   return `
-    <div class="team-roster-block">
+    <div class="team-roster-block access-status-block">
       <div class="section-head compact-head">
         <div>
-          <h4>Player Access Requests</h4>
-          <p class="muted small">Only requests that still need attention appear here. Verified players appear under your player list.</p>
+          <h4>Access Status</h4>
+          <p class="muted small">Items appear here only when approval or jersey verification still needs attention.</p>
         </div>
       </div>
       <div class="admin-request-list">
@@ -5556,11 +5556,11 @@ function renderTeamRosterCard(options = {}) {
   const claimByNumberForm = showClaimByNumber
     ? renderPlayerVerificationBlock(team.id, { suffix: "active-team" })
     : "";
-  const teamCardTitle = canCreateTeams() ? "Connected Team" : "Verified Player Team";
+  const teamCardTitle = canCreateTeams() ? "Connected Team" : "Your Verified Players";
   const teamHeaderCopy = !team
     ? canCreateTeams()
       ? "Create a team or request access with a team code."
-      : "No verified player team yet. Request access, then verify the player jersey number after approval."
+      : "No verified players yet. Add a player with your team code and jersey number."
     : "";
   const teamCodeHelper = team?.inviteCode
     ? `<p class="team-code-helper">Team Code: <code>${escapeHTML(team.inviteCode)}</code></p>`
@@ -5589,7 +5589,6 @@ function renderTeamRosterCard(options = {}) {
             <div class="team-card-body">
               <div class="team-actions">
                 <button class="mini-btn light" type="button" data-action="sync-team-roster">Sync</button>
-                ${canCreateTeams() ? "" : `<button class="mini-btn light" type="button" data-action="toggle-team-access">Request Access</button>`}
               </div>
               ${
                 teams
@@ -5597,7 +5596,7 @@ function renderTeamRosterCard(options = {}) {
                   : `<p class="muted small">${
                       canCreateTeams()
                         ? "No teams yet. Create one for your roster or request access with a team code."
-                        : "No verified player teams yet. Use Player Access Requests to finish verification after approval."
+                        : "No verified players yet. Add a player below to start the approval process."
                     }</p>`
               }
               ${team?.localRecovered && !team.cloudBacked ? `<div class="notice-card error-card compact-notice"><strong>Team needs attention.</strong><p class="muted small">This team was recovered from this device, but it is not connected to your account. Remove it or recreate the team before adding roster players.</p></div>` : ""}
@@ -5824,7 +5823,7 @@ function renderMore() {
           <button class="more-action" type="button" data-nav="team">
             <span>${renderNavIcon("team")}</span>
             <strong>Manage Teams</strong>
-            <small>Sync approvals, request access, and verify players.</small>
+            <small>View verified players, sync updates, or add another player.</small>
           </button>
         </div>
       </section>
@@ -5998,13 +5997,13 @@ function renderTeamAccessTools() {
   const requestList = renderMyTeamAccessRequests();
   const expanded = state.teamAccessExpanded;
   return `
-      <section class="card pad ${expanded ? "" : "collapsed"}">
+      <section class="card pad add-player-access-card ${expanded ? "" : "collapsed"}">
         <div class="collapsible-card-head">
           <div>
-            <h3>Request Player Access</h3>
-            <p class="muted small">${escapeHTML(team ? "Use this only if you need access to another team." : "Ask your coach, team admin, or parent coordinator for the team code.")}</p>
+            <h3>Add Another Player</h3>
+            <p class="muted small">${escapeHTML(team ? "Use a team code and jersey number to connect another player." : "Ask your coach, team admin, or parent coordinator for the team code.")}</p>
           </div>
-          <button class="collapse-icon" type="button" data-action="toggle-team-access" aria-expanded="${expanded}" aria-label="${expanded ? "Minimize Request Player Access" : "Expand Request Player Access"}">
+          <button class="collapse-icon" type="button" data-action="toggle-team-access" aria-expanded="${expanded}" aria-label="${expanded ? "Minimize Add Another Player" : "Expand Add Another Player"}">
             <span aria-hidden="true">${expanded ? "v" : ">"}</span>
           </button>
         </div>
@@ -6024,25 +6023,25 @@ function renderTeamAccessTools() {
                   </div>
                 </div>
                 <div class="team-form-actions">
-                  <button class="mini-btn" type="submit">Request Player Access</button>
+                  <button class="mini-btn" type="submit">Submit Player Info</button>
                 </div>
+                <p class="muted small">Once the team admin approves and the jersey number matches the roster, only that player appears in this account.</p>
                 ${renderPrivacyReassurance()}
-                <p class="muted small">Once approved, only the matching roster player will appear for this account.</p>
               </form>`
             : ""
         }
       </section>
 
-      <section class="card pad team-requests-card">
+      <section class="card pad team-requests-card compact-status-card">
         ${
           requestList ||
           `<div class="section-head compact-head">
             <div>
-              <h3>Player Access Requests</h3>
-              <p class="muted small">Requests that need approval or player verification appear here.</p>
+              <h3>Access Status</h3>
+              <p class="muted small">No player steps need attention right now.</p>
             </div>
           </div>
-          <p class="muted small">No player access requests need attention.</p>`
+          <p class="muted small">Verified players are listed above. Add another player only when you need to track a different child or team.</p>`
         }
       </section>
   `;
@@ -6053,15 +6052,14 @@ function renderTeamPage() {
   const showNoTeamCodeCard = !admin && !activeTeam();
   return renderShell(`
     <section class="screen-title">
-      <h2>${admin ? "Team Admin Tools" : "Team Access"}</h2>
-      <p>${admin ? "Create teams, sync parent approvals, and manage roster tools in one place." : "Request team access, sync approvals, and verify your player by jersey number."}</p>
+      <h2>${admin ? "Team Admin Tools" : "Players & Teams"}</h2>
+      <p>${admin ? "Create teams, sync parent approvals, and manage roster tools in one place." : "See verified players, sync updates, or add another player with a team code."}</p>
     </section>
 
     <section class="stack">
-      ${admin ? "" : renderPrivacyReassurance()}
       ${showNoTeamCodeCard ? renderNoTeamCodeCard() : ""}
-      ${renderTeamAccessTools()}
       ${renderTeamRosterCard()}
+      ${renderTeamAccessTools()}
       ${renderAdminTeamRequestInbox()}
     </section>
   `, { hideNav: admin });
@@ -6189,9 +6187,9 @@ function renderNoApprovedPlayerHome() {
   return `
     <section class="card pad empty-state-card">
       <h3>No approved player yet</h3>
-      <p class="muted small">Request access with your team code and jersey number. Once your team admin approves it, you can start tracking games.</p>
+      <p class="muted small">Add a player with your team code and jersey number. Once your team admin approves it, you can start tracking games.</p>
       <div class="action-grid compact">
-        <button class="btn positive" type="button" data-nav="team">Request Player Access</button>
+        <button class="btn positive" type="button" data-nav="team">Add Player</button>
         <button class="btn secondary" type="button" data-nav="tutorial">Help / Tracker Guide</button>
       </div>
     </section>
