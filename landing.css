@@ -1,14 +1,38 @@
 :root {
-  --red: #e81010;
-  --black: #050505;
-  --graphite: #151515;
-  --graphite-2: #202124;
-  --white: #ffffff;
-  --light: #f4f5f6;
-  --muted: #c9cbd0;
-  --ink: #121318;
-  --line: rgba(255, 255, 255, 0.14);
-  --shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+  --lh-black: #050607;
+  --lh-carbon-950: #090a0b;
+  --lh-carbon-900: #0f1012;
+  --lh-carbon-850: #131518;
+  --lh-carbon-800: #17191c;
+  --lh-carbon-700: #22262b;
+  --lh-surface: #f7f8f9;
+  --lh-surface-soft: #eef0f2;
+  --lh-surface-raised: #ffffff;
+  --lh-text-light: #f8f9fa;
+  --lh-text-dark: #111317;
+  --lh-muted-light: #b8bec5;
+  --lh-muted-dark: #5c6570;
+  --lh-red: #e81010;
+  --lh-red-deep: #9f1115;
+  --lh-red-soft: rgba(232, 16, 16, 0.12);
+  --lh-line-light: rgba(17, 19, 23, 0.12);
+  --lh-line-dark: rgba(255, 255, 255, 0.12);
+  --lh-radius-md: 8px;
+  --lh-radius-lg: 12px;
+  --lh-shadow-card: 0 16px 36px rgba(0, 0, 0, 0.28);
+  --lh-shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.16);
+  --lh-font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  --red: var(--lh-red);
+  --black: var(--lh-black);
+  --graphite: var(--lh-carbon-850);
+  --graphite-2: var(--lh-carbon-700);
+  --white: var(--lh-text-light);
+  --light: var(--lh-surface);
+  --muted: var(--lh-muted-light);
+  --ink: var(--lh-text-dark);
+  --line: var(--lh-line-dark);
+  --shadow: var(--lh-shadow-card);
 }
 
 * {
@@ -23,9 +47,10 @@ body {
   margin: 0;
   color: var(--white);
   background:
-    radial-gradient(circle at 78% 8%, rgba(232, 16, 16, 0.16), transparent 28rem),
-    linear-gradient(180deg, #090909 0%, #171717 48%, #080808 100%);
-  font-family: Arial, Helvetica, sans-serif;
+    radial-gradient(circle at 78% 8%, rgba(232, 16, 16, 0.13), transparent 28rem),
+    radial-gradient(circle at 14% 0%, rgba(255, 255, 255, 0.055), transparent 24rem),
+    linear-gradient(180deg, var(--lh-black) 0%, var(--lh-carbon-800) 48%, var(--lh-black) 100%);
+  font-family: var(--lh-font);
   line-height: 1.5;
 }
 
@@ -72,8 +97,10 @@ a {
 .nav-cta {
   padding: 10px 14px;
   border: 1px solid rgba(232, 16, 16, 0.62);
-  border-radius: 8px;
-  background: rgba(232, 16, 16, 0.15);
+  border-radius: var(--lh-radius-md);
+  background:
+    linear-gradient(90deg, var(--red) 0 5px, transparent 5px),
+    rgba(255, 255, 255, 0.08);
 }
 
 .hero {
@@ -118,17 +145,17 @@ a {
   justify-content: center;
   padding: 13px 18px;
   border: 1px solid rgba(232, 16, 16, 0.58);
-  border-radius: 8px;
+  border-radius: var(--lh-radius-md);
   font-size: 1rem;
   font-weight: 950;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  box-shadow: var(--lh-shadow-soft), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 .btn.primary {
   color: #fff;
   background:
     linear-gradient(90deg, var(--red) 0 6px, transparent 6px),
-    linear-gradient(180deg, #2a3038, #13161a);
+    linear-gradient(180deg, #252a31, #121519);
 }
 
 .btn.secondary {
@@ -166,7 +193,7 @@ a {
   padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 34px;
-  background: linear-gradient(145deg, #050505, #202124);
+  background: linear-gradient(145deg, var(--lh-black), var(--lh-carbon-700));
   box-shadow: var(--shadow);
 }
 
@@ -183,7 +210,7 @@ a {
   min-height: 560px;
   padding: 20px;
   border-radius: 24px;
-  background: #f5f6f7;
+  background: var(--lh-surface);
   color: var(--ink);
 }
 
@@ -237,9 +264,9 @@ a {
 .preview-grid button {
   min-height: 72px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--lh-radius-md);
   color: white;
-  background: #191b1f;
+  background: linear-gradient(180deg, #20242a, #101214);
   box-shadow: inset 4px 0 0 var(--red);
   font: inherit;
   font-weight: 950;
@@ -288,12 +315,13 @@ a {
   width: min(1120px, calc(100% - 32px));
   margin: 0 auto 24px;
   padding: clamp(34px, 6vw, 66px);
-  border-radius: 12px;
+  border-radius: var(--lh-radius-lg);
 }
 
 .section.light {
   color: var(--ink);
   background: var(--light);
+  box-shadow: var(--lh-shadow-soft);
 }
 
 .section-heading {
@@ -326,9 +354,9 @@ a {
 .feature-list article {
   min-height: 230px;
   padding: 22px;
-  border: 1px solid #dfe2e6;
-  border-radius: 8px;
-  background: #fff;
+  border: 1px solid var(--lh-line-light);
+  border-radius: var(--lh-radius-md);
+  background: var(--lh-surface-raised);
 }
 
 .feature-number {
@@ -349,7 +377,9 @@ a {
   gap: clamp(28px, 6vw, 70px);
   align-items: center;
   border: 1px solid var(--line);
-  background: linear-gradient(135deg, #111, #1b1c1f);
+  background:
+    linear-gradient(135deg, rgba(232, 16, 16, 0.12), transparent 42%),
+    linear-gradient(180deg, var(--lh-carbon-850), var(--lh-carbon-950));
 }
 
 .dark-split p {
@@ -376,8 +406,9 @@ a {
 .mini-card {
   padding: 16px;
   border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.075);
   color: #fff;
+  border-radius: var(--lh-radius-md);
 }
 
 .mini-card span,
