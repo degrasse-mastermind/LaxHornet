@@ -22,7 +22,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v195";
+const APP_VERSION = "v196";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -358,10 +358,15 @@ const app = document.querySelector("#app");
 const startupParams = new URLSearchParams(window.location.search);
 const startupShareCode = startupParams.get("share")?.trim().toUpperCase() || "";
 const startupAuthStatus = startupParams.get("auth") || "";
-const supabaseClient =
+const rawSupabaseClient =
   window.supabase?.createClient && SUPABASE_CONFIG.url && SUPABASE_CONFIG.publishableKey
     ? window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.publishableKey)
     : null;
+const supabaseClient =
+  rawSupabaseClient?.auth?.signInWithPassword && rawSupabaseClient?.auth?.signUp
+    ? rawSupabaseClient
+    : null;
+const supabaseClientLoadIssue = Boolean(rawSupabaseClient && !supabaseClient);
 
 let sharedGameChannel = null;
 let lastSyncErrorAt = 0;
@@ -3384,7 +3389,11 @@ async function repairApprovedPlayerClaims(options = {}) {
     if (!isMissingRpcError(error) && !options.silent) reportTeamSetupError(error);
     return [];
   }
-  return Array.isArray(data) ? data : [];
+  const repairedClaims = normalizePlayerClaims((Array.isArray(data) ? data : []).map(playerClaimFromSupabaseRow));
+  if (repairedClaims.length) {
+    state.playerClaims = normalizePlayerClaims([...state.playerClaims, ...repairedClaims]);
+  }
+  return repairedClaims;
 }
 
 async function loadPlayerClaims(options = {}) {
@@ -3584,11 +3593,10 @@ async function resetThisDeviceState() {
   );
   if (!confirmed) return;
   if (supabaseClient) await supabaseClient.auth.signOut().catch(() => {});
-  Object.keys(localStorage)
-    .filter((key) => key.startsWith("laxhornet."))
-    .forEach((key) => localStorage.removeItem(key));
+  clearLaxHornetBrowserStorage();
   await clearLaxHornetCaches().catch(() => {});
-  window.location.replace("app.html?fresh=device-reset");
+  await unregisterLaxHornetServiceWorkers().catch(() => {});
+  window.location.replace(`app.html?fresh=${APP_VERSION}-device-reset-${Date.now()}`);
 }
 
 async function requestUserRole(role, options = {}) {
@@ -8468,6 +8476,33 @@ async function clearLaxHornetCaches() {
   await Promise.all(keys.filter((key) => key.startsWith("laxhornet-")).map((key) => caches.delete(key)));
 }
 
+function clearLaxHornetBrowserStorage() {
+  const supabaseProjectKey = (() => {
+    try {
+      return new URL(SUPABASE_CONFIG.url).hostname.split(".")[0];
+    } catch {
+      return "";
+    }
+  })();
+  const shouldClearKey = (key) =>
+    key.startsWith("laxhornet.") ||
+    (supabaseProjectKey && key.startsWith(`sb-${supabaseProjectKey}-`)) ||
+    key.startsWith("supabase.") ||
+    key.includes("supabase.auth");
+
+  [localStorage, sessionStorage].forEach((storage) => {
+    Object.keys(storage)
+      .filter(shouldClearKey)
+      .forEach((key) => storage.removeItem(key));
+  });
+}
+
+async function unregisterLaxHornetServiceWorkers() {
+  if (!("serviceWorker" in navigator)) return;
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  await Promise.all(registrations.map((registration) => registration.unregister()));
+}
+
 async function applyAppUpdate() {
   state.updateAvailable = true;
   state.updateInstalling = true;
@@ -8506,7 +8541,10 @@ async function applyAppUpdate() {
 }
 
 async function initApp() {
-  if (supabaseClient) {
+  if (supabaseClientLoadIssue) {
+    state.cloudError = "App update needed. Tap Updates or Reset This Device if account data looks wrong.";
+    state.syncStatus = "Sync issue - tap to fix";
+  } else if (supabaseClient) {
     const { data } = await supabaseClient.auth.getSession();
     setAuthUser(data.session?.user || null);
     state.syncStatus = state.authUser ? "Signed in" : "Signed out";
