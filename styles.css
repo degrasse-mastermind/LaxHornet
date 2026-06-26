@@ -34,6 +34,14 @@
   --lh-tap-game: 64px;
   --lh-shadow-card: 0 16px 36px rgba(0, 0, 0, 0.28);
   --lh-shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.16);
+  --lh-shadow-crisp: 0 14px 28px rgba(0, 0, 0, 0.2);
+  --lh-card-border: rgba(17, 19, 23, 0.1);
+  --lh-card-border-red: rgba(232, 16, 16, 0.22);
+  --lh-panel-gradient: linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%);
+  --lh-command-gradient:
+    linear-gradient(135deg, rgba(232, 16, 16, 0.16), transparent 48%),
+    linear-gradient(180deg, var(--lh-carbon-800), var(--lh-carbon-900));
+  --lh-red-glow: 0 12px 28px rgba(232, 16, 16, 0.16);
   --lh-font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 
   --navy-950: var(--lh-carbon-950);
@@ -2379,7 +2387,7 @@ button:focus-visible,
 
 .quarter-tab,
 .period-tab {
-  min-height: 36px;
+  min-height: 44px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 7px;
   color: #b8bec5;
@@ -3906,8 +3914,8 @@ button:focus-visible,
 
 .icon-btn {
   display: inline-grid;
-  width: 42px;
-  height: 42px;
+  width: 46px;
+  height: 46px;
   place-items: center;
   border-radius: var(--radius);
   color: #ffffff;
@@ -3920,7 +3928,7 @@ button:focus-visible,
 
 .icon-btn.wide {
   width: auto;
-  min-width: 88px;
+  min-width: 96px;
   padding: 0 10px;
   font-size: 0.78rem;
 }
@@ -4007,6 +4015,542 @@ button:focus-visible,
 .empty-state-card h3,
 .empty-state-card p {
   margin: 0;
+}
+
+/* Design system reinforcement */
+.screen-title {
+  margin: 18px 0 16px;
+}
+
+.screen-title h2 {
+  margin: 0;
+  color: var(--lh-text-light);
+  font-size: clamp(1.82rem, 8.8vw, 2.42rem);
+  font-weight: 950;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+.screen-title p {
+  max-width: 46rem;
+  color: rgba(248, 249, 250, 0.74);
+  font-weight: 650;
+}
+
+.stack {
+  gap: 14px;
+}
+
+.card {
+  position: relative;
+  border-color: var(--lh-card-border);
+  border-radius: 10px;
+  background: var(--lh-panel-gradient);
+  box-shadow: var(--lh-shadow-crisp);
+}
+
+.card.pad {
+  padding: clamp(14px, 3.4vw, 18px);
+}
+
+.card h3 {
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.welcome-hero {
+  padding: clamp(16px, 4vw, 22px) 2px clamp(12px, 3vw, 18px);
+}
+
+.welcome-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.welcome-copy h2 {
+  max-width: 12ch;
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(2.35rem, 13vw, 4.1rem);
+  font-weight: 950;
+  line-height: 0.96;
+  text-wrap: balance;
+}
+
+.welcome-copy p {
+  max-width: 35rem;
+  margin: 0;
+  color: rgba(248, 249, 250, 0.78);
+  font-size: clamp(1rem, 4.5vw, 1.2rem);
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+form.account-card,
+.welcome-info-card,
+.faq-card,
+.share-watch-form,
+.profile-setup-card,
+.start-game-form > .card,
+.team-card,
+.my-players-card,
+.current-player-manage-card,
+.player-account-tools-card,
+.game-day-status-card,
+.quick-actions-card,
+.development-card,
+.archetype-card,
+.impact-card,
+.possession-impact-card,
+.edit-tools-card,
+.export-card,
+.more-card,
+.admin-portal-card {
+  border-color: var(--lh-card-border-red);
+}
+
+form.account-card::before,
+.welcome-info-card::before,
+.faq-card::before,
+.share-watch-form::before,
+.team-card::before,
+.my-players-card::before,
+.game-day-status-card::before,
+.quick-actions-card::before,
+.development-card::before,
+.impact-card::before,
+.possession-impact-card::before,
+.edit-tools-card::before,
+.more-card::before,
+.admin-portal-card::before,
+.empty-state-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--hornet-red);
+  opacity: 0.86;
+  pointer-events: none;
+}
+
+form.account-card {
+  gap: 14px;
+}
+
+form.account-card h3 {
+  margin-bottom: 0;
+  font-size: 1.16rem;
+}
+
+form.account-card > .muted.small {
+  margin-top: -4px;
+  max-width: 36rem;
+  font-size: 0.9rem;
+}
+
+form.account-card .account-actions {
+  gap: 10px;
+}
+
+.field label,
+.position-picker legend,
+.tag-editor-label {
+  color: #333940;
+  font-size: 0.76rem;
+  font-weight: 950;
+}
+
+.field input,
+.field textarea,
+.field select {
+  border-color: rgba(17, 19, 23, 0.14);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff, #fcfdfe);
+  box-shadow: inset 0 1px 0 rgba(17, 19, 23, 0.03);
+}
+
+.btn,
+.mini-btn,
+.icon-btn,
+.quick-action,
+.more-action,
+.collapse-icon,
+.stat-button {
+  border-radius: 10px;
+}
+
+.btn {
+  min-height: 52px;
+}
+
+.btn.brand,
+.btn.positive,
+.btn.neutral,
+.mini-btn,
+.icon-btn {
+  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.22), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.btn.secondary,
+.mini-btn.light {
+  background:
+    linear-gradient(90deg, var(--hornet-red) 0 5px, transparent 5px),
+    linear-gradient(180deg, #ffffff, #f6f7f8);
+}
+
+.home-next-card,
+.primary-manage-card,
+.live-player-card {
+  background: var(--lh-command-gradient);
+  box-shadow: var(--lh-shadow-card), var(--lh-red-glow);
+}
+
+.home-next-card::before,
+.primary-manage-card::before,
+.live-player-card::before,
+.admin-portal-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: var(--hornet-red);
+  pointer-events: none;
+}
+
+.home-next-card h3 {
+  font-size: clamp(1.12rem, 5vw, 1.48rem);
+}
+
+.home-next-card .action-grid.compact {
+  gap: 10px;
+}
+
+.game-day-status-card,
+.quick-actions-card {
+  gap: 10px;
+}
+
+.status-row {
+  min-height: 42px;
+  border-color: rgba(17, 19, 23, 0.11);
+  border-radius: 9px;
+  background: linear-gradient(180deg, #ffffff, #f4f5f6);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.status-row span {
+  color: #59626d;
+  font-size: 0.78rem;
+}
+
+.status-row strong {
+  color: #111317;
+  font-size: 0.84rem;
+}
+
+.quick-action,
+.more-action {
+  border-color: rgba(232, 16, 16, 0.2);
+  background:
+    linear-gradient(90deg, var(--hornet-red) 0 5px, transparent 5px),
+    linear-gradient(180deg, #ffffff, #f6f7f8);
+  box-shadow: inset 0 0 0 1px rgba(17, 19, 23, 0.03);
+}
+
+.quick-action {
+  min-height: 78px;
+  padding: 11px;
+}
+
+.quick-action span,
+.more-action > span {
+  background:
+    radial-gradient(circle at 45% 35%, rgba(255, 255, 255, 0.22), transparent 52%),
+    var(--hornet-red);
+}
+
+.quick-action strong,
+.more-action strong {
+  color: #14171b;
+  font-weight: 950;
+}
+
+.player-chip,
+.team-chip,
+.player-assignment-card,
+.compact-status-card,
+.access-request-row,
+.unclaimed-summary-block,
+.roster-action-block {
+  border-color: rgba(17, 19, 23, 0.1);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff, #f7f8f9);
+}
+
+.player-chip strong,
+.player-chip span,
+.team-chip strong,
+.team-chip span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.player-chip.active,
+.team-chip.active,
+.player-assignment-card.active,
+.position-option input:checked + span {
+  border-color: rgba(232, 16, 16, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(232, 16, 16, 0.12), 0 10px 22px rgba(17, 19, 23, 0.1);
+}
+
+.player-context-panel,
+.notice-card,
+.explainer-card,
+.archetype-focus,
+.impact-takeaway {
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, rgba(232, 16, 16, 0.08), transparent 54%),
+    linear-gradient(180deg, #ffffff, #fff8f8);
+}
+
+.live-title h2 {
+  font-size: clamp(1.1rem, 5vw, 1.45rem);
+  font-weight: 950;
+}
+
+.live-title p {
+  color: rgba(248, 249, 250, 0.7);
+}
+
+.live-status-chips span {
+  min-height: 28px;
+  border-color: rgba(255, 255, 255, 0.15);
+  color: rgba(248, 249, 250, 0.84);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.live-player-card {
+  min-height: 78px;
+}
+
+.live-player-card h3 {
+  font-size: clamp(0.96rem, 4vw, 1.08rem);
+}
+
+.live-confirmation {
+  align-items: stretch;
+  border-color: rgba(232, 16, 16, 0.28);
+  border-left: 5px solid var(--hornet-red);
+  border-radius: 10px;
+  box-shadow: var(--lh-shadow-soft);
+}
+
+.live-confirmation strong {
+  display: grid;
+  align-content: center;
+  font-size: 0.9rem;
+}
+
+.stat-group {
+  gap: 9px;
+}
+
+.stat-group-head h3 {
+  color: rgba(248, 249, 250, 0.86);
+  font-weight: 950;
+}
+
+.stat-group-head span {
+  color: rgba(184, 190, 197, 0.76);
+}
+
+.tracker-grid {
+  gap: 10px;
+}
+
+.stat-button {
+  min-height: var(--lh-tap-game);
+  border-color: rgba(255, 255, 255, 0.1);
+  background:
+    linear-gradient(90deg, var(--stat-accent, var(--neutral)) 0 5px, transparent 5px),
+    linear-gradient(180deg, #24282e, #121416);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 12px 22px rgba(0, 0, 0, 0.24);
+}
+
+.stat-button .label {
+  font-weight: 950;
+}
+
+.live-pill,
+.metric,
+.insight-card,
+.impact-breakdown-row,
+.possession-impact-metric,
+.stat-mini-row,
+.season-stat-group {
+  border-color: rgba(17, 19, 23, 0.1);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff, #f4f6f8);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.metric {
+  min-height: 92px;
+}
+
+.metric strong,
+.insight-value,
+.possession-impact-metric strong {
+  letter-spacing: 0;
+}
+
+.insight-card {
+  min-height: 112px;
+}
+
+.insight-card-copy {
+  min-height: 132px;
+}
+
+.insight-value-copy {
+  margin-top: 8px;
+  color: #28303a;
+  font-size: clamp(0.84rem, 2.65vw, 0.92rem);
+  font-weight: 650;
+  line-height: 1.38;
+}
+
+.explainer-card,
+.archetype-card,
+.development-card,
+.impact-card,
+.possession-impact-card {
+  box-shadow: var(--lh-shadow-crisp);
+}
+
+.review-section > .card,
+.edit-event-form,
+.edit-game-form,
+.tag-editor {
+  border-color: var(--lh-card-border-red);
+}
+
+.event-row {
+  border-color: rgba(17, 19, 23, 0.1);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff, #f6f7f8);
+}
+
+.event-actions {
+  padding-top: 2px;
+}
+
+.tag-chip,
+.tag-suggestion {
+  border-color: rgba(232, 16, 16, 0.22);
+  background: #fff6f6;
+}
+
+.season-stat-group {
+  padding: 12px;
+}
+
+.season-stat-group h3 {
+  color: #14171b;
+  font-size: 1rem;
+}
+
+.stat-table .stat-section-row th {
+  color: var(--hornet-red);
+  background: #f1f2f4;
+}
+
+.list-row {
+  min-height: 74px;
+}
+
+.list-row:hover,
+.quick-action:hover,
+.more-action:hover {
+  border-color: rgba(232, 16, 16, 0.34);
+}
+
+.admin-portal-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--lh-command-gradient);
+}
+
+.admin-portal-metrics div {
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, var(--hornet-red) 0 5px, transparent 5px),
+    linear-gradient(180deg, #1b1f24, #101214);
+}
+
+.admin-tool-groups > div {
+  border-color: rgba(17, 19, 23, 0.1);
+  border-left: 4px solid var(--hornet-red);
+  border-radius: 10px;
+}
+
+.admin-portal-entry-card {
+  border-color: rgba(232, 16, 16, 0.34);
+  background:
+    linear-gradient(90deg, rgba(232, 16, 16, 0.12), transparent 58%),
+    linear-gradient(180deg, #ffffff, #fff8f8);
+}
+
+.more-helper-text,
+.account-app-helper {
+  padding: 8px 2px 0;
+  border-top: 1px solid rgba(17, 19, 23, 0.08);
+}
+
+.empty-state-card {
+  min-height: 126px;
+  padding: clamp(16px, 4vw, 20px);
+  border-color: var(--lh-card-border-red);
+}
+
+.empty-state-card h3 {
+  font-size: 1.08rem;
+}
+
+@media (max-width: 430px) {
+  .welcome-copy h2 {
+    max-width: 10.5ch;
+  }
+
+  .live-confirmation {
+    display: grid;
+  }
+
+  .live-confirmation div {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .live-confirmation .mini-btn {
+    width: 100%;
+  }
+
+  .insight-card {
+    min-height: 106px;
+  }
+
+  .insight-card-copy {
+    grid-column: 1 / -1;
+    min-height: auto;
+  }
+
+  .compact-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .noscript-fallback {
@@ -4159,8 +4703,8 @@ a.btn {
 .update-dismiss {
   display: inline-grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   border: 1px solid rgba(232, 16, 16, 0.34);
   border-radius: 50%;
   color: var(--hornet-red);
