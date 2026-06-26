@@ -38,6 +38,8 @@
   --lh-card-border: rgba(17, 19, 23, 0.1);
   --lh-card-border-red: rgba(232, 16, 16, 0.22);
   --lh-panel-gradient: linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%);
+  --lh-accent-surface: #f2f3f5;
+  --lh-accent-surface-strong: #e8ebef;
   --lh-command-gradient:
     linear-gradient(135deg, rgba(232, 16, 16, 0.16), transparent 48%),
     linear-gradient(180deg, var(--lh-carbon-800), var(--lh-carbon-900));
@@ -80,7 +82,7 @@
   --danger: #c72a2e;
   --warning: #c7681d;
   --hornet-red: var(--lh-red);
-  --hornet-red-soft: #ffe4e4;
+  --hornet-red-soft: var(--lh-accent-surface);
   --hornet-yellow: var(--hornet-red);
   --hornet-yellow-soft: var(--hornet-red-soft);
   --brand-red: var(--lh-red);
@@ -546,8 +548,8 @@ button:focus-visible,
 .lh-chip-danger,
 .lh-chip-live {
   border-color: rgba(232, 16, 16, 0.32);
-  color: var(--lh-red-deep);
-  background: #ffe7e7;
+  color: var(--lh-text-dark);
+  background: var(--lh-accent-surface);
 }
 
 .lh-notice,
@@ -564,7 +566,7 @@ button:focus-visible,
 .lh-notice,
 .lh-notice-privacy {
   border: 1px solid rgba(232, 16, 16, 0.22);
-  background: #fff7f7;
+  background: var(--lh-panel-gradient);
 }
 
 .lh-notice-warning {
@@ -971,7 +973,7 @@ button:focus-visible,
 
 .status-pill.danger {
   border-color: rgba(232, 16, 16, 0.22);
-  color: var(--hornet-red);
+  color: var(--text);
   background: var(--hornet-red-soft);
 }
 
@@ -1026,7 +1028,7 @@ button:focus-visible,
   border: 1px solid rgba(232, 16, 16, 0.2);
   border-radius: var(--radius);
   background:
-    linear-gradient(90deg, rgba(232, 16, 16, 0.08), transparent 42%),
+    linear-gradient(90deg, rgba(17, 19, 23, 0.04), transparent 42%),
     #f7f8f9;
 }
 
@@ -1221,8 +1223,8 @@ button:focus-visible,
   padding: 12px;
   border: 1px solid rgba(232, 16, 16, 0.22);
   background:
-    linear-gradient(90deg, rgba(232, 16, 16, 0.08), transparent 42%),
-    #fff7f7;
+    linear-gradient(90deg, rgba(17, 19, 23, 0.04), transparent 42%),
+    var(--lh-panel-gradient);
   box-shadow: none;
 }
 
@@ -1231,8 +1233,8 @@ button:focus-visible,
   border: 1px solid rgba(232, 16, 16, 0.26);
   border-radius: var(--radius);
   background:
-    linear-gradient(90deg, rgba(232, 16, 16, 0.1), transparent 48%),
-    #fff8f8;
+    linear-gradient(90deg, rgba(17, 19, 23, 0.04), transparent 48%),
+    var(--lh-panel-gradient);
 }
 
 .roster-action-block .collapsible-card-head {
@@ -1314,7 +1316,7 @@ button:focus-visible,
   padding: 10px 12px;
   border: 1px solid rgba(232, 16, 16, 0.18);
   border-radius: var(--radius);
-  background: #fffafa;
+  background: var(--lh-panel-gradient);
 }
 
 .admin-tool-group h4,
@@ -1327,14 +1329,14 @@ button:focus-visible,
 }
 
 .team-safety-group {
-  background: #fff7f7;
+  background: var(--lh-accent-surface);
 }
 
 .add-player-access-card {
   border-color: rgba(232, 16, 16, 0.18);
   background:
-    linear-gradient(90deg, rgba(232, 16, 16, 0.06), transparent 44%),
-    #ffffff;
+    linear-gradient(90deg, rgba(17, 19, 23, 0.035), transparent 44%),
+    var(--lh-panel-gradient);
 }
 
 .add-player-access-card.collapsed {
@@ -1450,8 +1452,8 @@ button:focus-visible,
 .access-request-row.needs-verification {
   border-color: rgba(232, 16, 16, 0.22);
   background:
-    linear-gradient(90deg, rgba(232, 16, 16, 0.06), transparent 48%),
-    #ffffff;
+    linear-gradient(90deg, rgba(17, 19, 23, 0.035), transparent 48%),
+    var(--lh-panel-gradient);
 }
 
 .request-main {
@@ -1592,7 +1594,7 @@ button:focus-visible,
   border: 1px solid rgba(232, 16, 16, 0.22);
   border-radius: var(--radius);
   color: var(--text);
-  background: linear-gradient(180deg, #ffffff, #fff6f6);
+  background: var(--lh-panel-gradient);
   font-size: 0.86rem;
   font-weight: 800;
 }
@@ -1756,11 +1758,11 @@ button:focus-visible,
 
 .error-card {
   border-color: rgba(232, 16, 16, 0.48);
-  background: #ffe7e7;
+  background: var(--lh-accent-surface);
 }
 
 .error-card .muted {
-  color: #6f1010;
+  color: var(--muted);
 }
 
 .two-actions {
@@ -1880,7 +1882,7 @@ button:focus-visible,
   border: 1px solid rgba(232, 16, 16, 0.2);
   border-left: 4px solid var(--hornet-red);
   border-radius: var(--radius);
-  background: linear-gradient(180deg, #ffffff, #fff7f7);
+  background: var(--lh-panel-gradient);
   color: var(--text);
 }
 
@@ -1911,14 +1913,14 @@ button:focus-visible,
   padding: 7px;
   border: 1px solid rgba(232, 16, 16, 0.35);
   border-radius: 14px;
-  color: var(--hornet-red);
-  background: #fff4f4;
+  color: var(--text);
+  background: var(--lh-accent-surface);
   font-size: 1.1rem;
   font-weight: 950;
 }
 
 .impact-score-badge .impact-grade small {
-  color: #7a2024;
+  color: var(--muted);
   font-size: 0.62rem;
 }
 
@@ -1969,7 +1971,7 @@ button:focus-visible,
   padding: 11px 12px;
   border-left: 4px solid var(--hornet-red);
   border-radius: 8px;
-  background: #fff7f7;
+  background: var(--lh-panel-gradient);
   color: var(--text);
   font-size: 0.9rem;
   line-height: 1.35;
@@ -2045,8 +2047,8 @@ button:focus-visible,
   padding: 0 12px;
   border: 1px solid rgba(232, 16, 16, 0.35);
   border-radius: 999px;
-  background: #fff4f4;
-  color: var(--hornet-red);
+  background: var(--lh-accent-surface);
+  color: var(--text);
   font-size: 0.78rem;
   font-weight: 950;
 }
@@ -2142,7 +2144,7 @@ button:focus-visible,
   padding: 10px 12px;
   border-left: 4px solid var(--hornet-red);
   border-radius: 8px;
-  background: #fff7f7;
+  background: var(--lh-panel-gradient);
 }
 
 .archetype-focus span {
@@ -2787,7 +2789,7 @@ button:focus-visible,
   border: 1px solid rgba(17, 19, 23, 0.16);
   border-radius: 999px;
   color: #111317;
-  background: #fff0f0;
+  background: var(--lh-accent-surface);
   font-size: 0.78rem;
   font-weight: 900;
   line-height: 1.1;
@@ -2838,7 +2840,7 @@ button:focus-visible,
   border: 1px solid rgba(232, 16, 16, 0.26);
   border-radius: 999px;
   color: #111317;
-  background: #fffafa;
+  background: var(--lh-panel-gradient);
   font-size: 0.88rem;
   font-weight: 900;
 }
@@ -2966,7 +2968,7 @@ button:focus-visible,
 }
 
 .more-helper-text .warning {
-  color: #8f1518;
+  color: #505963;
 }
 
 .more-inline-form {
@@ -2987,8 +2989,8 @@ button:focus-visible,
   gap: 12px;
   border-color: rgba(232, 16, 16, 0.46);
   background:
-    linear-gradient(90deg, rgba(232, 16, 16, 0.14), transparent 54%),
-    linear-gradient(180deg, #ffffff, #fff7f7);
+    linear-gradient(90deg, rgba(17, 19, 23, 0.04), transparent 54%),
+    var(--lh-panel-gradient);
 }
 
 .admin-portal-entry-card h3,
@@ -3110,7 +3112,7 @@ button:focus-visible,
 }
 
 .more-action.danger-link strong {
-  color: #8d1f22;
+  color: #14171b;
 }
 
 .compact-actions .more-action {
@@ -4310,8 +4312,8 @@ form.account-card .account-actions {
 .impact-takeaway {
   border-radius: 10px;
   background:
-    linear-gradient(90deg, rgba(232, 16, 16, 0.08), transparent 54%),
-    linear-gradient(180deg, #ffffff, #fff8f8);
+    linear-gradient(90deg, rgba(17, 19, 23, 0.035), transparent 54%),
+    var(--lh-panel-gradient);
 }
 
 .live-title h2 {
@@ -4451,7 +4453,7 @@ form.account-card .account-actions {
 .tag-chip,
 .tag-suggestion {
   border-color: rgba(232, 16, 16, 0.22);
-  background: #fff6f6;
+  background: var(--lh-accent-surface);
 }
 
 .season-stat-group {
@@ -4501,8 +4503,8 @@ form.account-card .account-actions {
 .admin-portal-entry-card {
   border-color: rgba(232, 16, 16, 0.34);
   background:
-    linear-gradient(90deg, rgba(232, 16, 16, 0.12), transparent 58%),
-    linear-gradient(180deg, #ffffff, #fff8f8);
+    linear-gradient(90deg, rgba(17, 19, 23, 0.04), transparent 58%),
+    var(--lh-panel-gradient);
 }
 
 .more-helper-text,
@@ -4670,9 +4672,7 @@ a.btn {
   border: 1px solid rgba(232, 16, 16, 0.38);
   border-radius: var(--radius);
   color: var(--text);
-  background:
-    linear-gradient(90deg, rgba(232, 16, 16, 0.1), transparent 54%),
-    #ffffff;
+  background: var(--lh-panel-gradient);
   box-shadow: var(--lh-shadow-soft);
 }
 
