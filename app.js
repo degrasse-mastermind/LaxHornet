@@ -22,7 +22,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v196";
+const APP_VERSION = "v197";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -1300,17 +1300,18 @@ function escapeHTML(value = "") {
 function displaySyncStatus(status = state.syncStatus) {
   const text = String(status || "").trim();
   if (state.isOffline) return "Will sync when online";
-  if (state.cloudError) return "Sync issue — tap to fix";
+  if (state.cloudError) return "Sync needs attention";
   if (/synced|signed in|watching live/i.test(text)) return "Synced to your account";
   if (/saved on this phone|ready|no saved account games|signed out|account features unavailable/i.test(text)) return "Saved on this phone";
   if (/offline|waiting|will sync/i.test(text)) return "Will sync when online";
-  if (/issue|error|failed|needs attention|setup|missing|approval required/i.test(text)) return "Sync issue — tap to fix";
+  if (/issue|error|failed|needs attention|setup|missing|approval required/i.test(text)) return "Sync needs attention";
   return text || "Saved on this phone";
 }
 
 function gameDayCloudStatus() {
   if (state.isOffline) return "Will sync when online";
-  return displaySyncStatus();
+  const label = displaySyncStatus();
+  return label === "Sync needs attention" ? "Needs attention" : label;
 }
 
 function gameDayLiveShareStatus() {
@@ -3068,7 +3069,7 @@ function reportTeamSetupError(error) {
   const now = Date.now();
   if (now - lastSyncErrorAt > 8000) {
     lastSyncErrorAt = now;
-    showToast(state.cloudError ? `Sync issue: ${state.cloudError}` : "Sync issue — tap to fix");
+    showToast(state.cloudError ? `Sync issue: ${state.cloudError}` : "Sync needs attention");
   } else {
     render();
   }
@@ -5483,7 +5484,7 @@ function renderTeamRosterCard(options = {}) {
                     }</p>`
               }
               ${team?.localRecovered && !team.cloudBacked ? `<div class="notice-card error-card compact-notice"><strong>Team needs attention.</strong><p class="muted small">This team was recovered from this device, but it is not connected to your account. Remove it or recreate the team before adding roster players.</p></div>` : ""}
-              ${state.cloudError ? `<div class="notice-card error-card compact-notice"><strong>Sync issue — tap to fix</strong><p class="muted small">${escapeHTML(state.cloudError)}</p></div>` : ""}
+              ${state.cloudError ? `<div class="notice-card error-card compact-notice"><strong>Sync needs attention</strong><p class="muted small">${escapeHTML(state.cloudError)}</p></div>` : ""}
               ${manageRoster ? renderAdminTeamSnapshot(team, fullTeamRoster) : ""}
               ${manageRoster ? renderUnclaimedRosterPlayers(fullTeamRoster) : ""}
               ${manageRoster ? renderTeamAccessRequests() : ""}
@@ -5638,7 +5639,7 @@ function renderMore() {
         </div>
         ${renderAccountSyncMessage()}
         ${accountModeToggle}
-        ${state.cloudError ? `<div class="notice-card error-card"><strong>Sync issue — tap to fix</strong><p class="muted small">${escapeHTML(state.cloudError)}</p></div>` : ""}
+        ${state.cloudError ? `<div class="notice-card error-card"><strong>Sync needs attention</strong><p class="muted small">${escapeHTML(state.cloudError)}</p></div>` : ""}
         <div class="more-action-list compact-actions">
           <button class="more-action" type="button" data-nav="profileSetup">
             <span>${renderNavIcon("more")}</span>
@@ -7347,8 +7348,8 @@ function renderAccountSyncMessage() {
   if (label === "Saved on this phone") {
     return `<div class="notice-card compact-notice"><strong>Saved on this phone</strong><p class="muted small">We&apos;ll sync this game when your connection returns.</p></div>`;
   }
-  if (label === "Sync issue — tap to fix") {
-    return `<div class="notice-card error-card compact-notice"><strong>Sync issue — tap to fix</strong><p class="muted small">Open Sync to refresh games, teams, and player access.</p></div>`;
+  if (label === "Sync needs attention") {
+    return `<div class="notice-card error-card compact-notice"><strong>Sync needs attention</strong><p class="muted small">Use Sync or Updates from Account & App to refresh games, teams, and player access.</p></div>`;
   }
   return "";
 }
@@ -8543,7 +8544,7 @@ async function applyAppUpdate() {
 async function initApp() {
   if (supabaseClientLoadIssue) {
     state.cloudError = "App update needed. Tap Updates or Reset This Device if account data looks wrong.";
-    state.syncStatus = "Sync issue - tap to fix";
+    state.syncStatus = "Sync needs attention";
   } else if (supabaseClient) {
     const { data } = await supabaseClient.auth.getSession();
     setAuthUser(data.session?.user || null);
