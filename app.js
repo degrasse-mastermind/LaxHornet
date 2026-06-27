@@ -7395,10 +7395,63 @@ function savedNextFocusForPlayer(player = state.player) {
   return saved.text;
 }
 
+function listPhrase(items = []) {
+  const cleanItems = items.map((item) => String(item || "").trim()).filter(Boolean);
+  if (cleanItems.length <= 1) return cleanItems[0] || "";
+  if (cleanItems.length === 2) return `${cleanItems[0]} and ${cleanItems[1]}`;
+  return `${cleanItems.slice(0, -1).join(", ")}, and ${cleanItems[cleanItems.length - 1]}`;
+}
+
+function isPossessionReviewStory(totals = {}, topContribution = "") {
+  const extraPossessions = Number(totals.extraPossessions || 0);
+  const possessionValue = Number(totals.possessionValue || 0);
+  if (topContribution === "Possession") return true;
+  if (Math.abs(extraPossessions) >= 3) return true;
+  if (Math.abs(possessionValue) >= 4) return true;
+  if (extraPossessions >= 2 && possessionValue >= 2) return true;
+  return false;
+}
+
+function possessionStoryForTotals(totals = {}, topContribution = "") {
+  if (!isPossessionReviewStory(totals, topContribution)) return "";
+  const extraPossessions = Number(totals.extraPossessions || 0);
+  const possessionValue = Number(totals.possessionValue || 0);
+  const events = totals.possessionImpact?.eventsByType || {};
+  const positives = [];
+  const negatives = [];
+
+  if (events.groundBall > 0) positives.push(`${events.groundBall} ground ball${events.groundBall === 1 ? "" : "s"}`);
+  if (events.causedTurnover > 0) positives.push(`${events.causedTurnover} caused turnover${events.causedTurnover === 1 ? "" : "s"}`);
+  if (events.successfulClear > 0) positives.push(`${events.successfulClear} successful clear${events.successfulClear === 1 ? "" : "s"}`);
+  if (events.backedUpShot > 0) positives.push(`${events.backedUpShot} backed up shot${events.backedUpShot === 1 ? "" : "s"}`);
+  if (events.goalieSave > 0) positives.push(`${events.goalieSave} save${events.goalieSave === 1 ? "" : "s"}`);
+  if (events.faceoffWin > 0) positives.push(`${events.faceoffWin} faceoff win${events.faceoffWin === 1 ? "" : "s"}`);
+  if (events.turnover > 0) negatives.push(`${events.turnover} turnover${events.turnover === 1 ? "" : "s"}`);
+  if (events.failedClear > 0) negatives.push(`${events.failedClear} failed clear${events.failedClear === 1 ? "" : "s"}`);
+
+  if (extraPossessions > 0 && possessionValue > 0) {
+    const source = positives.length ? ` through ${listPhrase(positives.slice(0, 3))}` : "";
+    return `Created ${signedMetric(extraPossessions)} extra chances${source}, adding ${signedMetric(possessionValue)} possession value.`;
+  }
+  if (extraPossessions > 0) {
+    const source = positives.length ? ` with ${listPhrase(positives.slice(0, 3))}` : "";
+    return `Created ${signedMetric(extraPossessions)} extra chances${source}. The next step is turning more of those possessions into clean scoring chances.`;
+  }
+  if (possessionValue > 0) {
+    const source = positives.length ? ` from ${listPhrase(positives.slice(0, 3))}` : "";
+    return `Protected or improved possessions${source}, finishing at ${signedMetric(possessionValue)} possession value.`;
+  }
+  if (extraPossessions < 0 || possessionValue < 0) {
+    const source = negatives.length ? ` after ${listPhrase(negatives.slice(0, 2))}` : "";
+    return `Possession was the area to clean up${source}. Encourage safer outlets, stronger catches, and the next ground ball opportunity.`;
+  }
+  return "";
+}
+
 function developmentTakeawayForTotals(totals = {}, player = state.player, topContribution = "") {
   const name = playerTitle(player);
   const positionGroup = impactPositionGroup(player);
-  const hasPossessionImpact = Number(totals.extraPossessions || 0) > 0 || Number(totals.possessionValue || 0) > 0;
+  const possessionIsStory = isPossessionReviewStory(totals, topContribution);
 
   if (Number(totals.eventCount || 0) < 3) {
     return {
@@ -7435,7 +7488,7 @@ function developmentTakeawayForTotals(totals = {}, player = state.player, topCon
       focus: "Stay aggressive while keeping clears and decisions clean.",
     };
   }
-  if (topContribution === "Possession" || hasPossessionImpact) {
+  if (possessionIsStory) {
     return {
       wentWell: `${name} created or protected extra possessions.`,
       why: "Extra possessions give the team more chances and reduce pressure on the defense.",
@@ -7458,12 +7511,14 @@ function developmentTakeawayForTotals(totals = {}, player = state.player, topCon
 
 function renderDevelopmentTakeaway(totals = {}, player = state.player, topContribution = "") {
   const takeaway = developmentTakeawayForTotals(totals, player, topContribution);
+  const possessionStory = possessionStoryForTotals(totals, topContribution);
   return `
     <section class="card pad development-card lh-development-takeaway">
       <h3>Development Takeaway</h3>
       <div class="takeaway-stack">
         <p><span>What went well</span>${escapeHTML(takeaway.wentWell)}</p>
         <p><span>Why it mattered</span>${escapeHTML(takeaway.why)}</p>
+        ${possessionStory ? `<p><span>Possession story:</span>${escapeHTML(possessionStory)}</p>` : ""}
         <p><span>Next focus</span>${escapeHTML(savedNextFocusForPlayer(player) || takeaway.focus)}</p>
       </div>
     </section>
@@ -7722,7 +7777,7 @@ function renderReviewSummarySection(game, player, totals, archetypeResult) {
     <section class="review-section">
       <div class="section-head compact-head">
         <div>
-          <h3>Game Summary</h3>
+          <h3>Game Snapshot</h3>
           <p class="muted small">${escapeHTML(playerTitle(player))} vs ${escapeHTML(game.opponent)} - ${formatDate(game.date)}</p>
         </div>
       </div>
@@ -7756,7 +7811,6 @@ function renderReviewStatsSection(totals) {
         </div>
       </div>
       ${renderImpactBreakdown(totals)}
-      ${renderPossessionImpact(totals)}
       ${renderTotalsTable(totals)}
     </section>
   `;
