@@ -24,7 +24,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v237";
+const APP_VERSION = "v238";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -1243,6 +1243,17 @@ function syncActivePlayer() {
 function playerTitle(player = state.player) {
   const normalized = normalizePlayer(player);
   return `${normalized.name || "Player"}${normalized.number ? ` #${normalized.number}` : ""}`;
+}
+
+function playerFirstName(player = state.player) {
+  const normalized = normalizePlayer(player);
+  const name = String(normalized.name || "").trim();
+  return name.split(/\s+/).filter(Boolean)[0] || "Player";
+}
+
+function possessiveName(name = "Player") {
+  const clean = String(name || "Player").trim() || "Player";
+  return /s$/i.test(clean) ? `${clean}'` : `${clean}'s`;
 }
 
 function playerSubline(player = state.player) {
@@ -2861,7 +2872,7 @@ function confirmEndGame() {
   persistAll();
   syncGameToSupabase(completedGame, { includeEvents: true });
   render();
-  showToast(`Game saved. Review ${playerTitle(gamePlayerSnapshot(completedGame))}'s impact.`);
+  showToast(`Game saved. Review ${possessiveName(playerFirstName(gamePlayerSnapshot(completedGame)))} impact.`);
 }
 
 function deleteGame(id) {
@@ -5078,7 +5089,7 @@ function renderGameSavedModal() {
   return `
     <section class="modal-backdrop" role="presentation">
       <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="gameSavedTitle">
-        <h3 id="gameSavedTitle">Game saved. Review ${escapeHTML(playerTitle(player))}&apos;s impact.</h3>
+        <h3 id="gameSavedTitle">Game saved. Review ${escapeHTML(possessiveName(playerFirstName(player)))} impact.</h3>
         <p class="muted small">The game is saved in Past Games and can be reopened for corrections.</p>
         <div class="edit-actions">
           <button class="btn positive" type="button" data-action="open-saved-review" data-game-id="${escapeHTML(game.id)}">Open Game Review</button>
@@ -7500,7 +7511,7 @@ function encouragementForTotals(totals = {}, topContribution = "") {
 }
 
 function developmentTakeawayForTotals(totals = {}, player = state.player, topContribution = "") {
-  const name = playerTitle(player);
+  const name = playerFirstName(player);
   const positionGroup = impactPositionGroup(player);
   const possessionIsStory = isPossessionReviewStory(totals, topContribution);
 
@@ -7757,7 +7768,7 @@ function familyRecapTakeaway(totals = {}, player = {}, topContribution = "") {
 function buildFamilyRecap(game = {}, events = [], playerContext = {}, computedStats = null) {
   const player = playerContext || {};
   const totals = computedStats || calculateTotals(events || [], player);
-  const title = `${playerTitle(player)} ${familyRecapOpponentLabel(game)}`;
+  const title = `${playerFirstName(player)} ${familyRecapOpponentLabel(game)}`;
 
   if (Number(totals.eventCount || events?.length || 0) < 3) {
     const body = `A short recap is available once more plays are tracked.\nNext focus: ${nextGameFocusForRecap(totals, player, "")}`;
@@ -7813,7 +7824,7 @@ function seasonStrengthBullets(totals, player = state.player) {
   const add = (condition, text) => {
     if (condition && bullets.length < 4) bullets.push(text);
   };
-  add(totals.points > 0, `${playerTitle(player)} has created ${totals.points} total points through goals and assists.`);
+  add(totals.points > 0, `${playerFirstName(player)} has created ${totals.points} total points through goals and assists.`);
   add(totals.possessionValue > 0, `Possession Impact is positive at ${signedMetric(totals.possessionValue)}, showing helpful possession-changing plays.`);
   add(totals.groundBalls > 0, `${totals.groundBalls} ground balls are helping turn loose balls into team chances.`);
   add(totals.causedTurnovers + totals.defensiveStops > 0, `${totals.causedTurnovers + totals.defensiveStops} defensive impact plays are helping prevent opponent chances.`);
@@ -7915,7 +7926,7 @@ function renderReview() {
   return renderShell(`
     <section class="screen-title">
       <h2>Game Review</h2>
-      <p>${escapeHTML(playerTitle(player))} vs ${escapeHTML(game.opponent)} &middot; ${formatDate(game.date)}</p>
+      <p>${escapeHTML(playerFirstName(player))} vs ${escapeHTML(game.opponent)} &middot; ${formatDate(game.date)}</p>
     </section>
 
     <section class="stack review-screen-stack">
@@ -8394,7 +8405,7 @@ function renderDashboard() {
         ${insightCard("Average Game Impact", renderImpactGrade(totals.averageImpact), "Across saved games")}
       </div>
       <section class="card pad development-card">
-        <h3>What ${escapeHTML(playerTitle(state.player))} is doing well</h3>
+        <h3>What ${escapeHTML(playerFirstName(state.player))} is doing well</h3>
         <ul class="insight-list">
           ${strengths.map((item) => `<li>${escapeHTML(item)}</li>`).join("")}
         </ul>
