@@ -5538,8 +5538,11 @@ form.account-card,
 
 .review-details-card > summary {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 12px;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  grid-template-areas:
+    "title arrow"
+    "helper arrow";
+  gap: 3px 12px;
   align-items: center;
   min-height: 58px;
   padding: 13px 14px;
@@ -5554,6 +5557,9 @@ form.account-card,
 .review-details-card > summary::after {
   content: ">";
   display: inline-grid;
+  grid-area: arrow;
+  justify-self: end;
+  align-self: center;
   width: 34px;
   height: 34px;
   place-items: center;
@@ -5571,15 +5577,19 @@ form.account-card,
 .review-details-card > summary span,
 .review-details-card > summary small {
   display: block;
+  min-width: 0;
 }
 
 .review-details-card > summary span {
+  grid-area: title;
   color: var(--text);
   font-size: 1rem;
   font-weight: 950;
+  line-height: 1.15;
 }
 
 .review-details-card > summary small {
+  grid-area: helper;
   margin-top: 3px;
   color: var(--muted);
   font-size: 0.82rem;
