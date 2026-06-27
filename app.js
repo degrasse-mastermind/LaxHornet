@@ -24,7 +24,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v242";
+const APP_VERSION = "v243";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -592,6 +592,7 @@ if (initialStoredState.activePlayerId && state.players.some((player) => player.i
 }
 ensureActiveTeamRosterPlayer();
 syncActivePlayer();
+state.nextGameFocus = activeNextGameFocusForPlayer(state.player);
 state.games = state.games.map((game) => normalizeGame(game, state.player));
 state.activeGame = state.activeGame ? normalizeGame(state.activeGame, state.player) : null;
 mergePlayersFromGames([state.activeGame, ...state.games].filter(Boolean));
@@ -649,6 +650,19 @@ function readStoredAccountState(userId = activeStorageUserId) {
 function normalizeNextGameFocus(focus = null) {
   if (!focus || typeof focus !== "object") {
     return {
+      focusType: "",
+      focusText: "",
+      sourceGameId: "",
+      sourceGameDate: "",
+      createdAt: "",
+      status: "",
+      accountId: "",
+      teamId: "",
+      startedGameId: "",
+      startedAt: "",
+      followUpResult: "",
+      followUpGameId: "",
+      followUpAt: "",
       selected: "",
       customText: "",
       text: "",
@@ -658,15 +672,93 @@ function normalizeNextGameFocus(focus = null) {
       updatedAt: "",
     };
   }
+  const focusText = String(focus.focusText || focus.text || "").trim();
+  const sourceGameId = String(focus.sourceGameId || focus.gameId || "").trim();
+  const createdAt = String(focus.createdAt || focus.updatedAt || "").trim();
   return {
+    focusType: String(focus.focusType || focus.selected || "").trim(),
+    focusText,
+    sourceGameId,
+    sourceGameDate: String(focus.sourceGameDate || "").trim(),
+    createdAt,
+    status: String(focus.status || (focusText ? "open" : "")).trim(),
+    accountId: String(focus.accountId || "").trim(),
+    teamId: String(focus.teamId || "").trim(),
+    startedGameId: String(focus.startedGameId || "").trim(),
+    startedAt: String(focus.startedAt || "").trim(),
+    followUpResult: String(focus.followUpResult || "").trim(),
+    followUpGameId: String(focus.followUpGameId || "").trim(),
+    followUpAt: String(focus.followUpAt || "").trim(),
     selected: String(focus.selected || "").trim(),
     customText: String(focus.customText || "").trim(),
-    text: String(focus.text || "").trim(),
-    gameId: String(focus.gameId || "").trim(),
+    text: focusText,
+    gameId: sourceGameId,
     playerId: String(focus.playerId || "").trim(),
     rosterPlayerId: String(focus.rosterPlayerId || "").trim(),
-    updatedAt: String(focus.updatedAt || "").trim(),
+    updatedAt: String(focus.updatedAt || createdAt).trim(),
   };
+}
+
+function focusStorageSegment(value = "none") {
+  return String(value || "none")
+    .trim()
+    .replace(/[^a-z0-9_-]+/gi, "_")
+    .slice(0, 80) || "none";
+}
+
+function focusAccountId() {
+  return currentUserId?.() || activeStorageUserId || "device";
+}
+
+function nextGameFocusStorageKey(player = state?.player) {
+  const normalized = normalizePlayer(player || DEFAULT_PLAYER);
+  const teamId = normalized.teamId || "local";
+  const rosterPlayerId = normalized.rosterPlayerId || normalized.id || "player";
+  return [
+    "laxhornet.nextGameFocus.v2",
+    `user.${focusStorageSegment(focusAccountId())}`,
+    `team.${focusStorageSegment(teamId)}`,
+    `player.${focusStorageSegment(rosterPlayerId)}`,
+  ].join(".");
+}
+
+function loadScopedNextGameFocus(player = state.player) {
+  try {
+    return normalizeNextGameFocus(JSON.parse(localStorage.getItem(nextGameFocusStorageKey(player)) || "null"));
+  } catch {
+    return normalizeNextGameFocus(null);
+  }
+}
+
+function saveScopedNextGameFocus(focus, player = state.player) {
+  const normalized = normalizeNextGameFocus(focus);
+  const key = nextGameFocusStorageKey(player);
+  if (!normalized.text) {
+    localStorage.removeItem(key);
+    return normalized;
+  }
+  localStorage.setItem(key, JSON.stringify(normalized));
+  return normalized;
+}
+
+function activeNextGameFocusForPlayer(player = state.player) {
+  const scoped = loadScopedNextGameFocus(player);
+  if (scoped.text) return scoped;
+  const legacy = normalizeNextGameFocus(state?.nextGameFocus);
+  return nextGameFocusMatchesPlayer(legacy, player) ? legacy : normalizeNextGameFocus(null);
+}
+
+function nextGameFocusMatchesPlayer(focus = null, player = state.player) {
+  const saved = normalizeNextGameFocus(focus);
+  if (!saved.text) return false;
+  const normalized = normalizePlayer(player);
+  const playerId = normalized.id || "";
+  const rosterPlayerId = normalized.rosterPlayerId || "";
+  const teamId = normalized.teamId || "";
+  if (saved.playerId && playerId && saved.playerId !== playerId) return false;
+  if (saved.rosterPlayerId && rosterPlayerId && saved.rosterPlayerId !== rosterPlayerId) return false;
+  if (saved.teamId && teamId && saved.teamId !== teamId) return false;
+  return true;
 }
 
 function uid(prefix = "id") {
@@ -1324,6 +1416,7 @@ function setActivePlayer(playerId, message = "") {
   state.activePlayerId = playerId;
   syncActivePlayer();
   if (state.player.teamId) state.activeTeamId = state.player.teamId;
+  state.nextGameFocus = activeNextGameFocusForPlayer(state.player);
   persistAll();
   render();
   if (message) showToast(message);
@@ -1994,6 +2087,9 @@ function persistAll() {
   saveJSON(STORAGE_KEYS.adminViewMode, state.adminViewMode === "tracker" ? "tracker" : "admin");
   saveJSON(STORAGE_KEYS.onboardingIntent, state.onboardingIntent || "child");
   saveJSON(STORAGE_KEYS.nextGameFocus, normalizeNextGameFocus(state.nextGameFocus));
+  if (state.nextGameFocus?.text && nextGameFocusMatchesPlayer(state.nextGameFocus, state.player)) {
+    saveScopedNextGameFocus(state.nextGameFocus, state.player);
+  }
   saveJSON(STORAGE_KEYS.deletedGames, uniqueIds(state.deletedGameIds));
   saveJSON(STORAGE_KEYS.deletedEvents, uniqueIds(state.deletedEventIds));
   saveJSON(STORAGE_KEYS.games, state.games);
@@ -2033,6 +2129,7 @@ function applyStoredAccountState(userId) {
   mergeRosterPlayersIntoPlayers();
   ensureActiveTeamRosterPlayer();
   syncActivePlayer();
+  state.nextGameFocus = activeNextGameFocusForPlayer(state.player);
   state.games = state.games.map((game) => normalizeGame(game, state.player));
   state.activeGame = state.activeGame ? normalizeGame(state.activeGame, state.player) : null;
   mergePlayersFromGames([state.activeGame, ...state.games].filter(Boolean));
@@ -4875,18 +4972,28 @@ function saveNextGameFocusFromReview(options = {}) {
     showToast("Choose a focus first");
     return null;
   }
-  state.nextGameFocus = normalizeNextGameFocus({
+  const teamId = draft.player?.teamId || gameTeamId(draft.game) || "";
+  const rosterPlayerId = draft.player?.rosterPlayerId || gameRosterPlayerId(draft.game) || "";
+  state.nextGameFocus = saveScopedNextGameFocus({
+    focusType: draft.selected,
+    focusText: draft.text,
+    sourceGameId: draft.game?.id || "",
+    sourceGameDate: draft.game?.date || "",
+    createdAt: new Date().toISOString(),
+    status: "open",
+    accountId: focusAccountId(),
+    teamId,
+    rosterPlayerId,
     selected: draft.selected,
     customText: draft.customText,
     text: draft.text,
     gameId: draft.game?.id || "",
     playerId: draft.player?.id || "",
-    rosterPlayerId: draft.player?.rosterPlayerId || "",
     updatedAt: new Date().toISOString(),
-  });
+  }, draft.player);
   persistAll();
   render();
-  if (!options.silent) showToast("Next game focus saved");
+  if (!options.silent) showToast("Next game focus saved.");
   return state.nextGameFocus;
 }
 
@@ -4905,6 +5012,53 @@ function addFocusToFamilyRecap() {
   const saved = saveNextGameFocusFromReview({ silent: true });
   if (!saved) return;
   showToast("Focus added to Family Recap");
+}
+
+function markFocusUsedForGame(game = state.activeGame) {
+  if (!game) return null;
+  const player = gamePlayerSnapshot(game);
+  const saved = activeNextGameFocusForPlayer(player);
+  if (!saved.text || saved.status !== "open") return null;
+  const updated = normalizeNextGameFocus({
+    ...saved,
+    startedGameId: game.id,
+    startedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+  state.nextGameFocus = saveScopedNextGameFocus(updated, player);
+  return state.nextGameFocus;
+}
+
+function reviewFollowUpFocus(game = currentReviewGame()) {
+  if (!game) return normalizeNextGameFocus(null);
+  const player = gamePlayerSnapshot(game);
+  const saved = activeNextGameFocusForPlayer(player);
+  if (!saved.text || saved.status !== "open") return normalizeNextGameFocus(null);
+  if (saved.startedGameId !== game.id) return normalizeNextGameFocus(null);
+  if (saved.sourceGameId === game.id) return normalizeNextGameFocus(null);
+  return saved;
+}
+
+function updateFocusFollowUp(result, game = currentReviewGame()) {
+  const focus = reviewFollowUpFocus(game);
+  if (!focus.text || !game) return;
+  const player = gamePlayerSnapshot(game);
+  const completed = result === "yes";
+  const carryForward = result === "carry" || result === "somewhat" || result === "not-yet";
+  const updated = normalizeNextGameFocus({
+    ...focus,
+    status: completed ? "completed" : "open",
+    followUpResult: result,
+    followUpGameId: game.id,
+    followUpAt: new Date().toISOString(),
+    startedGameId: carryForward ? "" : focus.startedGameId,
+    updatedAt: new Date().toISOString(),
+  });
+  state.nextGameFocus = saveScopedNextGameFocus(updated, player);
+  persistAll();
+  render();
+  if (completed) showToast("Focus marked complete.");
+  else showToast("Focus carried forward.");
 }
 
 async function writeTextToClipboard(text) {
@@ -5998,6 +6152,7 @@ function renderHome() {
     <section class="stack">
       ${renderApprovedPlayerCallout()}
       ${hasApprovedPlayer ? renderHomeReadyCard() : renderNoApprovedPlayerHome()}
+      ${hasApprovedPlayer ? renderHomeNextGameFocusCard() : ""}
       ${renderGameDayStatusCard()}
       ${renderHomeQuickActions()}
 
@@ -6608,6 +6763,26 @@ function renderHomeReadyCard() {
   `;
 }
 
+function renderHomeNextGameFocusCard() {
+  const focus = openNextGameFocusForPlayer(state.player);
+  if (!focus.text) return "";
+  return `
+    <section class="card pad development-card lh-active-focus-card">
+      <div class="section-head compact-head">
+        <div>
+          <h3>Next Game Focus</h3>
+          <p class="muted small">Saved from the last game review.</p>
+        </div>
+      </div>
+      <p>${escapeHTML(focus.text)}</p>
+      <div class="lh-focus-actions compact">
+        <button class="btn brand positive" type="button" data-action="start-with-focus">Start Game With This Focus</button>
+        <button class="btn secondary" type="button" data-action="change-next-focus">Change</button>
+      </div>
+    </section>
+  `;
+}
+
 function renderGameDayStatusCard() {
   const rows = [
     ["Offline tracking", "Ready"],
@@ -6712,6 +6887,7 @@ function renderSettings() {
 function renderStartGame() {
   const viewOnlyTeamPlayer = isTeamPlayer(state.player) && !canTrackPlayer(state.player);
   const availablePlayers = visiblePlayers();
+  const focus = openNextGameFocusForPlayer(state.player);
   return renderShell(`
     <section class="screen-title">
       <h2>Set up game</h2>
@@ -6735,6 +6911,20 @@ function renderStartGame() {
             : ""
         }
       </section>
+
+      ${
+        focus.text
+          ? `<section class="card pad development-card lh-active-focus-card">
+              <h3>Today's Focus</h3>
+              <p>${escapeHTML(focus.text)}</p>
+              <p class="muted small">Keep this in mind while tracking the next game.</p>
+              <div class="lh-focus-actions compact">
+                <button class="btn brand positive" type="button" data-action="use-this-focus">Use This Focus</button>
+                <button class="btn secondary" type="button" data-action="change-next-focus">Change Focus</button>
+              </div>
+            </section>`
+          : ""
+      }
 
       <section class="card pad form-grid">
         <div class="section-head compact-head">
@@ -7413,13 +7603,29 @@ function focusTextForValue(value, customText = "", totals = {}, player = state.p
 }
 
 function savedNextFocusForPlayer(player = state.player) {
-  const saved = normalizeNextGameFocus(state.nextGameFocus);
+  const saved = activeNextGameFocusForPlayer(player);
   if (!saved.text) return "";
+  if (saved.status && saved.status !== "open") return "";
   const playerId = player.id || "";
   const rosterPlayerId = player.rosterPlayerId || "";
   if (saved.playerId && saved.playerId !== playerId) return "";
   if (saved.rosterPlayerId && rosterPlayerId && saved.rosterPlayerId !== rosterPlayerId) return "";
   return saved.text;
+}
+
+function openNextGameFocusForPlayer(player = state.player) {
+  const saved = activeNextGameFocusForPlayer(player);
+  return saved.text && (!saved.status || saved.status === "open") ? saved : normalizeNextGameFocus(null);
+}
+
+function navigateToFocusSourceReview() {
+  const focus = openNextGameFocusForPlayer(state.player);
+  if (focus.sourceGameId && state.games.some((game) => game.id === focus.sourceGameId)) {
+    state.reviewGameId = focus.sourceGameId;
+    navigate("review");
+    return;
+  }
+  navigate("dashboard");
 }
 
 function listPhrase(items = []) {
@@ -7775,7 +7981,7 @@ function nextGameFocusForRecap(totals = {}, player = state.player, topContributi
 }
 
 function renderNextGameFocusSection(game, player, totals, topContribution = "") {
-  const saved = normalizeNextGameFocus(state.nextGameFocus);
+  const saved = openNextGameFocusForPlayer(player);
   const recommendedValue = recommendedFocusValue(totals);
   const selectedValue = saved.selected || recommendedValue;
   const customText = selectedValue === "custom" ? saved.customText : "";
@@ -7802,9 +8008,30 @@ function renderNextGameFocusSection(game, player, totals, topContribution = "") 
         <strong>${escapeHTML(previewFocus)}</strong>
       </div>
       <div class="lh-focus-actions">
-        <button class="btn secondary" type="button" data-action="save-next-focus" data-game-id="${escapeHTML(game.id)}">Save Focus</button>
+        <button class="btn secondary" type="button" data-action="save-next-focus" data-game-id="${escapeHTML(game.id)}">Save for Next Game</button>
         <button class="btn neutral" type="button" data-action="add-focus-to-recap" data-game-id="${escapeHTML(game.id)}">Add to Family Recap</button>
         <button class="btn neutral" type="button" data-action="copy-focus-note" data-game-id="${escapeHTML(game.id)}">Copy Focus Note</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderFocusFollowUpSection(game, player) {
+  const focus = reviewFollowUpFocus(game);
+  if (!focus.text) return "";
+  return `
+    <section class="card pad development-card lh-focus-followup-card">
+      <h3>Follow-up from last game</h3>
+      <div class="focus-preview">
+        <span>Focus</span>
+        <strong>${escapeHTML(focus.text)}</strong>
+      </div>
+      <p class="muted small">Did this show up today?</p>
+      <div class="lh-focus-actions followup">
+        <button class="btn secondary" type="button" data-action="focus-followup" data-result="yes" data-game-id="${escapeHTML(game.id)}">Yes</button>
+        <button class="btn neutral" type="button" data-action="focus-followup" data-result="somewhat" data-game-id="${escapeHTML(game.id)}">Somewhat</button>
+        <button class="btn neutral" type="button" data-action="focus-followup" data-result="not-yet" data-game-id="${escapeHTML(game.id)}">Not yet</button>
+        <button class="btn neutral" type="button" data-action="focus-followup" data-result="carry" data-game-id="${escapeHTML(game.id)}">Carry Forward</button>
       </div>
     </section>
   `;
@@ -8144,6 +8371,7 @@ function renderReview() {
       ${renderWhyThesePlaysMatter(game.events || [], { limit: 3, showMore: true })}
       ${renderReviewStatsSection(totals, player, archetypeResult)}
       ${renderConversationStarters(totals, player)}
+      ${renderFocusFollowUpSection(game, player)}
       ${renderNextGameFocusSection(game, player, totals, topContribution.label)}
       ${renderFamilyRecapSection(game, player, totals)}
       <section class="review-section">
@@ -9381,6 +9609,7 @@ function handleSubmit(event) {
       return;
     }
     state.activeGame = makeGame(formData);
+    markFocusUsedForGame(state.activeGame);
     state.reviewGameId = state.activeGame.id;
     if (state.activeGame.isShared) state.liveSharePromptGameId = state.activeGame.id;
     persistAll();
@@ -9509,6 +9738,7 @@ function handleClick(event) {
       state.activePlayerId = playerId;
       syncActivePlayer();
       if (state.player.teamId) state.activeTeamId = state.player.teamId;
+      state.nextGameFocus = activeNextGameFocusForPlayer(state.player);
       persistAll();
       navigate(targetScreen);
     }
@@ -9535,6 +9765,7 @@ function handleClick(event) {
       state.activePlayerId = rosterForTeam[0].id;
       syncActivePlayer();
     }
+    state.nextGameFocus = activeNextGameFocusForPlayer(state.player);
     persistAll();
     render();
     showToast("Team selected");
@@ -9580,6 +9811,10 @@ function handleClick(event) {
     if (action.dataset.action === "save-next-focus") saveNextGameFocusFromReview();
     if (action.dataset.action === "add-focus-to-recap") addFocusToFamilyRecap();
     if (action.dataset.action === "copy-focus-note") copyNextFocusNote();
+    if (action.dataset.action === "start-with-focus") navigate("start");
+    if (action.dataset.action === "change-next-focus") navigateToFocusSourceReview();
+    if (action.dataset.action === "use-this-focus") showToast("Today's focus is ready.");
+    if (action.dataset.action === "focus-followup") updateFocusFollowUp(action.dataset.result);
     if (action.dataset.action === "close-saved-game") {
       state.gameSavedSummaryId = "";
       navigate("home");

@@ -5593,9 +5593,22 @@ form.account-card,
   gap: 10px;
 }
 
+.lh-focus-actions.compact {
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.75fr);
+}
+
+.lh-focus-actions.followup {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .lh-focus-actions .btn {
   min-height: 48px;
   padding-inline: 10px;
+}
+
+.lh-active-focus-card p,
+.lh-focus-followup-card p {
+  line-height: 1.45;
 }
 
 .review-details-card {
