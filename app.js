@@ -24,7 +24,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v230";
+const APP_VERSION = "v231";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -5250,14 +5250,16 @@ function renderAccountCard() {
         <input id="authPassword" name="password" type="password" autocomplete="current-password" minlength="6" required />
       </div>
       <div class="account-actions">
-        <button class="btn secondary auth-create" type="submit" name="authAction" value="sign-up" ${state.authBusy ? "disabled" : ""}>${state.authBusy ? "Sending..." : "Create Parent/Admin Account"}</button>
-        <button class="btn positive" type="submit" name="authAction" value="sign-in" ${state.authBusy ? "disabled" : ""}>${state.authBusy ? "Working..." : "Log In"}</button>
+        <button class="btn secondary auth-login" type="submit" name="authAction" value="sign-in" ${state.authBusy ? "disabled" : ""}>${state.authBusy ? "Working..." : "Log In"}</button>
+        <button class="btn neutral auth-create-dark" type="submit" name="authAction" value="sign-up" ${state.authBusy ? "disabled" : ""}>${state.authBusy ? "Sending..." : "Create Parent/Admin Account"}</button>
         <button class="btn neutral" type="button" data-nav="demo">View Demo Game</button>
       </div>
       ${renderInstallCard({ compact: true })}
-      <p class="auth-legal muted small">
-        By creating an account, you agree to the <a href="terms.html" target="_blank" rel="noopener">LaxHornet Terms of Use</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>. LaxHornet is for adults managing youth lacrosse tracking. Children may not create accounts. You are responsible for entering only player/team information you are authorized to manage or track.
-      </p>
+      <div class="auth-legal muted small">
+        <p>By creating an account, you agree to the <a href="terms.html" target="_blank" rel="noopener">LaxHornet Terms of Use</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>
+        <p>LaxHornet is for adults managing youth lacrosse tracking. Children may not create accounts.</p>
+        <p>Only enter player/team information you are authorized to manage or track.</p>
+      </div>
     </form>
   `;
 }
@@ -6179,8 +6181,14 @@ function renderWelcome() {
 
       ${renderWatchSharedGameForm()}
 
-      <div class="card pad faq-card">
-        <h3>Quick FAQ</h3>
+      <details class="card pad faq-card welcome-faq-card">
+        <summary class="faq-card-summary">
+          <span>
+            <strong>Quick FAQ</strong>
+            <small>Account, watching, and team setup basics.</small>
+          </span>
+        </summary>
+        <div class="faq-card-body">
         <details>
           <summary>Do I need an account?</summary>
           <p class="muted small">Yes for team rosters, player verification, saving stats to your account, and sharing stats across parent accounts.</p>
@@ -6197,7 +6205,8 @@ function renderWelcome() {
           <button class="btn neutral" type="button" data-nav="tutorial">Quick Guide</button>
           <button class="btn secondary" type="button" data-nav="help">Impact Help</button>
         </div>
-      </div>
+        </div>
+      </details>
     </section>
   `, { hideNav: true });
 }

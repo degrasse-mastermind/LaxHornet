@@ -3130,8 +3130,16 @@ button:focus-visible,
 }
 
 .auth-legal {
+  display: grid;
+  gap: 6px;
   margin: 2px 0 0;
-  text-align: center;
+  padding: 10px 12px 0;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.auth-legal p {
+  margin: 0;
 }
 
 .auth-legal a {
@@ -3139,6 +3147,69 @@ button:focus-visible,
   font-weight: 900;
   text-decoration-color: rgba(232, 16, 16, 0.45);
   text-underline-offset: 3px;
+}
+
+.welcome-faq-card {
+  display: block;
+}
+
+.welcome-faq-card > summary {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.welcome-faq-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.welcome-faq-card > summary::after {
+  content: ">";
+  display: inline-grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(232, 16, 16, 0.2);
+  border-radius: 999px;
+  color: var(--hornet-red);
+  background: #ffffff;
+  font-size: 1.25rem;
+  font-weight: 950;
+  transition: transform 140ms ease;
+}
+
+.welcome-faq-card[open] > summary::after {
+  transform: rotate(90deg);
+}
+
+.faq-card-summary strong,
+.faq-card-summary small {
+  display: block;
+}
+
+.faq-card-summary strong {
+  color: var(--text);
+  font-size: 1.05rem;
+  line-height: 1.15;
+}
+
+.faq-card-summary small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.faq-card-body {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .admin-tools-card {
