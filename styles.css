@@ -3231,6 +3231,15 @@ form.account-card .account-actions .btn.neutral {
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.24), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
+form.account-card .account-actions .btn.auth-demo-light {
+  border: 1px solid rgba(17, 19, 23, 0.22);
+  color: #111418;
+  background:
+    linear-gradient(90deg, #111418 0 6px, transparent 6px),
+    linear-gradient(180deg, #ffffff, #f7f8fa);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.16), inset 0 0 0 1px rgba(255, 255, 255, 0.68);
+}
+
 .admin-tools-card {
   border-color: rgba(232, 16, 16, 0.2);
 }
@@ -4264,6 +4273,10 @@ form.account-card .account-actions {
 .collapse-icon,
 .stat-button {
   border-radius: 10px;
+}
+
+.collapse-icon {
+  border-radius: 999px;
 }
 
 .btn {
