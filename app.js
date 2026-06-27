@@ -7197,13 +7197,14 @@ function renderTagEditor(game, event) {
   `;
 }
 
-function insightCard(label, value, helper = "") {
+function insightCard(label, value, helper = "", options = {}) {
   const isCopyCard = label.toLowerCase().includes("takeaway");
   const cardClass = isCopyCard ? "insight-card insight-card-copy" : "insight-card";
   const valueClass = isCopyCard ? "insight-value insight-value-copy" : "insight-value";
+  const extraClass = options.className ? ` ${options.className}` : "";
 
   return `
-    <div class="${cardClass}">
+    <div class="${cardClass}${extraClass}">
       <span>${escapeHTML(label)}</span>
       <div class="${valueClass}">${value}</div>
       ${helper ? `<small>${escapeHTML(helper)}</small>` : ""}
@@ -7329,10 +7330,24 @@ function importantEducationItemsForEvents(events = [], limit = 4) {
 }
 
 function renderWhyThesePlaysMatter(events = [], options = {}) {
-  const items = importantEducationItemsForEvents(events, options.limit || 4);
+  const limit = options.limit || 4;
+  const allItems = importantEducationItemsForEvents(events, options.showMore ? 8 : limit);
+  const items = allItems.slice(0, limit);
+  const extraItems = options.showMore ? allItems.slice(limit) : [];
   const title = options.title || "Why these plays matter";
   const helper = options.helper || "A quick parent guide to the plays that shaped this game.";
   const emptyCopy = options.emptyCopy || "Track a few plays to see simple explanations of what each stat means and why it supports development.";
+  const renderEducationItem = ({ count, education }) => `
+    <article class="why-play-item">
+      <div>
+        <strong>${escapeHTML(education.label)}</strong>
+        <span>${count} tracked</span>
+      </div>
+      <p><b>Meaning:</b> ${escapeHTML(education.meaning)}</p>
+      <p><b>Why it matters:</b> ${escapeHTML(education.why)}</p>
+      <p><b>Next focus:</b> ${escapeHTML(education.focus)}</p>
+    </article>
+  `;
 
   return `
     <details class="card pad lh-why-card" open>
@@ -7343,23 +7358,17 @@ function renderWhyThesePlaysMatter(events = [], options = {}) {
       ${
         items.length
           ? `<div class="why-play-list">
-              ${items
-                .map(
-                  ({ count, education }) => `
-                    <article class="why-play-item">
-                      <div>
-                        <strong>${escapeHTML(education.label)}</strong>
-                        <span>${count} tracked</span>
-                      </div>
-                      <p><b>Meaning:</b> ${escapeHTML(education.meaning)}</p>
-                      <p><b>Why it matters:</b> ${escapeHTML(education.why)}</p>
-                      <p><b>Next focus:</b> ${escapeHTML(education.focus)}</p>
-                    </article>
-                  `,
-                )
-                .join("")}
+              ${items.map(renderEducationItem).join("")}
             </div>`
           : `<p class="muted small">${escapeHTML(emptyCopy)}</p>`
+      }
+      ${
+        extraItems.length
+          ? `<details class="why-more-details">
+              <summary>Show more stat explanations</summary>
+              <div class="why-play-list compact">${extraItems.map(renderEducationItem).join("")}</div>
+            </details>`
+          : ""
       }
     </details>
   `;
@@ -7448,6 +7457,48 @@ function possessionStoryForTotals(totals = {}, topContribution = "") {
   return "";
 }
 
+function reviewOneLineSummary(totals = {}, topContribution = "") {
+  const eventCount = Number(totals.eventCount || 0);
+  const possessionIsStory = isPossessionReviewStory(totals, topContribution);
+  if (!eventCount) return "Here is what shaped this game.";
+  if (topContribution === "Possession") return "Possession work was the biggest story today.";
+  if (topContribution === "Scoring" && possessionIsStory) return "Balanced scoring and possession game with one clear next focus.";
+  if (topContribution === "Scoring") return "Scoring drove the impact, with possession as the next growth area.";
+  if (topContribution === "Defense") return "Defensive pressure and effort plays shaped this game.";
+  if (topContribution === "Goalie") return "Goalie play helped shape the game story.";
+  if (topContribution === "Hustle" && Number(totals.possessionValue || 0) > 0) return "Strong hustle game with positive possession impact.";
+  if (topContribution === "Hustle") return "Effort plays kept the player involved throughout the game.";
+  return "Here is what shaped this game.";
+}
+
+function encouragementForTotals(totals = {}, topContribution = "") {
+  if (topContribution === "Possession") {
+    if (totals.groundBalls || totals.clears || totals.backedUpShots) {
+      return "Celebrate the ground balls, clears, and backed up shots that created extra chances.";
+    }
+    return "Encourage cleaner possessions after winning the ball.";
+  }
+  if (topContribution === "Scoring" && totals.assists) {
+    return "Point out the smart decisions and feeds, not just the scoring moments.";
+  }
+  if (topContribution === "Scoring") {
+    return "Celebrate the finishing, then look for one way to add assists or possession plays.";
+  }
+  if (topContribution === "Defense") {
+    return "Praise the pressure, positioning, and stops that helped turn defense into possession.";
+  }
+  if (topContribution === "Goalie") {
+    return "Praise the saves and quick resets that helped the team move into the next play.";
+  }
+  if (topContribution === "Hustle") {
+    return "Praise the hustle plays that kept the player involved away from the ball.";
+  }
+  if (totals.turnovers > totals.groundBalls + totals.clears) {
+    return "Encourage safer outlets and cleaner possessions after winning the ball.";
+  }
+  return "Encourage the plays that show effort, awareness, and growth beyond the box score.";
+}
+
 function developmentTakeawayForTotals(totals = {}, player = state.player, topContribution = "") {
   const name = playerTitle(player);
   const positionGroup = impactPositionGroup(player);
@@ -7521,6 +7572,15 @@ function renderDevelopmentTakeaway(totals = {}, player = state.player, topContri
         ${possessionStory ? `<p><span>Possession story:</span>${escapeHTML(possessionStory)}</p>` : ""}
         <p><span>Next focus</span>${escapeHTML(savedNextFocusForPlayer(player) || takeaway.focus)}</p>
       </div>
+    </section>
+  `;
+}
+
+function renderWhatToEncourage(totals = {}, topContribution = "") {
+  return `
+    <section class="card pad development-card lh-encourage-card">
+      <h3>What to Encourage</h3>
+      <p>${escapeHTML(encouragementForTotals(totals, topContribution))}</p>
     </section>
   `;
 }
@@ -7771,47 +7831,53 @@ function nextLevelFocusForSeason(totals, archetypeResult) {
   return archetypeResult.nextFocus;
 }
 
-function renderReviewSummarySection(game, player, totals, archetypeResult) {
+function renderReviewSummarySection(game, player, totals) {
   const topContribution = topContributionForTotals(totals);
+  const showPossession = Number(totals.possessionValue || 0) !== 0 || Number(totals.extraPossessions || 0) !== 0 || topContribution.label === "Possession";
+  const activityLabel = totals.points > 0 ? "Points" : "Events";
+  const activityValue = totals.points > 0 ? totals.points : totals.eventCount;
+  const activityHelper = totals.points > 0 ? `${totals.goals}G ${totals.assists}A` : "tracked plays";
+  const snapshotCards = [
+    insightCard("Game Impact", renderImpactGrade(totals.impact), "Snapshot, not a coach grade", { className: "snapshot-card" }),
+    insightCard("Top Contribution", escapeHTML(topContribution.display), topContribution.label, { className: "snapshot-card" }),
+    showPossession
+      ? insightCard("Possession", escapeHTML(signedMetric(totals.possessionValue)), `${signedMetric(totals.extraPossessions)} extra ${Math.abs(Number(totals.extraPossessions || 0)) === 1 ? "chance" : "chances"}`, { className: "snapshot-card" })
+      : "",
+    insightCard(activityLabel, escapeHTML(String(activityValue)), activityHelper, { className: "snapshot-card" }),
+  ].filter(Boolean);
   return `
-    <section class="review-section">
+    <section class="review-section review-snapshot-section">
+      <p class="review-storyline">${escapeHTML(reviewOneLineSummary(totals, topContribution.label))}</p>
       <div class="section-head compact-head">
         <div>
           <h3>Game Snapshot</h3>
-          <p class="muted small">${escapeHTML(playerTitle(player))} vs ${escapeHTML(game.opponent)} - ${formatDate(game.date)}</p>
         </div>
       </div>
-      <div class="insight-grid">
-        ${insightCard("Game Impact", renderImpactGrade(totals.impact), "Snapshot, not a coach grade")}
-        ${insightCard("Top Contribution", escapeHTML(topContribution.display), topContribution.label)}
-        ${insightCard("Possession Impact", escapeHTML(signedMetric(totals.possessionValue)), `${signedMetric(totals.extraPossessions)} extra chances`)}
-        ${insightCard("Key Takeaway", renderTakeawayValue(totals.gameImpact?.takeaway))}
+      <div class="insight-grid review-snapshot-grid">
+        ${snapshotCards.join("")}
       </div>
-      ${renderDevelopmentTakeaway(totals, player, topContribution.label)}
-      ${renderWhyThesePlaysMatter(game.events || [])}
-      ${renderConversationStarters(totals, player)}
-      ${renderNextGameFocusSection(game, player, totals, topContribution.label)}
-      ${renderFamilyRecapSection(game, player, totals)}
-      <div class="explainer-card">
-        <strong>Game Impact</strong>
-        <p>Game Impact is a quick snapshot of how this player helped create, protect, finish, or defend possessions. It is not a coach grade or a permanent label.</p>
-      </div>
-      ${generateShareCard(player, archetypeResult, { profileLabel: "Today's Player Profile", patternScope: "game" })}
     </section>
   `;
 }
 
-function renderReviewStatsSection(totals) {
+function renderReviewStatsSection(totals, player, archetypeResult) {
   return `
-    <section class="review-section">
-      <div class="section-head compact-head">
-        <div>
-          <h3>Stats</h3>
-          <p class="muted small">Totals update automatically when plays are added, edited, tagged, or deleted.</p>
+    <section class="review-section review-full-breakdown">
+      <details class="review-details-card">
+        <summary>
+          <span>Full Game Impact Breakdown</span>
+          <small>Open detailed scoring, player profile, and full stat table.</small>
+        </summary>
+        <div class="review-details-stack">
+          ${renderImpactBreakdown(totals, { embedded: true })}
+          <div class="explainer-card review-explainer-card">
+            <strong>Game Impact</strong>
+            <p>Game Impact is a quick snapshot of how this player helped create, protect, finish, or defend possessions. It is not a coach grade or a permanent label.</p>
+          </div>
+          ${generateShareCard(player, archetypeResult, { profileLabel: "Today's Player Profile", patternScope: "game" })}
+          ${renderTotalsTable(totals, { embedded: true })}
         </div>
-      </div>
-      ${renderImpactBreakdown(totals)}
-      ${renderTotalsTable(totals)}
+      </details>
     </section>
   `;
 }
@@ -7834,6 +7900,7 @@ function renderReview() {
 
   const player = gamePlayerSnapshot(game);
   const totals = calculateTotals(game.events, player);
+  const topContribution = topContributionForTotals(totals);
   const archetypeResult = calculateArchetypeResult(totals);
   const canEditCurrentGame = canEditGame(game);
   const editingEvent = state.editingEventId
@@ -7848,16 +7915,22 @@ function renderReview() {
   return renderShell(`
     <section class="screen-title">
       <h2>Game Review</h2>
-      <p>${escapeHTML(playerTitle(player))} - ${escapeHTML(game.opponent)} - ${formatDate(game.date)}</p>
+      <p>${escapeHTML(playerTitle(player))} vs ${escapeHTML(game.opponent)} &middot; ${formatDate(game.date)}</p>
     </section>
 
-    <section class="stack">
+    <section class="stack review-screen-stack">
       ${renderReviewSummarySection(game, player, totals, archetypeResult)}
-      ${renderReviewStatsSection(totals)}
+      ${renderDevelopmentTakeaway(totals, player, topContribution.label)}
+      ${renderWhatToEncourage(totals, topContribution.label)}
+      ${renderWhyThesePlaysMatter(game.events || [], { limit: 3, showMore: true })}
+      ${renderReviewStatsSection(totals, player, archetypeResult)}
+      ${renderConversationStarters(totals, player)}
+      ${renderNextGameFocusSection(game, player, totals, topContribution.label)}
+      ${renderFamilyRecapSection(game, player, totals)}
       <section class="review-section">
         <div class="card pad">
-          <h3>Every tracked play</h3>
-          <p class="muted small">Tap an event to edit the note, tag, field zone, or stat type.</p>
+          <h3>Timeline &amp; Edits</h3>
+          <p class="muted small">Review each tracked play, add notes or tags, and make corrections if needed.</p>
           <p class="safety-note">Avoid private, medical, or sensitive information in notes. Notes may appear in reviews, exports, or Live Share.</p>
         ${
           game.events.length
@@ -7941,7 +8014,7 @@ function renderSharedGame() {
   `);
 }
 
-function renderTotalsTable(totals) {
+function renderTotalsTable(totals, options = {}) {
   const rows = [
     { section: "Offense" },
     ["Goals", totals.goals],
@@ -7976,7 +8049,7 @@ function renderTotalsTable(totals) {
   ];
 
   return `
-    <div class="card table-card">
+    <div class="${options.embedded ? "table-card table-card-embedded" : "card table-card"}">
       <table class="stat-table">
         <thead><tr><th>Stat</th><th>Total</th></tr></thead>
         <tbody>
@@ -7993,11 +8066,13 @@ function renderTotalsTable(totals) {
   `;
 }
 
-function renderImpactBreakdown(totals) {
+function renderImpactBreakdown(totals, options = {}) {
   const impact = totals.gameImpact || calculateGameImpact([]);
   const profile = impact.weightProfile || IMPACT_POSITION_WEIGHTS.midfield;
+  const WrapperTag = options.embedded ? "div" : "section";
+  const wrapperClass = options.embedded ? "impact-card impact-card-embedded" : "card pad impact-card";
   return `
-    <section class="card pad impact-card">
+    <${WrapperTag} class="${wrapperClass}">
       <div class="section-head compact-head">
         <div>
           <h3>Game Impact Breakdown</h3>
@@ -8021,7 +8096,7 @@ function renderImpactBreakdown(totals) {
       <p class="impact-takeaway">${escapeHTML(impact.takeaway)}</p>
       <p class="muted small">Game Impact is a quick snapshot of how this player helped create, protect, finish, or defend possessions. It is not a coach grade or a permanent label.</p>
       <p class="muted small">Raw event value: ${formatImpactNumber(impact.raw)}. Weighted event value: ${formatImpactNumber(impact.weightedRaw)}. Average Impact on the Season page averages these 0-100 game scores.</p>
-    </section>
+    </${WrapperTag}>
   `;
 }
 
