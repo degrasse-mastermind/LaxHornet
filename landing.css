@@ -193,7 +193,7 @@ a {
 }
 
 .phone {
-  width: min(100%, 318px);
+  width: min(100%, 356px);
   padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 34px;
@@ -553,7 +553,7 @@ a {
   }
 
   .phone {
-    width: min(100%, 306px);
+    width: min(100%, 338px);
   }
 
   .phone-screen {
