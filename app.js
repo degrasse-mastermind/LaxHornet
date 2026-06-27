@@ -24,7 +24,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v241";
+const APP_VERSION = "v242";
 
 const PERIOD_FORMATS = {
   quarters: {

@@ -836,6 +836,15 @@ a {
   margin-top: 24px;
 }
 
+.development-section .btn.secondary {
+  color: #111317;
+  border-color: rgba(232, 16, 16, 0.48);
+  background:
+    linear-gradient(90deg, var(--red) 0 6px, transparent 6px),
+    #ffffff;
+  box-shadow: 0 16px 34px rgba(17, 19, 23, 0.12), inset 0 0 0 1px rgba(17, 19, 23, 0.04);
+}
+
 .compact-heading {
   align-items: start;
 }
