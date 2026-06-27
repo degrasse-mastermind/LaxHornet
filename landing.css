@@ -928,3 +928,27 @@ a {
     right: 10px;
   }
 }
+
+@media (max-width: 560px) {
+  .hero {
+    width: min(100% - 32px, 100%);
+    gap: 28px;
+  }
+
+  .hero-copy h1 {
+    max-width: 100%;
+    font-size: clamp(2rem, 9.2vw, 2.8rem);
+    line-height: 1.08;
+  }
+}
+
+@media (max-width: 380px) {
+  .hero {
+    width: min(100% - 28px, 100%);
+  }
+
+  .hero-copy h1 {
+    font-size: clamp(1.82rem, 9.8vw, 2.18rem);
+    line-height: 1.1;
+  }
+}
