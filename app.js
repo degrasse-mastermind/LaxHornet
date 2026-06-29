@@ -16,6 +16,7 @@ const STORAGE_KEYS = {
   adminViewMode: "laxhornet.adminViewMode",
   onboardingIntent: "laxhornet.onboardingIntent",
   nextGameFocus: "laxhornet.nextGameFocus",
+  familyRecapFocus: "laxhornet.familyRecapFocus",
 };
 
 const SUPABASE_CONFIG = {
@@ -24,7 +25,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v253";
+const APP_VERSION = "v254";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -5141,6 +5142,48 @@ function saveInlineNextGameFocusFromPanel(panel) {
   return saveInlineNextGameFocus(formData, panel.dataset.focusContext || "");
 }
 
+function familyRecapFocusStorageKey(game = {}, player = state.player) {
+  const normalized = normalizePlayer(player || {});
+  const gameId = game?.id || "game";
+  const teamId = normalized.teamId || gameTeamId(game) || "local";
+  const rosterPlayerId = normalized.rosterPlayerId || gameRosterPlayerId(game) || normalized.id || "player";
+  return [
+    STORAGE_KEYS.familyRecapFocus,
+    `user.${focusStorageSegment(focusAccountId())}`,
+    `team.${focusStorageSegment(teamId)}`,
+    `player.${focusStorageSegment(rosterPlayerId)}`,
+    `game.${focusStorageSegment(gameId)}`,
+  ].join(".");
+}
+
+function loadFamilyRecapFocus(game = {}, player = state.player) {
+  if (!game?.id) return "";
+  try {
+    const saved = JSON.parse(localStorage.getItem(familyRecapFocusStorageKey(game, player)) || "null");
+    return String(saved?.focusText || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function saveFamilyRecapFocus(game = {}, player = state.player, focusText = "") {
+  const text = String(focusText || "").trim();
+  if (!game?.id || !text) return "";
+  const normalized = normalizePlayer(player || {});
+  localStorage.setItem(
+    familyRecapFocusStorageKey(game, player),
+    JSON.stringify({
+      focusText: text,
+      gameId: game.id,
+      teamId: normalized.teamId || gameTeamId(game) || "",
+      rosterPlayerId: normalized.rosterPlayerId || gameRosterPlayerId(game) || "",
+      playerId: normalized.id || "",
+      updatedAt: new Date().toISOString(),
+    }),
+  );
+  return text;
+}
+
 async function copyNextFocusNote() {
   const draft = nextFocusDraftFromReview();
   const text = `Next focus: ${draft.text}`;
@@ -5153,8 +5196,13 @@ async function copyNextFocusNote() {
 }
 
 function addFocusToFamilyRecap() {
-  const saved = saveNextGameFocusFromReview({ silent: true });
-  if (!saved) return;
+  const draft = nextFocusDraftFromReview();
+  if (!draft.text) {
+    showToast("Choose a focus first");
+    return;
+  }
+  saveFamilyRecapFocus(draft.game, draft.player, draft.text);
+  render();
   showToast("Focus added to Family Recap");
 }
 
@@ -6941,7 +6989,6 @@ function renderHomeNextGameFocusCard() {
   const focus = openNextGameFocusForPlayer(state.player);
   if (!focus.text) return "";
   const editorOpen = state.focusEditorContext === "home";
-  const changedNote = sourceReviewFocusChangeNote(focus, focus.sourceGameId);
   return `
     <section class="card pad development-card lh-active-focus-card">
       <div class="section-head compact-head">
@@ -6951,7 +6998,6 @@ function renderHomeNextGameFocusCard() {
         </div>
       </div>
       <p>${escapeHTML(focus.text)}</p>
-      ${changedNote ? `<p class="focus-change-note">${escapeHTML(changedNote)}</p>` : ""}
       <div class="lh-focus-actions compact">
         <button class="btn brand positive" type="button" data-action="start-with-focus">Start Game With This Focus</button>
         <button class="btn secondary" type="button" data-action="toggle-next-focus-editor" data-focus-context="home">${editorOpen ? "Close" : "Change"}</button>
@@ -7067,7 +7113,6 @@ function renderStartGame() {
   const availablePlayers = visiblePlayers();
   const focus = openNextGameFocusForPlayer(state.player);
   const focusEditorOpen = state.focusEditorContext === "start";
-  const focusChangeNote = sourceReviewFocusChangeNote(focus, focus.sourceGameId);
   return renderShell(`
     <section class="screen-title">
       <h2>Set up game</h2>
@@ -7094,10 +7139,9 @@ function renderStartGame() {
 
       ${
         focus.text
-          ? `<section class="card pad development-card lh-active-focus-card">
+            ? `<section class="card pad development-card lh-active-focus-card">
               <h3>Today's Focus</h3>
               <p>${escapeHTML(focus.text)}</p>
-              ${focusChangeNote ? `<p class="focus-change-note">${escapeHTML(focusChangeNote)}</p>` : ""}
               <p class="muted small">Keep this in mind while tracking the next game.</p>
               <div class="lh-focus-actions compact">
                 <button class="btn brand positive" type="button" data-action="use-this-focus">Use This Focus</button>
@@ -8148,7 +8192,9 @@ function renderConversationStarters(totals = {}, player = state.player) {
   `;
 }
 
-function nextGameFocusForRecap(totals = {}, player = state.player, topContribution = "") {
+function nextGameFocusForRecap(totals = {}, player = state.player, topContribution = "", game = null) {
+  const recapFocus = game ? loadFamilyRecapFocus(game, player) : "";
+  if (recapFocus) return recapFocus;
   return savedNextFocusForPlayer(player) || developmentTakeawayForTotals(totals, player, topContribution).focus;
 }
 
@@ -8324,7 +8370,7 @@ function buildFamilyRecap(game = {}, events = [], playerContext = {}, computedSt
   const title = `${playerFirstName(player)} ${familyRecapOpponentLabel(game)}`;
 
   if (Number(totals.eventCount || events?.length || 0) < 3) {
-    const body = `A short recap is available once more plays are tracked.\nNext focus: ${nextGameFocusForRecap(totals, player, "")}`;
+    const body = `A short recap is available once more plays are tracked.\nNext focus: ${nextGameFocusForRecap(totals, player, "", game)}`;
     return {
       title,
       body,
@@ -8343,7 +8389,7 @@ function buildFamilyRecap(game = {}, events = [], playerContext = {}, computedSt
   if (statLine) lines.push(`Stats: ${statLine}`);
   if (hasPossessionStory) lines.push(`Possession story: ${signedMetric(totals.possessionValue)} possession value and ${signedMetric(totals.extraPossessions)} extra chances`);
   lines.push(`Takeaway: ${familyRecapTakeaway(totals, player, topContribution)}`);
-  lines.push(`Next focus: ${nextGameFocusForRecap(totals, player, topContribution)}`);
+  lines.push(`Next focus: ${nextGameFocusForRecap(totals, player, topContribution, game)}`);
 
   const body = lines.join("\n");
   return {
