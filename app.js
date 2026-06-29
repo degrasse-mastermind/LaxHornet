@@ -24,7 +24,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v252";
+const APP_VERSION = "v253";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -958,9 +958,19 @@ function pruneLocalOnlyCloudState() {
   const cloudTeams = normalizeTeams(state.teams.filter((team) => normalizeTeam(team).cloudBacked));
   const cloudTeamIds = new Set(cloudTeams.map((team) => team.id));
   state.teams = cloudTeams;
-  state.rosterPlayers = normalizeRosterPlayers(
-    state.rosterPlayers.filter((player) => cloudTeamIds.has(normalizeRosterPlayer(player).teamId)),
+  state.playerClaims = normalizePlayerClaims(state.playerClaims).filter(
+    (claim) => !isPlayerAccessRemoved(claim.teamId, claim.rosterPlayerId),
   );
+  state.rosterPlayers = normalizeRosterPlayers(
+    state.rosterPlayers.filter((player) => {
+      const normalized = normalizeRosterPlayer(player);
+      if (!cloudTeamIds.has(normalized.teamId)) return false;
+      if (isPlatformReviewer()) return true;
+      if (isPlayerAccessRemoved(normalized.teamId, normalized.id, normalized.number)) return false;
+      return hasPlayerClaim(normalized.teamId, normalized.id);
+    }),
+  );
+  state.games = state.games.filter(canShowGameForCurrentAccess);
   if (state.activeTeamId && !cloudTeamIds.has(state.activeTeamId)) {
     state.activeTeamId = state.teams[0]?.id || "";
   }
@@ -1125,6 +1135,21 @@ function canTrackPlayer(player = state.player) {
   const normalized = normalizePlayer(player);
   if (!isTeamPlayer(normalized)) return true;
   return canTrackRosterPlayer(normalized.teamId, normalized.rosterPlayerId || normalized.id);
+}
+
+function canShowGameForCurrentAccess(game = {}) {
+  const gameId = game.id || "";
+  if (gameId && isDeletedGame(gameId)) return false;
+
+  const teamId = gameTeamId(game);
+  const rosterPlayerId = gameRosterPlayerId(game);
+  const snapshot = gamePlayerSnapshot(game);
+  if (teamId && isPlayerAccessRemoved(teamId, rosterPlayerId, snapshot.number)) return false;
+
+  if (!cloudRosterModeEnabled() || isPlatformReviewer()) return true;
+  if (!teamId) return !game.userId || game.userId === currentUserId();
+  if (!rosterPlayerId) return false;
+  return hasPlayerClaim(teamId, rosterPlayerId);
 }
 
 function visibleRosterPlayers(roster = state.rosterPlayers) {
@@ -2238,6 +2263,7 @@ function navigate(screen) {
 function upsertGame(game) {
   game = normalizeGame(game);
   if (isDeletedGame(game.id)) return;
+  if (!canShowGameForCurrentAccess(game)) return;
   const index = state.games.findIndex((item) => item.id === game.id);
   if (index >= 0) {
     state.games[index] = { ...game };
@@ -2821,12 +2847,13 @@ function visibleGames() {
 function visibleGamesForPlayer(player = state.player) {
   const userId = currentUserId();
   const joinedTeamIds = teamIds();
+  const accessFilteredGames = state.games.filter(canShowGameForCurrentAccess);
   const userGames = userId
-    ? state.games.filter((game) => {
+    ? accessFilteredGames.filter((game) => {
         const teamGameId = gameTeamId(game);
         return !game.userId || game.userId === userId || (teamGameId && joinedTeamIds.includes(teamGameId));
       })
-    : state.games.filter((game) => !game.userId && !gameTeamId(game));
+    : accessFilteredGames.filter((game) => !game.userId && !gameTeamId(game));
   const normalized = normalizePlayer(player);
   if (!normalized.id) return userGames;
   return userGames.filter((game) => {
@@ -3545,11 +3572,13 @@ function mergeGames(localGames, cloudGames) {
   const merged = new Map(
     localGames
       .filter((game) => !isDeletedGame(game.id))
+      .filter(canShowGameForCurrentAccess)
       .map((game) => [game.id, normalizeGame(game)]),
   );
   cloudGames
     .filter((game) => !isDeletedGame(game.id))
     .map(normalizeGame)
+    .filter(canShowGameForCurrentAccess)
     .forEach((game) => merged.set(game.id, game));
   return [...merged.values()].sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
 }
@@ -3686,8 +3715,9 @@ async function loadCloudTeams(options = {}) {
   state.teams = normalizeTeams([...localAdminTeams, ...cloudTeams]);
 
   await loadTeamAccessRequests({ silent: true });
-  await repairApprovedPlayerClaims({ silent: true });
-  await loadTeamAccessRequests({ silent: true });
+  // Do not auto-repair player claims during routine sync. If a parent removes a
+  // verified player from their account, an old approved request should not
+  // recreate that player claim on the next sync.
   const approvedRequestTeams = state.teamAccessRequests
     .filter((request) => request.status === "approved" && request.teamId)
     .map((request) => ({
@@ -3872,8 +3902,10 @@ async function loadCloudGames(options = {}) {
   }
 
   const rowsById = new Map([...(ownData || []), ...teamData].map((game) => [game.id, game]));
-  const cloudGames = [...rowsById.values()].map((game) => gameFromSupabaseRow(game, game.events || []));
-  state.games = mergeGames(state.games, cloudGames);
+  const cloudGames = [...rowsById.values()]
+    .map((game) => gameFromSupabaseRow(game, game.events || []))
+    .filter(canShowGameForCurrentAccess);
+  state.games = mergeGames(state.games, cloudGames).filter(canShowGameForCurrentAccess);
   mergePlayersFromGames(state.games);
   const newestCloudGame = cloudGames.find((game) => !isDeletedGame(game.id));
   if (!options.silent && newestCloudGame) {
