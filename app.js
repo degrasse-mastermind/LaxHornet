@@ -25,7 +25,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v255";
+const APP_VERSION = "v256";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -3288,7 +3288,7 @@ function deleteGame(id) {
   render();
 }
 
-function confirmDeleteGame(id) {
+async function confirmDeleteGame(id) {
   const game = state.games.find((item) => item.id === id);
   if (!game) {
     state.pendingDeleteGameId = "";
@@ -3311,12 +3311,20 @@ function confirmDeleteGame(id) {
   state.pendingDeleteGameId = "";
   if (state.reviewGameId === id) state.reviewGameId = state.games[0]?.id || null;
   persistAll();
-  deleteSupabaseGame(id);
   render();
   showToast("Game deleted");
+  const cloudDeleted = await deleteSupabaseGame(id);
+  if (cloudDeleted) {
+    state.syncStatus = "Synced";
+    if (/delete setup/i.test(state.cloudError || "")) state.cloudError = "";
+  } else if (supabaseClient && currentUserId() && !state.cloudError) {
+    reportCloudDeleteNeedsUpdate("game");
+  }
+  persistAll();
+  render();
 }
 
-function deleteEvent(gameId, eventId) {
+async function deleteEvent(gameId, eventId) {
   const game = state.games.find((item) => item.id === gameId);
   if (!game) return;
   if (!canEditGame(game)) {
@@ -3335,8 +3343,12 @@ function deleteEvent(gameId, eventId) {
   state.addingReviewEvent = false;
   if (state.editingEventId === eventId) state.editingEventId = null;
   if (state.tagEditingEventId === eventId) state.tagEditingEventId = null;
-  deleteSupabaseEvent(eventId);
   saveReviewedGame(updatedGame, "Event deleted");
+  const cloudDeleted = await deleteSupabaseEvent(eventId);
+  if (!cloudDeleted && supabaseClient && currentUserId() && !state.cloudError) {
+    reportCloudDeleteNeedsUpdate("event");
+    persistAll();
+  }
   render();
 }
 
@@ -3728,6 +3740,30 @@ function reportSyncError(error) {
   if (now - lastSyncErrorAt > 8000) {
     lastSyncErrorAt = now;
     showToast("Live Share is not ready yet");
+  }
+}
+
+function reportCloudDeleteNeedsUpdate(recordLabel = "item") {
+  state.syncStatus = "Sync issue — tap to fix";
+  state.cloudError = `Cloud delete setup needs an update. Deleted ${recordLabel}s stay hidden on this device, but may return on other devices until the update is applied.`;
+  const now = Date.now();
+  if (now - lastSyncErrorAt > 8000) {
+    lastSyncErrorAt = now;
+    showToast("Cloud delete setup needs an update");
+  }
+}
+
+function reportCloudDeleteError(recordLabel = "item", error = {}) {
+  console.warn(`LaxHornet cloud ${recordLabel} delete failed:`, error);
+  state.syncStatus = "Sync issue — tap to fix";
+  const detail = readableSupabaseError(error);
+  state.cloudError = detail
+    ? `Could not remove this ${recordLabel} from the cloud: ${detail}`
+    : `Could not remove this ${recordLabel} from the cloud.`;
+  const now = Date.now();
+  if (now - lastSyncErrorAt > 8000) {
+    lastSyncErrorAt = now;
+    showToast(`Cloud ${recordLabel} delete needs attention`);
   }
 }
 
@@ -4147,7 +4183,7 @@ async function loadClaimedRosterPlayers(options = {}) {
 async function loadCloudGames(options = {}) {
   if (!supabaseClient || !currentUserId()) return;
   await loadCloudTeams({ silent: true });
-  await flushDeletedCloudRecords();
+  await flushDeletedCloudRecords({ quiet: Boolean(options.silent) });
   const uploadedCount = await syncLocalGamesToCloud();
   const { data: ownData, error } = await supabaseClient
     .from("games")
@@ -4225,17 +4261,15 @@ async function syncLocalGamesToCloud() {
   return uploaded;
 }
 
-async function flushDeletedCloudRecords() {
+async function flushDeletedCloudRecords(options = {}) {
   if (!supabaseClient || !currentUserId()) return;
   const deletedEvents = uniqueIds(state.deletedEventIds);
   const deletedGames = uniqueIds(state.deletedGameIds);
-  if (deletedEvents.length) {
-    const { error } = await supabaseClient.from("events").delete().in("id", deletedEvents);
-    if (error) reportSyncError(error);
+  for (const eventId of deletedEvents) {
+    await deleteSupabaseEvent(eventId, { quiet: Boolean(options.quiet) });
   }
-  if (deletedGames.length) {
-    const { error } = await supabaseClient.from("games").delete().in("id", deletedGames);
-    if (error) reportSyncError(error);
+  for (const gameId of deletedGames) {
+    await deleteSupabaseGame(gameId, { quiet: Boolean(options.quiet) });
   }
 }
 
@@ -5073,16 +5107,44 @@ async function syncLoggedEvent(game, event) {
   }
 }
 
-async function deleteSupabaseEvent(eventId) {
+async function deleteSupabaseEvent(eventId, options = {}) {
   if (!supabaseClient || !eventId) return;
-  const { error } = await supabaseClient.from("events").delete().eq("id", eventId);
-  if (error) reportSyncError(error);
+  const rpcResult = await supabaseClient.rpc("laxhornet_delete_event", { p_event_id: eventId });
+  if (!rpcResult.error) return true;
+  if (/event not found/i.test(readableSupabaseError(rpcResult.error))) return true;
+  if (!isMissingRpcError(rpcResult.error)) {
+    reportCloudDeleteError("event", rpcResult.error);
+    return false;
+  }
+
+  const { data, error } = await supabaseClient.from("events").delete().eq("id", eventId).select("id");
+  if (error) {
+    reportCloudDeleteError("event", error);
+    return false;
+  }
+  if (Array.isArray(data) && data.length) return true;
+  if (!options.quiet) reportCloudDeleteNeedsUpdate("event");
+  return false;
 }
 
-async function deleteSupabaseGame(gameId) {
+async function deleteSupabaseGame(gameId, options = {}) {
   if (!supabaseClient || !gameId) return;
-  const { error } = await supabaseClient.from("games").delete().eq("id", gameId);
-  if (error) reportSyncError(error);
+  const rpcResult = await supabaseClient.rpc("laxhornet_delete_game", { p_game_id: gameId });
+  if (!rpcResult.error) return true;
+  if (/game not found/i.test(readableSupabaseError(rpcResult.error))) return true;
+  if (!isMissingRpcError(rpcResult.error)) {
+    reportCloudDeleteError("game", rpcResult.error);
+    return false;
+  }
+
+  const { data, error } = await supabaseClient.from("games").delete().eq("id", gameId).select("id");
+  if (error) {
+    reportCloudDeleteError("game", error);
+    return false;
+  }
+  if (Array.isArray(data) && data.length) return true;
+  if (!options.quiet) reportCloudDeleteNeedsUpdate("game");
+  return false;
 }
 
 function applySharedEventPayload(payload) {
