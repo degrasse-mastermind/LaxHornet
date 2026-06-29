@@ -5600,6 +5600,32 @@ form.account-card,
   line-height: 1.35;
 }
 
+.inline-next-focus-editor {
+  display: grid;
+  gap: 10px;
+  margin-top: 2px;
+  padding: 12px;
+  border: 1px solid rgba(17, 19, 23, 0.1);
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.inline-next-focus-editor .field {
+  gap: 5px;
+}
+
+.focus-change-note {
+  margin: 0;
+  padding: 9px 10px;
+  border-left: 3px solid var(--brand-red);
+  border-radius: 8px;
+  background: rgba(17, 19, 23, 0.045);
+  color: #4f5965;
+  font-size: 0.82rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
 .lh-focus-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

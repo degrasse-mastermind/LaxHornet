@@ -24,7 +24,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v251";
+const APP_VERSION = "v252";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -568,6 +568,7 @@ const state = {
   adminViewMode: initialStoredState.adminViewMode,
   onboardingIntent: initialStoredState.onboardingIntent,
   nextGameFocus: initialStoredState.nextGameFocus,
+  focusEditorContext: "",
   signupDraft: null,
   accessRequestSummary: null,
   toast: "",
@@ -663,6 +664,12 @@ function normalizeNextGameFocus(focus = null) {
       followUpResult: "",
       followUpGameId: "",
       followUpAt: "",
+      sourceFocusText: "",
+      sourceSelected: "",
+      sourceCustomText: "",
+      changedFromSourceAt: "",
+      changedFromSourceText: "",
+      changedFromSourceContext: "",
       selected: "",
       customText: "",
       text: "",
@@ -689,6 +696,12 @@ function normalizeNextGameFocus(focus = null) {
     followUpResult: String(focus.followUpResult || "").trim(),
     followUpGameId: String(focus.followUpGameId || "").trim(),
     followUpAt: String(focus.followUpAt || "").trim(),
+    sourceFocusText: String(focus.sourceFocusText || "").trim(),
+    sourceSelected: String(focus.sourceSelected || "").trim(),
+    sourceCustomText: String(focus.sourceCustomText || "").trim(),
+    changedFromSourceAt: String(focus.changedFromSourceAt || "").trim(),
+    changedFromSourceText: String(focus.changedFromSourceText || "").trim(),
+    changedFromSourceContext: String(focus.changedFromSourceContext || "").trim(),
     selected: String(focus.selected || "").trim(),
     customText: String(focus.customText || "").trim(),
     text: focusText,
@@ -4984,6 +4997,12 @@ function saveNextGameFocusFromReview(options = {}) {
     accountId: focusAccountId(),
     teamId,
     rosterPlayerId,
+    sourceFocusText: draft.text,
+    sourceSelected: draft.selected,
+    sourceCustomText: draft.customText,
+    changedFromSourceAt: "",
+    changedFromSourceText: "",
+    changedFromSourceContext: "",
     selected: draft.selected,
     customText: draft.customText,
     text: draft.text,
@@ -4995,6 +5014,99 @@ function saveNextGameFocusFromReview(options = {}) {
   render();
   if (!options.silent) showToast("Next game focus saved.");
   return state.nextGameFocus;
+}
+
+function focusValueMatchingText(text = "") {
+  const cleanText = String(text || "").trim();
+  if (!cleanText) return "";
+  return NEXT_GAME_FOCUS_OPTIONS.find((option) => option.value !== "custom" && option.label === cleanText)?.value || "";
+}
+
+function selectedFocusValueForFocus(focus = null, totals = {}) {
+  const saved = normalizeNextGameFocus(focus);
+  return saved.selected || saved.focusType || focusValueMatchingText(saved.text) || recommendedFocusValue(totals);
+}
+
+function focusContextLabel(context = "") {
+  if (context === "home") return "Home";
+  if (context === "start") return "Track";
+  return "app";
+}
+
+function formatFocusChangeDate(value = "") {
+  const clean = String(value || "").trim();
+  if (!clean) return "";
+  const datePart = clean.includes("T") ? clean.slice(0, 10) : clean;
+  return formatDate(datePart);
+}
+
+function sourceReviewFocusChangeNote(focus = null, gameId = "") {
+  const saved = normalizeNextGameFocus(focus);
+  if (!saved.text || !saved.sourceGameId || saved.sourceGameId !== gameId) return "";
+  const sourceText = saved.sourceFocusText || saved.text;
+  const changedText = saved.changedFromSourceText || saved.text;
+  if (!saved.changedFromSourceAt || !changedText || changedText === sourceText) return "";
+  const changedDate = formatFocusChangeDate(saved.changedFromSourceAt);
+  return `Changed to "${changedText}"${changedDate ? ` on ${changedDate}` : ""}.`;
+}
+
+function saveInlineNextGameFocus(formData, context = "") {
+  const player = state.player;
+  const saved = openNextGameFocusForPlayer(player);
+  if (!saved.text) {
+    showToast("Save a focus from Game Review first.");
+    return null;
+  }
+  const totals = calculateSeasonTotalsForPlayer(player);
+  const topContribution = topContributionForTotals(totals).label;
+  const selected = String(formData.get("focusType") || "").trim() || selectedFocusValueForFocus(saved, totals);
+  const customText = String(formData.get("customFocus") || "").trim();
+  const text = focusTextForValue(selected, customText, totals, player, topContribution);
+  if (!text) {
+    showToast("Choose a focus first.");
+    return null;
+  }
+  const now = new Date().toISOString();
+  const originalSelected =
+    saved.sourceSelected ||
+    saved.selected ||
+    saved.focusType ||
+    focusValueMatchingText(saved.text) ||
+    selectedFocusValueForFocus(saved, totals);
+  const updated = normalizeNextGameFocus({
+    ...saved,
+    focusType: selected,
+    focusText: text,
+    status: "open",
+    accountId: focusAccountId(),
+    teamId: player?.teamId || saved.teamId || "",
+    rosterPlayerId: player?.rosterPlayerId || saved.rosterPlayerId || "",
+    playerId: player?.id || saved.playerId || "",
+    sourceFocusText: saved.sourceFocusText || saved.text,
+    sourceSelected: originalSelected,
+    sourceCustomText: saved.sourceCustomText || saved.customText,
+    changedFromSourceAt: now,
+    changedFromSourceText: text,
+    changedFromSourceContext: focusContextLabel(context),
+    selected,
+    customText,
+    text,
+    updatedAt: now,
+  });
+  state.nextGameFocus = saveScopedNextGameFocus(updated, player);
+  state.focusEditorContext = "";
+  persistAll();
+  render();
+  showToast("Next game focus changed.");
+  return state.nextGameFocus;
+}
+
+function saveInlineNextGameFocusFromPanel(panel) {
+  if (!panel) return null;
+  const formData = new FormData();
+  formData.set("focusType", panel.querySelector('select[name="focusType"]')?.value || "");
+  formData.set("customFocus", panel.querySelector('input[name="customFocus"]')?.value || "");
+  return saveInlineNextGameFocus(formData, panel.dataset.focusContext || "");
 }
 
 async function copyNextFocusNote() {
@@ -6763,9 +6875,41 @@ function renderHomeReadyCard() {
   `;
 }
 
+function renderInlineNextFocusEditor(context, focus) {
+  const saved = normalizeNextGameFocus(focus);
+  const totals = calculateSeasonTotalsForPlayer(state.player);
+  const selectedValue = selectedFocusValueForFocus(saved, totals);
+  const customText = selectedValue === "custom" ? saved.customText : "";
+  const selectId = `inlineNextFocusSelect-${context}`;
+  const customId = `inlineNextFocusCustom-${context}`;
+  return `
+    <div class="inline-next-focus-editor" data-focus-context="${escapeHTML(context)}">
+      <div class="field">
+        <label for="${escapeHTML(selectId)}">Change focus</label>
+        <select id="${escapeHTML(selectId)}" name="focusType">
+          ${NEXT_GAME_FOCUS_OPTIONS.map(
+            (option) => `<option value="${escapeHTML(option.value)}" ${option.value === selectedValue ? "selected" : ""}>${escapeHTML(option.label)}</option>`,
+          ).join("")}
+        </select>
+      </div>
+      <div class="field">
+        <label for="${escapeHTML(customId)}">Custom focus</label>
+        <input id="${escapeHTML(customId)}" name="customFocus" value="${escapeHTML(customText)}" placeholder="One simple focus for next game" />
+      </div>
+      <p class="muted small">This changes the active focus for the next game. The original Game Review focus stays in that review with a change note.</p>
+      <div class="lh-focus-actions compact">
+        <button class="btn secondary" type="button" data-action="save-inline-next-focus">Save Change</button>
+        <button class="btn neutral" type="button" data-action="cancel-inline-next-focus">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderHomeNextGameFocusCard() {
   const focus = openNextGameFocusForPlayer(state.player);
   if (!focus.text) return "";
+  const editorOpen = state.focusEditorContext === "home";
+  const changedNote = sourceReviewFocusChangeNote(focus, focus.sourceGameId);
   return `
     <section class="card pad development-card lh-active-focus-card">
       <div class="section-head compact-head">
@@ -6775,10 +6919,12 @@ function renderHomeNextGameFocusCard() {
         </div>
       </div>
       <p>${escapeHTML(focus.text)}</p>
+      ${changedNote ? `<p class="focus-change-note">${escapeHTML(changedNote)}</p>` : ""}
       <div class="lh-focus-actions compact">
         <button class="btn brand positive" type="button" data-action="start-with-focus">Start Game With This Focus</button>
-        <button class="btn secondary" type="button" data-action="change-next-focus">Change</button>
+        <button class="btn secondary" type="button" data-action="toggle-next-focus-editor" data-focus-context="home">${editorOpen ? "Close" : "Change"}</button>
       </div>
+      ${editorOpen ? renderInlineNextFocusEditor("home", focus) : ""}
     </section>
   `;
 }
@@ -6888,6 +7034,8 @@ function renderStartGame() {
   const viewOnlyTeamPlayer = isTeamPlayer(state.player) && !canTrackPlayer(state.player);
   const availablePlayers = visiblePlayers();
   const focus = openNextGameFocusForPlayer(state.player);
+  const focusEditorOpen = state.focusEditorContext === "start";
+  const focusChangeNote = sourceReviewFocusChangeNote(focus, focus.sourceGameId);
   return renderShell(`
     <section class="screen-title">
       <h2>Set up game</h2>
@@ -6917,11 +7065,13 @@ function renderStartGame() {
           ? `<section class="card pad development-card lh-active-focus-card">
               <h3>Today's Focus</h3>
               <p>${escapeHTML(focus.text)}</p>
+              ${focusChangeNote ? `<p class="focus-change-note">${escapeHTML(focusChangeNote)}</p>` : ""}
               <p class="muted small">Keep this in mind while tracking the next game.</p>
               <div class="lh-focus-actions compact">
                 <button class="btn brand positive" type="button" data-action="use-this-focus">Use This Focus</button>
-                <button class="btn secondary" type="button" data-action="change-next-focus">Change Focus</button>
+                <button class="btn secondary" type="button" data-action="toggle-next-focus-editor" data-focus-context="start">${focusEditorOpen ? "Close" : "Change Focus"}</button>
               </div>
+              ${focusEditorOpen ? renderInlineNextFocusEditor("start", focus) : ""}
             </section>`
           : ""
       }
@@ -7618,16 +7768,6 @@ function openNextGameFocusForPlayer(player = state.player) {
   return saved.text && (!saved.status || saved.status === "open") ? saved : normalizeNextGameFocus(null);
 }
 
-function navigateToFocusSourceReview() {
-  const focus = openNextGameFocusForPlayer(state.player);
-  if (focus.sourceGameId && state.games.some((game) => game.id === focus.sourceGameId)) {
-    state.reviewGameId = focus.sourceGameId;
-    navigate("review");
-    return;
-  }
-  navigate("dashboard");
-}
-
 function listPhrase(items = []) {
   const cleanItems = items.map((item) => String(item || "").trim()).filter(Boolean);
   if (cleanItems.length <= 1) return cleanItems[0] || "";
@@ -7983,9 +8123,19 @@ function nextGameFocusForRecap(totals = {}, player = state.player, topContributi
 function renderNextGameFocusSection(game, player, totals, topContribution = "") {
   const saved = openNextGameFocusForPlayer(player);
   const recommendedValue = recommendedFocusValue(totals);
-  const selectedValue = saved.selected || recommendedValue;
-  const customText = selectedValue === "custom" ? saved.customText : "";
-  const previewFocus = saved.text || focusTextForValue(selectedValue, customText, totals, player, topContribution);
+  const savedFromThisGame = saved.sourceGameId && saved.sourceGameId === game.id;
+  const selectedValue = savedFromThisGame
+    ? saved.sourceSelected || saved.selected || recommendedValue
+    : saved.selected || recommendedValue;
+  const customText = selectedValue === "custom"
+    ? savedFromThisGame
+      ? saved.sourceCustomText || saved.customText
+      : saved.customText
+    : "";
+  const previewFocus = savedFromThisGame
+    ? saved.sourceFocusText || saved.text || focusTextForValue(selectedValue, customText, totals, player, topContribution)
+    : saved.text || focusTextForValue(selectedValue, customText, totals, player, topContribution);
+  const changedNote = sourceReviewFocusChangeNote(saved, game.id);
 
   return `
     <section class="card pad development-card lh-next-focus-card">
@@ -8007,6 +8157,7 @@ function renderNextGameFocusSection(game, player, totals, topContribution = "") 
         <span>Current focus</span>
         <strong>${escapeHTML(previewFocus)}</strong>
       </div>
+      ${changedNote ? `<p class="focus-change-note">${escapeHTML(changedNote)}</p>` : ""}
       <div class="lh-focus-actions">
         <button class="btn secondary" type="button" data-action="save-next-focus" data-game-id="${escapeHTML(game.id)}">Save for Next Game</button>
         <button class="btn neutral" type="button" data-action="add-focus-to-recap" data-game-id="${escapeHTML(game.id)}">Add to Family Recap</button>
@@ -9731,6 +9882,7 @@ function handleSubmit(event) {
   if (form.dataset.form === "watch-share") {
     loadSharedGame(formData.get("shareCode"));
   }
+
 }
 
 function handleClick(event) {
@@ -9816,7 +9968,18 @@ function handleClick(event) {
     if (action.dataset.action === "add-focus-to-recap") addFocusToFamilyRecap();
     if (action.dataset.action === "copy-focus-note") copyNextFocusNote();
     if (action.dataset.action === "start-with-focus") navigate("start");
-    if (action.dataset.action === "change-next-focus") navigateToFocusSourceReview();
+    if (action.dataset.action === "toggle-next-focus-editor") {
+      const context = action.dataset.focusContext || "";
+      state.focusEditorContext = state.focusEditorContext === context ? "" : context;
+      render();
+    }
+    if (action.dataset.action === "save-inline-next-focus") {
+      saveInlineNextGameFocusFromPanel(action.closest(".inline-next-focus-editor"));
+    }
+    if (action.dataset.action === "cancel-inline-next-focus") {
+      state.focusEditorContext = "";
+      render();
+    }
     if (action.dataset.action === "use-this-focus") showToast("Today's focus is ready.");
     if (action.dataset.action === "focus-followup") updateFocusFollowUp(action.dataset.result);
     if (action.dataset.action === "close-saved-game") {
