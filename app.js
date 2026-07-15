@@ -25,7 +25,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v263";
+const APP_VERSION = "v264";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -8648,7 +8648,7 @@ function detectProcessDecisionPattern(events = [], totals = {}, player = state.p
     title,
     text,
     category: "process",
-    priority: decisionQuality ? 98 : 87,
+    priority: decisionQuality >= 2 || process.total >= 3 ? 93 : 74,
     evidence: processFacts,
     development: {
       whatWentWell: decisionQuality
@@ -9792,6 +9792,170 @@ function renderFamilyRecapSection(game, player, totals, intelligence = null) {
   `;
 }
 
+function uniqueInsightLines(lines = [], limit = 5) {
+  const seen = new Set();
+  return lines
+    .map((line) => String(line || "").trim())
+    .filter((line) => {
+      const key = line.toLowerCase();
+      if (!line || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, limit);
+}
+
+function seasonEventsFromGames(games = []) {
+  return games.flatMap((game) =>
+    (game.events || []).map((event) => normalizeEvent(event, game.id || "")),
+  );
+}
+
+function seasonSignalsForContext(totals = {}, player = state.player, process = {}, sequence = {}) {
+  const signals = [];
+  const add = (condition, label, text) => {
+    if (condition && signals.length < 3) signals.push({ label, text });
+  };
+  add(
+    process.total >= 2,
+    "Decision context",
+    "Process tags add detail about reads, execution, response, and outcomes across the season.",
+  );
+  add(
+    sequence.protectedAfterWin > sequence.lossesAfterWin && sequence.protectedAfterWin > 0,
+    "Possession quality",
+    `${playerFirstName(player)} is showing a pattern of turning possession wins into protected next plays.`,
+  );
+  add(
+    sequence.lossesAfterWin > sequence.protectedAfterWin && sequence.lossesAfterWin > 0,
+    "Next-play growth",
+    "The clearest development opportunity is the first decision after winning or protecting the ball.",
+  );
+  add(
+    Number(totals.averagePossessionValue || 0) > 0,
+    "Possession value",
+    `${signedMetric(totals.averagePossessionValue)} average possession value shows possession impact is part of the season story.`,
+  );
+  add(
+    Number(totals.averageImpact || 0) > 0,
+    "Impact trend",
+    `${impactLetterGrade(totals.averageImpact)} average impact gives a quick snapshot of the saved games.`,
+  );
+  return signals;
+}
+
+function seasonStoryWithSignals(totals = {}, player = state.player, topContribution = "", process = {}, sequence = {}) {
+  const base = seasonStoryForTotals(totals, player, topContribution);
+  if (!Number(totals.gamesPlayed || 0) || Number(totals.eventCount || 0) < 3) return base;
+  if (process.total >= 3) {
+    return `${base} The process tags add a useful layer: they separate the read, the execution, and the outcome so the season story stays fair and development-focused.`;
+  }
+  if (sequence.protectedAfterWin > sequence.lossesAfterWin && sequence.protectedAfterWin > 0) {
+    return `${base} A helpful pattern is emerging after possession wins: more of those plays are becoming protected next actions instead of immediate resets.`;
+  }
+  if (sequence.lossesAfterWin > sequence.protectedAfterWin && sequence.lossesAfterWin > 0) {
+    return `${base} The next layer is possession quality after the ball is won: secure it, find support, and turn the win into a cleaner team possession.`;
+  }
+  return base;
+}
+
+function seasonStrengthsWithProcess(totals = {}, player = state.player, process = {}, sequence = {}) {
+  const name = playerFirstName(player);
+  const processLines = [];
+  if (process.goodDecisionUnsuccessfulExecution) {
+    processLines.push(`Decision tags show ${name} is making reads worth repeating, even when the execution still needs a cleaner rep.`);
+  }
+  if (process.createdAdvantage || process.supportedBallCarrier || process.communicatedEarly) {
+    processLines.push(`Process tags show team-helping plays: support, communication, and advantage creation beyond the box score.`);
+  }
+  if (process.recoveredAfterMistake || process.stayedComposedUnderPressure) {
+    processLines.push(`${name} is showing response plays after pressure, which is useful development evidence over a full season.`);
+  }
+  if (sequence.protectedAfterWin > 0) {
+    processLines.push(`Possession wins are starting to connect to protected next plays instead of ending as isolated stats.`);
+  }
+  return uniqueInsightLines([...processLines, ...seasonStrengthBullets(totals, player)], 5);
+}
+
+function seasonEncouragementWithProcess(totals = {}, player = state.player, topContribution = "", process = {}, sequence = {}) {
+  if (process.goodDecisionUnsuccessfulExecution) {
+    return "Praise the right read first, then talk about the simpler execution that makes the same idea repeatable.";
+  }
+  if (process.recoveredAfterMistake || process.stayedComposedUnderPressure) {
+    return "Praise the response after pressure. Staying connected after a tough play is a real development pattern.";
+  }
+  if (sequence.protectedAfterWin > sequence.lossesAfterWin && sequence.protectedAfterWin > 0) {
+    return "Celebrate the possession wins and the simple next plays that protected them.";
+  }
+  if (sequence.lossesAfterWin > sequence.protectedAfterWin && sequence.lossesAfterWin > 0) {
+    return "Celebrate winning the ball, then reinforce the first calm pass or carry after possession is secured.";
+  }
+  return seasonEncouragementForTotals(totals, player, topContribution);
+}
+
+function seasonNextFocusWithProcess(totals = {}, archetypeResult = {}, process = {}, sequence = {}) {
+  if (!totals.gamesPlayed) return "Track one full game to build a stronger season picture.";
+  if (sequence.lossesAfterWin > sequence.protectedAfterWin && sequence.lossesAfterWin > 0) {
+    return "Win the ball, then make the first clean decision before pressure arrives.";
+  }
+  if (process.goodDecisionUnsuccessfulExecution) {
+    return "Keep trusting the right read, then make the execution simpler and cleaner.";
+  }
+  if (process.poorDecisionSuccessfulOutcome) {
+    return "Celebrate the result, then practice the safer repeatable choice next time.";
+  }
+  if (sequence.protectedAfterWin > 0) {
+    return "Repeat the first clean support pass or safe carry after possession wins.";
+  }
+  return nextLevelFocusForSeason(totals, archetypeResult);
+}
+
+function seasonWhyThesePlaysMatter(events = [], totals = {}, player = state.player, process = {}, sequence = {}) {
+  const customItems = [];
+  if (process.total >= 2) {
+    customItems.push({
+      label: "Decision vs Outcome",
+      explanation: "Decision quality and outcome are not always the same thing. Season review should praise the right read, identify execution reps, and avoid judging a play only by whether it worked.",
+    });
+  }
+  if (sequence.wins > 0) {
+    customItems.push({
+      label: "Possession Quality",
+      explanation: "Possession quality asks what happened after the ball was won. Ground balls, saves, clears, and faceoff wins matter more when the next play protects possession.",
+    });
+  }
+  if (process.recoveredAfterMistake || process.stayedComposedUnderPressure) {
+    customItems.push({
+      label: "Response After Pressure",
+      explanation: "A response play shows the player stayed engaged after a tough moment. That is useful development evidence, but it should not become a permanent label.",
+    });
+  }
+  const eventItems = postGameWhyThesePlaysMatter(events, [], totals, player, 8);
+  const merged = new Map();
+  [...customItems, ...eventItems].forEach((item) => {
+    const key = String(item.label || "").toLowerCase();
+    if (key && !merged.has(key)) merged.set(key, item);
+  });
+  return [...merged.values()].slice(0, 8);
+}
+
+function buildSeasonIntelligence(games = visibleGames(), totals = calculateSeasonTotalsFromGames(games), player = state.player, archetypeResult = {}) {
+  const events = enrichPostGameEvents(seasonEventsFromGames(games));
+  const topContribution = topContributionForTotals(totals);
+  const process = processDecisionSummary(events);
+  const sequence = possessionQualitySequence(events);
+  return {
+    story: seasonStoryWithSignals(totals, player, topContribution.label, process, sequence),
+    strengths: seasonStrengthsWithProcess(totals, player, process, sequence),
+    encouragement: seasonEncouragementWithProcess(totals, player, topContribution.label, process, sequence),
+    nextFocus: seasonNextFocusWithProcess(totals, archetypeResult, process, sequence),
+    whyItems: seasonWhyThesePlaysMatter(events, totals, player, process, sequence),
+    signals: seasonSignalsForContext(totals, player, process, sequence),
+    process,
+    possessionQuality: sequence,
+  };
+}
+
 function seasonStoryForTotals(totals, player = state.player, topContribution = topContributionForTotals(totals).label) {
   const name = playerFirstName(player);
   const driver = reviewDriverType(totals, topContribution, player);
@@ -9924,6 +10088,18 @@ function renderGameStorySection(intelligence = null) {
       </div>
       <strong>${escapeHTML(intelligence.gameStoryTitle)}</strong>
       <p>${escapeHTML(intelligence.gameStoryText)}</p>
+      ${
+        intelligence.contextHighlights?.length
+          ? `<div class="context-highlight-list">
+              ${intelligence.contextHighlights.slice(0, 2).map((item) => `
+                <div class="context-highlight">
+                  <span>${escapeHTML(item.label)}</span>
+                  <p>${escapeHTML(item.text)}</p>
+                </div>
+              `).join("")}
+            </div>`
+          : ""
+      }
     </section>
   `;
 }
@@ -10477,14 +10653,15 @@ function dashboardHeadlineMetrics(totals, player = state.player) {
 }
 
 function renderDashboard() {
+  const seasonGames = visibleGames();
   const totals = calculateSeasonTotals();
   const archetypeResult = calculateArchetypeResult(totals);
-  const topContribution = topContributionForTotals(totals);
-  const strengths = seasonStrengthBullets(totals, state.player);
-  const seasonStory = seasonStoryForTotals(totals, state.player, topContribution.label);
-  const encouragement = seasonEncouragementForTotals(totals, state.player, topContribution.label);
-  const nextFocus = nextLevelFocusForSeason(totals, archetypeResult);
-  const seasonEvents = visibleGames().flatMap((game) => game.events || []);
+  const seasonIntelligence = buildSeasonIntelligence(seasonGames, totals, state.player, archetypeResult);
+  const strengths = seasonIntelligence.strengths;
+  const seasonStory = seasonIntelligence.story;
+  const encouragement = seasonIntelligence.encouragement;
+  const nextFocus = seasonIntelligence.nextFocus;
+  const seasonEvents = seasonGames.flatMap((game) => game.events || []);
   return renderShell(`
     <section class="screen-title">
       <h2>Season Snapshot</h2>
@@ -10505,6 +10682,18 @@ function renderDashboard() {
       <section class="card pad development-card lh-season-story-card">
         <h3>Season Story</h3>
         <p>${escapeHTML(seasonStory)}</p>
+        ${
+          seasonIntelligence.signals.length
+            ? `<div class="context-highlight-list season-signal-list">
+                ${seasonIntelligence.signals.map((item) => `
+                  <div class="context-highlight">
+                    <span>${escapeHTML(item.label)}</span>
+                    <p>${escapeHTML(item.text)}</p>
+                  </div>
+                `).join("")}
+              </div>`
+            : ""
+        }
         <p class="muted small">Season Snapshot highlights patterns across scoring, possession, defense, goalie play, hustle, and decision-making. Position matters, so players are not evaluated the same way across every role.</p>
       </section>
       <section class="card pad development-card lh-season-strengths-card">
@@ -10528,6 +10717,7 @@ function renderDashboard() {
         showMore: true,
         showMoreLabel: "Show more season stat explanations",
         emptyCopy: "Track games to see simple explanations of the plays shaping this player's season.",
+        items: seasonIntelligence.whyItems,
       })}
       ${generateShareCard(state.player, archetypeResult, { profileLabel: "Season Player Profile", patternScope: "season" })}
       <section class="review-section lh-season-stats-section">
