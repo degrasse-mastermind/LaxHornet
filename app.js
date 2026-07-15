@@ -25,7 +25,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v264";
+const APP_VERSION = "v265";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -5471,16 +5471,33 @@ function nextFocusDraftFromReview() {
   const player = game ? gamePlayerSnapshot(game) : state.player;
   const totals = game ? calculateTotals(game.events || [], player) : calculateSeasonTotalsForPlayer(player);
   const topContribution = topContributionForTotals(totals).label;
+  const intelligence = game
+    ? buildPostGameIntelligence(game, game.events || [], player, totals, calculateSeasonTotalsForPlayer(player))
+    : null;
+  const recommendationText =
+    intelligence?.developmentTakeaway?.nextFocus ||
+    intelligence?.nextFocusRecommendation?.tryThisNextGame ||
+    buildNextFocusLine(totals, player, topContribution, game);
+  const recommendationSelected = focusValueMatchingText(recommendationText) || (recommendationText ? "custom" : recommendedFocusValue(totals));
+  const recommendationCustomText = recommendationSelected === "custom" ? recommendationText : "";
   const select = document.querySelector("#nextGameFocusSelect");
   const customInput = document.querySelector("#nextGameFocusCustom");
-  const selected = select?.value || recommendedFocusValue(totals);
+  const selected = select?.value || recommendationSelected;
   const customText = customInput?.value?.trim() || "";
-  const text = focusTextForValue(selected, customText, totals, player, topContribution);
+  const editorChanged =
+    Boolean(select || customInput) &&
+    (selected !== recommendationSelected ||
+      (selected === "custom" && customText && customText !== recommendationCustomText));
+  const text = editorChanged
+    ? focusTextForValue(selected, customText, totals, player, topContribution)
+    : recommendationText;
+  const finalSelected = editorChanged ? selected : recommendationSelected;
+  const finalCustomText = editorChanged ? customText : recommendationCustomText;
   return {
     game,
     player,
-    selected,
-    customText,
+    selected: finalSelected,
+    customText: finalCustomText,
     text,
   };
 }
@@ -8591,11 +8608,14 @@ function detectHighLeverageImpact(events = [], totals = {}, player = state.playe
   if (!highLeverage.length) return null;
   const possessionPlays = highLeverage.filter(isPossessionWinEvent).length;
   const scoringPlays = highLeverage.filter((event) => ["goal", "assist", "shotOnGoal"].includes(event.statType)).length;
+  const hasOvertime = highLeverage.some((event) => event.intelligenceSegment === "overtime");
+  const stretchLabel = hasOvertime ? "overtime close-score stretch" : "second-half close-score stretch";
+  const storyType = hasOvertime ? "Late-Game Contributor" : "Close-Score Contributor";
   return patternResult({
     key: "highLeverageImpact",
-    storyType: "Late-Game Contributor",
+    storyType,
     title: "High-leverage stretch",
-    text: `${playerFirstName(player)} showed up in a close late-game or overtime stretch. Those moments matter because one clean possession can change the feel of a youth lacrosse game.`,
+    text: `${playerFirstName(player)} showed up in a ${stretchLabel}. Those moments matter because one clean possession can change the feel of a youth lacrosse game.`,
     category: "context",
     priority: 100,
     evidence: [
@@ -8605,12 +8625,16 @@ function detectHighLeverageImpact(events = [], totals = {}, player = state.playe
     ],
     development: {
       whatWentWell: `${playerFirstName(player)} stayed involved when the game context mattered most.`,
-      whyItMattered: "Late or overtime possessions carry extra weight because they can protect momentum, create a final chance, or help the team settle under pressure.",
+      whyItMattered: hasOvertime
+        ? "Overtime possessions carry extra weight because they can protect momentum, create a final chance, or help the team settle under pressure."
+        : "Close-score possessions after halftime carry extra weight because they can protect momentum, create a chance, or help the team settle under pressure.",
       whatToBuildOn: "Keep looking for the simple, controlled play in close-score moments.",
     },
     focus: {
       focusTitle: "Close-game possession",
-      whyThisFits: "The tracked plays show positive involvement when the score was close late.",
+      whyThisFits: hasOvertime
+        ? "The tracked plays show positive involvement when the score was close in overtime."
+        : "The tracked plays show positive involvement during a close-score second half.",
       tryThisNextGame: "In the next close stretch, secure the ball first, then make the simple pass before pressure arrives.",
       confidence: "high",
       category: "possession",
@@ -9124,14 +9148,26 @@ function educationLabelForKey(key) {
 
 function postGameWhyThesePlaysMatter(events = [], patterns = [], totals = {}, player = state.player, limit = 3) {
   const patternKeys = [];
+  const presentStats = new Set((events || []).map((event) => event.statType).filter(Boolean));
+  const addKey = (key, options = {}) => {
+    if (!key) return;
+    if (options.synthetic || presentStats.has(key)) patternKeys.push(key);
+  };
+  const addPresentKeys = (keys = []) => keys.forEach((key) => addKey(key));
   patterns.forEach((pattern) => {
-    if (pattern.key === "processDecision") patternKeys.push("processDecision", "responseAfterMistake");
-    if (pattern.key === "shotQuality") patternKeys.push("shotOnGoal", "goal");
-    if (pattern.key === "possessionWinLoss") patternKeys.push("possessionQuality", "groundBall", "turnover", "successfulClear");
-    if (pattern.key === "defenseClearConversion") patternKeys.push("causedTurnover", "successfulClear", "defensiveStop");
-    if (pattern.key === "goalieResponse") patternKeys.push("goalieSave", "successfulClear");
-    if (pattern.key === "faceoffExit") patternKeys.push("faceoffWin", "groundBall");
-    if (pattern.key === "playHardWithControl") patternKeys.push("turnover", "penalty", "failedClear");
+    if (pattern.key === "processDecision") {
+      addKey("processDecision", { synthetic: true });
+      addKey("responseAfterMistake", { synthetic: true });
+    }
+    if (pattern.key === "shotQuality") addPresentKeys(["shotOnGoal", "goal", "shot"]);
+    if (pattern.key === "possessionWinLoss") {
+      addKey("possessionQuality", { synthetic: true });
+      addPresentKeys(["groundBall", "turnover", "successfulClear", "failedClear"]);
+    }
+    if (pattern.key === "defenseClearConversion") addPresentKeys(["causedTurnover", "successfulClear", "defensiveStop", "failedClear"]);
+    if (pattern.key === "goalieResponse") addPresentKeys(["goalieSave", "successfulClear", "goalAllowed"]);
+    if (pattern.key === "faceoffExit") addPresentKeys(["faceoffWin", "faceoffLoss", "groundBall", "turnover"]);
+    if (pattern.key === "playHardWithControl") addPresentKeys(["turnover", "failedClear", "penalty"]);
   });
   const eventItems = importantEducationItemsForEvents(events, 6).map((item) => item.key);
   const keys = [...new Set([...patternKeys, ...eventItems])].filter((key) => key && key !== "note").slice(0, limit);
@@ -9545,20 +9581,25 @@ function nextGameFocusForRecap(totals = {}, player = state.player, topContributi
 
 function renderNextGameFocusSection(game, player, totals, topContribution = "", intelligence = null) {
   const saved = openNextGameFocusForPlayer(player);
-  const recommendedValue = recommendedFocusValue(totals);
   const focusRecommendation = intelligence?.nextFocusRecommendation || null;
+  const recommendationText =
+    intelligence?.developmentTakeaway?.nextFocus ||
+    focusRecommendation?.tryThisNextGame ||
+    buildNextFocusLine(totals, player, topContribution, game);
+  const recommendationSelected = focusValueMatchingText(recommendationText) || (recommendationText ? "custom" : recommendedFocusValue(totals));
+  const recommendationCustomText = recommendationSelected === "custom" ? recommendationText : "";
   const savedFromThisGame = saved.sourceGameId && saved.sourceGameId === game.id;
   const selectedValue = savedFromThisGame
-    ? saved.sourceSelected || saved.selected || recommendedValue
-    : saved.selected || recommendedValue;
+    ? saved.sourceSelected || saved.selected || recommendationSelected
+    : recommendationSelected;
   const customText = selectedValue === "custom"
     ? savedFromThisGame
       ? saved.sourceCustomText || saved.customText
-      : saved.customText
+      : recommendationCustomText
     : "";
   const previewFocus = savedFromThisGame
     ? saved.sourceFocusText || saved.text || focusTextForValue(selectedValue, customText, totals, player, topContribution)
-    : saved.text || focusTextForValue(selectedValue, customText, totals, player, topContribution);
+    : recommendationText || focusTextForValue(selectedValue, customText, totals, player, topContribution);
   const changedNote = sourceReviewFocusChangeNote(saved, game.id);
 
   return `
@@ -11953,11 +11994,23 @@ function watchServiceWorkerUpdates(registration) {
 }
 
 function showUpdateAvailable(worker, version = "") {
+  if (version && version === APP_VERSION) {
+    clearUpdateAvailableState();
+    render();
+    return;
+  }
   waitingServiceWorker = worker;
   state.updateAvailable = true;
   state.updateInstalling = false;
   if (version) state.availableVersion = version;
   render();
+}
+
+function clearUpdateAvailableState() {
+  waitingServiceWorker = null;
+  state.updateAvailable = false;
+  state.updateInstalling = false;
+  state.availableVersion = "";
 }
 
 async function fetchServerAppVersion() {
@@ -11976,18 +12029,24 @@ async function checkForAppUpdate(options = {}) {
     return;
   }
   try {
+    const serverVersion = await fetchServerAppVersion().catch(() => "");
     const registration = serviceWorkerRegistration || (await navigator.serviceWorker.getRegistration());
     if (registration) {
       serviceWorkerRegistration = registration;
       await registration.update();
       if (registration.waiting && navigator.serviceWorker.controller) {
+        if (serverVersion && serverVersion === APP_VERSION) {
+          clearUpdateAvailableState();
+          render();
+          if (options.manual) showToast("LaxHornet is up to date");
+          return;
+        }
         showUpdateAvailable(registration.waiting);
         if (options.manual) showToast("Update ready");
         return;
       }
     }
 
-    const serverVersion = await fetchServerAppVersion();
     if (serverVersion && serverVersion !== APP_VERSION) {
       state.updateAvailable = true;
       state.updateInstalling = false;
@@ -11997,6 +12056,8 @@ async function checkForAppUpdate(options = {}) {
       return;
     }
 
+    clearUpdateAvailableState();
+    render();
     if (options.manual) showToast("LaxHornet is up to date");
   } catch {
     if (options.manual) showToast("Could not check for updates");
@@ -12048,6 +12109,12 @@ async function applyAppUpdate() {
   render();
 
   const targetVersion = state.availableVersion || (await fetchServerAppVersion().catch(() => "")) || APP_VERSION;
+  if (targetVersion === APP_VERSION) {
+    clearUpdateAvailableState();
+    render();
+    showToast("LaxHornet is up to date");
+    return;
+  }
 
   try {
     const registration = serviceWorkerRegistration || (await navigator.serviceWorker?.getRegistration?.());
