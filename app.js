@@ -25,7 +25,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v269";
+const APP_VERSION = "v270";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -5506,7 +5506,7 @@ async function copyGameFamilyRecap(gameId) {
   const recap = buildFamilyRecap(game, game.events || [], player, calculateTotals(game.events || [], player));
   try {
     await writeTextToClipboard(recap.text);
-    showToast("Family recap copied.");
+    showToast("Recap copied.");
   } catch {
     showToast("Couldn't copy recap. Please try again.");
   }
@@ -5529,7 +5529,7 @@ async function shareGameFamilyRecap(gameId) {
 
   try {
     await navigator.share({ title: recap.title, text: recap.text });
-    showToast("Family recap shared.");
+    showToast("Recap shared.");
   } catch (error) {
     if (error?.name === "AbortError") return;
     try {
@@ -5749,17 +5749,6 @@ function saveFamilyRecapFocus(game = {}, player = state.player, focusText = "") 
   return text;
 }
 
-async function copyNextFocusNote() {
-  const draft = nextFocusDraftFromReview();
-  const text = `Next focus: ${draft.text}`;
-  try {
-    await writeTextToClipboard(text);
-    showToast("Focus note copied");
-  } catch {
-    showToast("Couldn't copy focus note");
-  }
-}
-
 function addFocusToFamilyRecap() {
   const draft = nextFocusDraftFromReview();
   if (!draft.text) {
@@ -5768,7 +5757,7 @@ function addFocusToFamilyRecap() {
   }
   saveFamilyRecapFocus(draft.game, draft.player, draft.text);
   render();
-  showToast("Focus added to Family Recap");
+  showToast("Focus added to recap");
 }
 
 function markFocusUsedForGame(game = state.activeGame) {
@@ -6010,7 +5999,7 @@ function renderGameSavedModal() {
         <p class="muted small">The game is saved in Past Games and can be reopened for corrections.</p>
         <div class="edit-actions">
           <button class="btn positive" type="button" data-action="open-saved-review" data-game-id="${escapeHTML(game.id)}">Open Game Review</button>
-          <button class="btn secondary" type="button" data-action="copy-family-summary" data-game-id="${escapeHTML(game.id)}">Copy Family Recap</button>
+          <button class="btn secondary" type="button" data-action="copy-family-summary" data-game-id="${escapeHTML(game.id)}">Copy Recap</button>
           <button class="btn ghost modal-ghost" type="button" data-action="close-saved-game">Back Home</button>
         </div>
       </div>
@@ -9587,6 +9576,15 @@ function developmentTakeawayForTotals(totals = {}, player = state.player, topCon
 function renderDevelopmentTakeaway(totals = {}, player = state.player, topContribution = "", game = null, intelligence = null) {
   const reviewIntelligence = intelligence || (game ? buildPostGameIntelligence(game, game.events || [], player, totals, calculateSeasonTotalsForPlayer(player)) : null);
   const takeaway = reviewIntelligence?.developmentTakeaway || developmentTakeawayForTotals(totals, player, topContribution, game);
+  const focusTools = game
+    ? `
+      <div class="lh-takeaway-focus-tools" aria-label="Next focus options">
+        <button class="mini-btn light lh-focus-option" type="button" data-action="save-next-focus" data-game-id="${escapeHTML(game.id)}">Save for Next Game</button>
+        <button class="mini-btn light lh-focus-option" type="button" data-action="add-focus-to-recap" data-game-id="${escapeHTML(game.id)}">Add to Recap</button>
+      </div>
+      ${renderNextGameFocusSection(game, player, totals, topContribution, reviewIntelligence)}
+    `
+    : "";
   return `
     <section class="card pad development-card lh-development-takeaway">
       <h3>Development Takeaway</h3>
@@ -9596,18 +9594,7 @@ function renderDevelopmentTakeaway(totals = {}, player = state.player, topContri
         <p><span>What to build on</span>${escapeHTML(takeaway.whatToBuildOn || "Repeat the most useful play from this game.")}</p>
         <p><span>Next focus</span>${escapeHTML(takeaway.nextFocus || takeaway.focus)}</p>
       </div>
-    </section>
-  `;
-}
-
-function renderReviewActionRow(game) {
-  return `
-    <section class="lh-review-action-section" aria-label="Review actions">
-      <div class="lh-review-action-row">
-        <button class="btn positive" type="button" data-action="save-next-focus" data-game-id="${escapeHTML(game.id)}">Save for Next Game</button>
-        <button class="btn neutral" type="button" data-action="add-focus-to-recap" data-game-id="${escapeHTML(game.id)}">Add to Family Recap</button>
-        <button class="btn ghost" type="button" data-action="copy-focus-note" data-game-id="${escapeHTML(game.id)}">Copy Focus Note</button>
-      </div>
+      ${focusTools}
     </section>
   `;
 }
@@ -9698,10 +9685,9 @@ function renderNextGameFocusSection(game, player, totals, topContribution = "", 
   const changedNote = sourceReviewFocusChangeNote(saved, game.id);
 
   return `
-    <details class="card pad development-card lh-next-focus-card lh-customize-focus-card">
+    <details class="lh-inline-focus-editor lh-customize-focus-card">
       <summary>
-        <span>Customize Next Focus</span>
-        <small>Change the saved focus before using the action buttons above.</small>
+        <span>Change focus</span>
       </summary>
       <div class="lh-customize-focus-body">
       <div class="field">
@@ -9908,24 +9894,24 @@ function renderFamilyRecapSection(game, player, totals, intelligence = null) {
     .slice(0, 2)
     .join("\n");
   return `
-    <section class="card pad lh-family-recap-card" aria-label="Optional family recap sharing">
+    <section class="card pad lh-family-recap-card" aria-label="Optional recap sharing">
       <details class="lh-family-recap-details">
         <summary>
           <span>
             <span class="lh-tertiary-label">Optional share</span>
-            <strong>Family Recap</strong>
-            <small>Copy a short, positive recap for family when you need it.</small>
+            <strong>Share Recap</strong>
+            <small>Copy a short, positive recap when you need it.</small>
           </span>
         </summary>
         <div class="lh-family-recap-body">
-          <div class="lh-family-recap-preview" aria-label="Family recap preview">${escapeHTML(previewLines || recap.title).replace(/\n/g, "<br>")}</div>
+          <div class="lh-family-recap-preview" aria-label="Recap preview">${escapeHTML(previewLines || recap.title).replace(/\n/g, "<br>")}</div>
           <div class="lh-family-recap-actions">
             <button class="mini-btn light" type="button" data-action="copy-family-recap" data-game-id="${escapeHTML(game.id)}">Copy Recap</button>
             ${canShareFamilyRecap() ? `<button class="mini-btn light" type="button" data-action="share-family-recap" data-game-id="${escapeHTML(game.id)}">Share Recap</button>` : ""}
           </div>
           <details class="lh-family-recap-expand">
             <summary>View full recap text</summary>
-            <div class="lh-family-recap-text" aria-label="Full family recap">${escapeHTML(recap.text).replace(/\n/g, "<br>")}</div>
+            <div class="lh-family-recap-text" aria-label="Full recap">${escapeHTML(recap.text).replace(/\n/g, "<br>")}</div>
           </details>
         </div>
       </details>
@@ -10348,8 +10334,6 @@ function renderReview() {
       ${renderReviewSummarySection(game, player, totals)}
       ${renderGameStorySection(postGameIntelligence)}
       ${renderDevelopmentTakeaway(totals, player, topContribution.label, game, postGameIntelligence)}
-      ${renderReviewActionRow(game)}
-      ${renderNextGameFocusSection(game, player, totals, topContribution.label, postGameIntelligence)}
       ${renderFamilyRecapSection(game, player, totals, postGameIntelligence)}
       ${renderConversationStarters(totals, player)}
       ${renderReviewStatsSection(totals, player, archetypeResult, game.events || [], postGameIntelligence)}
@@ -11812,7 +11796,6 @@ function handleClick(event) {
     if (action.dataset.action === "share-family-recap") shareGameFamilyRecap(action.dataset.gameId);
     if (action.dataset.action === "save-next-focus") saveNextGameFocusFromReview();
     if (action.dataset.action === "add-focus-to-recap") addFocusToFamilyRecap();
-    if (action.dataset.action === "copy-focus-note") copyNextFocusNote();
     if (action.dataset.action === "start-with-focus") navigate("start");
     if (action.dataset.action === "toggle-next-focus-editor") {
       const context = action.dataset.focusContext || "";

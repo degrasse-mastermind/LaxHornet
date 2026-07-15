@@ -5690,45 +5690,47 @@ form.account-card,
   color: #18202a;
 }
 
-.lh-review-action-section {
-  margin-top: -2px;
+.lh-takeaway-focus-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(17, 19, 23, 0.08);
 }
 
-.lh-review-action-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: 10px;
+.lh-focus-option {
+  min-height: 34px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  color: #252c35;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: none;
 }
 
-.lh-review-action-row .btn {
-  min-height: 50px;
-  padding-inline: 10px;
-}
-
-.lh-review-action-row .btn:first-child {
-  grid-column: 1 / -1;
-}
-
-.lh-review-action-row .btn.ghost {
-  border-color: rgba(17, 19, 23, 0.18);
-  color: #14191f;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: inset 4px 0 0 rgba(17, 19, 23, 0.76);
+.lh-focus-option:first-child {
+  border-color: rgba(232, 16, 16, 0.34);
+  color: var(--brand-red);
 }
 
 .lh-customize-focus-card {
-  margin-top: -2px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.985), rgba(247, 248, 249, 0.985));
+  margin-top: 8px;
+  padding-top: 0;
+  background: transparent;
 }
 
 .lh-customize-focus-card > summary {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 36px;
-  grid-template-areas:
-    "title arrow"
-    "helper arrow";
-  gap: 10px;
+  display: inline-grid;
+  grid-template-columns: minmax(0, auto) 24px;
+  grid-template-areas: "title arrow";
+  gap: 6px;
   align-items: center;
+  min-height: 32px;
+  padding: 0;
+  color: #5a6571;
   cursor: pointer;
   list-style: none;
 }
@@ -5741,13 +5743,14 @@ form.account-card,
   content: ">";
   display: inline-grid;
   grid-area: arrow;
-  justify-self: end;
-  width: 34px;
-  height: 34px;
+  width: 22px;
+  height: 22px;
   place-items: center;
-  border: 1px solid rgba(232, 16, 16, 0.22);
+  border: 1px solid rgba(17, 19, 23, 0.13);
   border-radius: 999px;
-  color: var(--brand-red);
+  color: #5a6571;
+  background: rgba(255, 255, 255, 0.62);
+  font-size: 0.8rem;
   font-weight: 950;
   transform: rotate(0deg);
 }
@@ -5763,9 +5766,9 @@ form.account-card,
 
 .lh-customize-focus-card > summary span {
   grid-area: title;
-  color: var(--text);
-  font-size: 0.98rem;
-  font-weight: 950;
+  color: #5a6571;
+  font-size: 0.78rem;
+  font-weight: 900;
   line-height: 1.18;
 }
 
