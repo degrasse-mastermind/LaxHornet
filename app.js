@@ -25,7 +25,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v270";
+const APP_VERSION = "v271";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -9608,24 +9608,94 @@ function renderWhatToEncourage(totals = {}, topContribution = "", player = state
   `;
 }
 
-function conversationStartersForTotals(totals = {}, player = state.player) {
-  const prompts = [];
-  const add = (condition, prompt) => {
-    if (condition && !prompts.includes(prompt) && prompts.length < 5) prompts.push(prompt);
+function conversationStarterCandidates(totals = {}, player = state.player, game = null, intelligence = null) {
+  const positionGroup = impactPositionGroup(player);
+  const context = game ? gameContextSummary(game, totals) : {};
+  const patterns = intelligence?.patterns || [];
+  const patternKeys = new Set(patterns.map((pattern) => pattern.key).filter(Boolean));
+  const possessionQuality = intelligence?.possessionQuality || (game ? possessionQualitySequence(game.events || []) : {});
+  const processLayer = intelligence?.processLayer || (game ? processDecisionSummary(game.events || []) : {});
+  const finalMargin = game && optionalScoreNumber(game.finalScoreFor) !== null && optionalScoreNumber(game.finalScoreAgainst) !== null
+    ? Number(game.finalScoreFor) - Number(game.finalScoreAgainst)
+    : null;
+  const shotVolume = Number(totals.shots || 0) + Number(totals.shotsOnGoal || 0) + Number(totals.goals || 0);
+  const shotOnGoalPct = shotVolume ? Number(totals.shotsOnGoal || 0) / shotVolume : 0;
+  const candidates = [];
+  const add = (condition, prompt, score = 10, group = "general") => {
+    if (!condition || !prompt) return;
+    candidates.push({ prompt, score, group });
   };
-  add(totals.points > 0, "What helped you create or finish your best scoring chance?");
-  add(totals.groundBalls + totals.backedUpShots > 0, "What play helped your team keep or win possession today?");
-  add(totals.causedTurnovers + totals.defensiveStops > 0, "When did you feel most connected on defense?");
-  add(totals.saves > 0, "What helped you see the ball and recover after a save?");
-  add(totals.effortScore > 0, "What was one moment where you worked hard away from the ball?");
-  add(totals.eventCount > 0, "What is one thing you want to try next game?");
-  add(true, "What play felt best today?");
-  add(true, "What should we practice before the next game?");
-  return prompts.slice(0, 5);
+
+  add(patternKeys.has("highLeverageImpact") || context.closePossessionPlays > 0, "Which close-game play felt most important, and what helped you stay calm in that moment?", 98, "context");
+  add(patternKeys.has("playHardWithControl") || context.lateNegative > 0, "What is one way to play hard in the next close stretch while still protecting the ball?", 95, "context");
+  add(patternKeys.has("strongFinish") || context.latePositivePossession > 0, "What helped you stay involved late in the game?", 92, "context");
+  add(patternKeys.has("strongStart") || context.earlyScoring > 0, "What helped you get into the game early?", 88, "context");
+  add(patternKeys.has("lateInvolvement"), "What changed later in the game that helped you get more involved?", 86, "context");
+  add(finalMargin !== null && finalMargin < 0, "Even in a loss, what play showed the kind of effort you want to repeat?", 84, "context");
+  add(finalMargin !== null && finalMargin > 0 && Number(totals.impact || 0) < 60, "The team won, but what is one personal play you want to clean up next game?", 82, "context");
+
+  add(patternKeys.has("possessionWinLoss") || possessionQuality.lossesAfterWin > 0, "After winning the ball, what could help make the next pass or carry cleaner?", 90, "possession");
+  add(Number(totals.groundBalls || 0) > 0, "Which ground ball changed momentum, and what helped you get there first?", 78, "possession");
+  add(Number(totals.backedUpShots || 0) > 0, "What did you notice that helped you back up a shot and keep possession?", 74, "possession");
+  add(Number(totals.clears || 0) > 0, "On your best clear, what made the first decision feel simple?", 72, "possession");
+  add(Number(totals.failedClears || 0) > 0, "On a tough clear, where was the safer outlet or support option?", 76, "possession");
+  add(Number(totals.turnovers || 0) > 0, "Before pressure arrived, what earlier option might have kept the possession clean?", 80, "possession");
+  add(Number(totals.extraPossessions || 0) > 0, "What did you do today that helped the team earn an extra chance?", 76, "possession");
+
+  add(patternKeys.has("shotQuality") || (shotVolume >= 3 && shotOnGoalPct < 0.5), "Which shot was the best quality chance, and what made it better than the others?", 88, "offense");
+  add(Number(totals.goals || 0) > 0, "On your goal, what happened before the shot that created the chance?", 78, "offense");
+  add(Number(totals.assists || 0) > 0, "On your assist, what did you see before you moved the ball?", 78, "offense");
+  add(Number(totals.points || 0) > 0, "What helped you create or finish your best scoring chance?", 70, "offense");
+  add(Number(totals.shotsOnGoal || 0) > 0, "What helped you get a shot on cage instead of just getting a shot off?", 68, "offense");
+
+  add(patternKeys.has("defenseClearConversion"), "After a stop, what helped the team turn defense into a clear?", 88, "defense");
+  add(Number(totals.causedTurnovers || 0) > 0, "What body position or pressure helped create the turnover?", 78, "defense");
+  add(Number(totals.defensiveStops || 0) > 0, "When did you feel most connected on defense?", 74, "defense");
+  add(positionGroup === "defense" || positionGroup === "lsm", "What defensive moment showed good feet before stick pressure?", 64, "defense");
+
+  add(patternKeys.has("goalieResponse") || Number(totals.saves || 0) > 0, "After your best save, what helped you reset and find the next outlet?", 90, "goalie");
+  add(Number(totals.goalsAllowed || 0) > 0 && positionGroup === "goalie", "After a goal against, what helped you reset for the next shot?", 72, "goalie");
+
+  add(patternKeys.has("faceoffExit") || Number(totals.faceoffAttempts || 0) > 0, "On the faceoff, what helped turn the rep into team possession?", 90, "faceoff");
+  add(Number(totals.faceoffLosses || 0) > 0, "After a lost faceoff, what was the quickest way to compete for the next possession?", 70, "faceoff");
+
+  add(processLayer.goodDecisionUnsuccessfulExecution > 0, "Was there a play where the idea was right even though the execution did not work yet?", 84, "process");
+  add(processLayer.recoveredAfterMistake > 0, "What did you do well after a mistake to get back into the play?", 84, "process");
+  add(processLayer.supportedBallCarrier > 0, "When did you help the ball carrier without needing the ball yourself?", 78, "process");
+  add(processLayer.communicatedEarly > 0, "What communication helped a teammate see pressure sooner?", 76, "process");
+  add(Number(totals.smartPlays || 0) > 0, "What smart decision helped the team, even if it did not show up as a goal or assist?", 76, "process");
+  add(Number(totals.hustlePlays || 0) > 0 || Number(totals.effortScore || 0) > 0, "What was one moment where you worked hard away from the ball?", 72, "effort");
+
+  add(positionGroup === "attack", "What spacing or off-ball movement helped create a better scoring chance?", 58, "position");
+  add(positionGroup === "midfield", "What was your best two-way play between offense, defense, and transition?", 58, "position");
+  add(positionGroup === "goalie", "What helped you organize the defense after pressure?", 58, "position");
+  add(positionGroup === "faceoff", "What happened after the clamp or draw that decided possession?", 58, "position");
+
+  add(Number(totals.eventCount || 0) < 3, "What play should we make sure to track next game so the review tells a fuller story?", 100, "lowData");
+  add(Number(totals.eventCount || 0) > 0, "What is one thing you want to try next game?", 40, "general");
+  add(true, "What play felt best today?", 30, "general");
+  add(true, "What should we practice before the next game?", 28, "general");
+  add(true, "What is one play you want me to notice next game?", 26, "general");
+
+  return candidates;
 }
 
-function renderConversationStarters(totals = {}, player = state.player) {
-  const prompts = conversationStartersForTotals(totals, player);
+function conversationStartersForTotals(totals = {}, player = state.player, game = null, intelligence = null, limit = 8) {
+  const seen = new Set();
+  return conversationStarterCandidates(totals, player, game, intelligence)
+    .sort((a, b) => b.score - a.score)
+    .map((candidate) => candidate.prompt)
+    .filter((prompt) => {
+      const key = prompt.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, limit);
+}
+
+function renderConversationStarters(totals = {}, player = state.player, game = null, intelligence = null) {
+  const prompts = conversationStartersForTotals(totals, player, game, intelligence, 8);
   const visiblePrompts = prompts.slice(0, 2);
   const extraPrompts = prompts.slice(2);
   return `
@@ -9841,9 +9911,9 @@ function familyRecapTakeaway(totals = {}, player = {}, topContribution = "", gam
   return buildFamilyRecapDevelopmentLine(totals, player, topContribution, game, intelligence);
 }
 
-function rideHomeRecapLine(totals = {}, player = {}, intelligence = null) {
+function rideHomeRecapLine(totals = {}, player = {}, intelligence = null, game = null) {
   const encouragement = intelligence?.parentEncouragement || buildEncouragementLine(totals, familyRecapTopContribution(totals, player), player);
-  const prompt = conversationStartersForTotals(totals, player)[0] || "What play felt best today?";
+  const prompt = conversationStartersForTotals(totals, player, game, intelligence)[0] || "What play felt best today?";
   return `Ride home idea: ${encouragement} Ask: "${prompt}"`;
 }
 
@@ -9854,7 +9924,7 @@ function buildFamilyRecap(game = {}, events = [], playerContext = {}, computedSt
   const title = `${playerFirstName(player)} ${familyRecapOpponentLabel(game)}`;
 
   if (Number(totals.eventCount || events?.length || 0) < 3) {
-    const body = `${reviewIntelligence.gameStoryText}\nNext focus: ${nextGameFocusForRecap(totals, player, "", game, reviewIntelligence)}\n${rideHomeRecapLine(totals, player, reviewIntelligence)}`;
+    const body = `${reviewIntelligence.gameStoryText}\nNext focus: ${nextGameFocusForRecap(totals, player, "", game, reviewIntelligence)}\n${rideHomeRecapLine(totals, player, reviewIntelligence, game)}`;
     return {
       title,
       body,
@@ -9875,7 +9945,7 @@ function buildFamilyRecap(game = {}, events = [], playerContext = {}, computedSt
   if (hasPossessionStory) lines.push(`Possession story: ${signedMetric(totals.possessionValue)} possession value and ${signedMetric(totals.extraPossessions)} extra chances`);
   lines.push(`Takeaway: ${familyRecapTakeaway(totals, player, topContribution, game, reviewIntelligence)}`);
   lines.push(`Next focus: ${nextGameFocusForRecap(totals, player, topContribution, game, reviewIntelligence)}`);
-  lines.push(rideHomeRecapLine(totals, player, reviewIntelligence));
+  lines.push(rideHomeRecapLine(totals, player, reviewIntelligence, game));
 
   const body = lines.join("\n");
   return {
@@ -10335,7 +10405,7 @@ function renderReview() {
       ${renderGameStorySection(postGameIntelligence)}
       ${renderDevelopmentTakeaway(totals, player, topContribution.label, game, postGameIntelligence)}
       ${renderFamilyRecapSection(game, player, totals, postGameIntelligence)}
-      ${renderConversationStarters(totals, player)}
+      ${renderConversationStarters(totals, player, game, postGameIntelligence)}
       ${renderReviewStatsSection(totals, player, archetypeResult, game.events || [], postGameIntelligence)}
       <section class="review-section lh-timeline-section">
         <div class="card pad">
