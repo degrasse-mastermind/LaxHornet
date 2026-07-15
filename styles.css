@@ -109,6 +109,7 @@
   color-scheme: light;
 }
 
+
 * {
   box-sizing: border-box;
 }
@@ -6268,4 +6269,192 @@ form.account-card,
   .review-details-card .archetype-bar span {
     grid-column: 1 / -1;
   }
+}
+
+/* Taste Skill cascade lock: final rendered polish overrides */
+:root {
+  --lh-font-body: ui-sans-serif, "Aptos", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --lh-font-display: "Aptos Display", "Segoe UI Variable Display", "Trebuchet MS", var(--lh-font-body);
+  --lh-ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+  --lh-shadow-premium: 0 18px 42px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  --lh-shadow-command: 0 18px 44px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  --lh-soft-border: rgba(17, 19, 23, 0.11);
+}
+
+body {
+  font-family: var(--lh-font-body);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+.screen-title h2,
+.welcome-copy h2,
+.brand-title,
+.metric strong,
+.insight-value,
+.live-pill strong,
+.impact-score-badge,
+.stat-button .label {
+  font-family: var(--lh-font-display);
+  text-wrap: balance;
+}
+
+p,
+.muted,
+.muted.small,
+.development-card p,
+.event-row p,
+.faq-card-body p,
+.more-action small,
+.quick-action small {
+  text-wrap: pretty;
+}
+
+.card {
+  border-color: var(--lh-soft-border);
+  border-radius: var(--lh-radius-lg);
+  box-shadow: var(--lh-shadow-premium);
+}
+
+.card.pad {
+  padding: clamp(16px, 4vw, 20px);
+}
+
+.metric strong,
+.insight-value,
+.live-pill strong,
+.impact-breakdown-row strong,
+.possession-impact-metric strong,
+.more-status-cell strong {
+  font-variant-numeric: tabular-nums;
+}
+
+form.account-card,
+.welcome-info-card,
+.faq-card,
+.share-watch-form,
+.team-card,
+.my-players-card,
+.game-day-status-card,
+.quick-actions-card,
+.development-card,
+.archetype-card,
+.impact-card,
+.possession-impact-card,
+.edit-tools-card,
+.export-card,
+.more-card,
+.admin-portal-card {
+  border-color: var(--lh-soft-border);
+}
+
+form.account-card::before,
+.welcome-info-card::before,
+.faq-card::before,
+.share-watch-form::before,
+.team-card::before,
+.my-players-card::before,
+.game-day-status-card::before,
+.quick-actions-card::before,
+.development-card::before,
+.impact-card::before,
+.possession-impact-card::before,
+.edit-tools-card::before,
+.more-card::before,
+.admin-portal-card::before,
+.empty-state-card::before {
+  width: 3px;
+  opacity: 0.74;
+}
+
+.btn,
+.mini-btn,
+.icon-btn,
+.quick-action,
+.more-action,
+.collapse-icon,
+.nav-tab,
+.stat-button {
+  transition:
+    transform 180ms var(--lh-ease-out),
+    border-color 180ms var(--lh-ease-out),
+    box-shadow 180ms var(--lh-ease-out),
+    background 180ms var(--lh-ease-out);
+}
+
+.quick-action,
+.more-action,
+.status-row,
+.player-chip,
+.team-chip,
+.event-row,
+.insight-card,
+.metric,
+.live-pill,
+.impact-breakdown-row,
+.possession-impact-metric,
+.stat-button {
+  border-radius: var(--lh-radius-lg);
+}
+
+.quick-action,
+.more-action {
+  background:
+    var(--lh-edge-accent-thin),
+    linear-gradient(180deg, #ffffff, #f5f7f9);
+}
+
+.status-row,
+.metric,
+.insight-card,
+.live-pill,
+.impact-breakdown-row,
+.possession-impact-metric,
+.event-row {
+  background: linear-gradient(180deg, #ffffff 0%, #f3f5f7 100%);
+}
+
+.home-next-card,
+.primary-manage-card,
+.live-player-card,
+.admin-portal-hero {
+  border-color: rgba(232, 16, 16, 0.34);
+  box-shadow: var(--lh-shadow-command);
+}
+
+.stat-button {
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, var(--stat-accent, var(--neutral)) 0 5px, transparent 5px),
+    radial-gradient(circle at 100% 0%, rgba(255, 255, 255, 0.09), transparent 35%),
+    linear-gradient(180deg, #262b32, #111315);
+}
+
+.stat-button::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 38%);
+  pointer-events: none;
+}
+
+.stat-button .label,
+.stat-button .points {
+  position: relative;
+  z-index: 1;
+}
+
+.bottom-nav {
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -16px 34px rgba(0, 0, 0, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.nav-tab.active {
+  box-shadow:
+    inset 0 3px 0 var(--hornet-red),
+    0 8px 20px rgba(0, 0, 0, 0.2);
 }
