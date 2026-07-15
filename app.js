@@ -25,7 +25,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v268";
+const APP_VERSION = "v269";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -9908,21 +9908,26 @@ function renderFamilyRecapSection(game, player, totals, intelligence = null) {
     .slice(0, 2)
     .join("\n");
   return `
-    <section class="card pad lh-family-recap-card">
-      <div class="section-head compact-head">
-        <div>
-          <h3>Family Recap</h3>
-          <p class="muted small">Copy a short, positive recap and ride-home prompt to share with family.</p>
+    <section class="card pad lh-family-recap-card" aria-label="Optional family recap sharing">
+      <details class="lh-family-recap-details">
+        <summary>
+          <span>
+            <span class="lh-tertiary-label">Optional share</span>
+            <strong>Family Recap</strong>
+            <small>Copy a short, positive recap for family when you need it.</small>
+          </span>
+        </summary>
+        <div class="lh-family-recap-body">
+          <div class="lh-family-recap-preview" aria-label="Family recap preview">${escapeHTML(previewLines || recap.title).replace(/\n/g, "<br>")}</div>
+          <div class="lh-family-recap-actions">
+            <button class="mini-btn light" type="button" data-action="copy-family-recap" data-game-id="${escapeHTML(game.id)}">Copy Recap</button>
+            ${canShareFamilyRecap() ? `<button class="mini-btn light" type="button" data-action="share-family-recap" data-game-id="${escapeHTML(game.id)}">Share Recap</button>` : ""}
+          </div>
+          <details class="lh-family-recap-expand">
+            <summary>View full recap text</summary>
+            <div class="lh-family-recap-text" aria-label="Full family recap">${escapeHTML(recap.text).replace(/\n/g, "<br>")}</div>
+          </details>
         </div>
-      </div>
-      <div class="lh-family-recap-preview" aria-label="Family recap preview">${escapeHTML(previewLines || recap.title).replace(/\n/g, "<br>")}</div>
-      <div class="lh-family-recap-actions">
-        <button class="btn secondary" type="button" data-action="copy-family-recap" data-game-id="${escapeHTML(game.id)}">Copy Recap</button>
-        ${canShareFamilyRecap() ? `<button class="btn neutral" type="button" data-action="share-family-recap" data-game-id="${escapeHTML(game.id)}">Share Recap</button>` : ""}
-      </div>
-      <details class="lh-family-recap-expand">
-        <summary>Expand</summary>
-        <div class="lh-family-recap-text" aria-label="Full family recap">${escapeHTML(recap.text).replace(/\n/g, "<br>")}</div>
       </details>
     </section>
   `;
