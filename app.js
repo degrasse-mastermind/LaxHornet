@@ -25,7 +25,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v261";
+const APP_VERSION = "v262";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -332,6 +332,46 @@ const LIVE_DEFAULT_STAT_KEYS = {
 };
 
 const FIELD_ZONE_OPTIONS = ["", "Offensive end", "Midfield", "Defensive end", "Sideline", "Endline", "Crease"];
+
+const PROCESS_DECISION_TAGS = {
+  createdAdvantage: "Created Advantage",
+  extendedPossession: "Extended Possession",
+  supportedBallCarrier: "Supported Ball Carrier",
+  forcedDefensiveRotation: "Forced Defensive Rotation",
+  recognizedTransition: "Recognized Transition",
+  protectedMiddle: "Protected the Middle",
+  recoveredAfterMistake: "Recovered After Mistake",
+  goodDecisionUnsuccessfulExecution: "Good Decision, Unsuccessful Execution",
+  poorDecisionSuccessfulOutcome: "Poor Decision, Successful Outcome",
+  wonSecondEffort: "Won the Second Effort",
+  communicatedEarly: "Communicated Early",
+  stayedComposedUnderPressure: "Stayed Composed Under Pressure",
+};
+
+const PROCESS_DECISION_TAG_VALUES = Object.values(PROCESS_DECISION_TAGS);
+const PRIVATE_REVIEW_TAGS = new Set(PROCESS_DECISION_TAG_VALUES.map((tag) => tag.toLowerCase()));
+
+const PROCESS_TAGS_BY_STAT = {
+  goal: ["createdAdvantage", "supportedBallCarrier", "poorDecisionSuccessfulOutcome"],
+  assist: ["createdAdvantage", "supportedBallCarrier", "forcedDefensiveRotation", "recognizedTransition"],
+  shot: ["createdAdvantage", "goodDecisionUnsuccessfulExecution", "poorDecisionSuccessfulOutcome"],
+  shotOnGoal: ["createdAdvantage", "goodDecisionUnsuccessfulExecution", "poorDecisionSuccessfulOutcome"],
+  goalieSave: ["recognizedTransition", "communicatedEarly", "stayedComposedUnderPressure"],
+  goalAllowed: ["stayedComposedUnderPressure", "recoveredAfterMistake"],
+  faceoffWin: ["extendedPossession", "wonSecondEffort", "recognizedTransition"],
+  faceoffLoss: ["wonSecondEffort", "recoveredAfterMistake", "stayedComposedUnderPressure"],
+  groundBall: ["extendedPossession", "wonSecondEffort", "stayedComposedUnderPressure"],
+  turnover: ["goodDecisionUnsuccessfulExecution", "poorDecisionSuccessfulOutcome", "recoveredAfterMistake"],
+  causedTurnover: ["protectedMiddle", "communicatedEarly", "wonSecondEffort"],
+  defensiveStop: ["protectedMiddle", "communicatedEarly", "stayedComposedUnderPressure"],
+  successfulClear: ["extendedPossession", "recognizedTransition", "communicatedEarly", "stayedComposedUnderPressure"],
+  failedClear: ["goodDecisionUnsuccessfulExecution", "recoveredAfterMistake", "stayedComposedUnderPressure"],
+  hustlePlay: ["wonSecondEffort", "recoveredAfterMistake", "extendedPossession"],
+  backedUpShot: ["extendedPossession", "wonSecondEffort", "recognizedTransition"],
+  smartPlay: ["createdAdvantage", "supportedBallCarrier", "recognizedTransition", "communicatedEarly", "stayedComposedUnderPressure"],
+  penalty: ["stayedComposedUnderPressure", "recoveredAfterMistake"],
+  note: ["goodDecisionUnsuccessfulExecution", "createdAdvantage", "recoveredAfterMistake", "stayedComposedUnderPressure"],
+};
 
 const TAG_SUGGESTIONS = {
   goal: [
@@ -2020,6 +2060,14 @@ function uniqueTags(tags = []) {
   return [...new Set(tags.map(normalizeTag).filter(Boolean))];
 }
 
+function isPrivateReviewTag(tag) {
+  return PRIVATE_REVIEW_TAGS.has(normalizeTag(tag).toLowerCase());
+}
+
+function publicEventTags(tags = []) {
+  return uniqueTags(tags).filter((tag) => !isPrivateReviewTag(tag));
+}
+
 function uniqueIds(ids = []) {
   return [...new Set(ids.map((id) => String(id || "").trim()).filter(Boolean))];
 }
@@ -2683,6 +2731,7 @@ function gameContextSummary(game = {}, totals = {}) {
 }
 
 function scoreContextSentence(context = {}, totals = {}, player = state.player) {
+  context = context || {};
   if (!context.eventCount || (!context.hasScore && !context.strongestStretch)) return "";
   const positionGroup = impactPositionGroup(player);
   if (context.goalieCloseSaves > 0) return "Goalie play helped protect the game during an important stretch.";
@@ -7763,7 +7812,7 @@ function renderEventRow(event, options = {}) {
       <span>
         <strong>${escapeHTML(event.statLabel)}</strong>
         <p>${formatTime(event.timestamp)} - ${escapeHTML(event.category || "General")}${scoreContext ? ` - ${escapeHTML(scoreContext)}` : ""}${event.fieldZone ? ` - ${escapeHTML(event.fieldZone)}` : ""}${event.note ? ` - ${escapeHTML(event.note)}` : ""}</p>
-        ${renderTagChips(event.tags)}
+        ${renderTagChips(event.tags, { publicOnly: Boolean(options.publicOnlyTags) })}
       </span>
       <span class="score">${pointText(impactValueForEvent(event))}</span>
       ${
@@ -7780,14 +7829,14 @@ function renderEventRow(event, options = {}) {
 }
 
 function renderTagChips(tags = [], options = {}) {
-  const cleanTags = uniqueTags(tags);
+  const cleanTags = options.publicOnly ? publicEventTags(tags) : uniqueTags(tags);
   if (!cleanTags.length) return "";
   return `
     <span class="tag-chip-list">
       ${cleanTags
         .map(
           (tag) => `
-            <span class="tag-chip">
+            <span class="tag-chip ${isPrivateReviewTag(tag) ? "process-tag" : ""}">
               ${escapeHTML(tag)}
               ${
                 options.removable
@@ -7944,15 +7993,22 @@ function suggestedTagsForEvent(event) {
   return TAG_SUGGESTIONS[event.statType] || [];
 }
 
+function processTagsForEvent(event = {}) {
+  const keys = PROCESS_TAGS_BY_STAT[event.statType] || PROCESS_TAGS_BY_STAT.note;
+  return uniqueTags(keys.map((key) => PROCESS_DECISION_TAGS[key]));
+}
+
 function renderTagEditor(game, event) {
   const selectedTags = uniqueTags(state.tagDraftTags);
   const suggestedTags = suggestedTagsForEvent(event).filter((tag) => !selectedTags.includes(tag));
+  const processTags = processTagsForEvent(event).filter((tag) => !selectedTags.includes(tag));
 
   return `
     <section class="card pad tag-editor" data-tag-editor="${event.id}">
       <h3>Edit Tags</h3>
       <p class="muted small">${escapeHTML(event.statLabel)} - ${escapeHTML(event.category || "General")} - ${formatTime(event.timestamp)}</p>
       <p class="safety-note">Avoid private, medical, or sensitive information in notes. Notes may appear in reviews, exports, or Live Share.</p>
+      <p class="field-help">Process tags are optional postgame notes that help separate the decision, execution, and outcome. They stay out of Live Share.</p>
       <div class="tag-editor-block">
         <strong class="tag-editor-label">Selected tags</strong>
         ${
@@ -7969,6 +8025,17 @@ function renderTagEditor(game, event) {
                 .map((tag) => `<button class="tag-suggestion" type="button" data-add-draft-tag="${escapeHTML(tag)}">${escapeHTML(tag)}</button>`)
                 .join("")}</div>`
             : `<p class="muted small">No suggestions for this event type.</p>`
+        }
+      </div>
+      <div class="tag-editor-block">
+        <strong class="tag-editor-label">Process / decision tags</strong>
+        <p class="muted small">Use these when the result does not tell the whole story.</p>
+        ${
+          processTags.length
+            ? `<div class="tag-suggestions process-suggestions">${processTags
+                .map((tag) => `<button class="tag-suggestion process-tag-option" type="button" data-add-draft-tag="${escapeHTML(tag)}">${escapeHTML(tag)}</button>`)
+                .join("")}</div>`
+            : `<p class="muted small">All suggested process tags are already selected.</p>`
         }
       </div>
       <form class="custom-tag-form" data-form="custom-tag">
@@ -8303,6 +8370,81 @@ function isPossessionLossEvent(event = {}) {
   return ["turnover", "failedClear", "faceoffLoss"].includes(event.statType);
 }
 
+function isPossessionProtectedEvent(event = {}) {
+  return ["successfulClear", "assist", "goal", "shotOnGoal", "backedUpShot", "smartPlay", "hustlePlay"].includes(event.statType);
+}
+
+function eventHasTag(event = {}, tag = "") {
+  const target = normalizeTag(tag).toLowerCase();
+  return uniqueTags(event.tags || []).some((eventTag) => eventTag.toLowerCase() === target);
+}
+
+function countEventsWithTag(events = [], tag = "") {
+  return events.filter((event) => eventHasTag(event, tag)).length;
+}
+
+function processDecisionSummary(events = []) {
+  const counts = {
+    goodDecisionUnsuccessfulExecution: countEventsWithTag(events, PROCESS_DECISION_TAGS.goodDecisionUnsuccessfulExecution),
+    poorDecisionSuccessfulOutcome: countEventsWithTag(events, PROCESS_DECISION_TAGS.poorDecisionSuccessfulOutcome),
+    recoveredAfterMistake: countEventsWithTag(events, PROCESS_DECISION_TAGS.recoveredAfterMistake),
+    extendedPossession: countEventsWithTag(events, PROCESS_DECISION_TAGS.extendedPossession),
+    supportedBallCarrier: countEventsWithTag(events, PROCESS_DECISION_TAGS.supportedBallCarrier),
+    createdAdvantage: countEventsWithTag(events, PROCESS_DECISION_TAGS.createdAdvantage),
+    wonSecondEffort: countEventsWithTag(events, PROCESS_DECISION_TAGS.wonSecondEffort),
+    stayedComposedUnderPressure: countEventsWithTag(events, PROCESS_DECISION_TAGS.stayedComposedUnderPressure),
+    communicatedEarly: countEventsWithTag(events, PROCESS_DECISION_TAGS.communicatedEarly),
+  };
+  const total = Object.values(counts).reduce((sum, value) => sum + Number(value || 0), 0);
+  return { ...counts, total };
+}
+
+function possessionQualitySequence(events = []) {
+  const ordered = chronologicalEvents(events).filter((event) => event.statType !== "note");
+  const wins = ordered.filter(isPossessionWinEvent);
+  let protectedAfterWin = 0;
+  let lossesAfterWin = 0;
+  let secondEffortWins = 0;
+
+  wins.forEach((win) => {
+    const index = ordered.findIndex((event) => event.id === win.id);
+    const nextEvents = ordered.slice(index + 1, index + 3);
+    if (eventHasTag(win, PROCESS_DECISION_TAGS.wonSecondEffort) || eventHasTag(win, PROCESS_DECISION_TAGS.extendedPossession)) {
+      secondEffortWins += 1;
+    }
+    if (nextEvents.some(isPossessionLossEvent)) {
+      lossesAfterWin += 1;
+    } else if (nextEvents.some(isPossessionProtectedEvent)) {
+      protectedAfterWin += 1;
+    }
+  });
+
+  const totalFollowUps = protectedAfterWin + lossesAfterWin;
+  const qualityScore = wins.length ? (protectedAfterWin - lossesAfterWin) / wins.length : 0;
+  return {
+    wins: wins.length,
+    protectedAfterWin,
+    lossesAfterWin,
+    secondEffortWins,
+    totalFollowUps,
+    qualityScore,
+  };
+}
+
+function possessionQualitySentence(sequence = possessionQualitySequence([])) {
+  if (!sequence.wins) return "";
+  if (sequence.protectedAfterWin && !sequence.lossesAfterWin) {
+    return `${sequence.protectedAfterWin} possession win${sequence.protectedAfterWin === 1 ? "" : "s"} turned into a protected next play.`;
+  }
+  if (sequence.lossesAfterWin && !sequence.protectedAfterWin) {
+    return `${sequence.lossesAfterWin} possession win${sequence.lossesAfterWin === 1 ? "" : "s"} was followed quickly by a lost possession, so the next growth area is the first clean decision after winning the ball.`;
+  }
+  if (sequence.protectedAfterWin || sequence.lossesAfterWin) {
+    return `${sequence.protectedAfterWin} protected follow-up${sequence.protectedAfterWin === 1 ? "" : "s"} and ${sequence.lossesAfterWin} quick loss${sequence.lossesAfterWin === 1 ? "" : "es"} show both the win and the next play mattered.`;
+  }
+  return "Possession wins were logged; add tags or follow-up events to show whether those wins became clean possessions.";
+}
+
 function isDefensivePressureEvent(event = {}) {
   return ["causedTurnover", "defensiveStop", "goalieSave"].includes(event.statType);
 }
@@ -8389,37 +8531,103 @@ function detectHighLeverageImpact(events = [], totals = {}, player = state.playe
   });
 }
 
+function detectProcessDecisionPattern(events = [], totals = {}, player = state.player) {
+  const process = processDecisionSummary(events);
+  if (!process.total) return null;
+  const name = playerFirstName(player);
+  const decisionQuality = process.goodDecisionUnsuccessfulExecution + process.poorDecisionSuccessfulOutcome;
+  const responseQuality = process.recoveredAfterMistake + process.stayedComposedUnderPressure;
+  const teamProcess = process.createdAdvantage + process.supportedBallCarrier + process.extendedPossession + process.communicatedEarly;
+  const processFacts = [
+    decisionQuality ? safeStatFact(decisionQuality, "decision-process tag") : "",
+    responseQuality ? safeStatFact(responseQuality, "response tag") : "",
+    teamProcess ? safeStatFact(teamProcess, "team-process tag") : "",
+  ];
+  const title = decisionQuality
+    ? "Decision and result"
+    : responseQuality
+      ? "Response after the play"
+      : "Process plays";
+  const text = decisionQuality
+    ? `${name}'s review includes process tags that separate the read from the execution and the final result. That helps the next focus stay fair and specific.`
+    : responseQuality
+      ? `${name}'s process tags point to response and composure after the play, not just what showed up in the box score.`
+      : `${name}'s process tags show useful team actions that may not become goals or assists but still shape possessions.`;
+
+  return patternResult({
+    key: "processDecision",
+    storyType: "Process Growth Game",
+    title,
+    text,
+    category: "process",
+    priority: decisionQuality ? 98 : 87,
+    evidence: processFacts,
+    development: {
+      whatWentWell: decisionQuality
+        ? `${name} had reviewable decisions where the idea, execution, and outcome can be separated.`
+        : `${name} showed process plays that helped the team stay connected.`,
+      whyItMattered: "A good result is not always a good decision, and a good decision can still need cleaner execution. Separating those pieces makes the feedback more useful.",
+      whatToBuildOn: process.goodDecisionUnsuccessfulExecution
+        ? "Keep trusting the right read, then make the execution simpler and cleaner."
+        : process.poorDecisionSuccessfulOutcome
+          ? "Celebrate the result, then look for the safer repeatable choice next time."
+          : "Repeat the process behavior that helped the possession stay connected.",
+    },
+    focus: {
+      focusTitle: "Decision before outcome",
+      whyThisFits: "The review includes process tags that add context beyond the stat result.",
+      tryThisNextGame: process.goodDecisionUnsuccessfulExecution
+        ? "Look for the same good read, then choose the simplest execution before pressure arrives."
+        : "Name the decision first, then decide whether the execution or result needs the next rep.",
+      confidence: process.total >= 2 ? "high" : "medium",
+      category: "process",
+    },
+    encouragement: "Praise the decision or response first, then talk about the result. That keeps the review development-focused.",
+  });
+}
+
 function detectPossessionWinLossPattern(events = [], totals = {}, player = state.player) {
   const wins = events.filter(isPossessionWinEvent);
   const losses = events.filter(isPossessionLossEvent);
-  if (!wins.length || !losses.length) return null;
-  const laterLosses = losses.filter((loss) => wins.some((win) => new Date(win.timestamp || 0) <= new Date(loss.timestamp || 0))).length;
-  if (!laterLosses) return null;
+  if (!wins.length) return null;
+  const sequence = possessionQualitySequence(events);
+  if (!sequence.lossesAfterWin && !sequence.protectedAfterWin) return null;
+  const protectedMoreThanLost = sequence.protectedAfterWin > sequence.lossesAfterWin;
   return patternResult({
     key: "possessionWinLoss",
-    storyType: totals.extraPossessions >= 0 ? "Possession Builder" : "Cleaner Possession Needed",
-    title: "Win it, then protect it",
-    text: `${playerFirstName(player)} helped create possession chances, and the next development layer is protecting the ball after those wins.`,
+    storyType: protectedMoreThanLost ? "Possession Builder" : "Cleaner Possession Needed",
+    title: protectedMoreThanLost ? "Win it, then use it" : "Win it, then protect it",
+    text: protectedMoreThanLost
+      ? `${playerFirstName(player)} helped turn possession wins into cleaner next plays.`
+      : `${playerFirstName(player)} helped create possession chances, and the next development layer is protecting the ball after those wins.`,
     category: "possession",
-    priority: 92,
+    priority: protectedMoreThanLost ? 84 : 94,
     evidence: [
       safeStatFact(wins.length, "possession win"),
       safeStatFact(losses.length, "possession loss", "possession losses"),
+      sequence.protectedAfterWin ? safeStatFact(sequence.protectedAfterWin, "protected follow-up") : "",
+      sequence.lossesAfterWin ? safeStatFact(sequence.lossesAfterWin, "quick loss", "quick losses") : "",
       `${signedMetric(totals.possessionValue)} possession value`,
     ],
     development: {
       whatWentWell: `${playerFirstName(player)} created chances to gain or protect possession.`,
-      whyItMattered: "Winning the ball is the first part of the play. The next pass, cradle, or clear decides whether that win becomes a team possession.",
-      whatToBuildOn: "Turn the first possession win into one clean decision before pressure arrives.",
+      whyItMattered: "Winning the ball is the first part of the play. Possession quality comes from the next pass, cradle, clear, or reset.",
+      whatToBuildOn: protectedMoreThanLost ? "Keep connecting possession wins to clean next plays." : "Turn the first possession win into one clean decision before pressure arrives.",
     },
     focus: {
-      focusTitle: "Protect the first win",
-      whyThisFits: "The stat pattern shows both possession wins and moments where the ball was given back.",
-      tryThisNextGame: "After a ground ball, save, clear, or faceoff win, make the first safe pass or carry before pressure closes.",
+      focusTitle: protectedMoreThanLost ? "Repeat the next play" : "Protect the first win",
+      whyThisFits: protectedMoreThanLost
+        ? "The stat pattern shows possession wins that were followed by protected next plays."
+        : "The stat pattern shows both possession wins and moments where the ball was given back.",
+      tryThisNextGame: protectedMoreThanLost
+        ? "After winning the ball, keep looking for the same simple outlet or support decision that protected the possession."
+        : "After a ground ball, save, clear, or faceoff win, make the first safe pass or carry before pressure closes.",
       confidence: "high",
       category: "possession",
     },
-    encouragement: "Celebrate the possession wins, then reinforce the first clean decision after the ball is secured.",
+    encouragement: protectedMoreThanLost
+      ? "Celebrate the possession wins and the simple follow-up plays that protected them."
+      : "Celebrate the possession wins, then reinforce the first clean decision after the ball is secured.",
   });
 }
 
@@ -8778,6 +8986,7 @@ function buildPostGamePatterns(events = [], totals = {}, player = state.player, 
   return rankPostGameInsights([
     detectLowDataPattern(events, totals, player),
     detectHighLeverageImpact(events, totals, player),
+    detectProcessDecisionPattern(events, totals, player),
     detectPlayHardWithControlPattern(events, totals, player),
     detectPossessionWinLossPattern(events, totals, player),
     detectDefenseClearConversion(events, totals, player),
@@ -8795,6 +9004,9 @@ function buildPostGamePatterns(events = [], totals = {}, player = state.player, 
 function playExplanationForKey(key, player = state.player) {
   const name = playerFirstName(player);
   const explanations = {
+    processDecision: "Decision quality and outcome are not always the same thing. This helps the review praise the right read, identify execution reps, and avoid judging a play only by whether it worked.",
+    possessionQuality: "Possession quality asks what happened after the ball was won. A ground ball, save, clear, or faceoff win matters more when the next play protects possession.",
+    responseAfterMistake: "A response play shows the player stayed engaged after a tough moment. That is useful development evidence, but it should not be turned into a permanent label.",
     goal: "A goal finishes a scoring chance, but the development value is also in how the player found space, handled pressure, or made the right read before the shot.",
     assist: "Assists show vision, timing, and trust with teammates. They are a strong sign that the player is seeing more than just their own shot.",
     groundBall: "Ground balls create extra chances and often decide who controls the game. They are one of the clearest signs of effort, readiness, and field awareness.",
@@ -8813,11 +9025,21 @@ function playExplanationForKey(key, player = state.player) {
   return explanations[key] || `${name}'s tracked plays help show how effort, awareness, and decisions shape the game beyond the box score.`;
 }
 
+function educationLabelForKey(key) {
+  const labels = {
+    processDecision: "Decision vs Outcome",
+    possessionQuality: "Possession Quality",
+    responseAfterMistake: "Response After Mistake",
+  };
+  return labels[key] || statEducationForKey(key).label;
+}
+
 function postGameWhyThesePlaysMatter(events = [], patterns = [], totals = {}, player = state.player, limit = 3) {
   const patternKeys = [];
   patterns.forEach((pattern) => {
+    if (pattern.key === "processDecision") patternKeys.push("processDecision", "responseAfterMistake");
     if (pattern.key === "shotQuality") patternKeys.push("shotOnGoal", "goal");
-    if (pattern.key === "possessionWinLoss") patternKeys.push("groundBall", "turnover", "successfulClear");
+    if (pattern.key === "possessionWinLoss") patternKeys.push("possessionQuality", "groundBall", "turnover", "successfulClear");
     if (pattern.key === "defenseClearConversion") patternKeys.push("causedTurnover", "successfulClear", "defensiveStop");
     if (pattern.key === "goalieResponse") patternKeys.push("goalieSave", "successfulClear");
     if (pattern.key === "faceoffExit") patternKeys.push("faceoffWin", "groundBall");
@@ -8829,7 +9051,7 @@ function postGameWhyThesePlaysMatter(events = [], patterns = [], totals = {}, pl
     return [{ label: "Tracked plays", explanation: "A fuller guide will build as more plays are tracked." }];
   }
   return keys.map((key) => ({
-    label: statEducationForKey(key).label,
+    label: educationLabelForKey(key),
     explanation: playExplanationForKey(key, player),
   }));
 }
@@ -8839,6 +9061,8 @@ function buildPostGameIntelligence(game = {}, events = [], playerContext = state
   const normalizedEvents = enrichPostGameEvents((events || []).map((event) => normalizeEvent(event, game.id || "")));
   const computedTotals = totals || calculateTotals(normalizedEvents, player);
   const patterns = buildPostGamePatterns(normalizedEvents, computedTotals, player, seasonContext);
+  const processLayer = processDecisionSummary(normalizedEvents);
+  const possessionQuality = possessionQualitySequence(normalizedEvents);
   const primary = patterns[0] || detectLowDataPattern(normalizedEvents, computedTotals, player);
   const nextPattern = patterns.find((pattern) => pattern.focus?.tryThisNextGame) || primary;
   const nextFocus = {
@@ -8871,6 +9095,8 @@ function buildPostGameIntelligence(game = {}, events = [], playerContext = state
     parentEncouragement: primary.encouragement || buildEncouragementLine(computedTotals, topContributionForTotals(computedTotals).label, player),
     whyThesePlaysMatter: postGameWhyThesePlaysMatter(normalizedEvents, patterns, computedTotals, player, 3),
     contextHighlights,
+    processLayer,
+    possessionQuality,
     warnings: primary.key === "lowData" ? ["Low data: track more plays to make feedback more specific."] : [],
     patterns,
   };
@@ -8966,6 +9192,9 @@ function buildPossessionStory(totals = {}, topContribution = "", player = state.
   const extraPossessions = Number(totals.extraPossessions || 0);
   const possessionValue = Number(totals.possessionValue || 0);
   const events = totals.possessionImpact?.eventsByType || {};
+  const gameEvents = Array.isArray(totals.events) ? totals.events : [];
+  const sequence = possessionQualitySequence(gameEvents);
+  const sequenceSentence = gameEvents.length ? possessionQualitySentence(sequence) : "";
   const positives = [];
   const negatives = [];
   const chanceLabel = Math.abs(extraPossessions) === 1 ? "chance" : "chances";
@@ -8982,11 +9211,11 @@ function buildPossessionStory(totals = {}, topContribution = "", player = state.
 
   if (extraPossessions > 0 && possessionValue > 0) {
     const source = positives.length ? ` through ${listPhrase(positives.slice(0, 3))}` : "";
-    return `${signedMetric(possessionValue)} possession value means the player helped create or protect ${signedMetric(extraPossessions)} extra ${chanceLabel}${source}. The next step is turning those wins into clean clears or better shot opportunities.`;
+    return `${signedMetric(possessionValue)} possession value means the player helped create or protect ${signedMetric(extraPossessions)} extra ${chanceLabel}${source}. ${sequenceSentence || "The next step is turning those wins into clean clears or better shot opportunities."}`;
   }
   if (extraPossessions > 0) {
     const source = positives.length ? ` came from ${listPhrase(positives.slice(0, 3))}` : " came from possession work";
-    return `${signedMetric(extraPossessions)} extra ${chanceLabel}${source}. Winning the ball is the first part; the next step is turning the win into a clean team possession.`;
+    return `${signedMetric(extraPossessions)} extra ${chanceLabel}${source}. ${sequenceSentence || "Winning the ball is the first part; the next step is turning the win into a clean team possession."}`;
   }
   if (possessionValue > 0) {
     const source = positives.length ? ` from ${listPhrase(positives.slice(0, 3))}` : "";
@@ -8994,7 +9223,7 @@ function buildPossessionStory(totals = {}, topContribution = "", player = state.
   }
   if (extraPossessions < 0 || possessionValue < 0) {
     const source = negatives.length ? ` The pressure showed up through ${listPhrase(negatives.slice(0, 2))}.` : "";
-    return `Possession was the growth area in this game.${source} The next step is making the first safe outlet or ground-ball decision before pressure builds.`;
+    return `Possession was the growth area in this game.${source} ${sequenceSentence || "The next step is making the first safe outlet or ground-ball decision before pressure builds."}`;
   }
   return "Possession was part of the story, but not the main driver in this game.";
 }
@@ -9402,6 +9631,12 @@ function familyRecapTakeaway(totals = {}, player = {}, topContribution = "", gam
   return buildFamilyRecapDevelopmentLine(totals, player, topContribution, game, intelligence);
 }
 
+function rideHomeRecapLine(totals = {}, player = {}, intelligence = null) {
+  const encouragement = intelligence?.parentEncouragement || buildEncouragementLine(totals, familyRecapTopContribution(totals, player), player);
+  const prompt = conversationStartersForTotals(totals, player)[0] || "What play felt best today?";
+  return `Ride home idea: ${encouragement} Ask: "${prompt}"`;
+}
+
 function buildFamilyRecap(game = {}, events = [], playerContext = {}, computedStats = null, intelligence = null) {
   const player = playerContext || {};
   const totals = computedStats || calculateTotals(events || [], player);
@@ -9409,7 +9644,7 @@ function buildFamilyRecap(game = {}, events = [], playerContext = {}, computedSt
   const title = `${playerFirstName(player)} ${familyRecapOpponentLabel(game)}`;
 
   if (Number(totals.eventCount || events?.length || 0) < 3) {
-    const body = `${reviewIntelligence.gameStoryText}\nNext focus: ${nextGameFocusForRecap(totals, player, "", game, reviewIntelligence)}`;
+    const body = `${reviewIntelligence.gameStoryText}\nNext focus: ${nextGameFocusForRecap(totals, player, "", game, reviewIntelligence)}\n${rideHomeRecapLine(totals, player, reviewIntelligence)}`;
     return {
       title,
       body,
@@ -9430,6 +9665,7 @@ function buildFamilyRecap(game = {}, events = [], playerContext = {}, computedSt
   if (hasPossessionStory) lines.push(`Possession story: ${signedMetric(totals.possessionValue)} possession value and ${signedMetric(totals.extraPossessions)} extra chances`);
   lines.push(`Takeaway: ${familyRecapTakeaway(totals, player, topContribution, game, reviewIntelligence)}`);
   lines.push(`Next focus: ${nextGameFocusForRecap(totals, player, topContribution, game, reviewIntelligence)}`);
+  lines.push(rideHomeRecapLine(totals, player, reviewIntelligence));
 
   const body = lines.join("\n");
   return {
@@ -9452,7 +9688,7 @@ function renderFamilyRecapSection(game, player, totals, intelligence = null) {
       <div class="section-head compact-head">
         <div>
           <h3>Family Recap</h3>
-          <p class="muted small">Copy a short, positive recap to share with family.</p>
+          <p class="muted small">Copy a short, positive recap and ride-home prompt to share with family.</p>
         </div>
       </div>
       <div class="lh-family-recap-preview" aria-label="Family recap preview">${escapeHTML(previewLines || recap.title).replace(/\n/g, "<br>")}</div>
@@ -9790,7 +10026,7 @@ function renderSharedGame() {
         <h3>Live Timeline</h3>
         ${
           events.length
-            ? `<div class="event-list">${events.map(renderEventRow).join("")}</div>`
+            ? `<div class="event-list">${events.map((event) => renderEventRow(event, { publicOnlyTags: true })).join("")}</div>`
             : `<p class="muted small">No events logged yet.</p>`
         }
       </div>

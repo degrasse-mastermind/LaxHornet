@@ -2877,6 +2877,14 @@ button:focus-visible,
   overflow-wrap: anywhere;
 }
 
+.tag-chip.process-tag {
+  border-color: rgba(232, 16, 16, 0.34);
+  color: #17191c;
+  background:
+    linear-gradient(90deg, rgba(232, 16, 16, 0.22) 0 4px, transparent 4px),
+    #f4f5f6;
+}
+
 .tag-remove {
   display: inline-grid;
   width: 22px;
@@ -2924,6 +2932,19 @@ button:focus-visible,
   background: var(--lh-panel-gradient);
   font-size: 0.88rem;
   font-weight: 900;
+}
+
+.process-suggestions {
+  padding-left: 10px;
+  border-left: 3px solid rgba(232, 16, 16, 0.72);
+}
+
+.tag-suggestion.process-tag-option {
+  border-color: rgba(232, 16, 16, 0.34);
+  color: #17191c;
+  background:
+    linear-gradient(90deg, rgba(232, 16, 16, 0.18) 0 4px, transparent 4px),
+    #ffffff;
 }
 
 .custom-tag-form {
