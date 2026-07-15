@@ -25,7 +25,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v262";
+const APP_VERSION = "v263";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -2080,6 +2080,22 @@ function rememberDeletedEvent(eventId) {
   state.deletedEventIds = uniqueIds([...state.deletedEventIds, eventId]);
 }
 
+function forgetDeletedGame(gameId) {
+  if (!gameId) return;
+  state.deletedGameIds = uniqueIds(state.deletedGameIds).filter((id) => id !== gameId);
+}
+
+function forgetDeletedEvent(eventId) {
+  if (!eventId) return;
+  state.deletedEventIds = uniqueIds(state.deletedEventIds).filter((id) => id !== eventId);
+}
+
+function forgetDeletedEvents(eventIds = []) {
+  const ids = new Set(uniqueIds(eventIds));
+  if (!ids.size) return;
+  state.deletedEventIds = uniqueIds(state.deletedEventIds).filter((id) => !ids.has(id));
+}
+
 function isDeletedGame(gameId) {
   return state.deletedGameIds.includes(gameId);
 }
@@ -3366,8 +3382,9 @@ async function confirmDeleteGame(id) {
   showToast("Game deleted");
   const cloudDeleted = await deleteSupabaseGame(id);
   if (cloudDeleted) {
+    forgetDeletedEvents((game.events || []).map((event) => event.id));
     state.syncStatus = "Synced";
-    if (/delete setup/i.test(state.cloudError || "")) state.cloudError = "";
+    clearResolvedCloudDeleteError();
   } else if (supabaseClient && currentUserId() && !state.cloudError) {
     reportCloudDeleteNeedsUpdate("game");
   }
@@ -3396,7 +3413,9 @@ async function deleteEvent(gameId, eventId) {
   if (state.tagEditingEventId === eventId) state.tagEditingEventId = null;
   saveReviewedGame(updatedGame, "Event deleted");
   const cloudDeleted = await deleteSupabaseEvent(eventId);
-  if (!cloudDeleted && supabaseClient && currentUserId() && !state.cloudError) {
+  if (cloudDeleted) {
+    clearResolvedCloudDeleteError();
+  } else if (supabaseClient && currentUserId() && !state.cloudError) {
     reportCloudDeleteNeedsUpdate("event");
     persistAll();
   }
@@ -3795,7 +3814,7 @@ function reportSyncError(error) {
 }
 
 function reportCloudDeleteNeedsUpdate(recordLabel = "item") {
-  state.syncStatus = "Sync issue — tap to fix";
+  state.syncStatus = "Sync needs attention";
   state.cloudError = `Cloud delete setup needs an update. Deleted ${recordLabel}s stay hidden on this device, but may return on other devices until the update is applied.`;
   const now = Date.now();
   if (now - lastSyncErrorAt > 8000) {
@@ -3806,7 +3825,7 @@ function reportCloudDeleteNeedsUpdate(recordLabel = "item") {
 
 function reportCloudDeleteError(recordLabel = "item", error = {}) {
   console.warn(`LaxHornet cloud ${recordLabel} delete failed:`, error);
-  state.syncStatus = "Sync issue — tap to fix";
+  state.syncStatus = "Sync needs attention";
   const detail = readableSupabaseError(error);
   state.cloudError = detail
     ? `Could not remove this ${recordLabel} from the cloud: ${detail}`
@@ -3824,6 +3843,42 @@ function supabaseErrorText(error = {}) {
 
 function readableSupabaseError(error = {}) {
   return supabaseErrorText(error).replace(/\s+/g, " ").slice(0, 220);
+}
+
+function isCloudDeleteNotFoundError(error = {}, label = "record") {
+  const text = readableSupabaseError(error);
+  return (
+    new RegExp(`${label}\\s+not\\s+found`, "i").test(text)
+    || (/not\s+found/i.test(text) && !/function|schema|rpc|cache/i.test(text))
+  );
+}
+
+function cloudDeleteErrorIsResolved() {
+  return !uniqueIds(state.deletedGameIds).length && !uniqueIds(state.deletedEventIds).length;
+}
+
+function clearResolvedCloudDeleteError() {
+  if (!cloudDeleteErrorIsResolved()) return;
+  if (/cloud delete|could not remove|deleted .* may return/i.test(state.cloudError || "")) {
+    state.cloudError = "";
+  }
+  if (/sync (issue|needs attention)/i.test(state.syncStatus || "")) {
+    state.syncStatus = "Synced";
+  }
+}
+
+async function cloudRecordStillVisible(tableName, id) {
+  if (!supabaseClient || !tableName || !id) return false;
+  const { data, error } = await supabaseClient
+    .from(tableName)
+    .select("id")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) {
+    console.warn(`LaxHornet ${tableName} delete verification failed:`, error);
+    return true;
+  }
+  return Boolean(data?.id);
 }
 
 function isTeamForeignKeyError(error = {}) {
@@ -4316,11 +4371,18 @@ async function flushDeletedCloudRecords(options = {}) {
   if (!supabaseClient || !currentUserId()) return;
   const deletedEvents = uniqueIds(state.deletedEventIds);
   const deletedGames = uniqueIds(state.deletedGameIds);
+  let changed = false;
   for (const eventId of deletedEvents) {
-    await deleteSupabaseEvent(eventId, { quiet: Boolean(options.quiet) });
+    const deleted = await deleteSupabaseEvent(eventId, { quiet: Boolean(options.quiet) });
+    if (deleted) changed = true;
   }
   for (const gameId of deletedGames) {
-    await deleteSupabaseGame(gameId, { quiet: Boolean(options.quiet) });
+    const deleted = await deleteSupabaseGame(gameId, { quiet: Boolean(options.quiet) });
+    if (deleted) changed = true;
+  }
+  if (changed) {
+    clearResolvedCloudDeleteError();
+    persistAll();
   }
 }
 
@@ -5161,8 +5223,11 @@ async function syncLoggedEvent(game, event) {
 async function deleteSupabaseEvent(eventId, options = {}) {
   if (!supabaseClient || !eventId) return;
   const rpcResult = await supabaseClient.rpc("laxhornet_delete_event", { p_event_id: eventId });
-  if (!rpcResult.error) return true;
-  if (/event not found/i.test(readableSupabaseError(rpcResult.error))) return true;
+  if (!rpcResult.error || isCloudDeleteNotFoundError(rpcResult.error, "event")) {
+    forgetDeletedEvent(eventId);
+    clearResolvedCloudDeleteError();
+    return true;
+  }
   if (!isMissingRpcError(rpcResult.error)) {
     reportCloudDeleteError("event", rpcResult.error);
     return false;
@@ -5173,7 +5238,17 @@ async function deleteSupabaseEvent(eventId, options = {}) {
     reportCloudDeleteError("event", error);
     return false;
   }
-  if (Array.isArray(data) && data.length) return true;
+  if (Array.isArray(data) && data.length) {
+    forgetDeletedEvent(eventId);
+    clearResolvedCloudDeleteError();
+    return true;
+  }
+  const stillVisible = await cloudRecordStillVisible("events", eventId);
+  if (!stillVisible) {
+    forgetDeletedEvent(eventId);
+    clearResolvedCloudDeleteError();
+    return true;
+  }
   if (!options.quiet) reportCloudDeleteNeedsUpdate("event");
   return false;
 }
@@ -5181,8 +5256,11 @@ async function deleteSupabaseEvent(eventId, options = {}) {
 async function deleteSupabaseGame(gameId, options = {}) {
   if (!supabaseClient || !gameId) return;
   const rpcResult = await supabaseClient.rpc("laxhornet_delete_game", { p_game_id: gameId });
-  if (!rpcResult.error) return true;
-  if (/game not found/i.test(readableSupabaseError(rpcResult.error))) return true;
+  if (!rpcResult.error || isCloudDeleteNotFoundError(rpcResult.error, "game")) {
+    forgetDeletedGame(gameId);
+    clearResolvedCloudDeleteError();
+    return true;
+  }
   if (!isMissingRpcError(rpcResult.error)) {
     reportCloudDeleteError("game", rpcResult.error);
     return false;
@@ -5193,7 +5271,17 @@ async function deleteSupabaseGame(gameId, options = {}) {
     reportCloudDeleteError("game", error);
     return false;
   }
-  if (Array.isArray(data) && data.length) return true;
+  if (Array.isArray(data) && data.length) {
+    forgetDeletedGame(gameId);
+    clearResolvedCloudDeleteError();
+    return true;
+  }
+  const stillVisible = await cloudRecordStillVisible("games", gameId);
+  if (!stillVisible) {
+    forgetDeletedGame(gameId);
+    clearResolvedCloudDeleteError();
+    return true;
+  }
   if (!options.quiet) reportCloudDeleteNeedsUpdate("game");
   return false;
 }
