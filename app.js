@@ -25,7 +25,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v265";
+const APP_VERSION = "v266";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -2758,6 +2758,81 @@ function scoreContextSentence(context = {}, totals = {}, player = state.player) 
   if (context.earlyScoring > 0) return "Early scoring helped set the tone.";
   if (positionGroup === "goalie" && totals.saves > 0) return "The score context can make save-and-clear moments easier to understand over time.";
   return "";
+}
+
+function isTeamWinWithModestPlayerImpact(game = {}, totals = {}) {
+  const context = gameContextSummary(game, totals);
+  if (!context.hasFinal) return false;
+  const finalFor = Number(context.finalScoreFor || 0);
+  const finalAgainst = Number(context.finalScoreAgainst || 0);
+  if (finalFor <= finalAgainst) return false;
+  const eventCount = Number(totals.eventCount || 0);
+  if (eventCount < 5) return false;
+  const impact = Number(totals.impact || 0);
+  const points = Number(totals.points || 0);
+  const possessionPressure = Number(totals.turnovers || 0) + Number(totals.failedClears || 0) + Number(totals.penalties || 0);
+  const positiveRolePlays =
+    Number(totals.groundBalls || 0) +
+    Number(totals.causedTurnovers || 0) +
+    Number(totals.clears || 0) +
+    Number(totals.hustlePlays || 0) +
+    Number(totals.smartPlays || 0);
+  return (impact < 75 || points === 0 || possessionPressure >= 2) && positiveRolePlays > 0 && !(points >= 3 || impact >= 85);
+}
+
+function buildTeamWinGrowthPattern(game = {}, events = [], totals = {}, player = state.player, nextFocus = null) {
+  if (!isTeamWinWithModestPlayerImpact(game, totals)) return null;
+  const context = gameContextSummary(game, totals);
+  const name = playerFirstName(player);
+  const topContribution = topContributionForTotals(totals);
+  const roleSignals = [
+    countPhrase(totals.groundBalls, "ground ball"),
+    countPhrase(totals.causedTurnovers, "caused turnover"),
+    countPhrase(totals.clears, "successful clear"),
+    countPhrase(totals.hustlePlays, "hustle play"),
+    countPhrase(totals.smartPlays, "smart play"),
+  ].filter(Boolean);
+  const pressureSignals = [
+    countPhrase(totals.turnovers, "turnover"),
+    countPhrase(totals.failedClears, "failed clear"),
+    countPhrase(totals.penalties, "penalty", "penalties"),
+  ].filter(Boolean);
+  const result = `${context.finalScoreFor}-${context.finalScoreAgainst}`;
+  const signalText = roleSignals.length ? `The useful role plays came through ${listPhrase(roleSignals.slice(0, 3))}.` : "The useful plays came in supporting moments away from the scoring line.";
+  const pressureText = pressureSignals.length
+    ? `The growth layer is protecting the next possession after ${listPhrase(pressureSignals.slice(0, 2))}.`
+    : "The growth layer is turning those useful plays into one clean next action.";
+  const tryThis = nextFocus?.tryThisNextGame || buildNextFocusLine(totals, player, topContribution.label, game);
+
+  return patternResult({
+    key: "teamWinIndividualGrowth",
+    storyType: "Team Win, Individual Growth",
+    title: "Team result, next-play focus",
+    text: `The team won ${result}, but ${name}'s review is more about role impact and the next clean decision than the scoreboard. ${signalText} ${pressureText}`,
+    category: "development",
+    priority: 112,
+    evidence: [
+      `Team won ${result}`,
+      `${impactLetterGrade(totals.impact)} / ${formatImpactNumber(totals.impact)} Game Impact`,
+      topContribution.label && topContribution.label !== "Building profile" ? `${topContribution.label} led the stat profile` : "",
+      pressureSignals.length ? `${listPhrase(pressureSignals.slice(0, 2))} to clean up` : "",
+    ],
+    development: {
+      whatWentWell: `${name} stayed involved in a game the team won, even without a big scoring line.`,
+      whyItMattered: `${positionDevelopmentLens(player)} Role plays matter because they help the team gain control even when points are not the story.`,
+      whatToBuildOn: pressureSignals.length
+        ? "Build the next play after pressure: secure it, find support, and choose the simple outlet."
+        : "Build on the useful role play by turning it into one calm next decision.",
+    },
+    focus: {
+      focusTitle: "Next clean decision",
+      whyThisFits: "The team result was positive, but the individual development pattern points to cleaner next-play possession.",
+      tryThisNextGame: tryThis,
+      confidence: "high",
+      category: "decision",
+    },
+    encouragement: `Praise ${name}'s involvement in the win, then reinforce the simple next-play decision that can make those moments more repeatable.`,
+  });
 }
 
 /**
@@ -9197,32 +9272,47 @@ function buildPostGameIntelligence(game = {}, events = [], playerContext = state
     category: nextPattern.focus?.category || nextPattern.category || "development",
     evidence: (nextPattern.evidence || primary.evidence || []).filter(Boolean).slice(0, 3),
   };
-  const contextHighlights = patterns
+  const teamWinGrowthPattern = buildTeamWinGrowthPattern(game, normalizedEvents, computedTotals, player, nextFocus);
+  const primaryPattern = teamWinGrowthPattern || primary;
+  const activeNextFocus = teamWinGrowthPattern?.focus
+    ? {
+        ...nextFocus,
+        ...teamWinGrowthPattern.focus,
+        evidence: teamWinGrowthPattern.evidence?.filter(Boolean).slice(0, 3) || nextFocus.evidence,
+      }
+    : nextFocus;
+  const insightPatterns = teamWinGrowthPattern
+    ? [
+        teamWinGrowthPattern,
+        ...patterns.filter((pattern) => !["highLeverageImpact", "positiveStandout", "teamWinIndividualGrowth"].includes(pattern.key)),
+      ]
+    : patterns;
+  const contextHighlights = insightPatterns
     .filter((pattern) => pattern.key !== "lowData")
-    .slice(0, 3)
+    .slice(0, teamWinGrowthPattern ? 2 : 3)
     .map((pattern) => ({
       label: pattern.title,
       text: pattern.evidence?.length ? `Based on ${listPhrase(pattern.evidence.slice(0, 2))}.` : pattern.text,
     }));
-  const development = primary.development || {};
+  const development = primaryPattern.development || {};
   return {
-    gameStoryType: primary.storyType || "Effort Game",
-    gameStoryTitle: primary.title || "Game Story",
-    gameStoryText: primary.text || "Here is what shaped this game.",
+    gameStoryType: primaryPattern.storyType || "Effort Game",
+    gameStoryTitle: primaryPattern.title || "Game Story",
+    gameStoryText: primaryPattern.text || "Here is what shaped this game.",
     developmentTakeaway: {
       whatWentWell: development.whatWentWell || `${playerFirstName(player)} contributed in tracked moments.`,
       whyItMattered: development.whyItMattered || "These plays help show development beyond the scoreboard.",
       whatToBuildOn: development.whatToBuildOn || "Repeat the most useful play from this game.",
-      nextFocus: nextFocus.tryThisNextGame,
+      nextFocus: activeNextFocus.tryThisNextGame,
     },
-    nextFocusRecommendation: nextFocus,
-    parentEncouragement: primary.encouragement || buildEncouragementLine(computedTotals, topContributionForTotals(computedTotals).label, player),
-    whyThesePlaysMatter: postGameWhyThesePlaysMatter(normalizedEvents, patterns, computedTotals, player, 3),
+    nextFocusRecommendation: activeNextFocus,
+    parentEncouragement: primaryPattern.encouragement || buildEncouragementLine(computedTotals, topContributionForTotals(computedTotals).label, player),
+    whyThesePlaysMatter: postGameWhyThesePlaysMatter(normalizedEvents, insightPatterns, computedTotals, player, 3),
     contextHighlights,
     processLayer,
     possessionQuality,
-    warnings: primary.key === "lowData" ? ["Low data: track more plays to make feedback more specific."] : [],
-    patterns,
+    warnings: primaryPattern.key === "lowData" ? ["Low data: track more plays to make feedback more specific."] : [],
+    patterns: insightPatterns,
   };
 }
 
@@ -9469,7 +9559,7 @@ function buildEncouragementLine(totals = {}, topContribution = "", player = stat
 function buildFamilyRecapDevelopmentLine(totals = {}, player = {}, topContribution = "", game = null, intelligence = null) {
   const reviewIntelligence = intelligence || (game ? buildPostGameIntelligence(game, game.events || [], player, totals, calculateSeasonTotalsForPlayer(player)) : null);
   if (reviewIntelligence?.developmentTakeaway) {
-    return `${reviewIntelligence.developmentTakeaway.whatWentWell} ${reviewIntelligence.developmentTakeaway.whatToBuildOn}`;
+    return `${reviewIntelligence.developmentTakeaway.whatWentWell} Build on: ${reviewIntelligence.developmentTakeaway.whatToBuildOn}`;
   }
   if (Number(totals.eventCount || 0) < 3) {
     return "A fuller recap will build as more plays are tracked. From this sample, focus on involvement and effort.";
@@ -9576,7 +9666,12 @@ function nextGameFocusForRecap(totals = {}, player = state.player, topContributi
   const recapFocus = game ? loadFamilyRecapFocus(game, player) : "";
   if (recapFocus) return recapFocus;
   const reviewIntelligence = intelligence || (game ? buildPostGameIntelligence(game, game.events || [], player, totals, calculateSeasonTotalsForPlayer(player)) : null);
-  return savedNextFocusForPlayer(player) || reviewIntelligence?.nextFocusRecommendation?.tryThisNextGame || developmentTakeawayForTotals(totals, player, topContribution).focus;
+  return (
+    reviewIntelligence?.developmentTakeaway?.nextFocus ||
+    reviewIntelligence?.nextFocusRecommendation?.tryThisNextGame ||
+    savedNextFocusForPlayer(player) ||
+    developmentTakeawayForTotals(totals, player, topContribution).focus
+  );
 }
 
 function renderNextGameFocusSection(game, player, totals, topContribution = "", intelligence = null) {
@@ -9787,7 +9882,7 @@ function buildFamilyRecap(game = {}, events = [], playerContext = {}, computedSt
   const lines = [];
 
   if (game.date) lines.push(`Date: ${formatDate(game.date)}`);
-  lines.push(`Game story: ${reviewIntelligence.gameStoryType} - ${reviewIntelligence.gameStoryText}`);
+  lines.push(`Game story: ${reviewIntelligence.gameStoryTitle}. ${reviewIntelligence.gameStoryText}`);
   lines.push(`Game Impact: ${impactLetterGrade(totals.impact)} / ${formatImpactNumber(totals.impact)} score`);
   if (topContribution) lines.push(`Top contribution: ${topContribution}`);
   if (statLine) lines.push(`Stats: ${statLine}`);
@@ -10119,6 +10214,7 @@ function renderReviewSummarySection(game, player, totals) {
 
 function renderGameStorySection(intelligence = null) {
   if (!intelligence) return "";
+  const showHighlights = intelligence.gameStoryType !== "Team Win, Individual Growth" && intelligence.contextHighlights?.length;
   return `
     <section class="card pad development-card lh-game-story-card">
       <div class="section-head compact-head">
@@ -10130,7 +10226,7 @@ function renderGameStorySection(intelligence = null) {
       <strong>${escapeHTML(intelligence.gameStoryTitle)}</strong>
       <p>${escapeHTML(intelligence.gameStoryText)}</p>
       ${
-        intelligence.contextHighlights?.length
+        showHighlights
           ? `<div class="context-highlight-list">
               ${intelligence.contextHighlights.slice(0, 2).map((item) => `
                 <div class="context-highlight">
