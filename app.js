@@ -25,7 +25,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v271";
+const APP_VERSION = "v272";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -2678,12 +2678,36 @@ function applyScoreIncrement(game, side = "") {
   if (!game) return { side: "", beforeFor: null, beforeAgainst: null };
   const beforeFor = optionalScoreNumber(game.scoreFor) ?? 0;
   const beforeAgainst = optionalScoreNumber(game.scoreAgainst) ?? 0;
+  const beforeFinalFor = optionalScoreNumber(game.finalScoreFor);
+  const beforeFinalAgainst = optionalScoreNumber(game.finalScoreAgainst);
   game.scoreFor = beforeFor;
   game.scoreAgainst = beforeAgainst;
   game.scoreTrackingTouched = true;
-  if (side === "for") game.scoreFor += 1;
-  if (side === "against") game.scoreAgainst += 1;
+  if (side === "for") {
+    game.scoreFor += 1;
+    if (beforeFinalFor !== null) game.finalScoreFor = beforeFinalFor + 1;
+  }
+  if (side === "against") {
+    game.scoreAgainst += 1;
+    if (beforeFinalAgainst !== null) game.finalScoreAgainst = beforeFinalAgainst + 1;
+  }
   return { side, beforeFor, beforeAgainst };
+}
+
+function scoreIncrementSideForStat(statKey = "") {
+  if (statKey === "goal" || statKey === "assist") return "for";
+  if (statKey === "goalAllowed") return "against";
+  return "";
+}
+
+function applyScoreIncrementForStat(game, statKey = "") {
+  const side = scoreIncrementSideForStat(statKey);
+  if (side) return applyScoreIncrement(game, side);
+  return {
+    side: "",
+    beforeFor: optionalScoreNumber(game?.scoreFor) ?? 0,
+    beforeAgainst: optionalScoreNumber(game?.scoreAgainst) ?? 0,
+  };
 }
 
 function rollbackScoreIncrement(game, event = {}) {
@@ -2696,6 +2720,25 @@ function rollbackScoreIncrement(game, event = {}) {
   if (event.scoreAutoIncrement === "against" && currentAgainst === optionalScoreNumber(event.scoreAgainstAtEvent)) {
     game.scoreAgainst = optionalScoreNumber(event.scoreAgainstBeforeEvent) ?? Math.max(0, currentAgainst - 1);
   }
+}
+
+function removeScoreIncrementFromGameTotal(game, event = {}) {
+  if (!game || !event.scoreAutoIncrement) return game;
+  const nextGame = { ...game };
+  const side = event.scoreAutoIncrement;
+  if (side === "for") {
+    nextGame.scoreFor = Math.max(0, (optionalScoreNumber(nextGame.scoreFor) ?? 0) - 1);
+    if (optionalScoreNumber(nextGame.finalScoreFor) !== null) {
+      nextGame.finalScoreFor = Math.max(0, optionalScoreNumber(nextGame.finalScoreFor) - 1);
+    }
+  }
+  if (side === "against") {
+    nextGame.scoreAgainst = Math.max(0, (optionalScoreNumber(nextGame.scoreAgainst) ?? 0) - 1);
+    if (optionalScoreNumber(nextGame.finalScoreAgainst) !== null) {
+      nextGame.finalScoreAgainst = Math.max(0, optionalScoreNumber(nextGame.finalScoreAgainst) - 1);
+    }
+  }
+  return nextGame;
 }
 
 function possessionContextEvent(event = {}) {
@@ -3238,12 +3281,7 @@ function logEvent(statKey) {
   }
 
   const stat = STAT_BY_KEY[statKey];
-  const scoreChange =
-    statKey === "goal"
-      ? applyScoreIncrement(state.activeGame, "for")
-      : statKey === "goalAllowed"
-        ? applyScoreIncrement(state.activeGame, "against")
-        : { side: "", beforeFor: optionalScoreNumber(state.activeGame.scoreFor) ?? 0, beforeAgainst: optionalScoreNumber(state.activeGame.scoreAgainst) ?? 0 };
+  const scoreChange = applyScoreIncrementForStat(state.activeGame, statKey);
   const scoreContext = scoreContextForGame(state.activeGame, state.activeGame.currentQuarter);
   let note = "";
   if (statKey === "note") {
@@ -3479,7 +3517,7 @@ async function deleteEvent(gameId, eventId) {
   if (!window.confirm(`Delete ${event.statLabel}?`)) return;
 
   const updatedGame = {
-    ...game,
+    ...removeScoreIncrementFromGameTotal(game, event),
     events: game.events.filter((item) => item.id !== eventId),
   };
   rememberDeletedEvent(eventId);
@@ -11678,6 +11716,7 @@ function handleSubmit(event) {
     const stat = STAT_BY_KEY[formData.get("statType")];
     if (!stat) return;
     const eventQuarter = formData.get("quarter") || periodsForGame(game)[0];
+    const scoreChange = applyScoreIncrementForStat(game, stat.key);
     const scoreContext = scoreContextForGame(game, eventQuarter);
 
     const newEvent = {
@@ -11697,6 +11736,9 @@ function handleSubmit(event) {
       fieldZone: formData.get("fieldZone") || "",
       correctedAt: new Date().toISOString(),
       ...scoreContext,
+      scoreAutoIncrement: scoreChange.side,
+      scoreForBeforeEvent: scoreChange.beforeFor,
+      scoreAgainstBeforeEvent: scoreChange.beforeAgainst,
     };
 
     state.addingReviewEvent = false;
