@@ -6,247 +6,198 @@
     <meta name="theme-color" content="#0b0c0e" />
     <meta
       name="description"
-      content="LaxHornet is a mobile-first youth lacrosse tracker for approved parent tracking, live family sharing, Game Review, Season Review, team admin tools, and offline game-day use."
+      content="LaxHornet helps youth and competitive club lacrosse organizations give families a clear way to visualize player development through game tracking, reviews, recaps, and season trends."
     />
-    <title>LaxHornet | Track the plays that show the whole game</title>
-    <link rel="manifest" href="manifest.json?v=253" />
+    <title>LaxHornet | Visualize player development for your lacrosse program</title>
+    <link rel="manifest" href="manifest.json?v=273" />
     <link rel="icon" href="assets/LHicon.png?v=1" type="image/png" />
     <link rel="apple-touch-icon" href="assets/LHicon.png?v=1" />
-    <link rel="stylesheet" href="landing.css?v=253" />
+    <link rel="stylesheet" href="landing.css?v=273" />
   </head>
   <body>
-    <header class="site-header" aria-label="LaxHornet landing navigation">
+    <header class="site-header" aria-label="LaxHornet site navigation">
       <a class="brand-link" href="/" aria-label="LaxHornet home">
         <img src="assets/LHbanner.png?v=3" alt="LaxHornet" />
       </a>
       <nav class="landing-nav" aria-label="Primary">
-        <a href="#how-it-works">How It Works</a>
-        <a href="#parents">For Parents</a>
-        <a href="#teams">For Teams</a>
+        <a href="#program-value">Program Value</a>
+        <a href="#development-view">Development View</a>
+        <a href="#rollout">Rollout</a>
         <a href="privacy.html">Privacy</a>
-        <a href="terms.html">Terms of Service</a>
-        <a class="nav-cta" href="app.html">Start Tracking</a>
+        <a class="nav-cta" href="mailto:degrassed@gmail.com?subject=LaxHornet%20club%20walkthrough">Request Walkthrough</a>
       </nav>
     </header>
 
     <main>
-      <section class="hero">
+      <section class="hero" aria-labelledby="hero-heading">
         <div class="hero-copy">
-          <div class="hero-kicker">Youth lacrosse tracking for parents and teams</div>
-          <h1>Track the plays that show the whole game.</h1>
-          <p>
-            LaxHornet helps approved Parent Trackers log the plays that shape a game,
-            share live read-only updates with family, and turn each Game Review and
-            Season Review into a clear development story.
+          <p class="hero-kicker">For youth and competitive club lacrosse programs</p>
+          <h1 id="hero-heading">Help every family visualize player development.</h1>
+          <p class="hero-lede">
+            LaxHornet gives presidents, directors, officers, and coaches a practical value add:
+            a mobile-first lacrosse tracker that turns game events into clear reviews, family
+            recaps, season trends, and one next focus for the player.
           </p>
-          <p class="hero-tagline">Track the game. Understand the sport. Encourage the player.</p>
-          <div class="hero-actions">
-            <a class="btn primary" href="app.html">Start Tracking a Player</a>
-            <a class="btn secondary" href="#teams">See Team Tools</a>
+          <div class="hero-actions" aria-label="Primary actions">
+            <a class="btn primary" href="mailto:degrassed@gmail.com?subject=LaxHornet%20club%20walkthrough">Request a Club Walkthrough</a>
+            <a class="btn secondary" href="app.html">Open the App</a>
           </div>
-          <div class="trust-row" aria-label="Key app benefits">
-            <span>Parent-approved player access</span>
-            <span>Works offline during games</span>
-            <span>Live Share for family</span>
-            <span>Game and Season Reviews</span>
-          </div>
-          <div class="hero-stats" aria-label="Highlighted LaxHornet features">
+          <dl class="leadership-stats" aria-label="Leadership value points">
             <div>
-              <strong>Live</strong>
-              <span>sideline tracking</span>
+              <dt>Parents</dt>
+              <dd>See what mattered beyond the box score</dd>
             </div>
             <div>
-              <strong>Story</strong>
-              <span>post-game recaps</span>
+              <dt>Players</dt>
+              <dd>Leave each game with one clear focus</dd>
             </div>
             <div>
-              <strong>Season</strong>
-              <span>development trends</span>
+              <dt>Coaches</dt>
+              <dd>Get cleaner context for development talks</dd>
             </div>
-          </div>
+          </dl>
         </div>
 
-        <div class="phone-wrap" aria-label="LaxHornet app preview">
-          <div class="phone">
-            <div class="phone-bar"></div>
-            <div class="phone-screen">
-              <div class="preview-top">
-                <span>Game Review</span>
-                <strong>A-</strong>
-              </div>
-              <div class="preview-player">
-                <strong>Demo Player</strong>
-                <span>#12 - Midfield vs. Madison Demo</span>
-              </div>
-              <div class="preview-snapshot" aria-label="Demo game review snapshot">
-                <div>
-                  <span>Impact</span>
-                  <strong>91</strong>
-                </div>
-                <div>
-                  <span>Points</span>
-                  <strong>3</strong>
-                </div>
-                <div>
-                  <span>Possession</span>
-                  <strong>+4</strong>
-                </div>
-              </div>
-              <div class="preview-impact">
-                <span>Development Takeaway</span>
-                <strong>Possession work drove the story.</strong>
-                <small>Ground balls and smart clears helped create extra chances.</small>
-              </div>
-              <div class="preview-feed" aria-label="Sample reviewed plays">
-                <span><b>Ground Ball</b> created an extra chance</span>
-                <span><b>Assist</b> turned possession into points</span>
-                <span><b>Next Focus</b> make the first clean pass</span>
-              </div>
-            </div>
+        <div class="product-stage" aria-label="LaxHornet development review preview">
+          <div class="screenshot-rail">
+            <img src="assets/club-review-start.png" alt="LaxHornet game review entry on a phone" />
+            <img src="assets/club-review-insight.png" alt="LaxHornet review insight explaining why plays matter" />
+            <img src="assets/club-family-recap.png" alt="LaxHornet family recap with game story and next focus" />
+          </div>
+          <div class="stage-caption">
+            <span>Game Review</span>
+            <strong>From sideline taps to a development story families can understand.</strong>
           </div>
         </div>
       </section>
 
-      <section id="parents" class="section light spotlight-section">
-        <div class="section-heading">
-          <h2>Built for real game speed.</h2>
-          <p>Lacrosse moves fast. LaxHornet keeps the tracker focused with large, one-handed buttons, position-aware play groups, quick undo, notes, and More Plays for less common events.</p>
-        </div>
-        <div class="spotlight-grid" aria-label="What LaxHornet highlights after games">
-          <div><span>Possession</span><strong>Clears, rides, turnovers, and ground balls</strong></div>
-          <div><span>Production</span><strong>Goals, assists, shots, saves, and faceoffs</strong></div>
-          <div><span>Development</span><strong>Hustle plays, smart plays, tags, notes, and trends</strong></div>
-        </div>
-      </section>
-
-      <section class="section light development-section" aria-labelledby="development-heading">
-        <div class="section-heading">
-          <h2 id="development-heading">Built for development, not just stats.</h2>
+      <section id="program-value" class="section program-section" aria-labelledby="program-value-heading">
+        <div class="section-intro">
+          <span class="section-label">Program Value</span>
+          <h2 id="program-value-heading">A useful benefit your organization can offer without changing how teams play.</h2>
           <p>
-            LaxHornet explains what the plays mean, highlights what to encourage,
-            suggests one next-level focus, and creates a family-friendly recap after the game.
-            Winning matters, but development is the path.
+            LaxHornet is built for real lacrosse parents, fast sidelines, and busy coaches.
+            It helps your program give families a shared development language while keeping
+            player access controlled by team and roster.
           </p>
-          <a class="btn secondary" href="#how-it-works">Learn How It Works</a>
         </div>
-      </section>
-
-      <section class="section light detail-section" aria-labelledby="tracking-detail-heading">
-        <div class="section-heading compact-heading">
-          <h2 id="tracking-detail-heading">Track the pieces that decide a lacrosse game.</h2>
-          <p>Most stat apps stop at goals. LaxHornet is built around the full story: who created possessions, who protected the ball, who handled pressure, and what changed period by period.</p>
-        </div>
-        <div class="detail-matrix" aria-label="Detailed lacrosse tracking categories">
+        <div class="value-grid" aria-label="LaxHornet value for club leaders">
           <article>
-            <span>Scoring</span>
-            <strong>Goals, assists, shots, shot quality, and points</strong>
-            <p>Keep production visible without losing the context around how chances were created.</p>
+            <h3>Differentiate your program</h3>
+            <p>Offer families more than schedules and standings. Give them a tool that shows effort, possession, decision making, and progress.</p>
           </article>
           <article>
+            <h3>Improve parent conversations</h3>
+            <p>Game Review and Share Recap turn a fast game into plain-language takeaways parents can discuss on the ride home.</p>
+          </article>
+          <article>
+            <h3>Support coach alignment</h3>
+            <p>Players can see a focused next step after each game, making development conversations more specific and less emotional.</p>
+          </article>
+          <article>
+            <h3>Respect access boundaries</h3>
+            <p>Team codes, roster matching, and parent approvals help keep tracking tied to the right player and team context.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="development-view" class="section development-section" aria-labelledby="development-heading">
+        <div class="development-copy">
+          <span class="section-label">Development View</span>
+          <h2 id="development-heading">Turn hidden plays into visible growth.</h2>
+          <p>
+            Goals still matter, but lacrosse development also lives in ground balls, clears,
+            rides, caused turnovers, smart plays, hustle, saves, faceoff work, and decisions
+            under pressure. LaxHornet keeps those moments visible.
+          </p>
+        </div>
+        <div class="metric-board" aria-label="Development signals LaxHornet can track">
+          <div>
             <span>Possession</span>
-            <strong>Ground balls, clears, rides, turnovers, and extra possessions</strong>
-            <p>Capture the hidden work that changes momentum and gives the offense more chances.</p>
-          </article>
-          <article>
-            <span>Defense</span>
-            <strong>Caused turnovers, takeaways, pressure plays, and recovery notes</strong>
-            <p>Show defensive impact with more detail than a basic box score can carry.</p>
-          </article>
-          <article>
-            <span>Specialists</span>
-            <strong>Saves, goalie clears, faceoff wins, losses, and wing support</strong>
-            <p>Give goalie and faceoff work its own space instead of burying it in general notes.</p>
-          </article>
-          <article>
-            <span>Development</span>
-            <strong>Hustle plays, smart plays, penalties, tags, and coachable moments</strong>
-            <p>Turn observations from a fast sideline into review points after the game.</p>
-          </article>
-          <article>
-            <span>Season Review</span>
-            <strong>Season Story, player profile, encouragement, and next focus</strong>
-            <p>See patterns across saved games without letting the full stat table dominate the story.</p>
-          </article>
+            <strong>Ground balls, clears, rides, turnovers, faceoffs</strong>
+          </div>
+          <div>
+            <span>Production</span>
+            <strong>Goals, assists, shots, saves, shot quality</strong>
+          </div>
+          <div>
+            <span>Decision Making</span>
+            <strong>Smart plays, notes, tags, next focus prompts</strong>
+          </div>
+          <div>
+            <span>Season Story</span>
+            <strong>Trends, averages, game impact, player profile</strong>
+          </div>
         </div>
       </section>
 
-      <section id="how-it-works" class="section light">
-        <div class="section-heading">
-          <h2>How it works.</h2>
-          <p>Verify the player, tap the play, share the live view, and review the development story after the whistle.</p>
-        </div>
-        <div class="feature-list">
-          <article>
-            <span class="feature-number">01</span>
-            <h3>Verify the player</h3>
-            <p>Parents request access with a team code and jersey number. Once approved, they only see the player and team contexts they are allowed to track.</p>
-          </article>
-          <article>
-            <span class="feature-number">02</span>
-            <h3>Tap the play</h3>
-            <p>Log goals, assists, shots, ground balls, clears, saves, turnovers, caused turnovers, faceoffs, hustle plays, smart plays, penalties, and notes with quick sideline buttons.</p>
-          </article>
-          <article>
-            <span class="feature-number">03</span>
-            <h3>Share the live view</h3>
-            <p>Send a read-only link so family can follow the timeline, score context, and player impact without editing the game log.</p>
-          </article>
-          <article>
-            <span class="feature-number">04</span>
-            <h3>Review the story</h3>
-            <p>After the game, see Game Impact, possession story, timeline, tags, Share Recap, Season Story, and one clear next focus.</p>
-          </article>
-        </div>
-      </section>
-
-      <section id="teams" class="section dark-split">
-        <div>
-          <h2>Team rosters stay protected.</h2>
+      <section class="section proof-section" aria-labelledby="proof-heading">
+        <div class="proof-panel">
+          <span class="section-label">What Families Get</span>
+          <h2 id="proof-heading">A clearer answer to: How is my player developing?</h2>
           <p>
-            Team Admin Tools stay separate from the Parent Tracker app. Admins create teams,
-            manage rosters, review parent requests, and keep roster access controlled.
-            Parents only see approved player/team access - not the full roster.
-          </p>
-          <a class="text-link" href="app.html">Open LaxHornet</a>
-        </div>
-        <div class="team-panel">
-          <div class="mini-card">
-            <span>Live Share</span>
-            <strong>Family follows live</strong>
-            <small>Copy a read-only link during the game so another phone, tablet, or computer can watch updates without editing stats.</small>
-          </div>
-          <div class="mini-card">
-            <span>Verified Player</span>
-            <strong>Demo Player #12</strong>
-            <small>Branford Demo Hornets - Midfield</small>
-          </div>
-          <div class="mini-card">
-            <span>Team Code</span>
-            <strong>DEMO12</strong>
-            <small>Use the code shared by your team admin.</small>
-          </div>
-          <div class="mini-card">
-            <span>Access</span>
-            <strong>Approved</strong>
-            <small>Stats sync to the correct team and player.</small>
-          </div>
-          <div class="mini-card">
-            <span>Review</span>
-            <strong>Team Admin Tools</strong>
-            <small>Access requests are reviewed before a parent can track a rostered player.</small>
-          </div>
-        </div>
-      </section>
-
-      <section class="section light install-section">
-        <div>
-          <h2>Use it like an app - no app store needed.</h2>
-          <p>
-            Open LaxHornet in Safari, add it to your iPhone Home Screen, and launch it like an app on game day.
-            Core tracking stays fast when the sideline connection is unreliable, then syncs when the connection returns.
+            Each saved game can become a review that explains what happened, why key plays
+            mattered, how the player helped the team, and what to focus on next.
           </p>
         </div>
-        <a class="btn primary" href="app.html">Start Tracking</a>
+        <div class="proof-list" aria-label="Family and player outcomes">
+          <article>
+            <span>01</span>
+            <h3>Game Impact</h3>
+            <p>A quick snapshot of how the player created, protected, finished, or defended possessions.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>Family Recap</h3>
+            <p>A plain-language story that helps parents encourage the right moments after the game.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>Next Focus</h3>
+            <p>One concrete development theme players can carry into practice or the next matchup.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="rollout" class="section rollout-section" aria-labelledby="rollout-heading">
+        <div class="section-intro">
+          <span class="section-label">Club Rollout</span>
+          <h2 id="rollout-heading">Simple enough for one team. Useful enough for the whole organization.</h2>
+          <p>
+            Start with a pilot team or offer it as a program resource across age groups.
+            LaxHornet works in the browser, can be added to the iPhone Home Screen, and is
+            designed for unreliable sideline connectivity.
+          </p>
+        </div>
+        <div class="rollout-steps" aria-label="Suggested LaxHornet rollout steps">
+          <article>
+            <span>Step 1</span>
+            <h3>Create team access</h3>
+            <p>Admins create teams, preload rosters, and share the correct team code with approved families.</p>
+          </article>
+          <article>
+            <span>Step 2</span>
+            <h3>Approve parent trackers</h3>
+            <p>Parents request access with a team code and jersey number so tracking stays connected to the right rostered player.</p>
+          </article>
+          <article>
+            <span>Step 3</span>
+            <h3>Track and review</h3>
+            <p>Use quick game-day buttons, share a read-only live view, and review the story after the final whistle.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="cta-section" aria-labelledby="cta-heading">
+        <div>
+          <span class="section-label">For Club Leaders</span>
+          <h2 id="cta-heading">Give your families a better way to see progress.</h2>
+          <p>
+            If your program wants a practical development tool for players, parents, and
+            coaches, LaxHornet is ready for a club walkthrough.
+          </p>
+        </div>
+        <a class="btn primary" href="mailto:degrassed@gmail.com?subject=LaxHornet%20club%20walkthrough">Request a Walkthrough</a>
       </section>
     </main>
 
