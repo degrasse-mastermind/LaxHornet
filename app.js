@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
   deletedGames: "laxhornet.deletedGames",
   deletedEvents: "laxhornet.deletedEvents",
   activeGame: "laxhornet.activeGame",
+  trackingSession: "laxhornet.trackingSession",
   reviewGameId: "laxhornet.reviewGameId",
   teams: "laxhornet.teams",
   rosterPlayers: "laxhornet.rosterPlayers",
@@ -25,7 +26,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v278";
+const APP_VERSION = "v279";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -587,6 +588,7 @@ const state = {
   removedPlayerAccess: initialStoredState.removedPlayerAccess,
   games: initialStoredState.games,
   activeGame: initialStoredState.activeGame,
+  trackingSession: initialStoredState.trackingSession,
   reviewGameId: initialStoredState.reviewGameId,
   authUser: null,
   authUserId: "",
@@ -615,6 +617,7 @@ const state = {
   onboardingIntent: initialStoredState.onboardingIntent,
   nextGameFocus: initialStoredState.nextGameFocus,
   focusEditorContext: "",
+  gameSetupReturnScreen: "home",
   signupDraft: null,
   accessRequestSummary: null,
   toast: "",
@@ -629,6 +632,7 @@ const state = {
   lastEventConfirmation: null,
   morePlaysExpanded: false,
   pendingEndGame: false,
+  pendingCancelGame: false,
   gameSavedSummaryId: "",
   liveSharePromptGameId: "",
   pendingTeamAccessReview: null,
@@ -643,6 +647,7 @@ syncActivePlayer();
 state.nextGameFocus = activeNextGameFocusForPlayer(state.player);
 state.games = state.games.map((game) => normalizeGame(game, state.player));
 state.activeGame = state.activeGame ? normalizeGame(state.activeGame, state.player) : null;
+state.trackingSession = normalizeTrackingSession(state.trackingSession, state.activeGame);
 mergePlayersFromGames([state.activeGame, ...state.games].filter(Boolean));
 persistAll();
 
@@ -686,12 +691,30 @@ function readStoredAccountState(userId = activeStorageUserId) {
     removedPlayerAccess: normalizeRemovedPlayerAccess(loadJSON(STORAGE_KEYS.removedPlayerAccess, [])),
     games: loadJSON(STORAGE_KEYS.games, []),
     activeGame: loadJSON(STORAGE_KEYS.activeGame, null),
+    trackingSession: loadJSON(STORAGE_KEYS.trackingSession, null),
     reviewGameId: loadJSON(STORAGE_KEYS.reviewGameId, null),
     deletedGameIds: loadJSON(STORAGE_KEYS.deletedGames, []),
     deletedEventIds: loadJSON(STORAGE_KEYS.deletedEvents, []),
     onboardingIntent: loadJSON(STORAGE_KEYS.onboardingIntent, "child"),
     nextGameFocus: normalizeNextGameFocus(loadJSON(STORAGE_KEYS.nextGameFocus, null)),
     adminViewMode,
+  };
+}
+
+function normalizeTrackingSession(session = null, activeGame = null) {
+  const gameId = String(session?.gameId || session?.game_id || activeGame?.id || "").trim();
+  if (!gameId || (activeGame?.id && gameId !== activeGame.id)) return null;
+  const requestedOrigin = String(session?.origin || "").trim();
+  const origin = ["new", "existing"].includes(requestedOrigin) ? requestedOrigin : "existing";
+  return {
+    gameId,
+    origin,
+    previousScreen: String(session?.previousScreen || "home").trim() || "home",
+    startedAt: String(session?.startedAt || "").trim(),
+    initialGameSnapshot:
+      origin === "existing" && session?.initialGameSnapshot && typeof session.initialGameSnapshot === "object"
+        ? session.initialGameSnapshot
+        : null,
   };
 }
 
@@ -2235,6 +2258,11 @@ function persistAll() {
   } else {
     removeStoredItem(STORAGE_KEYS.activeGame);
   }
+  if (state.trackingSession) {
+    saveJSON(STORAGE_KEYS.trackingSession, normalizeTrackingSession(state.trackingSession, state.activeGame));
+  } else {
+    removeStoredItem(STORAGE_KEYS.trackingSession);
+  }
   saveJSON(STORAGE_KEYS.reviewGameId, state.reviewGameId);
 }
 
@@ -2254,6 +2282,7 @@ function applyStoredAccountState(userId) {
   state.nextGameFocus = stored.nextGameFocus;
   state.games = stored.games;
   state.activeGame = stored.activeGame;
+  state.trackingSession = stored.trackingSession;
   state.reviewGameId = stored.reviewGameId;
   state.deletedGameIds = stored.deletedGameIds;
   state.deletedEventIds = stored.deletedEventIds;
@@ -2263,12 +2292,14 @@ function applyStoredAccountState(userId) {
   state.editingGameDetails = false;
   state.tagEditingEventId = null;
   state.tagDraftTags = [];
+  state.pendingCancelGame = false;
   mergeRosterPlayersIntoPlayers();
   ensureActiveTeamRosterPlayer();
   syncActivePlayer();
   state.nextGameFocus = activeNextGameFocusForPlayer(state.player);
   state.games = state.games.map((game) => normalizeGame(game, state.player));
   state.activeGame = state.activeGame ? normalizeGame(state.activeGame, state.player) : null;
+  state.trackingSession = normalizeTrackingSession(state.trackingSession, state.activeGame);
   mergePlayersFromGames([state.activeGame, ...state.games].filter(Boolean));
   persistAll();
 }
@@ -3458,6 +3489,111 @@ function endGame() {
   render();
 }
 
+function activeTrackingSession() {
+  return normalizeTrackingSession(state.trackingSession, state.activeGame);
+}
+
+function isDiscardableTrackingSession() {
+  return Boolean(state.activeGame && activeTrackingSession()?.origin === "new");
+}
+
+function clearLiveTrackingTransientState(gameId = "") {
+  state.pendingCancelGame = false;
+  state.pendingEndGame = false;
+  state.lastEventConfirmation = null;
+  state.morePlaysExpanded = false;
+  state.addingReviewEvent = false;
+  state.editingEventId = null;
+  state.editingGameDetails = false;
+  state.tagEditingEventId = null;
+  state.tagDraftTags = [];
+  state.focusEditorContext = "";
+  if (!gameId || state.gameSavedSummaryId === gameId) state.gameSavedSummaryId = "";
+  if (!gameId || state.liveSharePromptGameId === gameId) state.liveSharePromptGameId = "";
+}
+
+function focusCancelGameDialog() {
+  window.requestAnimationFrame(() => {
+    document.querySelector('[data-action="keep-tracking"]')?.focus();
+  });
+}
+
+function requestCancelGame() {
+  if (!state.activeGame) return;
+  if (!canEditGame(state.activeGame)) {
+    showToast("View-only team access");
+    return;
+  }
+  state.pendingCancelGame = true;
+  state.pendingEndGame = false;
+  render();
+  focusCancelGameDialog();
+}
+
+function keepTrackingAfterCancelPrompt() {
+  state.pendingCancelGame = false;
+  render();
+  window.requestAnimationFrame(() => {
+    document.querySelector('[data-action="cancel-game"]')?.focus();
+  });
+}
+
+async function confirmCancelGame() {
+  const game = state.activeGame;
+  if (!game) {
+    state.pendingCancelGame = false;
+    render();
+    return;
+  }
+  if (!canEditGame(game)) {
+    state.pendingCancelGame = false;
+    showToast("View-only team access");
+    return;
+  }
+
+  const session = activeTrackingSession();
+  const returnScreen = ["home", "player", "more"].includes(session?.previousScreen) ? session.previousScreen : "home";
+
+  if (session?.origin !== "new") {
+    const previouslySavedGame = state.games.find((item) => item.id === game.id);
+    const preservedGame = normalizeGame(session?.initialGameSnapshot || previouslySavedGame || game);
+    upsertGame(preservedGame);
+    state.activeGame = null;
+    state.trackingSession = null;
+    clearLiveTrackingTransientState(game.id);
+    if (state.reviewGameId === game.id) state.reviewGameId = preservedGame.id;
+    persistAll();
+    navigate(returnScreen);
+    showToast("Tracking exited. The saved game was preserved.");
+    return;
+  }
+
+  rememberDeletedGame(game.id);
+  state.games = state.games.filter((item) => item.id !== game.id);
+  state.activeGame = null;
+  state.trackingSession = null;
+  clearLiveTrackingTransientState(game.id);
+  if (state.reviewGameId === game.id) state.reviewGameId = state.games[0]?.id || null;
+  persistAll();
+  navigate(returnScreen);
+  showToast("Game canceled");
+
+  if (state.isOffline || !supabaseClient || !currentUserId()) {
+    state.syncStatus = state.isOffline ? "Will sync when online" : "Saved on this phone";
+    persistAll();
+    return;
+  }
+
+  const cloudDeleted = await deleteSupabaseGame(game.id, { rpcOnly: true });
+  if (cloudDeleted) {
+    state.syncStatus = "Synced";
+    clearResolvedCloudDeleteError();
+    persistAll();
+  } else if (!state.cloudError) {
+    reportCloudDeleteNeedsUpdate("game");
+  }
+}
+
 function confirmEndGame() {
   if (!state.activeGame) {
     state.pendingEndGame = false;
@@ -3480,6 +3616,7 @@ function confirmEndGame() {
   upsertGame(state.activeGame);
   state.reviewGameId = state.activeGame.id;
   state.activeGame = null;
+  state.trackingSession = null;
   state.pendingEndGame = false;
   state.gameSavedSummaryId = completedGame.id;
   state.lastEventConfirmation = null;
@@ -3515,7 +3652,10 @@ async function confirmDeleteGame(id) {
   rememberDeletedGame(id);
   (game.events || []).forEach((event) => rememberDeletedEvent(event.id));
   state.games = state.games.filter((item) => item.id !== id);
-  if (state.activeGame?.id === id) state.activeGame = null;
+  if (state.activeGame?.id === id) {
+    state.activeGame = null;
+    state.trackingSession = null;
+  }
   state.addingReviewEvent = false;
   state.editingGameDetails = false;
   state.editingEventId = null;
@@ -5411,23 +5551,6 @@ async function deleteSupabaseGame(gameId, options = {}) {
     reportCloudDeleteError("game", rpcResult.error);
     return false;
   }
-
-  const { data, error } = await supabaseClient.from("games").delete().eq("id", gameId).select("id");
-  if (error) {
-    reportCloudDeleteError("game", error);
-    return false;
-  }
-  if (Array.isArray(data) && data.length) {
-    forgetDeletedGame(gameId);
-    clearResolvedCloudDeleteError();
-    return true;
-  }
-  const stillVisible = await cloudRecordStillVisible("games", gameId);
-  if (!stillVisible) {
-    forgetDeletedGame(gameId);
-    clearResolvedCloudDeleteError();
-    return true;
-  }
   if (!options.quiet) reportCloudDeleteNeedsUpdate("game");
   return false;
 }
@@ -5994,6 +6117,7 @@ function renderShell(content, options = {}) {
     ${renderUpdateBanner()}
     ${hideShellStatus ? "" : renderConnectionNotice()}
     ${content}
+    ${renderCancelGameModal()}
     ${renderEndGameModal()}
     ${renderGameSavedModal()}
     ${renderLiveShareModal()}
@@ -6001,6 +6125,35 @@ function renderShell(content, options = {}) {
     ${renderDeleteGameModal()}
     ${options.hideNav ? "" : renderBottomNav()}
     ${state.toast ? `<div class="toast" role="status">${escapeHTML(state.toast)}</div>` : ""}
+  `;
+}
+
+function renderCancelGameModal() {
+  if (!state.pendingCancelGame || !state.activeGame) return "";
+  const discardable = isDiscardableTrackingSession();
+  return `
+    <section class="modal-backdrop" role="presentation" data-cancel-game-backdrop>
+      <div
+        class="confirm-modal cancel-game-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cancelGameTitle"
+        aria-describedby="cancelGameDescription"
+      >
+        <h3 id="cancelGameTitle">${discardable ? "Cancel this game?" : "Exit tracking?"}</h3>
+        <p class="muted small" id="cancelGameDescription">${
+          discardable
+            ? "This will discard the current game and all events recorded during it. This action cannot be undone."
+            : "This game was already saved before this tracking session. Exit tracking without deleting the saved game."
+        }</p>
+        <div class="edit-actions">
+          <button class="btn secondary" type="button" data-action="keep-tracking">Keep Tracking</button>
+          <button class="btn danger" type="button" data-action="confirm-cancel-game">${
+            discardable ? "Cancel Game" : "Exit Tracking"
+          }</button>
+        </div>
+      </div>
+    </section>
   `;
 }
 
@@ -8039,6 +8192,11 @@ function renderLiveTracker() {
         <button class="btn warning" type="button" data-action="undo">Undo</button>
         <button class="btn neutral" type="button" data-action="save-game">Save</button>
         <button class="btn danger" type="button" data-action="end-game">End Game</button>
+      </div>
+      <div class="cancel-game-row">
+        <button class="cancel-game-trigger" type="button" data-action="cancel-game">
+          ${isDiscardableTrackingSession() ? "Cancel Game" : "Exit Tracking"}
+        </button>
       </div>
     </div>
   `, { hideNav: true });
@@ -11730,6 +11888,15 @@ function handleSubmit(event) {
       return;
     }
     state.activeGame = makeGame(formData);
+    state.trackingSession = {
+      gameId: state.activeGame.id,
+      origin: "new",
+      previousScreen: ["home", "player", "more"].includes(state.gameSetupReturnScreen)
+        ? state.gameSetupReturnScreen
+        : "home",
+      startedAt: new Date().toISOString(),
+      initialGameSnapshot: null,
+    };
     markFocusUsedForGame(state.activeGame);
     state.reviewGameId = state.activeGame.id;
     if (state.activeGame.isShared) state.liveSharePromptGameId = state.activeGame.id;
@@ -11876,6 +12043,7 @@ function handleClick(event) {
 
   const nav = event.target.closest("[data-nav]");
   if (nav) {
+    if (nav.dataset.nav === "start") state.gameSetupReturnScreen = state.screen;
     navigate(nav.dataset.nav);
     return;
   }
@@ -11926,6 +12094,9 @@ function handleClick(event) {
     if (action.dataset.action === "score-goal-against") updateActiveGameScore("against");
     if (action.dataset.action === "edit-score") editActiveGameScore();
     if (action.dataset.action === "save-game") saveActiveGame();
+    if (action.dataset.action === "cancel-game") requestCancelGame();
+    if (action.dataset.action === "keep-tracking") keepTrackingAfterCancelPrompt();
+    if (action.dataset.action === "confirm-cancel-game") confirmCancelGame();
     if (action.dataset.action === "end-game") endGame();
     if (action.dataset.action === "cancel-end-game") {
       state.pendingEndGame = false;
@@ -11942,7 +12113,10 @@ function handleClick(event) {
     if (action.dataset.action === "share-family-recap") shareGameFamilyRecap(action.dataset.gameId);
     if (action.dataset.action === "save-next-focus") saveNextGameFocusFromReview();
     if (action.dataset.action === "add-focus-to-recap") addFocusToFamilyRecap();
-    if (action.dataset.action === "start-with-focus") navigate("start");
+    if (action.dataset.action === "start-with-focus") {
+      state.gameSetupReturnScreen = state.screen;
+      navigate("start");
+    }
     if (action.dataset.action === "toggle-next-focus-editor") {
       const context = action.dataset.focusContext || "";
       state.focusEditorContext = state.focusEditorContext === context ? "" : context;
@@ -12173,6 +12347,31 @@ function handleClick(event) {
   const deleteButton = event.target.closest("[data-delete]");
   if (deleteButton) {
     deleteGame(deleteButton.dataset.delete);
+  }
+}
+
+function handleDialogKeydown(event) {
+  if (!state.pendingCancelGame) return;
+  const dialog = document.querySelector(".cancel-game-modal");
+  if (!dialog) return;
+
+  if (event.key === "Escape") {
+    event.preventDefault();
+    keepTrackingAfterCancelPrompt();
+    return;
+  }
+
+  if (event.key !== "Tab") return;
+  const focusable = [...dialog.querySelectorAll("button:not([disabled])")];
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
   }
 }
 
@@ -12426,6 +12625,7 @@ async function initApp() {
 document.addEventListener("submit", handleSubmit);
 document.addEventListener("click", handleClick);
 document.addEventListener("change", handleChange);
+document.addEventListener("keydown", handleDialogKeydown);
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
   deferredInstallPrompt = event;
