@@ -1,0 +1,1 @@
+﻿Exit code: 2 (expected SKIP because no disposable staging variables were available)

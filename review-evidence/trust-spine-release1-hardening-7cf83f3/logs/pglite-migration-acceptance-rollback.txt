@@ -1,0 +1,6 @@
+﻿MIGRATION: PASS
+TRUST_SPINE_TABLES: 20
+SQL_ACCEPTANCE: {"suite":"LaxHornet Trust Spine Release 1","fixtures":"synthetic","transaction":"rolled_back","sqlTestsPassed":33}
+ROLLBACK: PASS
+TRUST_SPINE_TABLES_AFTER_ROLLBACK: 0
+LEGACY_SENTINELS_AFTER_ROLLBACK: {"games":1,"events":1,"teams":1,"roster_players":1}

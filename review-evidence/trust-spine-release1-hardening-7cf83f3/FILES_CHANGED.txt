@@ -1,0 +1,16 @@
+﻿M	docs/methodnorth/trust-spine-gate/DEFERRED_SCOPE.md
+M	docs/methodnorth/trust-spine-gate/FINAL_DECLARATION.md
+A	docs/methodnorth/trust-spine-gate/TRUST_SPINE_HARDENING_REPORT.md
+M	docs/methodnorth/trust-spine-gate/TRUST_SPINE_MIGRATION_RUNBOOK.md
+M	docs/methodnorth/trust-spine-gate/TRUST_SPINE_ROLLBACK_RUNBOOK.md
+A	docs/methodnorth/trust-spine-gate/TRUST_SPINE_RPC_GRANT_MATRIX.md
+M	docs/methodnorth/trust-spine-gate/TRUST_SPINE_SCHEMA_PROPOSAL.sql
+A	docs/methodnorth/trust-spine-gate/TRUST_SPINE_SCOPE_REGISTRATION.md
+M	docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_RESULTS.md
+M	docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_ROLLBACK.sql
+M	docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_TESTS.sql
+M	docs/methodnorth/trust-spine-gate/TRUST_SPINE_TEST_PLAN.md
+M	tools/extract_trust_spine_rpcs.mjs
+M	tools/run_trust_spine_pglite.mjs
+M	tools/test_trust_spine_release1.mjs
+A	tools/test_trust_spine_remote.mjs

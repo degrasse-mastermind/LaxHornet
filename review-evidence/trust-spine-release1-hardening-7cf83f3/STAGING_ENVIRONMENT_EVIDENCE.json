@@ -1,0 +1,22 @@
+{
+  "capturedAt": "2026-07-20",
+  "projectRef": "ulbmjcvnyznvmjgpstno",
+  "productionChanged": false,
+  "branches": [
+    {
+      "id": "65768108-9fa7-4c99-881e-d53709dbf6ac",
+      "name": "main",
+      "project_ref": "ulbmjcvnyznvmjgpstno",
+      "is_default": true,
+      "git_branch": "main",
+      "persistent": false,
+      "status": "FUNCTIONS_DEPLOYED",
+      "with_data": false,
+      "preview_project_status": "ACTIVE_HEALTHY"
+    }
+  ],
+  "disposableBranchAvailable": false,
+  "branchCreationBlockedBy": "The branch API requires a confirm_cost_id, but no confirm-cost capability was available to this task.",
+  "actionTaken": "Stopped without applying SQL because the only available branch was production main."
+}
+

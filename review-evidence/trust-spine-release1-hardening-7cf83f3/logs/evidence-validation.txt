@@ -1,0 +1,4 @@
+﻿Migration copy SHA256: c692c4fa89fbc7e89b577cdad1c2191b5fc02d37743d1d6db3353188e3db26b7
+Rollback copy SHA256: a2383c4daebe610324c6a4308b3123598139efd893e8ab07c76d315baf8f7b78
+Extracted public RPC count: 9
+Forbidden restore object matches: none

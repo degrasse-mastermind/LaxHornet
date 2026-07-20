@@ -1,0 +1,20 @@
+﻿PASS Migration is additive and does not alter legacy runtime tables
+PASS Trust Spine foreign keys preserve evidence and never target legacy tables
+PASS Release 1 scope excludes deferred roles and systems
+PASS All 20 Trust Spine tables are in the deny-all RLS list
+PASS No direct Trust Spine table grants are given to browser roles
+PASS Staging rollback removes exactly the additive Trust Spine tables
+PASS Only the nine approved public RPCs are created and granted
+PASS Public RPC wrappers are fixed-path definers and private helpers are unreachable
+PASS Grant lifecycle and constrained provenance are represented
+PASS Create, correction, and permanent tombstone operation records are separate
+PASS Operations preserve all outcomes while revisions preserve accepted evidence only
+PASS Scope registration is canonical, idempotent, and does not issue grants
+PASS Accepted revision sequencing uses the locked effective-row counter
+PASS Evidence, annotations, Live Share, and export field allowlists are explicit
+PASS The SQL suite covers every required staging scenario
+PASS LaxHornet account storage keys isolate users
+PASS Next-game focus keys isolate account, team, and roster player
+PASS No production runtime or cache file is modified by this implementation
+
+18/18 local contract tests passed.

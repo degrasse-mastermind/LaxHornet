@@ -1,0 +1,2784 @@
+﻿diff --git a/docs/methodnorth/trust-spine-gate/DEFERRED_SCOPE.md b/docs/methodnorth/trust-spine-gate/DEFERRED_SCOPE.md
+index 718104d..1839dc4 100644
+--- a/docs/methodnorth/trust-spine-gate/DEFERRED_SCOPE.md
++++ b/docs/methodnorth/trust-spine-gate/DEFERRED_SCOPE.md
+@@ -37,6 +37,12 @@ Do not implement in Release 1:
+ - Offline disclosure release.
+ - Offline authoritative evidence adjudication.
+ - Offline coach-context release.
++- Event restoration after a permanent tombstone.
++- Annotation mutation and annotation revision history.
++
++Release 1 intentionally provides no restore operation type, table, helper, or
++public RPC. A future restoration design would require a separately reviewed
++authority model and must not reuse or silently reverse a Release 1 tombstone.
+ 
+ ## Deferred analytics
+ 
+diff --git a/docs/methodnorth/trust-spine-gate/FINAL_DECLARATION.md b/docs/methodnorth/trust-spine-gate/FINAL_DECLARATION.md
+index 4b1414d..85bb1e2 100644
+--- a/docs/methodnorth/trust-spine-gate/FINAL_DECLARATION.md
++++ b/docs/methodnorth/trust-spine-gate/FINAL_DECLARATION.md
+@@ -68,3 +68,15 @@ Nothing was removed from production code, production SQL, runtime config, or exi
+ The current app can continue as the current product, but it does not yet meet the Trust Spine Release 1 standard for immutable evidence, durable tombstones, explicit operation receipts, active grant authority, public-safe Live Share projections, or correction conflict handling.
+ 
+ Production migration and Project One UI remain blocked until the LH-00 review accepts a narrowed staging implementation plan and test suite.
++
++## Release 1 hardening addendum
++
++The additive Trust Spine staging implementation now includes private-helper
++isolation, permanent tombstones, accepted-only revisions, explicit annotation
++separation, authorized legacy scope registration, effective-row revision
++sequencing, nine audited public RPC wrappers, 33 SQL acceptance groups, and a
++rollback-preservation test.
++
++This does not change the production gate result. A disposable Supabase staging
++environment was unavailable, so real Auth/PostgREST/Realtime/concurrency and
++remote rollback proof remain required before browser integration.
+diff --git a/docs/methodnorth/trust-spine-gate/TRUST_SPINE_HARDENING_REPORT.md b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_HARDENING_REPORT.md
+new file mode 100644
+index 0000000..4d3e568
+--- /dev/null
++++ b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_HARDENING_REPORT.md
+@@ -0,0 +1,93 @@
++# Trust Spine Release 1 Hardening Report
++
++Date: 2026-07-20
++
++## Recommendation
++
++**Revise before browser integration.**
++
++The migration, rollback, local SQL acceptance suite, and repository contract
++suite pass. The implementation is ready for a disposable Supabase staging
++branch, but the required real Auth/PostgREST/Realtime/concurrency/rollback proof
++cannot be completed because only the production project is currently
++available. Production was not changed.
++
++This is a stop condition from the hardening brief, not permission to substitute
++production testing.
++
++## Hardening completed
++
++1. Private helper isolation
++   - Removed client schema usage and helper execution.
++   - Kept nine explicit public wrappers as the only client entrypoints.
++   - Fixed privileged wrapper `search_path` values and ownership.
++
++2. Permanent tombstones
++   - Removed restore operation types, tables, helpers, indexes, tests, and
++     rollback entries.
++   - Restoration remains deferred.
++
++3. Accepted-only revision history
++   - Rejected requests remain operation/attempt records.
++   - Conflicts remain operation/conflict records.
++   - Only accepted corrections or accepted adjudications create revision rows.
++
++4. Evidence/annotation boundary
++   - Core evidence fields are explicitly allowlisted and revisioned.
++   - `note` and `tags` live in a separate private annotation row.
++   - Annotation mutation is intentionally deferred.
++   - Live Share excludes annotations.
++
++5. Legacy scope registration
++   - Added authorized, idempotent team/player/game registration wrappers.
++   - Added identity and cross-scope validation.
++   - Registration does not grant access.
++
++6. Concurrency-safe sequencing
++   - Corrections lock the effective event row before accepted revision sequence
++     allocation.
++   - Accepted sequence state is maintained on that locked row.
++   - Conflicts and rejections do not consume accepted revision numbers.
++
++7. Grant audit
++   - Added the exact public RPC ownership/grant matrix and SQL audit queries.
++
++## Local proof
++
++- Repository contract tests: 18 passed.
++- Migration in fresh PGlite database: passed.
++- Transactional SQL acceptance groups: 33 passed.
++- Rollback: passed.
++- Trust Spine objects remaining after rollback: 0.
++- Legacy synthetic sentinels surviving rollback: games 1, events 1, teams 1,
++  roster players 1.
++
++## Staging proof not completed
++
++The connected Supabase project exposes only its default `main` branch, which is
++the production project. A disposable branch could not be created without an
++available billing confirmation flow. Therefore these remain unverified:
++
++- Real Supabase Auth role sessions.
++- Real PostgREST grants and private-helper denial.
++- Separate-session concurrent corrections over the network.
++- Anonymous Live Share response headers/body at the API edge.
++- Realtime publication behavior.
++- Supabase advisor/lint output.
++- Remote rollback rehearsal.
++
++## Production safety
++
++- No production migration was applied.
++- No production SQL was executed.
++- No browser runtime cutover was made.
++- No application, service-worker, cache, or version file was changed.
++- No real child/player data was used.
++
++## Next gate
++
++Create a disposable Supabase branch or separate staging project, apply the exact
++migration without edits, run the SQL suite and remote-session tests, inspect
++API exposed schemas and Realtime publication, run advisors, then rehearse the
++rollback. Browser integration remains blocked until that evidence passes.
++
+diff --git a/docs/methodnorth/trust-spine-gate/TRUST_SPINE_MIGRATION_RUNBOOK.md b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_MIGRATION_RUNBOOK.md
+index fcaf140..2c738c4 100644
+--- a/docs/methodnorth/trust-spine-gate/TRUST_SPINE_MIGRATION_RUNBOOK.md
++++ b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_MIGRATION_RUNBOOK.md
+@@ -31,7 +31,7 @@ The migration:
+ - Enables and forces RLS on every new table.
+ - Revokes all direct table privileges from `PUBLIC`, `anon`, and
+   `authenticated`.
+-- Exposes only six narrow public RPC wrappers.
++- Exposes only nine narrow public RPC wrappers.
+ - Does not alter legacy LaxHornet tables, runtime code, caches, or UI.
+ 
+ ## 3. Run the SQL acceptance suite
+@@ -43,7 +43,7 @@ psql $env:LAXHORNET_STAGING_DATABASE_URL -v ON_ERROR_STOP=1 -f "docs/methodnorth
+ Expected final result:
+ 
+ ```json
+-{"suite":"LaxHornet Trust Spine Release 1","fixtures":"synthetic","transaction":"rolled_back","sqlTestsPassed":24}
++{"suite":"LaxHornet Trust Spine Release 1","fixtures":"synthetic","transaction":"rolled_back","sqlTestsPassed":33}
+ ```
+ 
+ The SQL suite is transactional and rolls back its synthetic fixtures. The
+@@ -59,7 +59,7 @@ node --check app.js
+ 
+ ## 5. Inspect deny-all posture
+ 
+-Confirm all 21 new tables have both RLS flags and no browser-role table grants:
++Confirm all 20 new tables have both RLS flags and no browser-role table grants:
+ 
+ ```sql
+ select c.relname, c.relrowsecurity, c.relforcerowsecurity
+@@ -78,11 +78,30 @@ where table_schema = 'public'
+ 
+ The second query must return zero rows.
+ 
+-## 6. Release decision
++Confirm private helpers are not client reachable:
++
++```sql
++select routine_name, grantee
++from information_schema.routine_privileges
++where routine_schema = 'lh_trust_private'
++  and grantee in ('PUBLIC', 'anon', 'authenticated');
++```
++
++This query must return zero rows. Also inspect the Supabase API settings and
++confirm `lh_trust_private` is not listed as an exposed schema.
++
++## 6. Real-session and concurrency checks
++
++Use synthetic Supabase Auth users for parent, coach, and team-admin grants.
++Exercise each public wrapper through PostgREST, attempt private helper calls,
++and run same-event corrections from separate authenticated sessions. Record
++raw requests and responses with secrets removed.
++
++## 7. Release decision
+ 
+ Do not begin a pilot until:
+ 
+-- The migration and all 24 SQL tests pass on an isolated LaxHornet Supabase
++- The migration and all 33 SQL tests pass on an isolated LaxHornet Supabase
+   staging target.
+ - The public RPCs are exercised through real Supabase Auth/PostgREST sessions.
+ - Live Share is verified unauthenticated and exposes only the allowlisted
+@@ -99,3 +118,6 @@ Stop and roll back staging if:
+ - Any tombstoned event can be recreated or corrected.
+ - Any unallowlisted field appears in Live Share or export manifests.
+ - A duplicate operation ID can change its original payload.
++- The private schema is exposed through the API.
++- A real separate-session correction test produces duplicate or lost accepted
++  evidence.
+diff --git a/docs/methodnorth/trust-spine-gate/TRUST_SPINE_ROLLBACK_RUNBOOK.md b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_ROLLBACK_RUNBOOK.md
+index e78e9fc..688e8da 100644
+--- a/docs/methodnorth/trust-spine-gate/TRUST_SPINE_ROLLBACK_RUNBOOK.md
++++ b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_ROLLBACK_RUNBOOK.md
+@@ -6,9 +6,9 @@ Status: executable destructive rollback for disposable staging only.
+ 
+ The rollback removes only the additive Release 1 objects:
+ 
+-- Six public `lh_*` RPC wrappers.
++- Nine public `lh_*` RPC wrappers.
+ - The private `lh_trust_private` schema and helper functions.
+-- The 21 new `public.lh_*` staging tables.
++- The 20 new `public.lh_*` staging tables.
+ 
+ It does not alter legacy LaxHornet tables, runtime files, service-worker
+ caches, Project One UI, or production data.
+@@ -61,4 +61,4 @@ where schema_name = 'lh_trust_private';
+ 
+ Because this release has no runtime cutover, rollback requires no app version,
+ cache, or client migration. To restore the staging gate, reapply the migration
+-and rerun all 24 SQL tests.
++and rerun all 33 SQL tests.
+diff --git a/docs/methodnorth/trust-spine-gate/TRUST_SPINE_RPC_GRANT_MATRIX.md b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_RPC_GRANT_MATRIX.md
+new file mode 100644
+index 0000000..b5c523a
+--- /dev/null
++++ b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_RPC_GRANT_MATRIX.md
+@@ -0,0 +1,77 @@
++# Trust Spine Release 1 RPC and Grant Matrix
++
++Status: implemented in the additive staging migration; not applied to
++production.
++
++## Client boundary
++
++- `lh_trust_private` is not an exposed client schema.
++- `PUBLIC`, `anon`, and `authenticated` have no `USAGE` on
++  `lh_trust_private`.
++- Those roles have no direct `EXECUTE` on private helper functions.
++- All public wrappers are owned by `postgres`, use `SECURITY DEFINER`, and set
++  `search_path = ''`.
++- Browser roles receive no direct privileges on any Trust Spine table.
++- Authorization is resolved from `auth.uid()` and server-side grants or legacy
++  team/player relationships. No wrapper accepts a role label from the client.
++
++## Public RPC matrix
++
++| Public RPC | Owner | Security | Search path | `anon` | `authenticated` | Purpose |
++|---|---|---|---|---|---|---|
++| `lh_register_team_scope(text)` | `postgres` | definer | empty | deny | execute | Register or refresh an existing authorized team snapshot |
++| `lh_register_player_scope(text,text)` | `postgres` | definer | empty | deny | execute | Register or refresh an existing authorized active roster-player snapshot |
++| `lh_register_game_scope(text)` | `postgres` | definer | empty | deny | execute | Register or refresh an existing authorized game snapshot |
++| `lh_resolve_active_grants()` | `postgres` | definer | empty | deny | execute | Resolve accepted, active, unexpired, unrevoked grants for `auth.uid()` |
++| `lh_create_event(jsonb)` | `postgres` | definer | empty | deny | execute | Create immutable core evidence and an operation receipt |
++| `lh_correct_event(jsonb)` | `postgres` | definer | empty | deny | execute | Append an accepted evidence revision or record a conflict/rejection |
++| `lh_tombstone_event(jsonb)` | `postgres` | definer | empty | deny | execute | Permanently tombstone an event without physical deletion |
++| `lh_public_live_share_game(text)` | `postgres` | definer | empty | execute | execute | Return only the explicit public game/event allowlist for an active token |
++| `lh_record_sensitive_export(text,text)` | `postgres` | definer | empty | deny | execute | Record a sensitive-export audit event and return explicit field manifests |
++
++## Private helper posture
++
++Private helpers are implementation details. Their owners retain execution so
++the public wrappers can call them, but ordinary client roles cannot resolve or
++execute them. The migration ends with:
++
++```sql
++revoke all on all functions in schema lh_trust_private
++from public, anon, authenticated;
++
++revoke all on schema lh_trust_private
++from public, anon, authenticated;
++```
++
++The staging gate must also confirm that `lh_trust_private` is absent from the
++Supabase API exposed-schema list. This dashboard/configuration check cannot be
++proven from repository SQL alone.
++
++## Grant audit queries
++
++```sql
++select
++  n.nspname as schema_name,
++  p.proname as function_name,
++  pg_catalog.pg_get_userbyid(p.proowner) as owner,
++  p.prosecdef as security_definer,
++  p.proconfig
++from pg_catalog.pg_proc p
++join pg_catalog.pg_namespace n on n.oid = p.pronamespace
++where (n.nspname = 'public' and p.proname like 'lh\_%' escape '\')
++   or n.nspname = 'lh_trust_private'
++order by n.nspname, p.proname;
++
++select routine_schema, routine_name, grantee, privilege_type
++from information_schema.routine_privileges
++where routine_schema in ('public', 'lh_trust_private')
++  and grantee in ('PUBLIC', 'anon', 'authenticated')
++order by routine_schema, routine_name, grantee;
++```
++
++Expected:
++
++- No private-schema rows grant ordinary client execution.
++- Only the nine public wrappers have client execution.
++- `anon` can execute only `lh_public_live_share_game(text)`.
++
+diff --git a/docs/methodnorth/trust-spine-gate/TRUST_SPINE_SCHEMA_PROPOSAL.sql b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_SCHEMA_PROPOSAL.sql
+index 90af355..ca251d6 100644
+--- a/docs/methodnorth/trust-spine-gate/TRUST_SPINE_SCHEMA_PROPOSAL.sql
++++ b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_SCHEMA_PROPOSAL.sql
+@@ -4,7 +4,7 @@
+ -- This migration is additive. It does not alter legacy LaxHornet tables,
+ -- existing RLS policies, existing RPCs, runtime code, or production data.
+ -- The Trust Spine tables have RLS enabled and forced. No table privileges are
+--- granted to anon or authenticated. Only the six explicitly granted staging
++-- granted to anon or authenticated. Only the nine explicitly granted staging
+ -- RPC wrappers are reachable through the Data API.
+ 
+ begin;
+@@ -22,7 +22,8 @@ revoke all on schema lh_trust_private from anon, authenticated;
+ create table public.lh_team_scopes (
+   team_id text primary key,
+   team_name_snapshot text not null default '',
+-  registered_at timestamptz not null default now()
++  registered_at timestamptz not null default now(),
++  snapshot_refreshed_at timestamptz not null default now()
+ );
+ 
+ create table public.lh_player_scopes (
+@@ -32,6 +33,7 @@ create table public.lh_player_scopes (
+   jersey_snapshot text not null default '',
+   position_snapshot text not null default '',
+   registered_at timestamptz not null default now(),
++  snapshot_refreshed_at timestamptz not null default now(),
+   primary key (team_id, roster_player_id)
+ );
+ 
+@@ -45,6 +47,7 @@ create table public.lh_game_scopes (
+   final_score_for integer,
+   final_score_against integer,
+   registered_at timestamptz not null default now(),
++  snapshot_refreshed_at timestamptz not null default now(),
+   constraint lh_game_scopes_player_scope_fk
+     foreign key (team_id, roster_player_id)
+     references public.lh_player_scopes(team_id, roster_player_id)
+@@ -210,11 +213,14 @@ create table public.lh_event_effective_versions (
+   team_id text not null,
+   roster_player_id text not null,
+   server_event_version integer not null,
++  accepted_revision_sequence integer not null default 0,
+   lifecycle_state text not null default 'active',
+   effective_evidence jsonb not null,
+   updated_at timestamptz not null default now(),
+   constraint lh_event_effective_versions_version_positive
+     check (server_event_version > 0),
++  constraint lh_event_effective_versions_revision_sequence_nonnegative
++    check (accepted_revision_sequence >= 0),
+   constraint lh_event_effective_versions_state_check
+     check (lifecycle_state in ('active', 'tombstoned')),
+   constraint lh_event_effective_versions_event_scope_fk
+@@ -244,7 +250,7 @@ create table public.lh_event_operations (
+   client_created_at timestamptz,
+   server_received_at timestamptz not null default now(),
+   constraint lh_event_operations_type_check
+-    check (operation_type in ('create_event', 'correct_event', 'tombstone_event', 'restore_event')),
++    check (operation_type in ('create_event', 'correct_event', 'tombstone_event')),
+   constraint lh_event_operations_outcome_class_check
+     check (outcome_class in ('accepted', 'rejected', 'conflicted')),
+   constraint lh_event_operations_unique_client_operation
+@@ -262,7 +268,7 @@ create table public.lh_event_operation_attempts (
+   outcome_code text not null,
+   received_at timestamptz not null default now(),
+   constraint lh_event_operation_attempts_type_check
+-    check (operation_type in ('create_event', 'correct_event', 'tombstone_event', 'restore_event')),
++    check (operation_type in ('create_event', 'correct_event', 'tombstone_event')),
+   constraint lh_event_operation_attempts_outcome_check
+     check (outcome_class in ('accepted', 'rejected', 'conflicted'))
+ );
+@@ -271,7 +277,8 @@ create table public.lh_event_create_operations (
+   operation_id text primary key references public.lh_event_operations(operation_id) on delete restrict,
+   event_id text not null,
+   game_id text not null references public.lh_game_scopes(game_id) on delete restrict,
+-  evidence jsonb not null
++  evidence jsonb not null,
++  annotations jsonb not null default '{}'::jsonb
+ );
+ 
+ create table public.lh_event_correction_operations (
+@@ -295,36 +302,24 @@ create table public.lh_event_tombstone_operations (
+     check (base_server_event_version > 0)
+ );
+ 
+-create table public.lh_event_restore_operations (
+-  operation_id text primary key references public.lh_event_operations(operation_id) on delete restrict,
+-  event_id text not null references public.lh_events(event_id) on delete restrict,
+-  game_id text not null references public.lh_game_scopes(game_id) on delete restrict,
+-  tombstone_id text not null,
+-  base_server_event_version integer not null,
+-  restore_reason text not null default '',
+-  constraint lh_event_restore_operations_base_positive
+-    check (base_server_event_version > 0)
+-);
+-
+ create table public.lh_event_revisions (
+   revision_id text primary key,
+-  operation_id text not null references public.lh_event_operations(operation_id) on delete restrict,
++  operation_id text references public.lh_event_operations(operation_id) on delete restrict,
++  adjudication_id text,
+   event_id text not null references public.lh_events(event_id) on delete restrict,
+   game_id text not null references public.lh_game_scopes(game_id) on delete restrict,
+   revision_sequence integer not null,
+   base_server_event_version integer not null,
+-  proposed_evidence_fields jsonb not null,
++  accepted_evidence_fields jsonb not null,
+   prior_evidence_snapshot jsonb not null,
+-  accepted_evidence_snapshot jsonb,
+-  outcome_class text not null,
+-  outcome_code text not null,
++  accepted_evidence_snapshot jsonb not null,
+   actor_user_id uuid not null,
+   actor_grant_id text references public.lh_access_grants(id) on delete restrict,
+   recorded_at timestamptz not null default now(),
+   constraint lh_event_revisions_sequence_positive check (revision_sequence > 0),
+   constraint lh_event_revisions_base_positive check (base_server_event_version > 0),
+-  constraint lh_event_revisions_outcome_check
+-    check (outcome_class in ('accepted', 'rejected', 'conflicted')),
++  constraint lh_event_revisions_source_check
++    check (num_nonnulls(operation_id, adjudication_id) = 1),
+   constraint lh_event_revisions_unique_sequence unique (event_id, revision_sequence)
+ );
+ 
+@@ -342,24 +337,6 @@ create table public.lh_event_tombstones (
+   constraint lh_event_tombstones_unique_sequence unique (event_id, tombstone_sequence)
+ );
+ 
+-create table public.lh_event_restorations (
+-  restoration_id text primary key,
+-  operation_id text not null unique references public.lh_event_operations(operation_id) on delete restrict,
+-  event_id text not null references public.lh_events(event_id) on delete restrict,
+-  game_id text not null references public.lh_game_scopes(game_id) on delete restrict,
+-  tombstone_id text not null references public.lh_event_tombstones(tombstone_id) on delete restrict,
+-  actor_user_id uuid not null,
+-  actor_grant_id text references public.lh_access_grants(id) on delete restrict,
+-  reason text not null default '',
+-  recorded_at timestamptz not null default now()
+-);
+-
+-alter table public.lh_event_restore_operations
+-  add constraint lh_event_restore_operations_tombstone_fk
+-  foreign key (tombstone_id)
+-  references public.lh_event_tombstones(tombstone_id)
+-  on delete restrict;
+-
+ create table public.lh_event_conflicts (
+   conflict_id text primary key,
+   operation_id text not null unique references public.lh_event_operations(operation_id) on delete restrict,
+@@ -396,6 +373,25 @@ create table public.lh_conflict_adjudications (
+     unique (conflict_id, adjudication_sequence)
+ );
+ 
++alter table public.lh_event_revisions
++  add constraint lh_event_revisions_adjudication_fk
++  foreign key (adjudication_id)
++  references public.lh_conflict_adjudications(adjudication_id)
++  on delete restrict;
++
++-- Notes and process/custom tags are annotations, not authoritative event
++-- evidence. Release 1 stores only the initial annotation payload. Annotation
++-- mutation is deliberately deferred rather than being misrepresented as an
++-- evidence correction.
++create table public.lh_event_annotations (
++  event_id text primary key references public.lh_events(event_id) on delete restrict,
++  game_id text not null references public.lh_game_scopes(game_id) on delete restrict,
++  annotations jsonb not null default '{}'::jsonb,
++  created_by_user_id uuid not null,
++  created_by_grant_id text not null references public.lh_access_grants(id) on delete restrict,
++  created_at timestamptz not null default now()
++);
++
+ create table public.lh_live_share_tokens (
+   token_id text primary key,
+   token_hash text not null unique,
+@@ -455,9 +451,13 @@ create index lh_event_operations_game_idx on public.lh_event_operations(game_id,
+ create index lh_event_operation_attempts_client_idx
+   on public.lh_event_operation_attempts(actor_user_id, client_operation_id, received_at desc);
+ create index lh_event_revisions_event_idx on public.lh_event_revisions(event_id, revision_sequence);
+-create index lh_event_revisions_operation_idx on public.lh_event_revisions(operation_id);
++create unique index lh_event_revisions_operation_idx
++  on public.lh_event_revisions(operation_id)
++  where operation_id is not null;
++create unique index lh_event_revisions_adjudication_idx
++  on public.lh_event_revisions(adjudication_id)
++  where adjudication_id is not null;
+ create index lh_event_tombstones_event_idx on public.lh_event_tombstones(event_id, tombstone_sequence desc);
+-create index lh_event_restorations_event_idx on public.lh_event_restorations(event_id, recorded_at desc);
+ create index lh_event_conflicts_event_idx on public.lh_event_conflicts(event_id, recorded_at desc);
+ create index lh_conflict_adjudications_conflict_idx
+   on public.lh_conflict_adjudications(conflict_id, adjudication_sequence desc);
+@@ -497,12 +497,19 @@ as $$
+     'stat_label',
+     'category',
+     'point_value',
+-    'tags',
+-    'note',
+     'field_zone'
+   ]::text[];
+ $$;
+ 
++create or replace function lh_trust_private.lh_annotation_fields()
++returns text[]
++language sql
++immutable
++set search_path = ''
++as $$
++  select array['note', 'tags']::text[];
++$$;
++
+ create or replace function lh_trust_private.lh_live_share_game_fields()
+ returns text[]
+ language sql
+@@ -577,12 +584,19 @@ as $$
+     'stat_label',
+     'category',
+     'point_value',
+-    'tags',
+-    'note',
+     'field_zone'
+   ]::text[];
+ $$;
+ 
++create or replace function lh_trust_private.lh_sensitive_export_annotation_fields()
++returns text[]
++language sql
++immutable
++set search_path = ''
++as $$
++  select array['note', 'tags']::text[];
++$$;
++
+ create or replace function lh_trust_private.lh_valid_evidence(
+   p_value jsonb,
+   p_require_complete boolean
+@@ -614,12 +628,25 @@ as $$
+     and (not (p_value ? 'stat_label') or pg_catalog.jsonb_typeof(p_value -> 'stat_label') = 'string')
+     and (not (p_value ? 'category') or pg_catalog.jsonb_typeof(p_value -> 'category') = 'string')
+     and (not (p_value ? 'point_value') or pg_catalog.jsonb_typeof(p_value -> 'point_value') = 'number')
+-    and (not (p_value ? 'tags') or pg_catalog.jsonb_typeof(p_value -> 'tags') = 'array')
+-    and (not (p_value ? 'note') or pg_catalog.jsonb_typeof(p_value -> 'note') = 'string')
+     and (not (p_value ? 'field_zone') or pg_catalog.jsonb_typeof(p_value -> 'field_zone') = 'string')
+     and (p_require_complete or p_value <> '{}'::jsonb);
+ $$;
+ 
++create or replace function lh_trust_private.lh_valid_annotations(p_value jsonb)
++returns boolean
++language sql
++immutable
++set search_path = ''
++as $$
++  select
++    lh_trust_private.lh_jsonb_has_only_keys(
++      p_value,
++      lh_trust_private.lh_annotation_fields()
++    )
++    and (not (p_value ? 'tags') or pg_catalog.jsonb_typeof(p_value -> 'tags') = 'array')
++    and (not (p_value ? 'note') or pg_catalog.jsonb_typeof(p_value -> 'note') = 'string');
++$$;
++
+ alter table public.lh_events
+   add constraint lh_events_original_evidence_allowlist
+   check (lh_trust_private.lh_valid_evidence(original_evidence, true));
+@@ -632,13 +659,21 @@ alter table public.lh_event_create_operations
+   add constraint lh_event_create_evidence_allowlist
+   check (lh_trust_private.lh_valid_evidence(evidence, true));
+ 
++alter table public.lh_event_create_operations
++  add constraint lh_event_create_annotations_allowlist
++  check (lh_trust_private.lh_valid_annotations(annotations));
++
++alter table public.lh_event_annotations
++  add constraint lh_event_annotations_allowlist
++  check (lh_trust_private.lh_valid_annotations(annotations));
++
+ alter table public.lh_event_correction_operations
+   add constraint lh_event_correction_evidence_allowlist
+   check (lh_trust_private.lh_valid_evidence(changed_evidence_fields, false));
+ 
+ alter table public.lh_event_revisions
+-  add constraint lh_event_revisions_proposed_allowlist
+-  check (lh_trust_private.lh_valid_evidence(proposed_evidence_fields, false));
++  add constraint lh_event_revisions_accepted_fields_allowlist
++  check (lh_trust_private.lh_valid_evidence(accepted_evidence_fields, false));
+ 
+ alter table public.lh_event_revisions
+   add constraint lh_event_revisions_prior_allowlist
+@@ -646,10 +681,7 @@ alter table public.lh_event_revisions
+ 
+ alter table public.lh_event_revisions
+   add constraint lh_event_revisions_accepted_allowlist
+-  check (
+-    accepted_evidence_snapshot is null
+-    or lh_trust_private.lh_valid_evidence(accepted_evidence_snapshot, true)
+-  );
++  check (lh_trust_private.lh_valid_evidence(accepted_evidence_snapshot, true));
+ 
+ alter table public.lh_event_conflicts
+   add constraint lh_event_conflicts_current_allowlist
+@@ -710,10 +742,6 @@ create trigger lh_event_tombstone_operations_immutable
+ before update or delete on public.lh_event_tombstone_operations
+ for each row execute function lh_trust_private.lh_forbid_mutation();
+ 
+-create trigger lh_event_restore_operations_immutable
+-before update or delete on public.lh_event_restore_operations
+-for each row execute function lh_trust_private.lh_forbid_mutation();
+-
+ create trigger lh_event_revisions_immutable
+ before update or delete on public.lh_event_revisions
+ for each row execute function lh_trust_private.lh_forbid_mutation();
+@@ -722,8 +750,8 @@ create trigger lh_event_tombstones_immutable
+ before update or delete on public.lh_event_tombstones
+ for each row execute function lh_trust_private.lh_forbid_mutation();
+ 
+-create trigger lh_event_restorations_immutable
+-before update or delete on public.lh_event_restorations
++create trigger lh_event_annotations_immutable
++before update or delete on public.lh_event_annotations
+ for each row execute function lh_trust_private.lh_forbid_mutation();
+ 
+ create trigger lh_event_conflicts_immutable
+@@ -738,6 +766,49 @@ create trigger lh_security_audit_immutable
+ before update or delete on public.lh_security_audit_events
+ for each row execute function lh_trust_private.lh_forbid_mutation();
+ 
++create or replace function lh_trust_private.lh_validate_accepted_revision()
++returns trigger
++language plpgsql
++security definer
++set search_path = ''
++as $$
++declare
++  source_operation public.lh_event_operations%rowtype;
++  source_adjudication public.lh_conflict_adjudications%rowtype;
++begin
++  if new.operation_id is not null then
++    select * into source_operation
++    from public.lh_event_operations
++    where operation_id = new.operation_id;
++
++    if not found
++      or source_operation.operation_type <> 'correct_event'
++      or source_operation.outcome_class <> 'accepted'
++    then
++      raise exception 'Revision source must be an accepted correction'
++        using errcode = '23514';
++    end if;
++  else
++    select * into source_adjudication
++    from public.lh_conflict_adjudications
++    where adjudication_id = new.adjudication_id;
++
++    if not found
++      or source_adjudication.decision not in ('accept_proposed', 'accept_custom_patch')
++    then
++      raise exception 'Revision source must be an accepting conflict adjudication'
++        using errcode = '23514';
++    end if;
++  end if;
++
++  return new;
++end;
++$$;
++
++create trigger lh_event_revisions_validate_accepted
++before insert on public.lh_event_revisions
++for each row execute function lh_trust_private.lh_validate_accepted_revision();
++
+ -- Active grant resolution is based on the latest append-only lifecycle entry,
+ -- an accepted state, and a non-expired grant.
+ create or replace function lh_trust_private.lh_active_grants_for_user(
+@@ -1258,16 +1329,285 @@ as $$
+   );
+ $$;
+ 
+-create or replace function lh_trust_private.lh_next_revision_sequence(p_event_id text)
+-returns integer
++create or replace function lh_trust_private.lh_can_register_legacy_scope(
++  p_user_id uuid,
++  p_team_id text,
++  p_roster_player_id text default null
++)
++returns boolean
+ language sql
+ stable
+ security definer
+ set search_path = ''
+ as $$
+-  select coalesce(max(revision_sequence), 0) + 1
+-  from public.lh_event_revisions
+-  where event_id = p_event_id;
++  select
++    exists (
++      select 1
++      from public.team_members as member
++      where member.user_id = p_user_id
++        and member.team_id = p_team_id
++        and member.role = 'admin'
++    )
++    or (
++      p_roster_player_id is not null
++      and exists (
++        select 1
++        from public.player_claims as claim
++        where claim.user_id = p_user_id
++          and claim.team_id = p_team_id
++          and claim.roster_player_id = p_roster_player_id
++      )
++    );
++$$;
++
++create or replace function lh_trust_private.lh_register_team_scope_impl(p_team_id text)
++returns jsonb
++language plpgsql
++security definer
++set search_path = ''
++as $$
++declare
++  actor_id uuid := auth.uid();
++  canonical_team public.teams%rowtype;
++begin
++  if actor_id is null then
++    return pg_catalog.jsonb_build_object('outcome', 'rejected', 'code', 'unauthorized');
++  end if;
++
++  select * into canonical_team
++  from public.teams
++  where id = p_team_id;
++
++  if not found then
++    return pg_catalog.jsonb_build_object('outcome', 'rejected', 'code', 'team_not_found');
++  end if;
++
++  if not lh_trust_private.lh_can_register_legacy_scope(actor_id, p_team_id, null) then
++    return pg_catalog.jsonb_build_object('outcome', 'rejected', 'code', 'unauthorized_scope');
++  end if;
++
++  insert into public.lh_team_scopes(
++    team_id,
++    team_name_snapshot,
++    registered_at,
++    snapshot_refreshed_at
++  )
++  values (canonical_team.id, canonical_team.name, pg_catalog.now(), pg_catalog.now())
++  on conflict (team_id) do update
++  set
++    team_name_snapshot = excluded.team_name_snapshot,
++    snapshot_refreshed_at = pg_catalog.now();
++
++  return pg_catalog.jsonb_build_object(
++    'outcome', 'accepted',
++    'code', 'team_scope_registered',
++    'teamId', canonical_team.id
++  );
++end;
++$$;
++
++create or replace function lh_trust_private.lh_register_player_scope_impl(
++  p_team_id text,
++  p_roster_player_id text
++)
++returns jsonb
++language plpgsql
++security definer
++set search_path = ''
++as $$
++declare
++  actor_id uuid := auth.uid();
++  canonical_team public.teams%rowtype;
++  canonical_player public.roster_players%rowtype;
++begin
++  if actor_id is null then
++    return pg_catalog.jsonb_build_object('outcome', 'rejected', 'code', 'unauthorized');
++  end if;
++
++  select * into canonical_team
++  from public.teams
++  where id = p_team_id;
++
++  select * into canonical_player
++  from public.roster_players
++  where id = p_roster_player_id
++    and team_id = p_team_id
++    and active is true;
++
++  if canonical_team.id is null or canonical_player.id is null then
++    return pg_catalog.jsonb_build_object(
++      'outcome', 'rejected', 'code', 'invalid_player_team_scope'
++    );
++  end if;
++
++  if not lh_trust_private.lh_can_register_legacy_scope(
++    actor_id,
++    p_team_id,
++    p_roster_player_id
++  ) then
++    return pg_catalog.jsonb_build_object('outcome', 'rejected', 'code', 'unauthorized_scope');
++  end if;
++
++  insert into public.lh_team_scopes(
++    team_id,
++    team_name_snapshot,
++    registered_at,
++    snapshot_refreshed_at
++  )
++  values (canonical_team.id, canonical_team.name, pg_catalog.now(), pg_catalog.now())
++  on conflict (team_id) do update
++  set
++    team_name_snapshot = excluded.team_name_snapshot,
++    snapshot_refreshed_at = pg_catalog.now();
++
++  insert into public.lh_player_scopes(
++    team_id,
++    roster_player_id,
++    player_name_snapshot,
++    jersey_snapshot,
++    position_snapshot,
++    registered_at,
++    snapshot_refreshed_at
++  )
++  values (
++    canonical_team.id,
++    canonical_player.id,
++    canonical_player.name,
++    canonical_player.number,
++    canonical_player.position,
++    pg_catalog.now(),
++    pg_catalog.now()
++  )
++  on conflict (team_id, roster_player_id) do update
++  set
++    player_name_snapshot = excluded.player_name_snapshot,
++    jersey_snapshot = excluded.jersey_snapshot,
++    position_snapshot = excluded.position_snapshot,
++    snapshot_refreshed_at = pg_catalog.now();
++
++  return pg_catalog.jsonb_build_object(
++    'outcome', 'accepted',
++    'code', 'player_scope_registered',
++    'teamId', canonical_team.id,
++    'rosterPlayerId', canonical_player.id
++  );
++end;
++$$;
++
++create or replace function lh_trust_private.lh_register_game_scope_impl(p_game_id text)
++returns jsonb
++language plpgsql
++security definer
++set search_path = ''
++as $$
++declare
++  actor_id uuid := auth.uid();
++  canonical_game public.games%rowtype;
++  canonical_team public.teams%rowtype;
++  canonical_player public.roster_players%rowtype;
++  existing_game_scope public.lh_game_scopes%rowtype;
++begin
++  if actor_id is null then
++    return pg_catalog.jsonb_build_object('outcome', 'rejected', 'code', 'unauthorized');
++  end if;
++
++  select * into canonical_game
++  from public.games
++  where id = p_game_id;
++
++  if not found
++    or canonical_game.team_id is null
++    or canonical_game.roster_player_id is null
++  then
++    return pg_catalog.jsonb_build_object(
++      'outcome', 'rejected', 'code', 'game_scope_incomplete'
++    );
++  end if;
++
++  select * into canonical_team
++  from public.teams
++  where id = canonical_game.team_id;
++
++  select * into canonical_player
++  from public.roster_players
++  where id = canonical_game.roster_player_id
++    and team_id = canonical_game.team_id
++    and active is true;
++
++  if canonical_team.id is null or canonical_player.id is null then
++    return pg_catalog.jsonb_build_object(
++      'outcome', 'rejected', 'code', 'invalid_game_player_team_scope'
++    );
++  end if;
++
++  if not lh_trust_private.lh_can_register_legacy_scope(
++    actor_id,
++    canonical_game.team_id,
++    canonical_game.roster_player_id
++  ) then
++    return pg_catalog.jsonb_build_object('outcome', 'rejected', 'code', 'unauthorized_scope');
++  end if;
++
++  select * into existing_game_scope
++  from public.lh_game_scopes
++  where game_id = p_game_id
++  for update;
++
++  if found
++    and (
++      existing_game_scope.team_id <> canonical_game.team_id
++      or existing_game_scope.roster_player_id <> canonical_game.roster_player_id
++    )
++  then
++    return pg_catalog.jsonb_build_object(
++      'outcome', 'rejected', 'code', 'historical_game_identity_mismatch'
++    );
++  end if;
++
++  perform lh_trust_private.lh_register_player_scope_impl(
++    canonical_game.team_id,
++    canonical_game.roster_player_id
++  );
++
++  insert into public.lh_game_scopes(
++    game_id,
++    team_id,
++    roster_player_id,
++    opponent_snapshot,
++    game_date_snapshot,
++    period_format_snapshot,
++    registered_at,
++    snapshot_refreshed_at
++  )
++  values (
++    canonical_game.id,
++    canonical_game.team_id,
++    canonical_game.roster_player_id,
++    canonical_game.opponent,
++    canonical_game.game_date,
++    case
++      when canonical_game.period_format in ('quarters', 'halves')
++        then canonical_game.period_format
++      else 'quarters'
++    end,
++    pg_catalog.now(),
++    pg_catalog.now()
++  )
++  on conflict (game_id) do update
++  set
++    opponent_snapshot = excluded.opponent_snapshot,
++    game_date_snapshot = excluded.game_date_snapshot,
++    period_format_snapshot = excluded.period_format_snapshot,
++    snapshot_refreshed_at = pg_catalog.now();
++
++  return pg_catalog.jsonb_build_object(
++    'outcome', 'accepted',
++    'code', 'game_scope_registered',
++    'gameId', canonical_game.id,
++    'teamId', canonical_game.team_id,
++    'rosterPlayerId', canonical_game.roster_player_id
++  );
++end;
+ $$;
+ 
+ create or replace function lh_trust_private.lh_create_event_impl(p_operation jsonb)
+@@ -1282,6 +1622,7 @@ declare
+   event_id text := p_operation ->> 'event_id';
+   game_id text := p_operation ->> 'game_id';
+   evidence jsonb := p_operation -> 'evidence';
++  annotations jsonb := coalesce(p_operation -> 'annotations', '{}'::jsonb);
+   request_hash text := lh_trust_private.lh_operation_hash(p_operation);
+   replay jsonb;
+   grant_id text;
+@@ -1310,13 +1651,21 @@ begin
+ 
+   if not lh_trust_private.lh_jsonb_has_only_keys(
+     p_operation,
+-    array['client_operation_id', 'event_id', 'game_id', 'evidence', 'client_created_at']
++    array[
++      'client_operation_id',
++      'event_id',
++      'game_id',
++      'evidence',
++      'annotations',
++      'client_created_at'
++    ]
+   )
+     or event_id is null
+     or event_id = ''
+     or game_id is null
+     or game_id = ''
+     or not lh_trust_private.lh_valid_evidence(evidence, true)
++    or not lh_trust_private.lh_valid_annotations(annotations)
+   then
+     select * into operation
+     from lh_trust_private.lh_record_operation(
+@@ -1394,8 +1743,14 @@ begin
+     request_hash, 'accepted', 'created', 1, grant_id, client_time
+   );
+ 
+-  insert into public.lh_event_create_operations(operation_id, event_id, game_id, evidence)
+-  values (operation.operation_id, event_id, game_id, evidence);
++  insert into public.lh_event_create_operations(
++    operation_id,
++    event_id,
++    game_id,
++    evidence,
++    annotations
++  )
++  values (operation.operation_id, event_id, game_id, evidence, annotations);
+ 
+   insert into public.lh_events(
+     event_id,
+@@ -1416,6 +1771,23 @@ begin
+     evidence
+   );
+ 
++  if annotations <> '{}'::jsonb then
++    insert into public.lh_event_annotations(
++      event_id,
++      game_id,
++      annotations,
++      created_by_user_id,
++      created_by_grant_id
++    )
++    values (
++      event_id,
++      game_id,
++      annotations,
++      actor_id,
++      grant_id
++    );
++  end if;
++
+   insert into public.lh_event_effective_versions(
+     event_id,
+     game_id,
+@@ -1578,15 +1950,12 @@ begin
+   where exists (
+     select 1
+     from public.lh_event_revisions as revisions,
+-      lateral pg_catalog.jsonb_object_keys(revisions.proposed_evidence_fields) as accepted(key)
++      lateral pg_catalog.jsonb_object_keys(revisions.accepted_evidence_fields) as accepted(key)
+     where revisions.event_id = p_operation ->> 'event_id'
+-      and revisions.outcome_class = 'accepted'
+       and revisions.base_server_event_version >= base_version
+       and accepted.key = proposed.key
+   );
+ 
+-  revision_sequence := lh_trust_private.lh_next_revision_sequence(event_id);
+-
+   if cardinality(overlapping_fields) > 0
+     and base_version < effective.server_event_version
+   then
+@@ -1626,37 +1995,6 @@ begin
+     coalesce(p_operation ->> 'correction_reason', '')
+   );
+ 
+-  insert into public.lh_event_revisions(
+-    revision_id,
+-    operation_id,
+-    event_id,
+-    game_id,
+-    revision_sequence,
+-    base_server_event_version,
+-    proposed_evidence_fields,
+-    prior_evidence_snapshot,
+-    accepted_evidence_snapshot,
+-    outcome_class,
+-    outcome_code,
+-    actor_user_id,
+-    actor_grant_id
+-  )
+-  values (
+-    pg_catalog.gen_random_uuid()::text,
+-    operation.operation_id,
+-    event_id,
+-    game_id,
+-    revision_sequence,
+-    base_version,
+-    changes,
+-    effective.effective_evidence,
+-    case when outcome_class = 'accepted' then merged_evidence else null end,
+-    outcome_class,
+-    outcome_code,
+-    actor_id,
+-    grant_id
+-  );
+-
+   if outcome_class = 'conflicted' then
+     insert into public.lh_event_conflicts(
+       conflict_id,
+@@ -1681,9 +2019,43 @@ begin
+       changes
+     );
+   else
++    -- The effective row is locked above. Its accepted revision counter is the
++    -- transaction-safe allocator for authoritative evidence history.
++    revision_sequence := effective.accepted_revision_sequence + 1;
++
++    insert into public.lh_event_revisions(
++      revision_id,
++      operation_id,
++      adjudication_id,
++      event_id,
++      game_id,
++      revision_sequence,
++      base_server_event_version,
++      accepted_evidence_fields,
++      prior_evidence_snapshot,
++      accepted_evidence_snapshot,
++      actor_user_id,
++      actor_grant_id
++    )
++    values (
++      pg_catalog.gen_random_uuid()::text,
++      operation.operation_id,
++      null,
++      event_id,
++      game_id,
++      revision_sequence,
++      base_version,
++      changes,
++      effective.effective_evidence,
++      merged_evidence,
++      actor_id,
++      grant_id
++    );
++
+     update public.lh_event_effective_versions
+     set
+       server_event_version = result_version,
++      accepted_revision_sequence = revision_sequence,
+       effective_evidence = merged_evidence,
+       updated_at = pg_catalog.now()
+     where lh_event_effective_versions.event_id = p_operation ->> 'event_id';
+@@ -1712,7 +2084,6 @@ declare
+   operation public.lh_event_operations%rowtype;
+   outcome_code text;
+   client_time timestamptz;
+-  next_sequence integer;
+ begin
+   if actor_id is null then
+     return pg_catalog.jsonb_build_object('outcome', 'rejected', 'code', 'unauthorized');
+@@ -1837,11 +2208,6 @@ begin
+     coalesce(p_operation ->> 'tombstone_reason', '')
+   );
+ 
+-  select coalesce(max(tombstone_sequence), 0) + 1
+-  into next_sequence
+-  from public.lh_event_tombstones
+-  where lh_event_tombstones.event_id = p_operation ->> 'event_id';
+-
+   insert into public.lh_event_tombstones(
+     tombstone_id,
+     operation_id,
+@@ -1857,7 +2223,7 @@ begin
+     operation.operation_id,
+     event_id,
+     game_id,
+-    next_sequence,
++    1,
+     actor_id,
+     grant_id,
+     coalesce(p_operation ->> 'tombstone_reason', '')
+@@ -2042,7 +2408,8 @@ begin
+     pg_catalog.jsonb_build_object(
+       'exportType', p_export_type,
+       'gameFields', to_jsonb(lh_trust_private.lh_sensitive_export_game_fields()),
+-      'eventFields', to_jsonb(lh_trust_private.lh_sensitive_export_event_fields())
++      'eventFields', to_jsonb(lh_trust_private.lh_sensitive_export_event_fields()),
++      'annotationFields', to_jsonb(lh_trust_private.lh_sensitive_export_annotation_fields())
+     )
+   );
+ 
+@@ -2051,7 +2418,8 @@ begin
+     'code', 'export_audit_recorded',
+     'auditId', audit_id,
+     'gameFields', to_jsonb(lh_trust_private.lh_sensitive_export_game_fields()),
+-    'eventFields', to_jsonb(lh_trust_private.lh_sensitive_export_event_fields())
++    'eventFields', to_jsonb(lh_trust_private.lh_sensitive_export_event_fields()),
++    'annotationFields', to_jsonb(lh_trust_private.lh_sensitive_export_annotation_fields())
+   );
+ end;
+ $$;
+@@ -2059,6 +2427,42 @@ $$;
+ -- Public Data API wrappers. The privilege-bearing implementations remain in
+ -- the non-exposed private schema with fixed search paths and explicit auth/scope
+ -- checks.
++create or replace function public.lh_register_team_scope(p_team_id text)
++returns jsonb
++language sql
++volatile
++security definer
++set search_path = ''
++as $$
++  select lh_trust_private.lh_register_team_scope_impl(p_team_id);
++$$;
++
++create or replace function public.lh_register_player_scope(
++  p_team_id text,
++  p_roster_player_id text
++)
++returns jsonb
++language sql
++volatile
++security definer
++set search_path = ''
++as $$
++  select lh_trust_private.lh_register_player_scope_impl(
++    p_team_id,
++    p_roster_player_id
++  );
++$$;
++
++create or replace function public.lh_register_game_scope(p_game_id text)
++returns jsonb
++language sql
++volatile
++security definer
++set search_path = ''
++as $$
++  select lh_trust_private.lh_register_game_scope_impl(p_game_id);
++$$;
++
+ create or replace function public.lh_resolve_active_grants()
+ returns table (
+   grant_id text,
+@@ -2071,7 +2475,7 @@ returns table (
+ )
+ language sql
+ stable
+-security invoker
++security definer
+ set search_path = ''
+ as $$
+   select *
+@@ -2082,7 +2486,7 @@ create or replace function public.lh_create_event(p_operation jsonb)
+ returns jsonb
+ language sql
+ volatile
+-security invoker
++security definer
+ set search_path = ''
+ as $$
+   select lh_trust_private.lh_create_event_impl(p_operation);
+@@ -2092,7 +2496,7 @@ create or replace function public.lh_correct_event(p_operation jsonb)
+ returns jsonb
+ language sql
+ volatile
+-security invoker
++security definer
+ set search_path = ''
+ as $$
+   select lh_trust_private.lh_correct_event_impl(p_operation);
+@@ -2102,7 +2506,7 @@ create or replace function public.lh_tombstone_event(p_operation jsonb)
+ returns jsonb
+ language sql
+ volatile
+-security invoker
++security definer
+ set search_path = ''
+ as $$
+   select lh_trust_private.lh_tombstone_event_impl(p_operation);
+@@ -2112,7 +2516,7 @@ create or replace function public.lh_public_live_share_game(p_share_code text)
+ returns jsonb
+ language sql
+ stable
+-security invoker
++security definer
+ set search_path = ''
+ as $$
+   select lh_trust_private.lh_public_live_share_game_impl(p_share_code);
+@@ -2125,7 +2529,7 @@ create or replace function public.lh_record_sensitive_export(
+ returns jsonb
+ language sql
+ volatile
+-security invoker
++security definer
+ set search_path = ''
+ as $$
+   select lh_trust_private.lh_record_sensitive_export_impl(p_export_type, p_game_id);
+@@ -2150,10 +2554,9 @@ begin
+     'lh_event_create_operations',
+     'lh_event_correction_operations',
+     'lh_event_tombstone_operations',
+-    'lh_event_restore_operations',
+     'lh_event_revisions',
+     'lh_event_tombstones',
+-    'lh_event_restorations',
++    'lh_event_annotations',
+     'lh_event_conflicts',
+     'lh_conflict_adjudications',
+     'lh_live_share_tokens',
+@@ -2171,21 +2574,21 @@ end;
+ $$;
+ 
+ revoke all on all functions in schema lh_trust_private from public, anon, authenticated;
+-grant usage on schema lh_trust_private to anon, authenticated;
+-
+-grant execute on function lh_trust_private.lh_active_grants_for_user(uuid, timestamptz)
+-  to authenticated;
+-grant execute on function lh_trust_private.lh_create_event_impl(jsonb)
+-  to authenticated;
+-grant execute on function lh_trust_private.lh_correct_event_impl(jsonb)
+-  to authenticated;
+-grant execute on function lh_trust_private.lh_tombstone_event_impl(jsonb)
+-  to authenticated;
+-grant execute on function lh_trust_private.lh_public_live_share_game_impl(text)
+-  to anon, authenticated;
+-grant execute on function lh_trust_private.lh_record_sensitive_export_impl(text, text)
+-  to authenticated;
+-
++revoke all on schema lh_trust_private from public, anon, authenticated;
++
++alter function public.lh_register_team_scope(text) owner to postgres;
++alter function public.lh_register_player_scope(text, text) owner to postgres;
++alter function public.lh_register_game_scope(text) owner to postgres;
++alter function public.lh_resolve_active_grants() owner to postgres;
++alter function public.lh_create_event(jsonb) owner to postgres;
++alter function public.lh_correct_event(jsonb) owner to postgres;
++alter function public.lh_tombstone_event(jsonb) owner to postgres;
++alter function public.lh_public_live_share_game(text) owner to postgres;
++alter function public.lh_record_sensitive_export(text, text) owner to postgres;
++
++revoke execute on function public.lh_register_team_scope(text) from public, anon, authenticated;
++revoke execute on function public.lh_register_player_scope(text, text) from public, anon, authenticated;
++revoke execute on function public.lh_register_game_scope(text) from public, anon, authenticated;
+ revoke execute on function public.lh_resolve_active_grants() from public, anon, authenticated;
+ revoke execute on function public.lh_create_event(jsonb) from public, anon, authenticated;
+ revoke execute on function public.lh_correct_event(jsonb) from public, anon, authenticated;
+@@ -2193,6 +2596,9 @@ revoke execute on function public.lh_tombstone_event(jsonb) from public, anon, a
+ revoke execute on function public.lh_public_live_share_game(text) from public, anon, authenticated;
+ revoke execute on function public.lh_record_sensitive_export(text, text) from public, anon, authenticated;
+ 
++grant execute on function public.lh_register_team_scope(text) to authenticated;
++grant execute on function public.lh_register_player_scope(text, text) to authenticated;
++grant execute on function public.lh_register_game_scope(text) to authenticated;
+ grant execute on function public.lh_resolve_active_grants() to authenticated;
+ grant execute on function public.lh_create_event(jsonb) to authenticated;
+ grant execute on function public.lh_correct_event(jsonb) to authenticated;
+diff --git a/docs/methodnorth/trust-spine-gate/TRUST_SPINE_SCOPE_REGISTRATION.md b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_SCOPE_REGISTRATION.md
+new file mode 100644
+index 0000000..5402c45
+--- /dev/null
++++ b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_SCOPE_REGISTRATION.md
+@@ -0,0 +1,72 @@
++# Trust Spine Release 1 Scope Registration
++
++Status: staging bridge for the existing LaxHornet schema; not a new authority
++model.
++
++## Purpose
++
++Trust Spine evidence references immutable team, roster-player, and game scope
++snapshots. Existing LaxHornet records must be registered before Trust Spine
++event operations can use them.
++
++Registration:
++
++- Copies canonical identity from existing `teams`, `roster_players`, and
++  `games` records.
++- Is idempotent.
++- Refreshes descriptive snapshot fields and `snapshot_refreshed_at`.
++- Never changes immutable team/player/game identity.
++- Never creates an access grant, team membership, or player claim.
++- Accepts existing text game IDs, including IDs created locally and later
++  synchronized into the legacy `games` table.
++
++## Authorization
++
++The private registration helpers derive the caller from `auth.uid()` and allow
++registration only when the caller already has one of these legacy
++relationships:
++
++- Team admin membership for the relevant team.
++- An exact player claim for the relevant roster player.
++
++Registration does not treat client-submitted role labels as authority.
++
++## Validation
++
++### Team
++
++- The legacy team must exist.
++- The caller must already be authorized for that team.
++
++### Roster player
++
++- The legacy player must exist and be active.
++- Its `team_id` must match the requested team.
++- The caller must be authorized for that team/player.
++
++### Game
++
++- The legacy game must exist.
++- Its roster player must exist and be active.
++- The roster player's team must match the game's team.
++- Any existing Trust Spine scope row with the same ID must preserve that
++  identity.
++
++Cross-team and cross-player registration attempts are rejected.
++
++## Snapshot refresh boundary
++
++Re-registration may refresh descriptive snapshot values such as team name,
++player name, jersey, position, opponent, game date, and format. It may not
++rewrite historical event identity or retarget a scope ID to another team or
++player.
++
++## Public wrappers
++
++- `public.lh_register_team_scope(text)`
++- `public.lh_register_player_scope(text,text)`
++- `public.lh_register_game_scope(text)`
++
++Each wrapper is authenticated-only, fixed-path `SECURITY DEFINER`, and delegates
++to a private helper that performs the authorization and consistency checks.
++
+diff --git a/docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_RESULTS.md b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_RESULTS.md
+index 6c6076a..4cc546c 100644
+--- a/docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_RESULTS.md
++++ b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_RESULTS.md
+@@ -4,7 +4,7 @@ Date: 2026-07-20
+ 
+ ## Implementation status
+ 
+-The additive migration, six narrow RPC wrappers, 24-group SQL acceptance suite,
++The additive migration, nine narrow RPC wrappers, 33-group SQL acceptance suite,
+ local repository contracts, and staging rollback are implemented.
+ 
+ No production migration, runtime cutover, Project One UI change, service-worker
+@@ -14,7 +14,7 @@ change, version change, or legacy schema change was made.
+ 
+ - Migration parsed and executed successfully in a fresh temporary
+   Postgres-compatible PGlite database.
+-- All 24 SQL acceptance groups passed in a transaction that rolled back its
++- All 33 SQL acceptance groups passed in a transaction that rolled back its
+   synthetic fixtures.
+ - Repository contract tests passed after validating migration scope, RLS
+   posture, RPC surface, lifecycle semantics, allowlists, and existing
+@@ -25,14 +25,36 @@ change, version change, or legacy schema change was made.
+ Expected SQL suite result:
+ 
+ ```json
+-{"suite":"LaxHornet Trust Spine Release 1","fixtures":"synthetic","transaction":"rolled_back","sqlTestsPassed":24}
++{"suite":"LaxHornet Trust Spine Release 1","fixtures":"synthetic","transaction":"rolled_back","sqlTestsPassed":33}
+ ```
+ 
+ ## Hard staging blocker
+ 
+ No isolated LaxHornet Supabase staging branch or staging database connection was
+-available in this environment. The connected Supabase project was not a
+-LaxHornet project, so no migration was applied through that connector.
++available in this environment. The connected LaxHornet Supabase project exposed
++only its production `main` branch. Creating a disposable branch required a
++billing confirmation capability that was not available to this task, so no
++migration was applied through that connector.
++
++Observed branch inventory:
++
++```json
++{
++  "branches": [
++    {
++      "name": "main",
++      "project_ref": "ulbmjcvnyznvmjgpstno",
++      "is_default": true,
++      "git_branch": "main",
++      "status": "FUNCTIONS_DEPLOYED"
++    }
++  ]
++}
++```
++
++The remote-session harness is checked in as
++`tools/test_trust_spine_remote.mjs`. It exits with an explicit skip code when
++disposable-staging URL, synthetic credentials, and fixture IDs are absent.
+ 
+ Consequently, real Supabase Auth, PostgREST, and unauthenticated Live Share
+ network-edge behavior is not yet verified.
+@@ -42,6 +64,6 @@ network-edge behavior is not yet verified.
+ **Revise before pilot.**
+ 
+ The implementation is ready to apply to a disposable LaxHornet Supabase staging
+-branch. Do not proceed to pilot until the migration and all 24 SQL tests pass
+-there, the six RPCs are exercised through real authenticated sessions, and the
+-rollback is rehearsed.
++branch. Do not proceed to browser integration until the migration and all 33
++SQL tests pass there, the nine RPCs are exercised through real authenticated
++sessions, separate-session concurrency passes, and the rollback is rehearsed.
+diff --git a/docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_ROLLBACK.sql b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_ROLLBACK.sql
+index 4c1eca6..e3e608d 100644
+--- a/docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_ROLLBACK.sql
++++ b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_ROLLBACK.sql
+@@ -15,6 +15,9 @@ drop function if exists public.lh_tombstone_event(jsonb);
+ drop function if exists public.lh_correct_event(jsonb);
+ drop function if exists public.lh_create_event(jsonb);
+ drop function if exists public.lh_resolve_active_grants();
++drop function if exists public.lh_register_game_scope(text);
++drop function if exists public.lh_register_player_scope(text, text);
++drop function if exists public.lh_register_team_scope(text);
+ 
+ -- CASCADE removes only private helper functions and their triggers on lh_*
+ -- staging tables. Public wrappers were removed above.
+@@ -27,12 +30,11 @@ alter table if exists public.lh_access_invitations
+ 
+ drop table if exists public.lh_security_audit_events;
+ drop table if exists public.lh_live_share_tokens;
++drop table if exists public.lh_event_annotations;
++drop table if exists public.lh_event_revisions;
+ drop table if exists public.lh_conflict_adjudications;
+ drop table if exists public.lh_event_conflicts;
+-drop table if exists public.lh_event_restorations;
+-drop table if exists public.lh_event_restore_operations;
+ drop table if exists public.lh_event_tombstones;
+-drop table if exists public.lh_event_revisions;
+ drop table if exists public.lh_event_tombstone_operations;
+ drop table if exists public.lh_event_correction_operations;
+ drop table if exists public.lh_event_create_operations;
+diff --git a/docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_TESTS.sql b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_TESTS.sql
+index f7ea193..30a3aa6 100644
+--- a/docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_TESTS.sql
++++ b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_TESTS.sql
+@@ -18,6 +18,78 @@ begin;
+ -- admin_b:       99999999-9999-4999-8999-999999999999
+ -- renewed_user:  aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa
+ 
++-- Canonical legacy fixtures used only to exercise the scope-registration
++-- bridge. They are rolled back with the suite.
++insert into auth.users(id, email)
++values
++  ('11111111-1111-4111-8111-111111111111', 'parent-a@example.test'),
++  ('22222222-2222-4222-8222-222222222222', 'coach-a@example.test'),
++  ('33333333-3333-4333-8333-333333333333', 'coach-player@example.test'),
++  ('44444444-4444-4444-8444-444444444444', 'admin-a@example.test'),
++  ('55555555-5555-4555-8555-555555555555', 'pending@example.test'),
++  ('66666666-6666-4666-8666-666666666666', 'expired@example.test'),
++  ('77777777-7777-4777-8777-777777777777', 'revoked@example.test'),
++  ('88888888-8888-4888-8888-888888888888', 'parent-b@example.test'),
++  ('99999999-9999-4999-8999-999999999999', 'admin-b@example.test'),
++  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'renewed@example.test')
++on conflict (id) do nothing;
++
++insert into public.teams(id, name, invite_code, tracker_code, created_by)
++values
++  ('legacy-team-a', 'Legacy Demo Hornets', 'LEGACYA', 'TRACKA',
++    '44444444-4444-4444-8444-444444444444'),
++  ('legacy-team-b', 'Legacy Other Team', 'LEGACYB', 'TRACKB',
++    '99999999-9999-4999-8999-999999999999');
++
++insert into public.team_members(id, team_id, user_id, role)
++values
++  ('legacy-member-admin-a', 'legacy-team-a',
++    '44444444-4444-4444-8444-444444444444', 'admin'),
++  ('legacy-member-admin-b', 'legacy-team-b',
++    '99999999-9999-4999-8999-999999999999', 'admin');
++
++insert into public.roster_players(id, team_id, name, number, position, active)
++values
++  ('legacy-player-a', 'legacy-team-a', 'Offline Demo Player', '12', 'Midfield', true),
++  ('legacy-player-b', 'legacy-team-b', 'Other Offline Player', '88', 'Defense', true);
++
++insert into public.player_claims(id, team_id, roster_player_id, user_id)
++values (
++  'legacy-claim-parent-a',
++  'legacy-team-a',
++  'legacy-player-a',
++  '11111111-1111-4111-8111-111111111111'
++);
++
++insert into public.games(
++  id,
++  player_id,
++  user_id,
++  share_code,
++  opponent,
++  game_date,
++  period_format,
++  player_snapshot,
++  current_quarter,
++  status,
++  team_id,
++  roster_player_id
++)
++values (
++  'offline-local-game-a',
++  'legacy-player-a',
++  '11111111-1111-4111-8111-111111111111',
++  'OFFLINE-LOCAL-SHARE',
++  'Offline Opponent',
++  date '2026-07-20',
++  'halves',
++  '{"name":"Offline Demo Player","number":"12"}'::jsonb,
++  'H1',
++  'in-progress',
++  'legacy-team-a',
++  'legacy-player-a'
++);
++
+ insert into public.lh_team_scopes(team_id, team_name_snapshot)
+ values
+   ('team-a', 'Branford Demo Hornets'),
+@@ -676,9 +748,11 @@ begin
+         "stat_label":"Ground Ball",
+         "category":"Possession",
+         "point_value":2,
+-        "tags":["Contested"],
+-        "note":"Private test note",
+         "field_zone":"midfield"
++      },
++      "annotations":{
++        "tags":["Contested"],
++        "note":"Private test note"
+       }
+     }'::jsonb
+   );
+@@ -689,6 +763,19 @@ end;
+ $test$;
+ reset role;
+ 
++do $test$
++begin
++  if not exists (
++    select 1
++    from public.lh_event_annotations
++    where event_id = 'event-main'
++      and annotations ->> 'note' = 'Private test note'
++  ) then
++    raise exception 'TEST 6 failed: private annotations were not separated';
++  end if;
++end;
++$test$;
++
+ -- 7. Cross-player and cross-team create attempts are denied.
+ set local role authenticated;
+ select pg_catalog.set_config(
+@@ -942,12 +1029,12 @@ declare
+ begin
+   result := public.lh_correct_event(
+     '{
+-      "client_operation_id":"corr-note",
++      "client_operation_id":"corr-label",
+       "event_id":"event-main",
+       "game_id":"game-a1",
+       "base_server_event_version":1,
+-      "changes":{"note":"Updated private note"},
+-      "correction_reason":"Note correction"
++      "changes":{"stat_label":"Loose Ball Win"},
++      "correction_reason":"Label correction"
+     }'::jsonb
+   );
+   if result ->> 'outcome' <> 'accepted'
+@@ -1004,12 +1091,12 @@ declare
+ begin
+   result := public.lh_correct_event(
+     '{
+-      "client_operation_id":"corr-note",
++      "client_operation_id":"corr-label",
+       "event_id":"event-main",
+       "game_id":"game-a1",
+       "base_server_event_version":1,
+-      "changes":{"note":"Updated private note"},
+-      "correction_reason":"Note correction"
++      "changes":{"stat_label":"Loose Ball Win"},
++      "correction_reason":"Label correction"
+     }'::jsonb
+   );
+   if result ->> 'outcome' <> 'accepted'
+@@ -1023,7 +1110,7 @@ reset role;
+ 
+ do $test$
+ begin
+-  if (select count(*) from public.lh_event_revisions where event_id = 'event-main') <> 3 then
++  if (select count(*) from public.lh_event_revisions where event_id = 'event-main') <> 2 then
+     raise exception 'TEST 15 failed: replay created a duplicate revision';
+   end if;
+ end;
+@@ -1042,12 +1129,12 @@ declare
+ begin
+   result := public.lh_correct_event(
+     '{
+-      "client_operation_id":"corr-note",
++      "client_operation_id":"corr-label",
+       "event_id":"event-main",
+       "game_id":"game-a1",
+       "base_server_event_version":1,
+-      "changes":{"note":"Tampered duplicate payload"},
+-      "correction_reason":"Note correction"
++      "changes":{"stat_label":"Tampered duplicate payload"},
++      "correction_reason":"Label correction"
+     }'::jsonb
+   );
+   if result ->> 'outcome' <> 'rejected'
+@@ -1107,7 +1194,7 @@ begin
+       "event_id":"event-main",
+       "game_id":"game-a1",
+       "base_server_event_version":4,
+-      "changes":{"note":"Should not resurrect"}
++      "changes":{"stat_label":"Should not resurrect"}
+     }'::jsonb
+   );
+   recreate := public.lh_create_event(
+@@ -1171,10 +1258,9 @@ begin
+         "stat_label":"Successful Clear",
+         "category":"Possession",
+         "point_value":1,
+-        "tags":[],
+-        "note":"",
+         "field_zone":"defensive_end"
+-      }
++      },
++      "annotations":{"tags":[],"note":""}
+     }'::jsonb
+   );
+   corrected := public.lh_correct_event(
+@@ -1243,7 +1329,7 @@ begin
+       "event_id":"event-revocation-case",
+       "game_id":"game-a1",
+       "base_server_event_version":2,
+-      "changes":{"note":"Offline correction after authority changed"}
++      "changes":{"category":"Transition"}
+     }'::jsonb
+   );
+   if replay ->> 'outcome' <> 'accepted'
+@@ -1344,8 +1430,9 @@ declare
+   ]'::jsonb;
+   expected_event_fields jsonb := '[
+     "event_id", "occurred_at", "period", "stat_type", "stat_label",
+-    "category", "point_value", "tags", "note", "field_zone"
++    "category", "point_value", "field_zone"
+   ]'::jsonb;
++  expected_annotation_fields jsonb := '["note", "tags"]'::jsonb;
+ begin
+   response := public.lh_record_sensitive_export('player_json', 'game-a1');
+   if response ->> 'outcome' <> 'accepted'
+@@ -1363,6 +1450,11 @@ begin
+     raise exception 'TEST 22 failed: event export manifest drifted: %',
+       response -> 'eventFields';
+   end if;
++
++  if response -> 'annotationFields' <> expected_annotation_fields then
++    raise exception 'TEST 22 failed: annotation export manifest drifted: %',
++      response -> 'annotationFields';
++  end if;
+ end;
+ $test$;
+ reset role;
+@@ -1441,10 +1533,9 @@ declare
+     'lh_event_create_operations',
+     'lh_event_correction_operations',
+     'lh_event_tombstone_operations',
+-    'lh_event_restore_operations',
+     'lh_event_revisions',
+     'lh_event_tombstones',
+-    'lh_event_restorations',
++    'lh_event_annotations',
+     'lh_event_conflicts',
+     'lh_conflict_adjudications',
+     'lh_live_share_tokens',
+@@ -1477,9 +1568,378 @@ begin
+ end;
+ $test$;
+ 
++-- 25. Authenticated clients cannot invoke private helpers directly.
++set local role authenticated;
++select pg_catalog.set_config(
++  'request.jwt.claims',
++  '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}',
++  true
++);
++do $test$
++declare
++  denied boolean := false;
++begin
++  begin
++    perform lh_trust_private.lh_active_grants_for_user(
++      auth.uid(),
++      pg_catalog.now()
++    );
++  exception when insufficient_privilege then
++    denied := true;
++  end;
++
++  if not denied then
++    raise exception 'TEST 25 failed: private helper invocation was not denied';
++  end if;
++end;
++$test$;
++reset role;
++
++-- 26. Revision history contains accepted evidence only. Rejected and
++-- conflicted operations have no revision row.
++do $test$
++declare
++  sequences integer[];
++begin
++  select pg_catalog.array_agg(revision_sequence order by revision_sequence)
++  into sequences
++  from public.lh_event_revisions
++  where event_id = 'event-main';
++
++  if sequences <> array[1, 2] then
++    raise exception 'TEST 26 failed: accepted revision sequence drifted: %', sequences;
++  end if;
++
++  if exists (
++    select 1
++    from public.lh_event_revisions as revision
++    join public.lh_event_operations as operation
++      on operation.operation_id = revision.operation_id
++    where operation.outcome_class <> 'accepted'
++  ) then
++    raise exception 'TEST 26 failed: non-accepted operation created a revision';
++  end if;
++
++  if exists (
++    select 1
++    from public.lh_event_revisions
++    where accepted_evidence_snapshot is null
++  ) then
++    raise exception 'TEST 26 failed: accepted revision has no accepted snapshot';
++  end if;
++end;
++$test$;
++
++-- 27. Annotation fields cannot be submitted as evidence corrections and
++-- initial annotations never enter the authoritative evidence object.
++set local role authenticated;
++select pg_catalog.set_config(
++  'request.jwt.claims',
++  '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}',
++  true
++);
++do $test$
++declare
++  response jsonb;
++begin
++  response := public.lh_correct_event(
++    '{
++      "client_operation_id":"annotation-as-evidence",
++      "event_id":"event-coach-team",
++      "game_id":"game-a2",
++      "base_server_event_version":1,
++      "changes":{"note":"Must remain an annotation"}
++    }'::jsonb
++  );
++
++  if response ->> 'outcome' <> 'rejected'
++    or response ->> 'code' <> 'invalid_input'
++  then
++    raise exception 'TEST 27 failed: annotation entered correction history: %', response;
++  end if;
++
++end;
++$test$;
++reset role;
++
++do $test$
++begin
++  if exists (
++    select 1
++    from public.lh_event_effective_versions
++    where event_id = 'event-main'
++      and (effective_evidence ? 'note' or effective_evidence ? 'tags')
++  ) then
++    raise exception 'TEST 27 failed: annotations leaked into effective evidence';
++  end if;
++end;
++$test$;
++
++-- 28. Existing legacy scopes can be registered and refreshed idempotently
++-- without manufacturing a Trust Spine grant.
++set local role authenticated;
++select pg_catalog.set_config(
++  'request.jwt.claims',
++  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',
++  true
++);
++do $test$
++declare
++  team_result jsonb;
++  player_result jsonb;
++  game_result jsonb;
++  replay_result jsonb;
++  grant_count_before integer;
++begin
++  select count(*) into grant_count_before
++  from public.lh_resolve_active_grants();
++
++  team_result := public.lh_register_team_scope('legacy-team-a');
++  player_result := public.lh_register_player_scope('legacy-team-a', 'legacy-player-a');
++  game_result := public.lh_register_game_scope('offline-local-game-a');
++
++  replay_result := public.lh_register_game_scope('offline-local-game-a');
++
++  if team_result ->> 'outcome' <> 'accepted'
++    or player_result ->> 'outcome' <> 'accepted'
++    or game_result ->> 'outcome' <> 'accepted'
++    or replay_result ->> 'outcome' <> 'accepted'
++  then
++    raise exception 'TEST 28 failed: scope registration: %, %, %, %',
++      team_result, player_result, game_result, replay_result;
++  end if;
++
++  if (select count(*) from public.lh_resolve_active_grants()) <> grant_count_before then
++    raise exception 'TEST 28 failed: scope registration manufactured a grant';
++  end if;
++end;
++$test$;
++reset role;
++
++do $test$
++begin
++  if (select count(*) from public.lh_team_scopes where team_id = 'legacy-team-a') <> 1
++    or (
++      select count(*)
++      from public.lh_player_scopes
++      where team_id = 'legacy-team-a'
++        and roster_player_id = 'legacy-player-a'
++    ) <> 1
++    or (
++      select count(*)
++      from public.lh_game_scopes
++      where game_id = 'offline-local-game-a'
++    ) <> 1
++  then
++    raise exception 'TEST 28 failed: idempotent scope row counts';
++  end if;
++
++  if exists (
++    select 1
++    from public.lh_access_grants
++    where team_id = 'legacy-team-a'
++  ) then
++    raise exception 'TEST 28 failed: scope registration manufactured a grant';
++  end if;
++end;
++$test$;
++
++-- 29. Cross-team, cross-player, and unauthorized scope registration is denied.
++set local role authenticated;
++select pg_catalog.set_config(
++  'request.jwt.claims',
++  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',
++  true
++);
++do $test$
++declare
++  invalid_player jsonb;
++begin
++  invalid_player := public.lh_register_player_scope(
++    'legacy-team-a',
++    'legacy-player-b'
++  );
++  if invalid_player ->> 'outcome' <> 'rejected'
++    or invalid_player ->> 'code' <> 'invalid_player_team_scope'
++  then
++    raise exception 'TEST 29 failed: cross-team player registration: %', invalid_player;
++  end if;
++end;
++$test$;
++
++select pg_catalog.set_config(
++  'request.jwt.claims',
++  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
++  true
++);
++do $test$
++declare
++  unauthorized_team jsonb;
++begin
++  unauthorized_team := public.lh_register_team_scope('legacy-team-b');
++  if unauthorized_team ->> 'outcome' <> 'rejected'
++    or unauthorized_team ->> 'code' <> 'unauthorized_scope'
++  then
++    raise exception 'TEST 29 failed: unauthorized team registration: %', unauthorized_team;
++  end if;
++end;
++$test$;
++reset role;
++
++-- 30. Tombstones are permanent in Release 1; no restore table, operation, or
++-- public/private restore function exists.
++do $test$
++begin
++  if pg_catalog.to_regclass('public.lh_event_restore_operations') is not null
++    or pg_catalog.to_regclass('public.lh_event_restorations') is not null
++    or exists (
++      select 1
++      from pg_catalog.pg_proc as procedure
++      join pg_catalog.pg_namespace as namespace
++        on namespace.oid = procedure.pronamespace
++      where namespace.nspname in ('public', 'lh_trust_private')
++        and procedure.proname like '%restore%event%'
++    )
++  then
++    raise exception 'TEST 30 failed: restore-event scope remains';
++  end if;
++end;
++$test$;
++
++-- 31. Expired and revoked anonymous Live Share tokens fail closed.
++insert into public.lh_live_share_tokens(
++  token_id,
++  token_hash,
++  game_id,
++  created_by_user_id,
++  created_by_grant_id,
++  created_at,
++  expires_at,
++  revoked_at
++)
++values
++  (
++    'share-expired',
++    pg_catalog.encode(
++      extensions.digest(pg_catalog.convert_to('EXPIRED-SHARE', 'UTF8'), 'sha256'),
++      'hex'
++    ),
++    'game-a1',
++    '22222222-2222-4222-8222-222222222222',
++    'grant-coach-team-a',
++    pg_catalog.now() - interval '2 days',
++    pg_catalog.now() - interval '1 day',
++    null
++  ),
++  (
++    'share-revoked',
++    pg_catalog.encode(
++      extensions.digest(pg_catalog.convert_to('REVOKED-SHARE', 'UTF8'), 'sha256'),
++      'hex'
++    ),
++    'game-a1',
++    '22222222-2222-4222-8222-222222222222',
++    'grant-coach-team-a',
++    pg_catalog.now() - interval '1 day',
++    pg_catalog.now() + interval '1 day',
++    pg_catalog.now()
++  );
++
++set local role anon;
++select pg_catalog.set_config('request.jwt.claims', '{"role":"anon"}', true);
++do $test$
++begin
++  if public.lh_public_live_share_game('expired-share') is not null
++    or public.lh_public_live_share_game('revoked-share') is not null
++  then
++    raise exception 'TEST 31 failed: inactive Live Share token returned data';
++  end if;
++end;
++$test$;
++reset role;
++
++-- 32. Public wrappers are postgres-owned SECURITY DEFINER entrypoints with
++-- explicit role grants; private helpers remain unreachable.
++do $test$
++declare
++  expected_public text[] := array[
++    'lh_register_team_scope(text)',
++    'lh_register_player_scope(text,text)',
++    'lh_register_game_scope(text)',
++    'lh_resolve_active_grants()',
++    'lh_create_event(jsonb)',
++    'lh_correct_event(jsonb)',
++    'lh_tombstone_event(jsonb)',
++    'lh_public_live_share_game(text)',
++    'lh_record_sensitive_export(text,text)'
++  ];
++  function_signature text;
++  function_oid regprocedure;
++begin
++  if pg_catalog.has_schema_privilege('anon', 'lh_trust_private', 'USAGE')
++    or pg_catalog.has_schema_privilege('authenticated', 'lh_trust_private', 'USAGE')
++  then
++    raise exception 'TEST 32 failed: private schema usage remains';
++  end if;
++
++  foreach function_signature in array expected_public
++  loop
++    function_oid := ('public.' || function_signature)::regprocedure;
++
++    if (
++      select owner.rolname <> 'postgres' or procedure.prosecdef is not true
++      from pg_catalog.pg_proc as procedure
++      join pg_catalog.pg_roles as owner on owner.oid = procedure.proowner
++      where procedure.oid = function_oid
++    ) then
++      raise exception 'TEST 32 failed: owner/security mode for %', function_signature;
++    end if;
++
++    if not pg_catalog.has_function_privilege(
++      'authenticated',
++      function_oid,
++      'EXECUTE'
++    ) then
++      raise exception 'TEST 32 failed: authenticated grant missing for %',
++        function_signature;
++    end if;
++  end loop;
++
++  if pg_catalog.has_function_privilege(
++    'anon',
++    'public.lh_create_event(jsonb)',
++    'EXECUTE'
++  ) then
++    raise exception 'TEST 32 failed: anon can create evidence';
++  end if;
++end;
++$test$;
++
++-- 33. The effective-row counter and accepted revisions agree, proving the
++-- sequence allocator does not use max(sequence)+1.
++do $test$
++declare
++  accepted_counter integer;
++  accepted_max integer;
++begin
++  select accepted_revision_sequence into accepted_counter
++  from public.lh_event_effective_versions
++  where event_id = 'event-main';
++
++  select coalesce(max(revision_sequence), 0) into accepted_max
++  from public.lh_event_revisions
++  where event_id = 'event-main';
++
++  if accepted_counter <> accepted_max or accepted_counter <> 2 then
++    raise exception 'TEST 33 failed: concurrency-safe revision counter: %, %',
++      accepted_counter, accepted_max;
++  end if;
++end;
++$test$;
++
+ select pg_catalog.jsonb_build_object(
+   'suite', 'LaxHornet Trust Spine Release 1',
+-  'sqlTestsPassed', 24,
++  'sqlTestsPassed', 33,
+   'fixtures', 'synthetic',
+   'transaction', 'rolled_back'
+ ) as trust_spine_test_result;
+diff --git a/docs/methodnorth/trust-spine-gate/TRUST_SPINE_TEST_PLAN.md b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_TEST_PLAN.md
+index 41d77f2..1d914d8 100644
+--- a/docs/methodnorth/trust-spine-gate/TRUST_SPINE_TEST_PLAN.md
++++ b/docs/methodnorth/trust-spine-gate/TRUST_SPINE_TEST_PLAN.md
+@@ -11,13 +11,17 @@ staging target; local contract and Postgres-compatible execution have passed.
+   `docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_TESTS.sql`
+ - Repository contract suite:
+   `tools/test_trust_spine_release1.mjs`
++- Postgres-compatible migration/rollback runner:
++  `tools/run_trust_spine_pglite.mjs`
++- Real Auth/PostgREST and separate-request concurrency suite:
++  `tools/test_trust_spine_remote.mjs`
+ - Staging rollback:
+   `docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_ROLLBACK.sql`
+ 
+ ## SQL acceptance coverage
+ 
+ The transactional SQL suite uses synthetic identities, teams, players, games,
+-grants, events, and share tokens. It covers 24 acceptance groups:
++grants, events, and share tokens. It covers 33 acceptance groups:
+ 
+ 1. Parent grant boundary.
+ 2. Coach grant boundary.
+@@ -42,7 +46,16 @@ grants, events, and share tokens. It covers 24 acceptance groups:
+ 21. Public-safe Live Share allowlisting.
+ 22. Exact sensitive-export manifest and audit recording.
+ 23. Append-only conflict adjudication.
+-24. RLS/privilege posture on every new table.
++24. Core evidence and annotation separation.
++25. Scope-registration idempotency.
++26. Cross-team and cross-player registration denial.
++27. Scope registration creates no grant.
++28. Private helper invocation denial.
++29. Accepted-only revision history.
++30. Tombstone permanence and absence of restore objects.
++31. Expired/revoked anonymous share-token denial.
++32. Public RPC owner, fixed-path, and grant matrix.
++33. RLS/privilege posture on every new table.
+ 
+ ## Repository contract coverage
+ 
+@@ -52,11 +65,13 @@ The Node suite asserts:
+ - Trust Spine foreign keys never target deletable legacy tables.
+ - Internal foreign keys use preservation-safe `ON DELETE RESTRICT`.
+ - Deferred roles and systems are absent.
+-- All 21 tables are included in the deny-all RLS loop.
++- All 20 tables are included in the deny-all RLS loop.
+ - Browser roles receive no table grants.
+-- Only the six approved public RPCs exist.
+-- Public wrappers are invokers; privilege-bearing functions are private.
+-- Lifecycle, provenance, operation, conflict, and allowlist contracts exist.
++- Only the nine approved public RPCs exist.
++- Public wrappers are fixed-path security definers; implementation functions
++  are private and client-inaccessible.
++- Lifecycle, provenance, operation, conflict, accepted-only revision,
++  annotation, scope-registration, sequencing, and allowlist contracts exist.
+ - SQL markers cover every required acceptance scenario.
+ - Existing account-scoped local storage isolates accounts.
+ - Next-game focus storage isolates account, team, and roster player.
+@@ -81,7 +96,9 @@ psql $env:LAXHORNET_STAGING_DATABASE_URL -v ON_ERROR_STOP=1 -f "docs/methodnorth
+ 
+ ## Remaining staging-only verification
+ 
+-The SQL suite proves database semantics. Before pilot, also exercise the six
++The SQL suite proves database semantics. Before pilot, also exercise the nine
+ RPCs through real Supabase Auth/PostgREST sessions and verify unauthenticated
+-Live Share behavior. This environment did not have a connected LaxHornet
+-staging project, so those network-edge checks remain a hard release gate.
++Live Share behavior. Run concurrent same-event corrections from separate
++authenticated sessions. This environment had only the production LaxHornet
++project and no disposable branch, so those network-edge checks remain a hard
++release gate.
+diff --git a/tools/extract_trust_spine_rpcs.mjs b/tools/extract_trust_spine_rpcs.mjs
+index 1b73222..bac58f0 100644
+--- a/tools/extract_trust_spine_rpcs.mjs
++++ b/tools/extract_trust_spine_rpcs.mjs
+@@ -11,12 +11,19 @@ const functionNames = [
+   "lh_trust_private.lh_live_share_event_fields",
+   "lh_trust_private.lh_sensitive_export_game_fields",
+   "lh_trust_private.lh_sensitive_export_event_fields",
++  "lh_trust_private.lh_sensitive_export_annotation_fields",
+   "lh_trust_private.lh_active_grants_for_user",
++  "lh_trust_private.lh_register_team_scope_impl",
++  "lh_trust_private.lh_register_player_scope_impl",
++  "lh_trust_private.lh_register_game_scope_impl",
+   "lh_trust_private.lh_create_event_impl",
+   "lh_trust_private.lh_correct_event_impl",
+   "lh_trust_private.lh_tombstone_event_impl",
+   "lh_trust_private.lh_public_live_share_game_impl",
+   "lh_trust_private.lh_record_sensitive_export_impl",
++  "public.lh_register_team_scope",
++  "public.lh_register_player_scope",
++  "public.lh_register_game_scope",
+   "public.lh_resolve_active_grants",
+   "public.lh_create_event",
+   "public.lh_correct_event",
+@@ -46,9 +53,8 @@ const header = `-- LaxHornet Trust Spine Release 1 RPC evidence
+ -- This file extracts exact definitions from the implementation migration.
+ -- It is review evidence, not a standalone migration.
+ --
+--- Deliberate gap: no public or private restore-event RPC exists in Release 1.
+--- Restore operation tables and lifecycle records exist, but runtime restore
+--- cannot be exercised through the approved public RPC surface.
++-- Release 1 makes tombstones permanent. No restore operation, table, helper,
++-- or public RPC exists in the approved surface.
+ `;
+ 
+ const blocks = functionNames.map(
+diff --git a/tools/run_trust_spine_pglite.mjs b/tools/run_trust_spine_pglite.mjs
+index b2eebcf..2dda4b7 100644
+--- a/tools/run_trust_spine_pglite.mjs
++++ b/tools/run_trust_spine_pglite.mjs
+@@ -34,6 +34,10 @@ try {
+     create role authenticated nologin;
+     create schema auth;
+     create schema extensions;
++    create table auth.users(
++      id uuid primary key,
++      email text
++    );
+     create or replace function extensions.digest(value bytea, algorithm text)
+     returns bytea
+     language sql
+@@ -56,14 +60,78 @@ try {
+     grant execute on function auth.uid() to anon, authenticated;
+     grant execute on function extensions.digest(bytea, text) to anon, authenticated;
+ 
+-    create table public.games(id text primary key);
+-    create table public.events(id text primary key);
+-    create table public.teams(id text primary key);
+-    create table public.roster_players(id text primary key);
+-    insert into public.games(id) values ('legacy-game-sentinel');
+-    insert into public.events(id) values ('legacy-event-sentinel');
+-    insert into public.teams(id) values ('legacy-team-sentinel');
+-    insert into public.roster_players(id) values ('legacy-player-sentinel');
++    create table public.teams(
++      id text primary key,
++      name text not null,
++      invite_code text not null unique,
++      tracker_code text unique,
++      created_by uuid,
++      created_at timestamptz not null default now()
++    );
++    create table public.team_members(
++      id text primary key,
++      team_id text not null,
++      user_id uuid not null,
++      role text not null default 'member',
++      created_at timestamptz not null default now(),
++      unique(team_id, user_id)
++    );
++    create table public.roster_players(
++      id text primary key,
++      team_id text not null,
++      name text not null,
++      number text not null default '',
++      position text not null default '',
++      active boolean not null default true,
++      created_at timestamptz not null default now()
++    );
++    create table public.player_claims(
++      id text primary key,
++      team_id text not null,
++      roster_player_id text not null,
++      user_id uuid not null,
++      created_at timestamptz not null default now(),
++      unique(team_id, user_id, roster_player_id)
++    );
++    create table public.games(
++      id text primary key,
++      player_id text,
++      user_id uuid,
++      share_code text not null unique,
++      is_shared boolean not null default false,
++      opponent text not null,
++      game_date date not null,
++      location text,
++      game_type text,
++      period_format text not null default 'quarters',
++      player_snapshot jsonb not null default '{}'::jsonb,
++      current_quarter text not null default 'Q1',
++      status text not null default 'in-progress',
++      created_at timestamptz not null default now(),
++      saved_at timestamptz,
++      ended_at timestamptz,
++      team_id text,
++      roster_player_id text
++    );
++    create table public.events(
++      id text primary key,
++      game_id text,
++      user_id uuid,
++      timestamp timestamptz,
++      quarter text,
++      stat_type text,
++      stat_label text,
++      category text,
++      point_value integer not null default 0
++    );
++    insert into public.teams(id, name, invite_code)
++    values ('legacy-team-sentinel', 'Legacy Sentinel', 'SENTINEL');
++    insert into public.roster_players(id, team_id, name)
++    values ('legacy-player-sentinel', 'legacy-team-sentinel', 'Legacy Sentinel Player');
++    insert into public.games(id, share_code, opponent, game_date)
++    values ('legacy-game-sentinel', 'LEGACY-SENTINEL', 'Legacy Opponent', date '2026-01-01');
++    insert into public.events(id, game_id)
++    values ('legacy-event-sentinel', 'legacy-game-sentinel');
+   `);
+ 
+   await db.exec(migration);
+diff --git a/tools/test_trust_spine_release1.mjs b/tools/test_trust_spine_release1.mjs
+index 60bf22d..9da0a79 100644
+--- a/tools/test_trust_spine_release1.mjs
++++ b/tools/test_trust_spine_release1.mjs
+@@ -122,12 +122,12 @@ test("Release 1 scope excludes deferred roles and systems", () => {
+   }
+ });
+ 
+-test("All 21 Trust Spine tables are in the deny-all RLS list", () => {
++test("All 20 Trust Spine tables are in the deny-all RLS list", () => {
+   const createdTables = matches(
+     migration,
+     /create\s+table\s+public\.(lh_[a-z0-9_]+)\s*\(/gi,
+   ).map((match) => match[1]);
+-  assert.equal(createdTables.length, 21, "Unexpected Trust Spine table count");
++  assert.equal(createdTables.length, 20, "Unexpected Trust Spine table count");
+ 
+   const denyAllBlock = migration.match(
+     /foreach\s+table_name\s+in\s+array\s+array\[(?<tables>[\s\S]*?)\]\s+loop/i,
+@@ -178,8 +178,11 @@ test("Staging rollback removes exactly the additive Trust Spine tables", () => {
+   }
+ });
+ 
+-test("Only the six approved public RPCs are created and granted", () => {
++test("Only the nine approved public RPCs are created and granted", () => {
+   const expected = [
++    "lh_register_team_scope",
++    "lh_register_player_scope",
++    "lh_register_game_scope",
+     "lh_resolve_active_grants",
+     "lh_create_event",
+     "lh_correct_event",
+@@ -201,20 +204,38 @@ test("Only the six approved public RPCs are created and granted", () => {
+   }
+ });
+ 
+-test("Public RPC wrappers are invokers and privilege-bearing functions are private", () => {
++test("Public RPC wrappers are fixed-path definers and private helpers are unreachable", () => {
+   const publicBlocks = matches(
+     migration,
+     /create\s+or\s+replace\s+function\s+public\.lh_[\s\S]*?\$\$;/gi,
+   );
+-  assert.equal(publicBlocks.length, 6);
++  assert.equal(publicBlocks.length, 9);
+   for (const block of publicBlocks) {
+-    assert.match(block[0], /security invoker/i);
++    assert.match(block[0], /security definer/i);
+     assert.match(block[0], /set search_path = ''/i);
+   }
+   assert.match(
+     migration,
+     /create\s+or\s+replace\s+function\s+lh_trust_private\.lh_create_event_impl[\s\S]*?security definer[\s\S]*?set search_path = ''/i,
+   );
++  assert.match(
++    migration,
++    /revoke all on schema lh_trust_private from public, anon, authenticated/i,
++  );
++  assert.match(
++    migration,
++    /revoke all on all functions in schema lh_trust_private from public, anon, authenticated/i,
++  );
++  assert.equal(
++    /grant\s+usage\s+on\s+schema\s+lh_trust_private/i.test(migration),
++    false,
++    "Private schema usage is granted to a browser role",
++  );
++  assert.equal(
++    /grant\s+execute\s+on\s+function\s+lh_trust_private\./i.test(migration),
++    false,
++    "Private helper execution is granted to a browser role",
++  );
+ });
+ 
+ test("Grant lifecycle and constrained provenance are represented", () => {
+@@ -234,31 +255,90 @@ test("Grant lifecycle and constrained provenance are represented", () => {
+   assert.match(migration, /lh_validate_grant_lifecycle/i);
+ });
+ 
+-test("Create, correction, tombstone, and restore operation records are separate", () => {
++test("Create, correction, and permanent tombstone operation records are separate", () => {
+   for (const tableName of [
+     "lh_event_create_operations",
+     "lh_event_correction_operations",
+     "lh_event_tombstone_operations",
+-    "lh_event_restore_operations",
+   ]) {
+     assert.match(migration, new RegExp(`create table public\\.${tableName}\\b`, "i"));
+   }
++  assert.equal(/restore_event|lh_event_restore|lh_event_restoration/i.test(migration), false);
+ });
+ 
+-test("Accepted, rejected, conflicted, and append-only adjudication semantics exist", () => {
++test("Operations preserve all outcomes while revisions preserve accepted evidence only", () => {
+   assert.match(migration, /check \(outcome_class in \('accepted', 'rejected', 'conflicted'\)\)/i);
+   assert.match(migration, /create table public\.lh_event_conflicts/i);
+   assert.match(migration, /create table public\.lh_conflict_adjudications/i);
+   assert.match(migration, /lh_conflict_adjudications_immutable/i);
++  assert.match(migration, /accepted_evidence_fields jsonb not null/i);
++  assert.match(migration, /lh_validate_accepted_revision/i);
++  const revisionTable = migration.match(
++    /create table public\.lh_event_revisions\s*\(([\s\S]*?)\n\);/i,
++  )?.[1] || "";
++  assert.equal(
++    /outcome_class|outcome_code|proposed_evidence_fields/i.test(revisionTable),
++    false,
++    "Revision rows still carry rejected/conflicted outcomes",
++  );
++});
++
++test("Scope registration is canonical, idempotent, and does not issue grants", () => {
++  for (const helper of [
++    "lh_register_team_scope_impl",
++    "lh_register_player_scope_impl",
++    "lh_register_game_scope_impl",
++  ]) {
++    assert.match(migration, new RegExp(`function\\s+lh_trust_private\\.${helper}\\b`, "i"));
++  }
++  assert.match(migration, /on conflict \(team_id\) do update/i);
++  assert.match(migration, /on conflict \(team_id, roster_player_id\) do update/i);
++  assert.match(migration, /on conflict \(game_id\) do update/i);
++  assert.match(migration, /historical_game_identity_mismatch/i);
++  assert.match(migration, /invalid_game_player_team_scope/i);
++  const registrationSection = migration.slice(
++    migration.indexOf("function lh_trust_private.lh_can_register_legacy_scope"),
++    migration.indexOf("function lh_trust_private.lh_create_event_impl"),
++  );
++  assert.equal(
++    /insert\s+into\s+public\.lh_access_grants/i.test(registrationSection),
++    false,
++    "Scope registration issues access grants",
++  );
++});
++
++test("Accepted revision sequencing uses the locked effective-row counter", () => {
++  assert.match(migration, /accepted_revision_sequence integer not null default 0/i);
++  assert.match(
++    migration,
++    /select \* into effective[\s\S]*?from public\.lh_event_effective_versions[\s\S]*?for update;/i,
++  );
++  assert.match(
++    migration,
++    /revision_sequence := effective\.accepted_revision_sequence \+ 1/i,
++  );
++  assert.match(
++    migration,
++    /accepted_revision_sequence = revision_sequence/i,
++  );
++  assert.equal(/lh_next_revision_sequence|max\(revision_sequence\)/i.test(migration), false);
+ });
+ 
+-test("Evidence, Live Share, and export field allowlists are explicit", () => {
++test("Evidence, annotations, Live Share, and export field allowlists are explicit", () => {
+   assert.match(migration, /lh_evidence_fields\(\)/i);
++  assert.match(migration, /lh_annotation_fields\(\)/i);
++  assert.match(migration, /lh_valid_annotations/i);
++  assert.match(migration, /create table public\.lh_event_annotations/i);
+   assert.match(migration, /lh_live_share_game_fields\(\)/i);
+   assert.match(migration, /lh_live_share_event_fields\(\)/i);
+   assert.match(migration, /lh_sensitive_export_game_fields\(\)/i);
+   assert.match(migration, /lh_sensitive_export_event_fields\(\)/i);
++  assert.match(migration, /lh_sensitive_export_annotation_fields\(\)/i);
+   assert.match(migration, /lh_jsonb_has_only_keys/i);
++  const evidenceFields = migration.match(
++    /function lh_trust_private\.lh_evidence_fields\(\)[\s\S]*?\$\$;/i,
++  )?.[0] || "";
++  assert.equal(/'note'|'tags'/i.test(evidenceFields), false);
+ });
+ 
+ test("The SQL suite covers every required staging scenario", () => {
+@@ -283,11 +363,18 @@ test("The SQL suite covers every required staging scenario", () => {
+     "export audit",
+     "adjudication update",
+     "RLS posture",
++    "private helper invocation",
++    "accepted revision",
++    "annotation fields",
++    "scope registration",
++    "tombstones are permanent",
++    "inactive Live Share token",
++    "concurrency-safe revision counter",
+   ];
+   for (const marker of requiredMarkers) {
+     assert.match(sqlTests, new RegExp(marker, "i"), `Missing test marker: ${marker}`);
+   }
+-  assert.match(sqlTests, /sqlTestsPassed', 24/i);
++  assert.match(sqlTests, /sqlTestsPassed', 33/i);
+   assert.match(sqlTests, /rollback;/i);
+ });
+ 
+diff --git a/tools/test_trust_spine_remote.mjs b/tools/test_trust_spine_remote.mjs
+new file mode 100644
+index 0000000..631fc81
+--- /dev/null
++++ b/tools/test_trust_spine_remote.mjs
+@@ -0,0 +1,229 @@
++import crypto from "node:crypto";
++
++const required = [
++  "TRUST_SPINE_SUPABASE_URL",
++  "TRUST_SPINE_PUBLISHABLE_KEY",
++  "TRUST_SPINE_TEST_EMAIL",
++  "TRUST_SPINE_TEST_PASSWORD",
++  "TRUST_SPINE_TEST_GAME_ID",
++  "TRUST_SPINE_TEST_EVENT_ID",
++  "TRUST_SPINE_TEST_EVENT_VERSION",
++];
++
++const missing = required.filter((name) => !process.env[name]);
++if (missing.length) {
++  console.error(`SKIP: missing disposable-staging variables: ${missing.join(", ")}`);
++  process.exit(2);
++}
++
++const baseUrl = process.env.TRUST_SPINE_SUPABASE_URL.replace(/\/+$/, "");
++const apiKey = process.env.TRUST_SPINE_PUBLISHABLE_KEY;
++const gameId = process.env.TRUST_SPINE_TEST_GAME_ID;
++const eventId = process.env.TRUST_SPINE_TEST_EVENT_ID;
++const initialVersion = Number(process.env.TRUST_SPINE_TEST_EVENT_VERSION);
++
++if (!Number.isInteger(initialVersion) || initialVersion < 1) {
++  throw new Error("TRUST_SPINE_TEST_EVENT_VERSION must be a positive integer");
++}
++
++const safeJson = async (response) => {
++  const text = await response.text();
++  try {
++    return text ? JSON.parse(text) : null;
++  } catch {
++    return { raw: text };
++  }
++};
++
++const request = async (path, { token, method = "POST", body } = {}) => {
++  const response = await fetch(`${baseUrl}${path}`, {
++    method,
++    headers: {
++      apikey: apiKey,
++      Authorization: `Bearer ${token || apiKey}`,
++      "Content-Type": "application/json",
++    },
++    body: body === undefined ? undefined : JSON.stringify(body),
++  });
++  return { status: response.status, body: await safeJson(response) };
++};
++
++const assert = (condition, message, evidence) => {
++  if (!condition) {
++    const suffix = evidence === undefined ? "" : `\n${JSON.stringify(evidence, null, 2)}`;
++    throw new Error(`${message}${suffix}`);
++  }
++};
++
++const rpc = (name, args, token) =>
++  request(`/rest/v1/rpc/${name}`, { token, body: args });
++
++const operationId = (label) =>
++  `remote-${label}-${crypto.randomUUID()}`;
++
++const signIn = await request("/auth/v1/token?grant_type=password", {
++  body: {
++    email: process.env.TRUST_SPINE_TEST_EMAIL,
++    password: process.env.TRUST_SPINE_TEST_PASSWORD,
++  },
++});
++assert(signIn.status === 200 && signIn.body?.access_token, "Synthetic sign-in failed", signIn);
++const token = signIn.body.access_token;
++
++const results = [];
++const record = (name, evidence) => results.push({ name, status: "pass", evidence });
++
++const grants = await rpc("lh_resolve_active_grants", {}, token);
++assert(grants.status === 200 && Array.isArray(grants.body), "Active-grant resolver failed", grants);
++assert(grants.body.length > 0, "Synthetic user has no active staging grant", grants);
++record("active grant resolution", { status: grants.status, count: grants.body.length });
++
++const directTable = await request(
++  `/rest/v1/lh_event_effective?event_id=eq.${encodeURIComponent(eventId)}`,
++  { token, method: "GET" },
++);
++assert(directTable.status >= 400, "Direct Trust Spine table read was not denied", directTable);
++record("direct table denial", { status: directTable.status, body: directTable.body });
++
++const privateHelper = await rpc(
++  "lh_correct_event_impl",
++  { p_operation: {} },
++  token,
++);
++assert(privateHelper.status >= 400, "Private helper was reachable through PostgREST", privateHelper);
++record("private helper denial", { status: privateHelper.status, body: privateHelper.body });
++
++const differentBase = initialVersion;
++const differentFieldOps = [
++  {
++    client_operation_id: operationId("different-zone"),
++    event_id: eventId,
++    game_id: gameId,
++    base_server_event_version: differentBase,
++    changes: { field_zone: "remote_test_zone" },
++    correction_reason: "Disposable staging concurrency test",
++  },
++  {
++    client_operation_id: operationId("different-label"),
++    event_id: eventId,
++    game_id: gameId,
++    base_server_event_version: differentBase,
++    changes: { stat_label: "Remote Test Label" },
++    correction_reason: "Disposable staging concurrency test",
++  },
++];
++const differentResults = await Promise.all(
++  differentFieldOps.map((operation) => rpc("lh_correct_event", { p_operation: operation }, token)),
++);
++assert(
++  differentResults.every((result) => result.status === 200 && result.body?.outcome === "accepted"),
++  "Concurrent different-field corrections did not both preserve accepted evidence",
++  differentResults,
++);
++const versions = differentResults.map((result) => Number(result.body.serverEventVersion));
++assert(
++  new Set(versions).size === 2 && Math.min(...versions) === differentBase + 1,
++  "Concurrent different-field corrections did not receive unique sequential versions",
++  differentResults,
++);
++record("separate-request different-field concurrency", differentResults.map((result) => result.body));
++
++const sameBase = Math.max(...versions);
++const sameOperationIdA = operationId("same-field-a");
++const sameOperationIdB = operationId("same-field-b");
++const sameFieldResults = await Promise.all([
++  rpc("lh_correct_event", {
++    p_operation: {
++      client_operation_id: sameOperationIdA,
++      event_id: eventId,
++      game_id: gameId,
++      base_server_event_version: sameBase,
++      changes: { field_zone: "remote_test_zone_a" },
++      correction_reason: "Disposable staging same-field test",
++    },
++  }, token),
++  rpc("lh_correct_event", {
++    p_operation: {
++      client_operation_id: sameOperationIdB,
++      event_id: eventId,
++      game_id: gameId,
++      base_server_event_version: sameBase,
++      changes: { field_zone: "remote_test_zone_b" },
++      correction_reason: "Disposable staging same-field test",
++    },
++  }, token),
++]);
++const outcomes = sameFieldResults.map((result) => result.body?.outcome).sort();
++assert(
++  sameFieldResults.every((result) => result.status === 200)
++    && outcomes.join(",") === "accepted,conflicted",
++  "Concurrent same-field corrections did not produce one accepted result and one conflict",
++  sameFieldResults,
++);
++record("separate-request same-field concurrency", sameFieldResults.map((result) => result.body));
++
++const acceptedResult = sameFieldResults.find((result) => result.body?.outcome === "accepted");
++const acceptedOperation = acceptedResult.body.clientOperationId === sameOperationIdA
++  ? {
++      client_operation_id: sameOperationIdA,
++      event_id: eventId,
++      game_id: gameId,
++      base_server_event_version: sameBase,
++      changes: { field_zone: "remote_test_zone_a" },
++      correction_reason: "Disposable staging same-field test",
++    }
++  : {
++      client_operation_id: sameOperationIdB,
++      event_id: eventId,
++      game_id: gameId,
++      base_server_event_version: sameBase,
++      changes: { field_zone: "remote_test_zone_b" },
++      correction_reason: "Disposable staging same-field test",
++    };
++const replay = await rpc("lh_correct_event", { p_operation: acceptedOperation }, token);
++assert(
++  replay.status === 200 && replay.body?.replay === true,
++  "Exact operation replay did not return the original receipt",
++  replay,
++);
++const tampered = structuredClone(acceptedOperation);
++tampered.changes.field_zone = "tampered_remote_value";
++const tamperResult = await rpc("lh_correct_event", { p_operation: tampered }, token);
++assert(
++  tamperResult.status === 200 && tamperResult.body?.outcome === "rejected"
++    && tamperResult.body?.code === "duplicate_operation_id_payload_mismatch",
++  "Duplicate operation ID tampering was not rejected",
++  tamperResult,
++);
++record("idempotent replay and tamper denial", {
++  replay: replay.body,
++  tampered: tamperResult.body,
++});
++
++if (process.env.TRUST_SPINE_TEST_SHARE_CODE) {
++  const share = await rpc(
++    "lh_public_live_share_game",
++    { p_share_code: process.env.TRUST_SPINE_TEST_SHARE_CODE },
++  );
++  assert(share.status === 200 && share.body, "Anonymous Live Share failed", share);
++  const serialized = JSON.stringify(share.body);
++  for (const forbidden of [
++    "note",
++    "tags",
++    "grant",
++    "revision",
++    "operation",
++    "audit",
++    "internal_status",
++  ]) {
++    assert(!serialized.includes(`"${forbidden}"`), `Live Share leaked ${forbidden}`, share.body);
++  }
++  record("anonymous Live Share allowlist", share.body);
++}
++
++console.log(JSON.stringify({
++  suite: "LaxHornet Trust Spine remote disposable-staging checks",
++  synthetic: true,
++  testsPassed: results.length,
++  results,
++}, null, 2));
