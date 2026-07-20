@@ -1,0 +1,32 @@
+{
+  "_evidenceType": "synthetic shape derived from lh_record_sensitive_export; not a remote capture",
+  "outcome": "accepted",
+  "code": "export_audit_recorded",
+  "auditId": "00000000-0000-0000-0000-000000000001",
+  "gameFields": [
+    "game_id",
+    "team_id",
+    "roster_player_id",
+    "team_name",
+    "player_name",
+    "jersey_number",
+    "position",
+    "opponent",
+    "game_date",
+    "period_format",
+    "final_score_for",
+    "final_score_against"
+  ],
+  "eventFields": [
+    "event_id",
+    "occurred_at",
+    "period",
+    "stat_type",
+    "stat_label",
+    "category",
+    "point_value",
+    "tags",
+    "note",
+    "field_zone"
+  ]
+}

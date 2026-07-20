@@ -1,0 +1,9 @@
+﻿M	docs/methodnorth/trust-spine-gate/TRUST_SPINE_MIGRATION_RUNBOOK.md
+M	docs/methodnorth/trust-spine-gate/TRUST_SPINE_RLS_MATRIX.md
+M	docs/methodnorth/trust-spine-gate/TRUST_SPINE_ROLLBACK_RUNBOOK.md
+M	docs/methodnorth/trust-spine-gate/TRUST_SPINE_SCHEMA_PROPOSAL.sql
+A	docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_RESULTS.md
+A	docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_ROLLBACK.sql
+A	docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_TESTS.sql
+M	docs/methodnorth/trust-spine-gate/TRUST_SPINE_TEST_PLAN.md
+A	tools/test_trust_spine_release1.mjs

@@ -1,0 +1,3 @@
+﻿COMMAND: node --check app.js
+EXIT: 0
+OUTPUT: (none)

@@ -1,0 +1,27 @@
+{
+  "_evidenceType": "synthetic shape derived from lh_public_live_share_game; not a remote capture",
+  "game": {
+    "game_id": "demo-game-001",
+    "team_name": "Demo Hornets",
+    "player_name": "Demo Player",
+    "jersey_number": "12",
+    "position": "Midfield",
+    "opponent": "Demo Opponent",
+    "game_date": "2026-07-20",
+    "period_format": "halves",
+    "final_score_for": 7,
+    "final_score_against": 6
+  },
+  "events": [
+    {
+      "event_id": "demo-event-001",
+      "occurred_at": "2026-07-20T18:03:00Z",
+      "period": "H1",
+      "stat_type": "ground_ball",
+      "stat_label": "Ground Ball",
+      "category": "Possession",
+      "point_value": 2,
+      "field_zone": "midfield"
+    }
+  ]
+}
