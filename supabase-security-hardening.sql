@@ -77,6 +77,8 @@ begin
     'public.laxhornet_remove_roster_player(text, text)',
     'public.laxhornet_claim_roster_player(text, text)',
     'public.laxhornet_delete_player_claim(text, text)',
+    'public.laxhornet_delete_game(text)',
+    'public.laxhornet_delete_event(text)',
     'public.laxhornet_my_player_claims()',
     'public.laxhornet_my_roster_players()',
     'public.laxhornet_my_teams()',
