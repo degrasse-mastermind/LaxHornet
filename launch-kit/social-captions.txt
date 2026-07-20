@@ -8,7 +8,7 @@ CAPTION 1
 
 Fast stats for a fast game.
 
-LaxHornet is a mobile-first youth lacrosse stat tracker built for parents on the sideline. Track goals, assists, shots, saves, faceoffs, ground balls, clears, turnovers, penalties, Game Impact, Average Impact, and season totals.
+LaxHornet is a mobile-first youth lacrosse stat tracker built for parents on the sideline. Track goals, assists, shots, saves, faceoffs, ground balls, clears, turnovers, penalties, support events, possession metrics, and season totals.
 
 Open LaxHornet:
 https://mybranford.com/

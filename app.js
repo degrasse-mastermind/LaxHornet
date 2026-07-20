@@ -26,7 +26,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v279";
+const APP_VERSION = "v280";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -1991,7 +1991,7 @@ function calculateGameImpact(events = [], player = state.player) {
 
 function impactTakeaway(events = [], breakdown = [], weightProfile = IMPACT_POSITION_WEIGHTS.midfield) {
   const activeBreakdowns = breakdown.filter((item) => item.score > 0);
-  if (!events.length) return "Log game events to build a Game Impact profile.";
+  if (!events.length) return "Record game events to calculate a LaxHornet Game Impact summary.";
   const count = (key) => events.filter((event) => event.statType === key).length;
   const goals = count("goal");
   const assists = count("assist");
@@ -2020,7 +2020,7 @@ function impactTakeaway(events = [], breakdown = [], weightProfile = IMPACT_POSI
   const lines = [];
 
   if (!activeBreakdowns.length) {
-    return `Impact was limited in the logged events. The profile shows ${mistakes} negative event${mistakes === 1 ? "" : "s"} and no positive pillar contribution yet, graded with the ${weightProfile.label || "player"} position profile.`;
+    return `The recorded events include ${mistakes} possession-losing or goal-allowed event${mistakes === 1 ? "" : "s"} and no positive contribution-category value yet. The calculation uses the ${weightProfile.label || "player"} position weighting.`;
   }
 
   const biggest = activeBreakdowns.reduce((best, item) => (item.score > best.score ? item : best), activeBreakdowns[0]);
@@ -2028,36 +2028,36 @@ function impactTakeaway(events = [], breakdown = [], weightProfile = IMPACT_POSI
   if (biggest.key === "scoring" && scoringChances) {
     lines.push(
       efficiency >= 0.4
-        ? `Scoring drove the impact: ${goals} goal${goals === 1 ? "" : "s"}, ${assists} assist${assists === 1 ? "" : "s"}, and efficient shot selection.`
-        : `Scoring volume was the main driver, but ${missedShots} missed shot${missedShots === 1 ? "" : "s"} kept the score from climbing higher.`,
+        ? `Scoring contributed the most recorded value: ${goals} goal${goals === 1 ? "" : "s"}, ${assists} assist${assists === 1 ? "" : "s"}, and the recorded shot outcomes.`
+        : `Scoring events contributed the most recorded value, with ${missedShots} missed shot${missedShots === 1 ? "" : "s"} also included in the calculation.`,
     );
   } else if (biggest.key === "possession") {
-    lines.push(`Possession work led the profile: ${extraPossessions} extra-possession play${extraPossessions === 1 ? "" : "s"} helped keep the ball with the team.`);
+    lines.push(`Possession contributed the most recorded value: ${extraPossessions} possession-changing play${extraPossessions === 1 ? "" : "s"} was included.`);
   } else if (biggest.key === "defense") {
-    lines.push(`Defensive pressure stood out: ${defensiveWins} stop or caused-turnover event${defensiveWins === 1 ? "" : "s"} reduced opponent chances.`);
+    lines.push(`Defense contributed the most recorded value: ${defensiveWins} stop or caused-turnover event${defensiveWins === 1 ? "" : "s"} was included.`);
   } else if (biggest.key === "goalie") {
     lines.push(
       saveLooksStrong
-        ? `Goalie impact was strong: ${saves} save${saves === 1 ? "" : "s"} stabilized the game without over-penalizing goals allowed.`
-        : `Goalie impact was mixed, with ${saves} save${saves === 1 ? "" : "s"} and ${goalsAllowed} goal${goalsAllowed === 1 ? "" : "s"} allowed.`,
+        ? `Goalie events contributed the most recorded value, including ${saves} save${saves === 1 ? "" : "s"}.`
+        : `Goalie events contributed the most recorded value, with ${saves} save${saves === 1 ? "" : "s"} and ${goalsAllowed} goal${goalsAllowed === 1 ? "" : "s"} allowed included.`,
     );
   } else {
-    lines.push(`Effort and IQ showed up most: ${hustle} hustle, backed-up-shot, or smart-play event${hustle === 1 ? "" : "s"} added value beyond the box score.`);
+    lines.push(`Effort and awareness contributed the most recorded value: ${hustle} manually recorded hustle, backed-up-shot, or smart-play event${hustle === 1 ? "" : "s"} was included.`);
   }
 
   if (faceoffAttempts) {
-    lines.push(`At the stripe, the player went ${faceoffWins}-${faceoffAttempts}, which ${faceoffWins > faceoffLosses ? "created possession leverage" : "limited possession impact"}.`);
+    lines.push(`The recorded faceoff line was ${faceoffWins}-${faceoffAttempts}; those outcomes are included as possession inputs.`);
   } else if (extraPossessions) {
-    lines.push(`The player created ${extraPossessions} possession swing${extraPossessions === 1 ? "" : "s"} through ground balls, clears, backed-up shots, or defensive pressure.`);
+    lines.push(`${extraPossessions} recorded possession swing${extraPossessions === 1 ? "" : "s"} came from ground balls, clears, backed-up shots, or defensive pressure.`);
   }
 
   if (mistakes) {
-    lines.push(`${mistakes} negative event${mistakes === 1 ? "" : "s"} pulled the score down, so cleaner possessions would raise impact quickly.`);
+    lines.push(`${mistakes} possession-losing or goal-allowed event${mistakes === 1 ? "" : "s"} also affected the numeric result.`);
   } else {
-    lines.push("No major negative events were logged, which protected the overall impact score.");
+    lines.push("No possession-losing or goal-allowed events were recorded in this game.");
   }
 
-  lines.push(`This was graded with the ${weightProfile.label || "player"} position profile, so ${biggest.label.toLowerCase()} events count in context for that role.`);
+  lines.push(`The ${weightProfile.label || "player"} position weighting changes how ${biggest.label.toLowerCase()} events contribute to this LaxHornet-created summary.`);
 
   return lines.join(" ");
 }
@@ -2616,30 +2616,19 @@ function formatImpactNumber(value) {
   return Number.isInteger(number) ? String(number) : number.toFixed(1);
 }
 
-function impactLetterGrade(value) {
-  const score = Number(value || 0);
-  if (score >= 97) return "A+";
-  if (score >= 93) return "A";
-  if (score >= 90) return "A-";
-  if (score >= 87) return "B+";
-  if (score >= 83) return "B";
-  if (score >= 80) return "B-";
-  if (score >= 77) return "C+";
-  if (score >= 73) return "C";
-  if (score >= 70) return "C-";
-  if (score >= 67) return "D+";
-  if (score >= 63) return "D";
-  if (score >= 60) return "D-";
-  return "F";
-}
+const GAME_IMPACT_LIMITATION =
+  "Game Impact is a LaxHornet-created summary of selected recorded events. It is not a coach grade, player rating, ranking, or complete measure of performance or development.";
 
-function renderImpactGrade(value, options = {}) {
+const GAME_IMPACT_EVIDENCE_LIMIT =
+  "Missing or incorrectly recorded events can change the result.";
+
+function renderImpactScore(value, options = {}) {
   const score = formatImpactNumber(value);
-  const label = options.label || "score";
+  const label = options.label || "LaxHornet score";
   return `
-    <span class="impact-grade">
-      <strong>${escapeHTML(impactLetterGrade(value))}</strong>
-      <small>${escapeHTML(score)} ${escapeHTML(label)}</small>
+    <span class="impact-score">
+      <strong>${escapeHTML(score)}</strong>
+      <small>${escapeHTML(label)}</small>
     </span>
   `;
 }
@@ -2874,7 +2863,6 @@ function isTeamWinWithModestPlayerImpact(game = {}, totals = {}) {
   if (finalFor <= finalAgainst) return false;
   const eventCount = Number(totals.eventCount || 0);
   if (eventCount < 5) return false;
-  const impact = Number(totals.impact || 0);
   const points = Number(totals.points || 0);
   const possessionPressure = Number(totals.turnovers || 0) + Number(totals.failedClears || 0) + Number(totals.penalties || 0);
   const positiveRolePlays =
@@ -2883,7 +2871,7 @@ function isTeamWinWithModestPlayerImpact(game = {}, totals = {}) {
     Number(totals.clears || 0) +
     Number(totals.hustlePlays || 0) +
     Number(totals.smartPlays || 0);
-  return (impact < 75 || points === 0 || possessionPressure >= 2) && positiveRolePlays > 0 && !(points >= 3 || impact >= 85);
+  return (points === 0 || possessionPressure >= 2) && positiveRolePlays > 0 && points < 3;
 }
 
 function buildTeamWinGrowthPattern(game = {}, events = [], totals = {}, player = state.player, nextFocus = null) {
@@ -2919,8 +2907,7 @@ function buildTeamWinGrowthPattern(game = {}, events = [], totals = {}, player =
     priority: 112,
     evidence: [
       `Team won ${result}`,
-      `${impactLetterGrade(totals.impact)} / ${formatImpactNumber(totals.impact)} Game Impact`,
-      topContribution.label && topContribution.label !== "Building profile" ? `${topContribution.label} led the stat profile` : "",
+      topContribution.label && topContribution.label !== "Building profile" ? `${topContribution.label} was the largest recorded contribution category` : "",
       pressureSignals.length ? `${listPhrase(pressureSignals.slice(0, 2))} to clean up` : "",
     ],
     development: {
@@ -2941,352 +2928,13 @@ function buildTeamWinGrowthPattern(game = {}, events = [], totals = {}, player =
   });
 }
 
-/**
- * @typedef {Object} PlayerStats
- * @property {number} [gamesPlayed]
- * @property {number} goals
- * @property {number} assists
- * @property {number} shots
- * @property {number} shotsOnGoal
- * @property {number} shootingPct
- * @property {number} groundBalls
- * @property {number} faceoffWins
- * @property {number} extraPossessions
- * @property {number} clears
- * @property {number} turnovers
- * @property {number} causedTurnovers
- * @property {number} defensiveStops
- * @property {number} saves
- * @property {number} goalsAllowed
- * @property {number} savePct
- * @property {number} failedClears
- * @property {number} penalties
- * @property {number} hustlePlays
- * @property {number} backedUpShots
- * @property {number} smartPlays
- */
-
-/**
- * @typedef {Object} DimensionScores
- * @property {number} scoring
- * @property {number} playmaking
- * @property {number} possession
- * @property {number} defense
- * @property {number} goalie
- * @property {number} hustle
- * @property {number} mistakeCost
- */
-
-/**
- * @typedef {Object} ArchetypeResult
- * @property {string} name
- * @property {string} explanation
- * @property {string} nextFocus
- * @property {Array<string>} reasons
- * @property {DimensionScores} scores
- */
-
-const ARCHETYPE_SCORE_CAPS = {
-  scoring: 18,
-  playmaking: 10,
-  possession: 24,
-  defense: 12,
-  goalie: 18,
-  hustle: 18,
-  mistakeCost: 12,
-};
-
-const ARCHETYPE_DEFS = {
-  finisher: {
-    name: "Finisher",
-    explanation: "You made your biggest impact by finishing scoring chances.",
-    nextFocus: "Add assists or ground balls to become a more complete offensive threat.",
-  },
-  setupArtist: {
-    name: "Setup Artist",
-    explanation: "You created offense for teammates and helped the ball find the right player.",
-    nextFocus: "Look for moments to become a scoring threat too.",
-  },
-  possessionEngine: {
-    name: "Possession Engine",
-    explanation: "You helped your team get more chances by winning possessions and protecting the ball.",
-    nextFocus: "Turn more possession wins into transition chances.",
-  },
-  groundBallMagnet: {
-    name: "Ground Ball Magnet",
-    explanation: "You changed possessions by winning loose balls.",
-    nextFocus: "Turn more ground balls into clean clears or scoring chances.",
-  },
-  defensiveDisruptor: {
-    name: "Defensive Disruptor",
-    explanation: "You created problems for the other team and turned defense into possession.",
-    nextFocus: "Stay aggressive without taking penalties.",
-  },
-  twoWayForce: {
-    name: "Two-Way Force",
-    explanation: "You impacted both ends of the field and contributed in multiple ways.",
-    nextFocus: "Keep balancing offense, defense, and possession work.",
-  },
-  sparkPlug: {
-    name: "Spark Plug",
-    explanation: "You brought energy across the field and helped in several ways.",
-    nextFocus: "Channel that energy into controlled possessions and smart decisions.",
-  },
-  gluePlayer: {
-    name: "Glue Player",
-    explanation: "You helped connect the team by making steady plays in multiple areas.",
-    nextFocus: "Find one area to become dominant while keeping your balanced impact.",
-  },
-  theWall: {
-    name: "The Wall",
-    explanation: "You kept the team in the game with strong saves.",
-    nextFocus: "Improve outlet speed after saves to create transition chances.",
-  },
-  outletStarter: {
-    name: "Outlet Starter",
-    explanation: "You helped turn defensive stops into clean possessions.",
-    nextFocus: "Look for safe fast-break outlets after stops.",
-  },
-  growthProfile: {
-    name: "Growth Profile",
-    explanation: "You logged trackable moments that give a clear starting point for the next game.",
-    nextFocus: "Pick one stat to chase next game, then build from there.",
-  },
-};
-
-const ARCHETYPE_DIMENSION_LABELS = {
-  scoring: "Scoring",
-  playmaking: "Playmaking",
-  possession: "Possession",
-  defense: "Defense",
-  goalie: "Goalie",
-  hustle: "Hustle",
-  mistakeCost: "Care of the Ball",
-};
-
-function statRate(playerStats, key) {
-  const games = Math.max(1, Number(playerStats.gamesPlayed || 1));
-  return Number(playerStats[key] || 0) / games;
-}
-
-function shootingPctBonus(playerStats) {
-  const shots = statRate(playerStats, "shots");
-  const pctValue = Number(playerStats.shootingPct || 0);
-  if (shots < 2) return 0;
-  if (pctValue >= 0.5) return 8;
-  if (pctValue >= 0.35) return 5;
-  if (pctValue >= 0.25) return 3;
-  return 0;
-}
-
-function savePctBonus(playerStats) {
-  const chances = statRate(playerStats, "saves") + statRate(playerStats, "goalsAllowed");
-  const pctValue = Number(playerStats.savePct || 0);
-  if (chances < 3) return 0;
-  if (pctValue >= 0.7) return 8;
-  if (pctValue >= 0.6) return 5;
-  if (pctValue >= 0.5) return 3;
-  return 0;
-}
-
-function activeArchetypeCategoryCount(playerStats) {
-  const categories = [
-    statRate(playerStats, "goals") + statRate(playerStats, "shotsOnGoal") > 0,
-    statRate(playerStats, "assists") + statRate(playerStats, "smartPlays") > 0,
-    statRate(playerStats, "groundBalls") + statRate(playerStats, "faceoffWins") + Math.max(0, statRate(playerStats, "extraPossessions")) > 0,
-    statRate(playerStats, "causedTurnovers") + statRate(playerStats, "defensiveStops") > 0,
-    statRate(playerStats, "saves") > 0,
-    statRate(playerStats, "hustlePlays") + statRate(playerStats, "backedUpShots") > 0,
-  ];
-  return categories.filter(Boolean).length;
-}
-
-function multiCategoryBonus(playerStats) {
-  return Math.max(0, activeArchetypeCategoryCount(playerStats) - 1) * 2;
-}
-
-function normalizeScore(value, cap) {
-  return Math.round(clampNumber((Number(value || 0) / cap) * 100, 0, 100));
-}
-
-function calculateRawDimensionScores(playerStats) {
-  const goals = statRate(playerStats, "goals");
-  const assists = statRate(playerStats, "assists");
-  const shotsOnGoal = statRate(playerStats, "shotsOnGoal");
-  const groundBalls = statRate(playerStats, "groundBalls");
-  const faceoffWins = statRate(playerStats, "faceoffWins");
-  const extraPossessionsCreated = Math.max(0, statRate(playerStats, "extraPossessions"));
-  const successfulClears = statRate(playerStats, "clears");
-  const turnovers = statRate(playerStats, "turnovers");
-  const causedTurnovers = statRate(playerStats, "causedTurnovers");
-  const defensiveStops = statRate(playerStats, "defensiveStops");
-  const saves = statRate(playerStats, "saves");
-  const goalsAllowed = statRate(playerStats, "goalsAllowed");
-  const failedClears = statRate(playerStats, "failedClears");
-  const penalties = statRate(playerStats, "penalties");
-  const hustlePlays = statRate(playerStats, "hustlePlays");
-  const backedUpShots = statRate(playerStats, "backedUpShots");
-  const smartPlays = statRate(playerStats, "smartPlays");
-
-  return {
-    scoring: goals * 5 + shotsOnGoal * 1 + shootingPctBonus(playerStats),
-    playmaking: assists * 4 + smartPlays * 0.5 - turnovers * 1,
-    possession: groundBalls * 2 + faceoffWins * 2 + extraPossessionsCreated * 3 + successfulClears * 1 - turnovers * 2,
-    defense: causedTurnovers * 3 + defensiveStops * 3,
-    goalie: saves * 3 + savePctBonus(playerStats) + successfulClears * 1 - goalsAllowed * 1,
-    hustle: groundBalls * 2 + backedUpShots * 2 + hustlePlays * 3 + multiCategoryBonus(playerStats),
-    mistakeCost: turnovers * 3 + failedClears * 2 + penalties * 2,
-  };
-}
-
-function normalizeDimensionScores(allPlayersRawScores) {
-  return allPlayersRawScores.map((rawScores) =>
-    Object.fromEntries(
-      Object.keys(ARCHETYPE_SCORE_CAPS).map((key) => [key, normalizeScore(rawScores[key], ARCHETYPE_SCORE_CAPS[key])]),
-    ),
-  );
-}
-
-function generateNextLevelFocus(archetype) {
-  return ARCHETYPE_DEFS[archetype]?.nextFocus || ARCHETYPE_DEFS.growthProfile.nextFocus;
-}
-
-function assignArchetype(playerStats, dimensionScores) {
-  const goals = statRate(playerStats, "goals");
-  const assists = statRate(playerStats, "assists");
-  const groundBalls = statRate(playerStats, "groundBalls");
-  const extraPossessionsCreated = Math.max(0, statRate(playerStats, "extraPossessions"));
-  const causedTurnovers = statRate(playerStats, "causedTurnovers");
-  const successfulClears = statRate(playerStats, "clears");
-  const turnovers = statRate(playerStats, "turnovers");
-  const activeCategories = activeArchetypeCategoryCount(playerStats);
-  const strongDimensions = ["scoring", "playmaking", "possession", "defense", "hustle"].filter((key) => dimensionScores[key] >= 60).length;
-  const lowMistakeCost = dimensionScores.mistakeCost <= 35;
-  const manageableMistakeCost = dimensionScores.mistakeCost <= 50;
-
-  let archetype = "growthProfile";
-  if (dimensionScores.scoring >= 75 && goals >= 2) archetype = "finisher";
-  else if (dimensionScores.playmaking >= 75 || assists >= 2) archetype = "setupArtist";
-  else if (dimensionScores.possession >= 75 && extraPossessionsCreated >= 3) archetype = "possessionEngine";
-  else if (groundBalls >= 3 && dimensionScores.possession >= 55 && dimensionScores.hustle >= 55) archetype = "groundBallMagnet";
-  else if (dimensionScores.defense >= 75 || causedTurnovers >= 2) archetype = "defensiveDisruptor";
-  else if (strongDimensions >= 3 && manageableMistakeCost) archetype = "twoWayForce";
-  else if (dimensionScores.hustle >= 75 && activeCategories >= 3) archetype = "sparkPlug";
-  else if (activeCategories >= 3 && lowMistakeCost) archetype = "gluePlayer";
-  else if (dimensionScores.goalie >= 75) archetype = "theWall";
-  else if (successfulClears >= 3 && turnovers <= 1) archetype = "outletStarter";
-
-  const definition = ARCHETYPE_DEFS[archetype];
-  return {
-    key: archetype,
-    name: definition.name,
-    explanation: definition.explanation,
-    nextFocus: generateNextLevelFocus(archetype),
-    reasons: generateReasons(playerStats, dimensionScores, archetype),
-    scores: dimensionScores,
-  };
-}
-
-function generateReasons(playerStats, dimensionScores, archetype) {
-  const reasons = [];
-  const addIf = (condition, reason) => {
-    if (condition && reasons.length < 3) reasons.push(reason);
-  };
-  const statLabel = (key, singular, plural = `${singular}s`) => {
-    const value = statRate(playerStats, key);
-    const label = value === 1 ? singular : plural;
-    return `${formatImpactNumber(value)} ${label}${Number(playerStats.gamesPlayed || 0) > 1 ? " per game" : ""}`;
-  };
-
-  addIf(statRate(playerStats, "goals") > 0, statLabel("goals", "goal"));
-  addIf(statRate(playerStats, "assists") > 0, statLabel("assists", "assist"));
-  addIf(statRate(playerStats, "groundBalls") > 0, statLabel("groundBalls", "ground ball"));
-  addIf(statRate(playerStats, "causedTurnovers") > 0, statLabel("causedTurnovers", "caused turnover"));
-  addIf(statRate(playerStats, "saves") > 0, statLabel("saves", "save"));
-  addIf(
-    Math.max(0, statRate(playerStats, "extraPossessions")) > 0,
-    `${signedMetric(Math.max(0, statRate(playerStats, "extraPossessions")))} extra possession impact${Number(playerStats.gamesPlayed || 0) > 1 ? " per game" : ""}`,
-  );
-  addIf(statRate(playerStats, "clears") > 0, statLabel("clears", "successful clear"));
-  addIf(activeArchetypeCategoryCount(playerStats) >= 3, `Contributed in ${activeArchetypeCategoryCount(playerStats)} tracked areas`);
-  addIf(dimensionScores.mistakeCost <= 35, "Protected possessions well for the role");
-
-  if (!reasons.length) {
-    reasons.push("This profile will sharpen as more game events are tracked.");
-  }
-
-  const leadingDimension = ["scoring", "playmaking", "possession", "defense", "goalie", "hustle"]
-    .map((key) => [key, dimensionScores[key]])
-    .sort((a, b) => b[1] - a[1])[0];
-  if (leadingDimension && leadingDimension[1] > 0 && reasons.length < 3) {
-    reasons.push(`${ARCHETYPE_DIMENSION_LABELS[leadingDimension[0]]} led the dimension profile at ${leadingDimension[1]}/100`);
-  }
-
-  return reasons;
-}
-
-function calculateArchetypeResult(playerStats) {
-  const rawScores = calculateRawDimensionScores(playerStats);
-  const scores = normalizeDimensionScores([rawScores])[0];
-  return assignArchetype(playerStats, scores);
-}
-
-function generateShareCard(player, archetypeResult, options = {}) {
-  const scoreEntries = ["scoring", "playmaking", "possession", "defense", "goalie", "hustle"];
-  const badgeLabel = archetypeResult.name.replace(/^The\s+/i, "").split(" ")[0];
-  const profileLabel = options.profileLabel || "Today's Player Profile";
-  const patternScope = options.patternScope || "game";
-  const whyCopy =
-    patternScope === "season"
-      ? `${seasonProfileDescription(archetypeResult.key)}${
-          archetypeResult.reasons.length ? ` Season evidence: ${archetypeResult.reasons.join(". ")}.` : ""
-        }`
-      : archetypeResult.reasons.length
-        ? archetypeResult.reasons.join(". ")
-        : archetypeResult.explanation;
-  const whySentence = /[.!?]$/.test(whyCopy.trim()) ? whyCopy.trim() : `${whyCopy}.`;
-  return `
-    <section class="card pad archetype-card">
-      <div class="section-head compact-head">
-        <div>
-          <p class="eyebrow">${escapeHTML(profileLabel)}</p>
-          <h3>${escapeHTML(archetypeResult.name)}</h3>
-          <p class="muted small">This is not a fixed label - it describes this ${escapeHTML(patternScope)}'s pattern.</p>
-        </div>
-        <span class="archetype-badge">${escapeHTML(badgeLabel)}</span>
-      </div>
-      <div class="archetype-story">
-        <strong>Why:</strong>
-        <p>${escapeHTML(whySentence)}</p>
-      </div>
-      <div class="archetype-story">
-        <strong>Next focus:</strong>
-        <p>${escapeHTML(archetypeResult.nextFocus)}</p>
-      </div>
-      <div class="archetype-bars">
-        ${scoreEntries
-          .map(
-            (key) => `
-              <div class="archetype-bar">
-                <span>${escapeHTML(ARCHETYPE_DIMENSION_LABELS[key])}</span>
-                <div><i style="width: ${archetypeResult.scores[key]}%;"></i></div>
-                <strong>${archetypeResult.scores[key]}</strong>
-              </div>
-            `,
-          )
-          .join("")}
-      </div>
-    </section>
-  `;
-}
-
 function impactWeightLabel(weight) {
   const value = Number(weight || 0);
-  if (value === 0) return "not graded";
-  if (value >= 1.6) return "very high";
-  if (value >= 1.2) return "high";
-  if (value <= 0.7) return "low";
-  return "medium";
+  if (value === 0) return "not weighted";
+  if (value >= 1.6) return "primary weight";
+  if (value >= 1.2) return "added weight";
+  if (value <= 0.7) return "reduced weight";
+  return "standard weight";
 }
 
 function visibleGames() {
@@ -3784,7 +3432,7 @@ function buildCSV() {
     "pointValue",
     "eventImpactValue",
     "eventImpactPillar",
-    "gameImpactScore",
+    "laxhornetImpactScore",
     "gameImpactRaw",
     "extraPossessions",
     "possessionValue",
@@ -3865,6 +3513,9 @@ function exportJSON() {
     impactModel: {
       version: "game-impact-v2-position-weighted",
       scale: "0-100",
+      proprietary: true,
+      limitation: GAME_IMPACT_LIMITATION,
+      evidenceLimit: GAME_IMPACT_EVIDENCE_LIMIT,
       pillars: IMPACT_PILLARS,
       rules: IMPACT_RULES,
       positionWeights: IMPACT_POSITION_WEIGHTS,
@@ -6563,7 +6214,7 @@ function renderPlayerAssignmentCard(player) {
       </div>
       <div class="player-assignment-stats">
         <span><strong>${totals.gamesPlayed}</strong> Games</span>
-        <span><strong>${totals.averageImpact.toFixed(1)}</strong> Avg Impact</span>
+        <span><strong>${signedMetric(totals.possessionValue)}</strong> Possession Value</span>
         <span><strong>${totals.goals}</strong> Goals</span>
         <span><strong>${totals.assists}</strong> Assists</span>
       </div>
@@ -7128,7 +6779,7 @@ function renderHome() {
 
       <div class="metric-grid">
         <div class="metric"><strong>${season.gamesPlayed}</strong><span>Games</span></div>
-        <div class="metric"><strong>${season.averageImpact.toFixed(1)}</strong><span>Avg Impact</span></div>
+        <div class="metric"><strong>${signedMetric(season.possessionValue)}</strong><span>Possession Value</span></div>
         <div class="metric"><strong>${season.goals}</strong><span>Goals</span></div>
         <div class="metric"><strong>${season.assists}</strong><span>Assists</span></div>
       </div>
@@ -8098,15 +7749,12 @@ function renderLastEventConfirmation(game) {
 }
 
 function renderLiveImpactPill(game, totals) {
-  if ((game.events || []).length < 3) {
-    return `
-      <div class="live-pill live-pill-pending">
-        <strong>&mdash;</strong>
-        <span>Not enough plays yet</span>
-      </div>
-    `;
-  }
-  return `<div class="live-pill">${renderImpactGrade(totals.impact)}<span>Game Impact</span></div>`;
+  return `
+    <div class="live-pill">
+      <strong>${Number(totals.eventCount || (game.events || []).length || 0)}</strong>
+      <span>Recorded Events</span>
+    </div>
+  `;
 }
 
 function renderLiveScoreControl(game) {
@@ -8205,12 +7853,14 @@ function renderLiveTracker() {
 function renderEventRow(event, options = {}) {
   const stat = STAT_BY_KEY[event.statType] || { tone: "neutral" };
   const scoreContext = eventScoreDisplay(event);
+  const privateView = !options.publicOnlyTags;
+  const noteText = privateView && event.note ? ` - ${escapeHTML(event.note)}` : "";
   return `
     <div class="event-row ${stat.tone}">
       <span class="badge">${escapeHTML(event.quarter)}</span>
       <span>
         <strong>${escapeHTML(event.statLabel)}</strong>
-        <p>${formatTime(event.timestamp)} - ${escapeHTML(event.category || "General")}${scoreContext ? ` - ${escapeHTML(scoreContext)}` : ""}${event.fieldZone ? ` - ${escapeHTML(event.fieldZone)}` : ""}${event.note ? ` - ${escapeHTML(event.note)}` : ""}</p>
+        <p>${formatTime(event.timestamp)} - ${escapeHTML(event.category || "General")}${scoreContext ? ` - ${escapeHTML(scoreContext)}` : ""}${event.fieldZone ? ` - ${escapeHTML(event.fieldZone)}` : ""}${noteText}</p>
         ${renderTagChips(event.tags, { publicOnly: Boolean(options.publicOnlyTags) })}
       </span>
       <span class="score">${pointText(impactValueForEvent(event))}</span>
@@ -8230,8 +7880,10 @@ function renderEventRow(event, options = {}) {
 function renderTagChips(tags = [], options = {}) {
   const cleanTags = options.publicOnly ? publicEventTags(tags) : uniqueTags(tags);
   if (!cleanTags.length) return "";
+  const hasUserContext = !options.publicOnly && cleanTags.some(isPrivateReviewTag);
   return `
     <span class="tag-chip-list">
+      ${hasUserContext ? `<span class="tag-context-label">User-recorded context</span>` : ""}
       ${cleanTags
         .map(
           (tag) => `
@@ -8282,7 +7934,7 @@ function renderEventEditForm(game, event) {
       <div class="field">
         <label for="editNote">Note</label>
         <textarea id="editNote" name="note" placeholder="Optional correction note">${escapeHTML(event.note || "")}</textarea>
-        <p class="field-help">Avoid private, medical, or sensitive information in notes. Notes may appear in reviews, exports, or Live Share.</p>
+        <p class="field-help">Avoid private, medical, or sensitive information. Notes stay in private reviews and account exports; they do not appear in Live Share.</p>
       </div>
       <div class="edit-actions">
         <button class="btn positive" type="submit">Save Correction</button>
@@ -8326,7 +7978,7 @@ function renderEventAddForm(game) {
       <div class="field">
         <label for="addNote">Note</label>
         <textarea id="addNote" name="note" placeholder="Optional correction note"></textarea>
-        <p class="field-help">Avoid private, medical, or sensitive information in notes. Notes may appear in reviews, exports, or Live Share.</p>
+        <p class="field-help">Avoid private, medical, or sensitive information. Notes stay in private reviews and account exports; they do not appear in Live Share.</p>
       </div>
       <div class="edit-actions">
         <button class="btn positive" type="submit">Add Event</button>
@@ -8406,8 +8058,8 @@ function renderTagEditor(game, event) {
     <section class="card pad tag-editor" data-tag-editor="${event.id}">
       <h3>Edit Tags</h3>
       <p class="muted small">${escapeHTML(event.statLabel)} - ${escapeHTML(event.category || "General")} - ${formatTime(event.timestamp)}</p>
-      <p class="safety-note">Avoid private, medical, or sensitive information in notes. Notes may appear in reviews, exports, or Live Share.</p>
-      <p class="field-help">Process tags are optional postgame notes that help separate the decision, execution, and outcome. They stay out of Live Share.</p>
+      <p class="safety-note">Avoid private, medical, or sensitive information. Notes and tags stay in private reviews and account exports; they do not appear in Live Share.</p>
+      <p class="field-help">Process tags are optional user-recorded context. They can help separate a decision, its execution, and its outcome, but they do not define the player or create season conclusions.</p>
       <div class="tag-editor-block">
         <strong class="tag-editor-label">Selected tags</strong>
         ${
@@ -8427,7 +8079,7 @@ function renderTagEditor(game, event) {
         }
       </div>
       <div class="tag-editor-block">
-        <strong class="tag-editor-label">Process / decision tags</strong>
+        <strong class="tag-editor-label">User-recorded process / decision context</strong>
         <p class="muted small">Use these when the result does not tell the whole story.</p>
         ${
           processTags.length
@@ -8937,61 +8589,6 @@ function detectHighLeverageImpact(events = [], totals = {}, player = state.playe
   });
 }
 
-function detectProcessDecisionPattern(events = [], totals = {}, player = state.player) {
-  const process = processDecisionSummary(events);
-  if (!process.total) return null;
-  const name = playerFirstName(player);
-  const decisionQuality = process.goodDecisionUnsuccessfulExecution + process.poorDecisionSuccessfulOutcome;
-  const responseQuality = process.recoveredAfterMistake + process.stayedComposedUnderPressure;
-  const teamProcess = process.createdAdvantage + process.supportedBallCarrier + process.extendedPossession + process.communicatedEarly;
-  const processFacts = [
-    decisionQuality ? safeStatFact(decisionQuality, "decision-process tag") : "",
-    responseQuality ? safeStatFact(responseQuality, "response tag") : "",
-    teamProcess ? safeStatFact(teamProcess, "team-process tag") : "",
-  ];
-  const title = decisionQuality
-    ? "Decision and result"
-    : responseQuality
-      ? "Response after the play"
-      : "Process plays";
-  const text = decisionQuality
-    ? `${name}'s review includes process tags that separate the read from the execution and the final result. That helps the next focus stay fair and specific.`
-    : responseQuality
-      ? `${name}'s process tags point to response and composure after the play, not just what showed up in the box score.`
-      : `${name}'s process tags show useful team actions that may not become goals or assists but still shape possessions.`;
-
-  return patternResult({
-    key: "processDecision",
-    storyType: "Process Growth Game",
-    title,
-    text,
-    category: "process",
-    priority: decisionQuality >= 2 || process.total >= 3 ? 93 : 74,
-    evidence: processFacts,
-    development: {
-      whatWentWell: decisionQuality
-        ? `${name} had reviewable decisions where the idea, execution, and outcome can be separated.`
-        : `${name} showed process plays that helped the team stay connected.`,
-      whyItMattered: "A good result is not always a good decision, and a good decision can still need cleaner execution. Separating those pieces makes the feedback more useful.",
-      whatToBuildOn: process.goodDecisionUnsuccessfulExecution
-        ? "Keep trusting the right read, then make the execution simpler and cleaner."
-        : process.poorDecisionSuccessfulOutcome
-          ? "Celebrate the result, then look for the safer repeatable choice next time."
-          : "Repeat the process behavior that helped the possession stay connected.",
-    },
-    focus: {
-      focusTitle: "Decision before outcome",
-      whyThisFits: "The review includes process tags that add context beyond the stat result.",
-      tryThisNextGame: process.goodDecisionUnsuccessfulExecution
-        ? "Look for the same good read, then choose the simplest execution before pressure arrives."
-        : "Name the decision first, then decide whether the execution or result needs the next rep.",
-      confidence: process.total >= 2 ? "high" : "medium",
-      category: "process",
-    },
-    encouragement: "Praise the decision or response first, then talk about the result. That keeps the review development-focused.",
-  });
-}
-
 function detectPossessionWinLossPattern(events = [], totals = {}, player = state.player) {
   const wins = events.filter(isPossessionWinEvent);
   const losses = events.filter(isPossessionLossEvent);
@@ -9287,9 +8884,8 @@ function detectFaceoffExitPattern(events = [], totals = {}, player = state.playe
 
 function detectSeasonTrendPattern(events = [], totals = {}, player = state.player, seasonContext = null) {
   if (!seasonContext || Number(seasonContext.gamesPlayed || 0) < 2) return null;
-  const aboveImpact = Number(totals.impact || 0) >= Number(seasonContext.averageImpact || 0) + 8;
   const abovePossession = Number(totals.possessionValue || 0) >= Number(seasonContext.averagePossessionValue || 0) + 1.5;
-  if (!aboveImpact && !abovePossession) return null;
+  if (!abovePossession) return null;
   return patternResult({
     key: "seasonTrend",
     storyType: abovePossession ? "Possession Builder" : "Effort Game",
@@ -9300,7 +8896,6 @@ function detectSeasonTrendPattern(events = [], totals = {}, player = state.playe
     category: "season",
     priority: 82,
     evidence: [
-      aboveImpact ? `Game Impact ${formatImpactNumber(totals.impact)} vs ${formatImpactNumber(seasonContext.averageImpact)} season average` : "",
       abovePossession ? `Possession value ${signedMetric(totals.possessionValue)} vs ${signedMetric(seasonContext.averagePossessionValue)} season average` : "",
     ],
     development: {
@@ -9361,23 +8956,23 @@ function detectLowDataPattern(events = [], totals = {}, player = state.player) {
     key: "lowData",
     storyType: "Low Data Game",
     title: "Short game review",
-    text: "A short game review is available, but more tracked plays will make the feedback more specific.",
+    text: "There may not be enough recorded evidence for a reliable game takeaway yet.",
     category: "low-data",
     priority: 120,
     evidence: [safeStatFact(Number(totals.eventCount || events.length || 0), "tracked play") || "Few tracked plays"],
     development: {
-      whatWentWell: "A fuller review will build as more plays are tracked.",
-      whyItMattered: "From this sample, focus on involvement and effort without over-reading the game.",
+      whatWentWell: "The recorded plays are available for review.",
+      whyItMattered: "There may not be enough recorded evidence for a reliable game takeaway yet.",
       whatToBuildOn: "Track one simple pattern next game.",
     },
     focus: {
       focusTitle: "Track one simple pattern",
-      whyThisFits: "There are not enough tracked plays yet for a confident development read.",
+      whyThisFits: "There are fewer than three recorded events, so LaxHornet does not create a developmental takeaway.",
       tryThisNextGame: "Pick one area to watch, such as ground balls, clears, or smart decisions.",
       confidence: "low",
       category: "tracking",
     },
-    encouragement: "Encourage the tracked moments that show involvement, effort, and growth beyond the box score.",
+    encouragement: "Ask about one recorded play without drawing a broader conclusion from this short sample.",
   });
 }
 
@@ -9392,7 +8987,6 @@ function buildPostGamePatterns(events = [], totals = {}, player = state.player, 
   return rankPostGameInsights([
     detectLowDataPattern(events, totals, player),
     detectHighLeverageImpact(events, totals, player),
-    detectProcessDecisionPattern(events, totals, player),
     detectPlayHardWithControlPattern(events, totals, player),
     detectPossessionWinLossPattern(events, totals, player),
     detectDefenseClearConversion(events, totals, player),
@@ -9410,9 +9004,9 @@ function buildPostGamePatterns(events = [], totals = {}, player = state.player, 
 function playExplanationForKey(key, player = state.player) {
   const name = playerFirstName(player);
   const explanations = {
-    processDecision: "Decision quality and outcome are not always the same thing. This helps the review praise the right read, identify execution reps, and avoid judging a play only by whether it worked.",
+    processDecision: "A user-entered process tag records the tracker's context about a decision, execution, or outcome. It does not establish a player trait or season conclusion.",
     possessionQuality: "Possession quality asks what happened after the ball was won. A ground ball, save, clear, or faceoff win matters more when the next play protects possession.",
-    responseAfterMistake: "A response play shows the player stayed engaged after a tough moment. That is useful development evidence, but it should not be turned into a permanent label.",
+    responseAfterMistake: "A user-entered response tag records what the tracker noticed after a difficult moment. It is optional context, not a conclusion about the player.",
     goal: "A goal finishes a scoring chance, but the development value is also in how the player found space, handled pressure, or made the right read before the shot.",
     assist: "Assists show vision, timing, and trust with teammates. They are a strong sign that the player is seeing more than just their own shot.",
     groundBall: "Ground balls create extra chances and often decide who controls the game. They are one of the clearest signs of effort, readiness, and field awareness.",
@@ -9449,10 +9043,6 @@ function postGameWhyThesePlaysMatter(events = [], patterns = [], totals = {}, pl
   };
   const addPresentKeys = (keys = []) => keys.forEach((key) => addKey(key));
   patterns.forEach((pattern) => {
-    if (pattern.key === "processDecision") {
-      addKey("processDecision", { synthetic: true });
-      addKey("responseAfterMistake", { synthetic: true });
-    }
     if (pattern.key === "shotQuality") addPresentKeys(["shotOnGoal", "goal", "shot"]);
     if (pattern.key === "possessionWinLoss") {
       addKey("possessionQuality", { synthetic: true });
@@ -9491,7 +9081,10 @@ function buildPostGameIntelligence(game = {}, events = [], playerContext = state
     category: nextPattern.focus?.category || nextPattern.category || "development",
     evidence: (nextPattern.evidence || primary.evidence || []).filter(Boolean).slice(0, 3),
   };
-  const teamWinGrowthPattern = buildTeamWinGrowthPattern(game, normalizedEvents, computedTotals, player, nextFocus);
+  const hasEnoughEvidence = Number(computedTotals.eventCount || normalizedEvents.length || 0) >= 3;
+  const teamWinGrowthPattern = hasEnoughEvidence
+    ? buildTeamWinGrowthPattern(game, normalizedEvents, computedTotals, player, nextFocus)
+    : null;
   const primaryPattern = teamWinGrowthPattern || primary;
   const activeNextFocus = teamWinGrowthPattern?.focus
     ? {
@@ -9518,19 +9111,21 @@ function buildPostGameIntelligence(game = {}, events = [], playerContext = state
     gameStoryType: primaryPattern.storyType || "Effort Game",
     gameStoryTitle: primaryPattern.title || "Game Story",
     gameStoryText: primaryPattern.text || "Here is what shaped this game.",
-    developmentTakeaway: {
-      whatWentWell: development.whatWentWell || `${playerFirstName(player)} contributed in tracked moments.`,
-      whyItMattered: development.whyItMattered || "These plays help show development beyond the scoreboard.",
-      whatToBuildOn: development.whatToBuildOn || "Repeat the most useful play from this game.",
-      nextFocus: activeNextFocus.tryThisNextGame,
-    },
+    developmentTakeaway: hasEnoughEvidence
+      ? {
+          whatWentWell: development.whatWentWell || `${playerFirstName(player)} contributed in recorded moments.`,
+          whyItMattered: development.whyItMattered || "Based on the recorded events, these plays may help explain contribution beyond the scoreboard.",
+          whatToBuildOn: development.whatToBuildOn || "One possible next step is to repeat the most useful recorded play from this game.",
+          nextFocus: activeNextFocus.tryThisNextGame,
+        }
+      : null,
     nextFocusRecommendation: activeNextFocus,
     parentEncouragement: primaryPattern.encouragement || buildEncouragementLine(computedTotals, topContributionForTotals(computedTotals).label, player),
     whyThesePlaysMatter: postGameWhyThesePlaysMatter(normalizedEvents, insightPatterns, computedTotals, player, 3),
     contextHighlights,
     processLayer,
     possessionQuality,
-    warnings: primaryPattern.key === "lowData" ? ["Low data: track more plays to make feedback more specific."] : [],
+    warnings: hasEnoughEvidence ? [] : ["There may not be enough recorded evidence for a reliable game takeaway yet."],
     patterns: insightPatterns,
   };
 }
@@ -9806,6 +9401,14 @@ function developmentTakeawayForTotals(totals = {}, player = state.player, topCon
 function renderDevelopmentTakeaway(totals = {}, player = state.player, topContribution = "", game = null, intelligence = null) {
   const reviewIntelligence = intelligence || (game ? buildPostGameIntelligence(game, game.events || [], player, totals, calculateSeasonTotalsForPlayer(player)) : null);
   const takeaway = reviewIntelligence?.developmentTakeaway || developmentTakeawayForTotals(totals, player, topContribution, game);
+  const hasEnoughEvidence = Number(totals.eventCount || game?.events?.length || 0) >= 3;
+  const recorded = familyRecapStatLine(totals, player) || `${Number(totals.eventCount || 0)} recorded event${Number(totals.eventCount || 0) === 1 ? "" : "s"}`;
+  const interpretation = hasEnoughEvidence && takeaway
+    ? `Based on the recorded events, ${takeaway.whatWentWell || takeaway.wentWell} ${takeaway.whyItMattered || takeaway.why}`
+    : "There may not be enough recorded evidence for a reliable game takeaway yet.";
+  const possibleFocus = hasEnoughEvidence && takeaway
+    ? takeaway.nextFocus || takeaway.focus
+    : "Track one simple pattern next game, such as ground balls, clears, or smart decisions.";
   const focusTools = game
     ? `
       <div class="lh-takeaway-focus-tools" aria-label="Next focus options">
@@ -9819,12 +9422,11 @@ function renderDevelopmentTakeaway(totals = {}, player = state.player, topContri
     <section class="card pad development-card lh-development-takeaway">
       <h3>Development Takeaway</h3>
       <div class="takeaway-stack">
-        <p><span>What went well</span>${escapeHTML(takeaway.whatWentWell || takeaway.wentWell)}</p>
-        <p><span>Why it mattered</span>${escapeHTML(takeaway.whyItMattered || takeaway.why)}</p>
-        <p><span>What to build on</span>${escapeHTML(takeaway.whatToBuildOn || "Repeat the most useful play from this game.")}</p>
-        <p><span>Next focus</span>${escapeHTML(takeaway.nextFocus || takeaway.focus)}</p>
+        <p><span>Recorded</span>${escapeHTML(recorded)}</p>
+        <p><span>What this may suggest</span>${escapeHTML(interpretation)}</p>
+        <p><span>Possible next focus</span>${escapeHTML(possibleFocus)}</p>
       </div>
-      ${focusTools}
+      ${hasEnoughEvidence ? focusTools : ""}
     </section>
   `;
 }
@@ -10152,30 +9754,24 @@ function buildFamilyRecap(game = {}, events = [], playerContext = {}, computedSt
   const totals = computedStats || calculateTotals(events || [], player);
   const reviewIntelligence = intelligence || buildPostGameIntelligence(game, events || [], player, totals, calculateSeasonTotalsForPlayer(player));
   const title = `${playerFirstName(player)} ${familyRecapOpponentLabel(game)}`;
-
-  if (Number(totals.eventCount || events?.length || 0) < 3) {
-    const body = `${reviewIntelligence.gameStoryText}\nNext focus: ${nextGameFocusForRecap(totals, player, "", game, reviewIntelligence)}\n${rideHomeRecapLine(totals, player, reviewIntelligence, game)}`;
-    return {
-      title,
-      body,
-      text: `${title}\n${body}`,
-    };
-  }
-
+  const eventCount = Number(totals.eventCount || events?.length || 0);
   const topContribution = familyRecapTopContribution(totals, player);
   const statLine = familyRecapStatLine(totals, player);
-  const hasPossessionStory = Number(totals.possessionValue || 0) !== 0 || Number(totals.extraPossessions || 0) !== 0;
+  const recorded = statLine || `${eventCount} recorded event${eventCount === 1 ? "" : "s"}`;
+  const interpretation = eventCount < 3
+    ? "There may not be enough recorded evidence for a reliable game takeaway yet."
+    : topContribution
+      ? `Based on the recorded events, ${topContribution.toLowerCase()} may have been an important part of this game.`
+      : "The recorded events suggest several contribution types may have shaped the game.";
+  const publicRecapIntelligence = { ...reviewIntelligence, processLayer: {} };
+  const conversationPrompt = conversationStartersForTotals(totals, player, game, publicRecapIntelligence)[0] || "What play felt best today?";
+  const optionalFocus = loadFamilyRecapFocus(game, player);
   const lines = [];
 
-  if (game.date) lines.push(`Date: ${formatDate(game.date)}`);
-  lines.push(`Game story: ${reviewIntelligence.gameStoryTitle}. ${reviewIntelligence.gameStoryText}`);
-  lines.push(`Game Impact: ${impactLetterGrade(totals.impact)} / ${formatImpactNumber(totals.impact)} score`);
-  if (topContribution) lines.push(`Top contribution: ${topContribution}`);
-  if (statLine) lines.push(`Stats: ${statLine}`);
-  if (hasPossessionStory) lines.push(`Possession story: ${signedMetric(totals.possessionValue)} possession value and ${signedMetric(totals.extraPossessions)} extra chances`);
-  lines.push(`Takeaway: ${familyRecapTakeaway(totals, player, topContribution, game, reviewIntelligence)}`);
-  lines.push(`Next focus: ${nextGameFocusForRecap(totals, player, topContribution, game, reviewIntelligence)}`);
-  lines.push(rideHomeRecapLine(totals, player, reviewIntelligence, game));
+  lines.push("Recorded contributions", recorded);
+  lines.push("", "What this may suggest", interpretation);
+  lines.push("", "Conversation starter", conversationPrompt);
+  if (optionalFocus) lines.push("", "Possible next focus", `One possible focus is ${optionalFocus}`);
 
   const body = lines.join("\n");
   return {
@@ -10191,7 +9787,7 @@ function renderFamilyRecapSection(game, player, totals, intelligence = null) {
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
-    .slice(0, 2)
+    .slice(0, 4)
     .join("\n");
   return `
     <section class="card pad lh-family-recap-card" aria-label="Optional recap sharing">
@@ -10238,47 +9834,39 @@ function seasonEventsFromGames(games = []) {
   );
 }
 
-function seasonSignalsForContext(totals = {}, player = state.player, process = {}, sequence = {}) {
+function seasonSignalsForContext(totals = {}, player = state.player, sequence = {}) {
   const signals = [];
   const add = (condition, label, text) => {
     if (condition && signals.length < 3) signals.push({ label, text });
   };
   add(
-    process.total >= 2,
-    "Decision context",
-    "Process tags add detail about reads, execution, response, and outcomes across the season.",
-  );
-  add(
     sequence.protectedAfterWin > sequence.lossesAfterWin && sequence.protectedAfterWin > 0,
     "Possession quality",
-    `${playerFirstName(player)} is showing a pattern of turning possession wins into protected next plays.`,
+    `The recorded sequences may suggest that some possession wins became protected next plays.`,
   );
   add(
     sequence.lossesAfterWin > sequence.protectedAfterWin && sequence.lossesAfterWin > 0,
     "Next-play growth",
-    "The clearest development opportunity is the first decision after winning or protecting the ball.",
+    "One possible focus is the first decision after winning or protecting the ball.",
   );
   add(
     Number(totals.averagePossessionValue || 0) > 0,
     "Possession value",
-    `${signedMetric(totals.averagePossessionValue)} average possession value shows possession impact is part of the season story.`,
+    `${signedMetric(totals.averagePossessionValue)} average possession value suggests possession events are part of the recorded season story.`,
   );
   add(
     Number(totals.averageImpact || 0) > 0,
     "Impact trend",
-    `${impactLetterGrade(totals.averageImpact)} average impact gives a quick snapshot of the saved games.`,
+    `${formatImpactNumber(totals.averageImpact)} average LaxHornet Impact summarizes selected recorded events across saved games.`,
   );
   return signals;
 }
 
-function seasonStoryWithSignals(totals = {}, player = state.player, topContribution = "", process = {}, sequence = {}) {
+function seasonStoryWithSignals(totals = {}, player = state.player, topContribution = "", sequence = {}) {
   const base = seasonStoryForTotals(totals, player, topContribution);
   if (!Number(totals.gamesPlayed || 0) || Number(totals.eventCount || 0) < 3) return base;
-  if (process.total >= 3) {
-    return `${base} The process tags add a useful layer: they separate the read, the execution, and the outcome so the season story stays fair and development-focused.`;
-  }
   if (sequence.protectedAfterWin > sequence.lossesAfterWin && sequence.protectedAfterWin > 0) {
-    return `${base} A helpful pattern is emerging after possession wins: more of those plays are becoming protected next actions instead of immediate resets.`;
+    return `${base} The recorded sequence data may suggest that some possession wins became protected next actions.`;
   }
   if (sequence.lossesAfterWin > sequence.protectedAfterWin && sequence.lossesAfterWin > 0) {
     return `${base} The next layer is possession quality after the ball is won: secure it, find support, and turn the win into a cleaner team possession.`;
@@ -10286,31 +9874,15 @@ function seasonStoryWithSignals(totals = {}, player = state.player, topContribut
   return base;
 }
 
-function seasonStrengthsWithProcess(totals = {}, player = state.player, process = {}, sequence = {}) {
-  const name = playerFirstName(player);
-  const processLines = [];
-  if (process.goodDecisionUnsuccessfulExecution) {
-    processLines.push(`Decision tags show ${name} is making reads worth repeating, even when the execution still needs a cleaner rep.`);
-  }
-  if (process.createdAdvantage || process.supportedBallCarrier || process.communicatedEarly) {
-    processLines.push(`Process tags show team-helping plays: support, communication, and advantage creation beyond the box score.`);
-  }
-  if (process.recoveredAfterMistake || process.stayedComposedUnderPressure) {
-    processLines.push(`${name} is showing response plays after pressure, which is useful development evidence over a full season.`);
-  }
+function seasonRecordedEvidence(totals = {}, player = state.player, sequence = {}) {
+  const sequenceLines = [];
   if (sequence.protectedAfterWin > 0) {
-    processLines.push(`Possession wins are starting to connect to protected next plays instead of ending as isolated stats.`);
+    sequenceLines.push(`Recorded possession wins were followed by ${sequence.protectedAfterWin} protected next play${sequence.protectedAfterWin === 1 ? "" : "s"}.`);
   }
-  return uniqueInsightLines([...processLines, ...seasonStrengthBullets(totals, player)], 5);
+  return uniqueInsightLines([...sequenceLines, ...seasonStrengthBullets(totals, player)], 5);
 }
 
-function seasonEncouragementWithProcess(totals = {}, player = state.player, topContribution = "", process = {}, sequence = {}) {
-  if (process.goodDecisionUnsuccessfulExecution) {
-    return "Praise the right read first, then talk about the simpler execution that makes the same idea repeatable.";
-  }
-  if (process.recoveredAfterMistake || process.stayedComposedUnderPressure) {
-    return "Praise the response after pressure. Staying connected after a tough play is a real development pattern.";
-  }
+function seasonEncouragementFromEvidence(totals = {}, player = state.player, topContribution = "", sequence = {}) {
   if (sequence.protectedAfterWin > sequence.lossesAfterWin && sequence.protectedAfterWin > 0) {
     return "Celebrate the possession wins and the simple next plays that protected them.";
   }
@@ -10320,41 +9892,23 @@ function seasonEncouragementWithProcess(totals = {}, player = state.player, topC
   return seasonEncouragementForTotals(totals, player, topContribution);
 }
 
-function seasonNextFocusWithProcess(totals = {}, archetypeResult = {}, process = {}, sequence = {}) {
+function seasonNextFocusFromEvidence(totals = {}, sequence = {}) {
   if (!totals.gamesPlayed) return "Track one full game to build a stronger season picture.";
   if (sequence.lossesAfterWin > sequence.protectedAfterWin && sequence.lossesAfterWin > 0) {
     return "Win the ball, then make the first clean decision before pressure arrives.";
   }
-  if (process.goodDecisionUnsuccessfulExecution) {
-    return "Keep trusting the right read, then make the execution simpler and cleaner.";
-  }
-  if (process.poorDecisionSuccessfulOutcome) {
-    return "Celebrate the result, then practice the safer repeatable choice next time.";
-  }
   if (sequence.protectedAfterWin > 0) {
     return "Repeat the first clean support pass or safe carry after possession wins.";
   }
-  return nextLevelFocusForSeason(totals, archetypeResult);
+  return nextLevelFocusForSeason(totals);
 }
 
-function seasonWhyThesePlaysMatter(events = [], totals = {}, player = state.player, process = {}, sequence = {}) {
+function seasonWhyThesePlaysMatter(events = [], totals = {}, player = state.player, sequence = {}) {
   const customItems = [];
-  if (process.total >= 2) {
-    customItems.push({
-      label: "Decision vs Outcome",
-      explanation: "Decision quality and outcome are not always the same thing. Season review should praise the right read, identify execution reps, and avoid judging a play only by whether it worked.",
-    });
-  }
   if (sequence.wins > 0) {
     customItems.push({
       label: "Possession Quality",
       explanation: "Possession quality asks what happened after the ball was won. Ground balls, saves, clears, and faceoff wins matter more when the next play protects possession.",
-    });
-  }
-  if (process.recoveredAfterMistake || process.stayedComposedUnderPressure) {
-    customItems.push({
-      label: "Response After Pressure",
-      explanation: "A response play shows the player stayed engaged after a tough moment. That is useful development evidence, but it should not become a permanent label.",
     });
   }
   const eventItems = postGameWhyThesePlaysMatter(events, [], totals, player, 8);
@@ -10366,19 +9920,17 @@ function seasonWhyThesePlaysMatter(events = [], totals = {}, player = state.play
   return [...merged.values()].slice(0, 8);
 }
 
-function buildSeasonIntelligence(games = visibleGames(), totals = calculateSeasonTotalsFromGames(games), player = state.player, archetypeResult = {}) {
+function buildSeasonIntelligence(games = visibleGames(), totals = calculateSeasonTotalsFromGames(games), player = state.player) {
   const events = enrichPostGameEvents(seasonEventsFromGames(games));
   const topContribution = topContributionForTotals(totals);
-  const process = processDecisionSummary(events);
   const sequence = possessionQualitySequence(events);
   return {
-    story: seasonStoryWithSignals(totals, player, topContribution.label, process, sequence),
-    strengths: seasonStrengthsWithProcess(totals, player, process, sequence),
-    encouragement: seasonEncouragementWithProcess(totals, player, topContribution.label, process, sequence),
-    nextFocus: seasonNextFocusWithProcess(totals, archetypeResult, process, sequence),
-    whyItems: seasonWhyThesePlaysMatter(events, totals, player, process, sequence),
-    signals: seasonSignalsForContext(totals, player, process, sequence),
-    process,
+    story: seasonStoryWithSignals(totals, player, topContribution.label, sequence),
+    strengths: seasonRecordedEvidence(totals, player, sequence),
+    encouragement: seasonEncouragementFromEvidence(totals, player, topContribution.label, sequence),
+    nextFocus: seasonNextFocusFromEvidence(totals, sequence),
+    whyItems: seasonWhyThesePlaysMatter(events, totals, player, sequence),
+    signals: seasonSignalsForContext(totals, player, sequence),
     possessionQuality: sequence,
   };
 }
@@ -10387,27 +9939,27 @@ function seasonStoryForTotals(totals, player = state.player, topContribution = t
   const name = playerFirstName(player);
   const driver = reviewDriverType(totals, topContribution, player);
   if (!Number(totals.gamesPlayed || 0) || Number(totals.eventCount || 0) < 3) {
-    return `A clearer season story will build as more games are tracked. Right now, focus on the plays that show ${name}'s involvement, effort, and growth.`;
+    return "There may not be enough recorded evidence for a reliable season interpretation yet. More complete game tracking can make the summary more specific.";
   }
   if (driver === "goalie") {
-    return `${name}'s season story is taking shape around managing pressure in goal. Saves matter, but the bigger development pattern is how quickly those moments turn into organization, outlets, and clears.`;
+    return `Based on the recorded games, goalie events may be an important part of ${name}'s season. Saves are recorded evidence; organization, outlets, and clears are possible areas worth watching next.`;
   }
   if (impactPositionGroup(player) === "faceoff" && totals.faceoffAttempts > 0) {
-    return `${name}'s season impact is tied to possession creation at the faceoff spot. The next layer is turning wins, wing help, and loose-ball follow-up into controlled team possessions.`;
+    return `The recorded faceoff events suggest possession starts may be an important part of ${name}'s season. One possible next focus is turning wins and loose-ball follow-up into controlled team possessions.`;
   }
   if (driver === "possession") {
-    return `Across the saved games, ${name} is building a season around possession work. Ground balls, clears, faceoffs, and defensive pressure are helping create or protect extra chances, which often matters before the scoreboard shows it.`;
+    return `Across the saved games, the recorded events suggest possession work may be a recurring contribution for ${name}. Ground balls, clears, faceoffs, and defensive pressure can create or protect extra chances.`;
   }
   if (driver === "scoring") {
-    return `${name}'s season impact is being driven by scoring involvement. The next development step is making those chances more repeatable through shot quality, spacing, support play, and decisions under pressure.`;
+    return `The recorded games suggest scoring involvement may be a recurring contribution for ${name}. One possible next focus is how shot quality, spacing, and support play create those chances.`;
   }
   if (driver === "defense") {
-    return `${name} is showing value through pressure, stops, and possession-changing defensive plays. That type of impact helps turn defense into opportunity.`;
+    return `The recorded games suggest pressure, stops, and possession-changing defensive plays may be part of ${name}'s season contribution. Those events can help turn defense into a chance to clear and reset.`;
   }
   if (driver === "effort") {
-    return `${name}'s season story is forming around effort and awareness away from the scoreboard. Those plays keep the player connected to possessions even when they do not become goals or assists.`;
+    return `Manually recorded hustle and smart-play events may add context beyond ${name}'s scoring line. Because these are user-entered observations, they should be discussed as context rather than a conclusion about effort or character.`;
   }
-  return `${name} is contributing in several ways, which is a strong development sign. The season story is not just one stat; it is the mix of scoring, possession, effort, and decision-making.`;
+  return `The recorded games include several contribution types for ${name}. Scoring, possession, defense, goalie play, and manually entered context should be reviewed together rather than treated as one fixed player identity.`;
 }
 
 function seasonStrengthBullets(totals, player = state.player) {
@@ -10416,16 +9968,16 @@ function seasonStrengthBullets(totals, player = state.player) {
     if (condition && bullets.length < 5) bullets.push(text);
   };
   const name = playerFirstName(player);
-  add(totals.points > 0, `Scoring involvement is becoming part of ${name}'s season profile through goals, assists, or pressure around the cage.`);
-  add(totals.possessionValue > 0, `Positive possession impact shows ${name} is helping create or protect extra chances.`);
+  add(totals.points > 0, `Recorded goals and assists identify scoring involvement across the saved games.`);
+  add(totals.possessionValue > 0, `Positive recorded possession value may suggest extra chances were created or protected.`);
   add(totals.groundBalls > 0, `Ground balls are helping turn loose-ball moments into team possessions.`);
   add(totals.clears > 0, `Successful clears are helping protect the ball after pressure and turn defense into offense.`);
   add(totals.causedTurnovers + totals.defensiveStops > 0, `Defensive impact plays are helping reduce opponent pressure and create chances to reset.`);
   add(totals.saves > 0, `Saves are giving the team a chance to reset, outlet, and start the next possession.`);
   add(totals.faceoffWins > 0, `Faceoff wins are creating immediate possession chances that can become settled offense.`);
-  add(totals.effortScore > 0, `Effort plays show ${name} is staying involved away from the scoreboard.`);
+  add(totals.effortScore > 0, `Manually recorded hustle and support events add user-entered context beyond the scoreboard.`);
   add(totals.gamesPlayed === 0, "Track a game to start building a clear season story.");
-  return bullets.length ? bullets.slice(0, 5) : [`Keep tracking games to reveal ${name}'s strongest development patterns.`];
+  return bullets.length ? bullets.slice(0, 5) : ["Keep tracking complete games to build a more reliable evidence base."];
 }
 
 function seasonEncouragementForTotals(totals = {}, player = state.player, topContribution = topContributionForTotals(totals).label) {
@@ -10441,7 +9993,7 @@ function seasonEncouragementForTotals(totals = {}, player = state.player, topCon
   return "Encourage the plays that show effort, awareness, and growth beyond the stat sheet.";
 }
 
-function nextLevelFocusForSeason(totals, archetypeResult) {
+function nextLevelFocusForSeason(totals) {
   if (!totals.gamesPlayed) return "Track one full game to build a stronger season picture.";
   if (totals.turnovers + totals.failedClears > totals.groundBalls + totals.clears) return "Win the ball, then make the first clean pass before pressure arrives.";
   if (totals.shots > 0 && totals.shotOnGoalPct < 0.5) return "Look for higher-quality shots instead of rushing the first available look.";
@@ -10450,25 +10002,7 @@ function nextLevelFocusForSeason(totals, archetypeResult) {
   if (totals.saves > 0) return "Find the outlet after saves and help the defense reset quickly.";
   if (totals.faceoffAttempts > 0) return "Turn faceoff wins into controlled offensive chances.";
   if (totals.effortScore > 0) return "Keep turning effort plays into controlled possessions.";
-  return archetypeResult.nextFocus;
-}
-
-function seasonProfileDescription(archetypeKey = "growthProfile") {
-  const descriptions = {
-    finisher: "This profile shows a player whose season impact is coming through scoring chances and finishing moments.",
-    setupArtist: "This profile shows a player creating chances for teammates through passing, vision, and timing.",
-    possessionEngine: "This profile shows a player helping the team gain and protect possessions through ground balls, clears, faceoffs, or smart decisions.",
-    groundBallMagnet: "This profile shows a player changing possessions by winning loose balls and helping the team gain control.",
-    defensiveDisruptor: "This profile shows a player creating value by pressuring the ball, forcing turnovers, and helping end opponent possessions.",
-    twoWayForce: "This profile shows a player contributing across both ends of the field.",
-    sparkPlug: "This profile shows a player creating energy through hustle plays and momentum-changing moments.",
-    gluePlayer: "This profile shows a player connecting possessions, making smart plays, and helping the team function.",
-    theWall: "This profile shows a goalie whose saves and resets are shaping the season story.",
-    outletStarter: "This profile shows a goalie or defender helping turn stops into clears and new possessions.",
-    growthProfile:
-      "Growth Profile means the season is still taking shape. The tracked games show several areas of involvement, but one clear identity has not fully separated yet. That is normal in youth lacrosse as players learn roles, spacing, and decision-making.",
-  };
-  return descriptions[archetypeKey] || descriptions.growthProfile;
+  return "Choose one recorded behavior to watch next game, such as a ground ball, clear, support play, or shot decision.";
 }
 
 function renderReviewSummarySection(game, player, totals) {
@@ -10479,15 +10013,16 @@ function renderReviewSummarySection(game, player, totals) {
   const activityHelper = totals.points > 0 ? `${totals.goals}G ${totals.assists}A` : "tracked plays";
   const context = gameContextSummary(game, totals);
   const snapshotCards = [
-    insightCard("Game Impact", renderImpactGrade(totals.impact), "Snapshot, not a coach grade", { className: "snapshot-card" }),
+    insightCard("Recorded Events", escapeHTML(String(totals.eventCount)), "Tracked plays", { className: "snapshot-card" }),
     insightCard("Top Contribution", escapeHTML(topContribution.display), topContribution.label, { className: "snapshot-card" }),
     showPossession
       ? insightCard("Possession", escapeHTML(signedMetric(totals.possessionValue)), `${signedMetric(totals.extraPossessions)} extra ${Math.abs(Number(totals.extraPossessions || 0)) === 1 ? "chance" : "chances"}`, { className: "snapshot-card" })
       : "",
-    insightCard(activityLabel, escapeHTML(String(activityValue)), activityHelper, { className: "snapshot-card" }),
+    activityLabel === "Points" ? insightCard(activityLabel, escapeHTML(String(activityValue)), activityHelper, { className: "snapshot-card" }) : "",
     context.hasFinal
       ? insightCard("Final Score", escapeHTML(`${context.finalScoreFor}-${context.finalScoreAgainst}`), "final", { className: "snapshot-card" })
       : "",
+    insightCard("LaxHornet Impact", renderImpactScore(totals.impact), "Selected recorded events", { className: "snapshot-card impact-snapshot-card" }),
   ].filter(Boolean);
   return `
     <section class="review-section review-snapshot-section lh-review-snapshot">
@@ -10498,6 +10033,10 @@ function renderReviewSummarySection(game, player, totals) {
       </div>
       <div class="insight-grid review-snapshot-grid">
         ${snapshotCards.join("")}
+      </div>
+      <div class="impact-limitations snapshot-impact-limitations" role="note">
+        <p>${escapeHTML(GAME_IMPACT_LIMITATION)}</p>
+        <p>${escapeHTML(GAME_IMPACT_EVIDENCE_LIMIT)}</p>
       </div>
     </section>
   `;
@@ -10511,11 +10050,11 @@ function renderGameStorySection(intelligence = null) {
       <div class="section-head compact-head">
         <div>
           <h3>Game Story</h3>
-          <p class="muted small">${escapeHTML(intelligence.gameStoryType)}</p>
         </div>
       </div>
+      <span class="evidence-layer-label">What this may suggest</span>
       <strong>${escapeHTML(intelligence.gameStoryTitle)}</strong>
-      <p>${escapeHTML(intelligence.gameStoryText)}</p>
+      <p>Based on the recorded events, ${escapeHTML(intelligence.gameStoryText)}</p>
       ${
         showHighlights
           ? `<div class="context-highlight-list">
@@ -10558,7 +10097,7 @@ function renderGameContextCard(game, totals) {
   `;
 }
 
-function renderReviewStatsSection(totals, player, archetypeResult, events = [], postGameIntelligence = null) {
+function renderReviewStatsSection(totals, events = [], postGameIntelligence = null) {
   return `
     <section class="review-section review-full-breakdown">
       <details class="review-details-card lh-breakdown-card">
@@ -10580,10 +10119,10 @@ function renderReviewStatsSection(totals, player, archetypeResult, events = [], 
             className: "review-embedded-why-card",
           })}
           <div class="explainer-card review-explainer-card">
-            <strong>Game Impact</strong>
-            <p>Game Impact is a quick snapshot of how this player helped create, protect, finish, or defend possessions. It is not a coach grade or a permanent label.</p>
+            <strong>About LaxHornet Game Impact</strong>
+            <p>${escapeHTML(GAME_IMPACT_LIMITATION)}</p>
+            <p>${escapeHTML(GAME_IMPACT_EVIDENCE_LIMIT)}</p>
           </div>
-          ${generateShareCard(player, archetypeResult, { profileLabel: "Today's Player Profile", patternScope: "game" })}
           ${renderTotalsTable(totals, { embedded: true })}
         </div>
       </details>
@@ -10612,7 +10151,6 @@ function renderReview() {
   const topContribution = topContributionForTotals(totals);
   const seasonContext = calculateSeasonTotalsForPlayer(player);
   const postGameIntelligence = buildPostGameIntelligence(game, game.events || [], player, totals, seasonContext);
-  const archetypeResult = calculateArchetypeResult(totals);
   const canEditCurrentGame = canEditGame(game);
   const editingEvent = state.editingEventId
     ? game.events.find((event) => event.id === state.editingEventId)
@@ -10636,12 +10174,12 @@ function renderReview() {
       ${renderDevelopmentTakeaway(totals, player, topContribution.label, game, postGameIntelligence)}
       ${renderFamilyRecapSection(game, player, totals, postGameIntelligence)}
       ${renderConversationStarters(totals, player, game, postGameIntelligence)}
-      ${renderReviewStatsSection(totals, player, archetypeResult, game.events || [], postGameIntelligence)}
+      ${renderReviewStatsSection(totals, game.events || [], postGameIntelligence)}
       <section class="review-section lh-timeline-section">
         <div class="card pad">
           <h3>Timeline &amp; Edits</h3>
           <p class="muted small">Review each tracked play, add notes or tags, and make corrections if needed.</p>
-          <p class="safety-note">Avoid private, medical, or sensitive information in notes. Notes may appear in reviews, exports, or Live Share.</p>
+          <p class="safety-note">Avoid private, medical, or sensitive information. Notes and process tags stay in private reviews and account exports; they do not appear in Live Share.</p>
         ${
           game.events.length
             ? `<div class="event-list">${[...game.events]
@@ -10706,7 +10244,7 @@ function renderSharedGame() {
 
     <section class="stack">
       <div class="metric-grid">
-        <div class="metric">${renderImpactGrade(totals.impact)}<span>Game Impact</span></div>
+        <div class="metric"><strong>${totals.eventCount}</strong><span>Recorded Events</span></div>
         <div class="metric"><strong>${totals.points}</strong><span>Points</span></div>
         <div class="metric"><strong>${totals.goals}</strong><span>Goals</span></div>
         <div class="metric"><strong>${totals.assists}</strong><span>Assists</span></div>
@@ -10787,10 +10325,10 @@ function renderImpactBreakdown(totals, options = {}) {
     <${WrapperTag} class="${wrapperClass}">
       <div class="section-head compact-head">
         <div>
-          <h3>Game Impact Breakdown</h3>
-          <p class="muted small">Quick snapshot weighted for ${escapeHTML(profile.label || "this position")}.</p>
+          <h3>LaxHornet Game Impact Inputs</h3>
+          <p class="muted small">Recorded contribution categories weighted for ${escapeHTML(profile.label || "this position")} context.</p>
         </div>
-        <span class="impact-score-badge">${renderImpactGrade(impact.score)}</span>
+        <span class="impact-score-badge">${renderImpactScore(impact.score)}</span>
       </div>
       <div class="impact-breakdown-grid">
         ${impact.breakdown
@@ -10806,8 +10344,11 @@ function renderImpactBreakdown(totals, options = {}) {
           .join("")}
       </div>
       <p class="impact-takeaway">${escapeHTML(impact.takeaway)}</p>
-      <p class="muted small">Game Impact is a quick snapshot of how this player helped create, protect, finish, or defend possessions. It is not a coach grade or a permanent label.</p>
-      <p class="muted small">Raw event value: ${formatImpactNumber(impact.raw)}. Weighted event value: ${formatImpactNumber(impact.weightedRaw)}. Average Impact on the Season page averages these 0-100 game scores.</p>
+      <div class="impact-limitations" role="note">
+        <p>${escapeHTML(GAME_IMPACT_LIMITATION)}</p>
+        <p>${escapeHTML(GAME_IMPACT_EVIDENCE_LIMIT)}</p>
+      </div>
+      <p class="muted small">Recorded event value: ${formatImpactNumber(impact.raw)}. Position-weighted event value: ${formatImpactNumber(impact.weightedRaw)}. The Season page averages these bounded 0-100 LaxHornet summaries.</p>
     </${WrapperTag}>
   `;
 }
@@ -10976,13 +10517,12 @@ function renderGameListRow(game) {
   const player = gamePlayerSnapshot(game);
   const totals = calculateTotals(game.events, player);
   const editable = canEditGame(game);
-  const impactSummary = `${impactLetterGrade(totals.impact)} (${formatImpactNumber(totals.impact)})`;
   return `
     <div class="list-row">
       <button class="brand" type="button" data-review="${game.id}" style="color: var(--text); text-align: left;">
         <span>
           <h3>${escapeHTML(game.opponent)}</h3>
-          <p>${escapeHTML(playerContextLine(player))} - ${formatDate(game.date)} - Game Impact ${escapeHTML(impactSummary)} - Possession Value ${signedMetric(totals.possessionValue)}</p>
+          <p>${escapeHTML(playerContextLine(player))} - ${formatDate(game.date)} - ${totals.eventCount} recorded events - Possession Value ${signedMetric(totals.possessionValue)}</p>
         </span>
       </button>
       <div class="row-actions">
@@ -11060,7 +10600,7 @@ function dashboardHeadlineMetrics(totals, player = state.player) {
   const position = String(player.position || "").toLowerCase();
   const metrics = [
     [totals.gamesPlayed, "Games Played"],
-    [totals.averageImpact.toFixed(1), "Avg Impact"],
+    [totals.averageImpact.toFixed(1), "Avg LaxHornet Impact"],
     [signedMetric(totals.possessionValue), "Possession Value"],
     [totals.points, "Points"],
     [totals.goals, "Goals"],
@@ -11081,8 +10621,7 @@ function dashboardHeadlineMetrics(totals, player = state.player) {
 function renderDashboard() {
   const seasonGames = visibleGames();
   const totals = calculateSeasonTotals();
-  const archetypeResult = calculateArchetypeResult(totals);
-  const seasonIntelligence = buildSeasonIntelligence(seasonGames, totals, state.player, archetypeResult);
+  const seasonIntelligence = buildSeasonIntelligence(seasonGames, totals, state.player);
   const strengths = seasonIntelligence.strengths;
   const seasonStory = seasonIntelligence.story;
   const encouragement = seasonIntelligence.encouragement;
@@ -11103,10 +10642,15 @@ function renderDashboard() {
         ${insightCard("Games Tracked", escapeHTML(String(totals.gamesPlayed)), "Saved games")}
         ${insightCard("Total Points", escapeHTML(String(totals.points)), `${totals.goals}G ${totals.assists}A`)}
         ${insightCard("Possession Impact", escapeHTML(signedMetric(totals.possessionValue)), `${signedMetric(totals.extraPossessions)} extra chances`)}
-        ${insightCard("Average Game Impact", renderImpactGrade(totals.averageImpact), "Across saved games")}
+        ${insightCard("Average LaxHornet Impact", renderImpactScore(totals.averageImpact, { label: "average" }), "Selected recorded events")}
+      </div>
+      <div class="impact-limitations season-impact-limitations" role="note">
+        <p>${escapeHTML(GAME_IMPACT_LIMITATION)}</p>
+        <p>${escapeHTML(GAME_IMPACT_EVIDENCE_LIMIT)}</p>
       </div>
       <section class="card pad development-card lh-season-story-card">
         <h3>Season Story</h3>
+        <span class="evidence-layer-label">What this may suggest</span>
         <p>${escapeHTML(seasonStory)}</p>
         ${
           seasonIntelligence.signals.length
@@ -11123,7 +10667,7 @@ function renderDashboard() {
         <p class="muted small">Season Snapshot highlights patterns across scoring, possession, defense, goalie play, hustle, and decision-making. Position matters, so players are not evaluated the same way across every role.</p>
       </section>
       <section class="card pad development-card lh-season-strengths-card">
-        <h3>What ${escapeHTML(playerFirstName(state.player))} Is Building</h3>
+        <h3>Recorded Season Evidence</h3>
         <ul class="insight-list">
           ${strengths.map((item) => `<li>${escapeHTML(item)}</li>`).join("")}
         </ul>
@@ -11133,7 +10677,7 @@ function renderDashboard() {
         <p>${escapeHTML(encouragement)}</p>
       </section>
       <section class="card pad development-card lh-season-focus-card">
-        <h3>Next-Level Focus</h3>
+        <h3>Possible Next Focus</h3>
         <p>${escapeHTML(nextFocus)}</p>
       </section>
       ${renderWhyThesePlaysMatter(seasonEvents, {
@@ -11145,7 +10689,6 @@ function renderDashboard() {
         emptyCopy: "Track games to see simple explanations of the plays shaping this player's season.",
         items: seasonIntelligence.whyItems,
       })}
-      ${generateShareCard(state.player, archetypeResult, { profileLabel: "Season Player Profile", patternScope: "season" })}
       <section class="review-section lh-season-stats-section">
         <div class="section-head compact-head">
           <div>
@@ -11180,13 +10723,14 @@ function renderHelp() {
     <section class="stack">
       <div class="card pad">
         <h3>Game Impact</h3>
-        <p class="muted small">Game Impact displays as a letter grade with the underlying 0-100 score shown beneath it. It estimates how much a player helped create possessions, convert possessions, protect possessions, and prevent opponent chances. It is built from five pillars: scoring, possession, defense, goalie play, and effort.</p>
-        <p class="muted small">The score is position-weighted. Attack gives more credit to scoring, midfield values possession and effort, defense/LSM values defense and effort, faceoff/draw heavily values possession, and goalie heavily values saves and goalie-specific plays.</p>
+        <p class="muted small">${escapeHTML(GAME_IMPACT_LIMITATION)}</p>
+        <p class="muted small">It uses five recorded contribution categories: scoring, possession, defense, goalie play, and manually recorded effort/support events. Position weighting changes how those categories contribute for lacrosse context.</p>
+        <p class="muted small">${escapeHTML(GAME_IMPACT_EVIDENCE_LIMIT)}</p>
       </div>
 
       <div class="card pad">
         <h3>Average Impact</h3>
-        <p class="muted small">Average Impact appears on the Season page. It is the player's saved Game Impact scores averaged across games played. Example: game scores of 78, 84, and 69 create a 77.0 Average Impact.</p>
+        <p class="muted small">Average LaxHornet Impact appears on the Season page. It averages the player&apos;s bounded numeric Game Impact summaries across saved games. It is not a ranking or player comparison.</p>
       </div>
 
       <div class="card pad">
@@ -11316,7 +10860,6 @@ function renderDemoPage() {
   const totals = calculateTotals(game.events, DEMO_PLAYER);
   const seasonTotals = calculateSeasonTotalsFromGames([game]);
   const headlineMetrics = dashboardHeadlineMetrics(seasonTotals, DEMO_PLAYER).slice(0, 6);
-  const archetypeResult = calculateArchetypeResult(seasonTotals);
   const demoTopContribution = topContributionForTotals(totals).label;
   return renderShell(`
     <section class="screen-title">
@@ -11349,7 +10892,7 @@ function renderDemoPage() {
           <button class="period-tab" type="button">Q4</button>
         </div>
         <section class="live-summary" aria-label="Sample live summary">
-          <div class="live-pill">${renderImpactGrade(totals.impact)}<span>Game Impact</span></div>
+          <div class="live-pill"><strong>${signedMetric(totals.possessionValue)}</strong><span>Possession Value</span></div>
           <div class="live-pill"><strong>${totals.points}</strong><span>Points</span></div>
           <div class="live-pill"><strong>${totals.eventCount}</strong><span>Events</span></div>
         </section>
@@ -11359,10 +10902,14 @@ function renderDemoPage() {
       <section class="card pad">
         <h3>Sample Completed Game Review</h3>
         <div class="metric-grid compact-demo-grid">
-          <div class="metric">${renderImpactGrade(totals.impact)}<span>Game Impact</span></div>
+          <div class="metric">${renderImpactScore(totals.impact)}<span>LaxHornet Impact</span></div>
           <div class="metric"><strong>${totals.points}</strong><span>Points</span></div>
           <div class="metric"><strong>${statWithExtraPossessions(totals.groundBalls, totals.possessionImpact.eventsByType.groundBall || 0)}</strong><span>Ground Balls</span></div>
           <div class="metric"><strong>${signedMetric(totals.possessionValue)}</strong><span>Possession Value</span></div>
+        </div>
+        <div class="impact-limitations" role="note">
+          <p>${escapeHTML(GAME_IMPACT_LIMITATION)}</p>
+          <p>${escapeHTML(GAME_IMPACT_EVIDENCE_LIMIT)}</p>
         </div>
         <div class="event-list">${game.events.slice(-5).reverse().map(renderEventRow).join("")}</div>
       </section>
@@ -11379,7 +10926,10 @@ function renderDemoPage() {
         <div class="metric-grid compact-demo-grid">
           ${headlineMetrics.map(([value, label]) => metricTile(value, label)).join("")}
         </div>
-        ${generateShareCard(DEMO_PLAYER, archetypeResult, { profileLabel: "Season Player Profile", patternScope: "season" })}
+        <div class="impact-limitations" role="note">
+          <p>${escapeHTML(GAME_IMPACT_LIMITATION)}</p>
+          <p>${escapeHTML(GAME_IMPACT_EVIDENCE_LIMIT)}</p>
+        </div>
       </section>
 
       <section class="card pad">
@@ -11524,7 +11074,10 @@ function renderPromoDemoPage() {
     `);
   }
 
-  const impactTotal = calculateGameImpact(PROMO_DEMO_STEPS.map((step) => ({ statType: step.stat }))).score;
+  const promoTotals = calculateTotals(PROMO_DEMO_STEPS.map((step, index) => normalizeEvent({
+    id: `promo-${index}`,
+    statType: step.stat,
+  })));
   const lacrossePoints = PROMO_DEMO_STEPS.filter((step) => ["goal", "assist"].includes(step.stat)).length;
   const cycleStyle = `--promo-step-count: ${PROMO_DEMO_STEPS.length}; --promo-step-duration: ${PROMO_STEP_DURATION_SECONDS}s; --promo-cycle: ${PROMO_CYCLE_SECONDS}s;`;
 
@@ -11578,9 +11131,9 @@ function renderPromoDemoPage() {
             <button class="period-tab" type="button">Q4</button>
           </div>
           <section class="live-summary" aria-label="Demo game summary">
-            <div class="live-pill">${renderImpactGrade(impactTotal)}<span>Game Impact</span></div>
+            <div class="live-pill"><strong>${PROMO_DEMO_STEPS.length}</strong><span>Recorded Events</span></div>
             <div class="live-pill"><strong>${lacrossePoints}</strong><span>Points</span></div>
-            <div class="live-pill"><strong>${PROMO_DEMO_STEPS.length}</strong><span>Events</span></div>
+            <div class="live-pill"><strong>${signedMetric(promoTotals.possessionValue)}</strong><span>Possession Value</span></div>
           </section>
           ${renderLiveStatGroups({ demo: true, interactive: false, stepByKey: PROMO_STEP_BY_KEY })}
           <section class="promo-log-card">
@@ -11757,7 +11310,7 @@ function renderTutorial() {
 
       <div class="card pad">
         <h3>8. Review, Correct, And Tag</h3>
-        <p class="muted small">After a game, open Game Review to edit events, correct notes, add tags, and check Game Impact, Effort Score, Faceoff %, Save %, and shooting percentages. Season Dashboard shows Average Impact across saved games. Past Games follows the active player, so switch players when you want another player's totals.</p>
+        <p class="muted small">After a game, open Game Review to edit events, correct notes, add tags, and review recorded stats, possession metrics, and the bounded LaxHornet Game Impact summary. Season Dashboard shows recorded totals and an average numeric summary across saved games. Past Games follows the active player, so switch players when you want another player&apos;s totals.</p>
       </div>
 
       <div class="card pad">

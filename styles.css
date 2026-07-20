@@ -1843,15 +1843,15 @@ button:focus-visible,
   line-height: 1.0;
 }
 
-.impact-grade {
+.impact-score {
   display: block;
 }
 
-.impact-grade strong {
+.impact-score strong {
   display: block;
 }
 
-.impact-grade small {
+.impact-score small {
   display: block;
   margin-top: 3px;
   color: var(--muted);
@@ -1916,7 +1916,7 @@ button:focus-visible,
   line-height: 1.32;
 }
 
-.insight-value .impact-grade strong {
+.insight-value .impact-score strong {
   margin: 0;
   font-size: clamp(1.35rem, 6vw, 1.9rem);
 }
@@ -1944,6 +1944,38 @@ button:focus-visible,
   line-height: 1.38;
 }
 
+.impact-limitations {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--lh-line-light);
+  border-radius: 8px;
+  background: var(--lh-surface-soft);
+}
+
+.impact-limitations p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.evidence-layer-label,
+.tag-context-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.snapshot-impact-limitations {
+  margin-top: 0;
+}
+
 .impact-card {
   display: grid;
   gap: 12px;
@@ -1965,7 +1997,7 @@ button:focus-visible,
   font-weight: 950;
 }
 
-.impact-score-badge .impact-grade small {
+.impact-score-badge .impact-score small {
   color: var(--muted);
   font-size: 0.62rem;
 }
@@ -2068,142 +2100,6 @@ button:focus-visible,
   font-size: 1.5rem;
   font-weight: 950;
   line-height: 1;
-}
-
-.archetype-card {
-  display: grid;
-  gap: 12px;
-  border-color: rgba(232, 16, 16, 0.22);
-}
-
-.archetype-card .eyebrow {
-  margin: 0 0 2px;
-  color: var(--hornet-red);
-  font-size: 0.72rem;
-  font-weight: 950;
-  text-transform: uppercase;
-}
-
-.archetype-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 58px;
-  height: 36px;
-  padding: 0 12px;
-  border: 1px solid rgba(232, 16, 16, 0.35);
-  border-radius: 999px;
-  background: var(--lh-accent-surface);
-  color: var(--text);
-  font-size: 0.78rem;
-  font-weight: 950;
-}
-
-.archetype-explanation {
-  margin: 0;
-  color: var(--text);
-  font-size: 0.96rem;
-  line-height: 1.4;
-}
-
-.archetype-story {
-  display: grid;
-  gap: 3px;
-}
-
-.archetype-story strong {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 950;
-  text-transform: uppercase;
-}
-
-.archetype-story p {
-  margin: 0;
-  color: var(--text);
-  font-size: 0.92rem;
-  line-height: 1.38;
-}
-
-.archetype-reasons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.archetype-reasons span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 30px;
-  padding: 6px 9px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #f7f8f9;
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 850;
-}
-
-.archetype-bars {
-  display: grid;
-  gap: 8px;
-}
-
-.archetype-bar {
-  display: grid;
-  grid-template-columns: minmax(72px, 0.8fr) minmax(96px, 1.4fr) 34px;
-  align-items: center;
-  gap: 8px;
-}
-
-.archetype-bar span {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.archetype-bar div {
-  height: 8px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #e6e8eb;
-}
-
-.archetype-bar i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #111, #30363d);
-}
-
-.archetype-bar strong {
-  color: var(--text);
-  font-size: 0.82rem;
-  font-weight: 950;
-  text-align: right;
-}
-
-.archetype-focus {
-  display: grid;
-  gap: 3px;
-  padding: 10px 12px;
-  border-left: 4px solid var(--hornet-red);
-  border-radius: 8px;
-  background: var(--lh-panel-gradient);
-}
-
-.archetype-focus span {
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 950;
-  text-transform: uppercase;
-}
-
-.archetype-focus strong {
-  color: var(--text);
-  font-size: 0.9rem;
-  line-height: 1.35;
 }
 
 .season-groups {
@@ -2519,7 +2415,7 @@ button:focus-visible,
   font-weight: 900;
 }
 
-.live-pill .impact-grade small {
+.live-pill .impact-score small {
   font-size: 0.58rem;
 }
 
@@ -2905,6 +2801,10 @@ button:focus-visible,
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
+}
+
+.tag-chip-list .tag-context-label {
+  flex: 0 0 100%;
 }
 
 .tag-chip {
@@ -4344,7 +4244,6 @@ form.account-card,
 .game-day-status-card,
 .quick-actions-card,
 .development-card,
-.archetype-card,
 .impact-card,
 .possession-impact-card,
 .edit-tools-card,
@@ -4551,7 +4450,6 @@ form.account-card .account-actions {
 .player-context-panel,
 .notice-card,
 .explainer-card,
-.archetype-focus,
 .impact-takeaway {
   border-radius: 10px;
   background:
@@ -4669,7 +4567,6 @@ form.account-card .account-actions {
 }
 
 .explainer-card,
-.archetype-card,
 .development-card,
 .impact-card,
 .possession-impact-card {
@@ -5164,7 +5061,6 @@ form.account-card,
 .game-day-status-card,
 .quick-actions-card,
 .development-card,
-.archetype-card,
 .impact-card,
 .possession-impact-card,
 .edit-tools-card,
@@ -5695,12 +5591,12 @@ form.account-card,
   font-size: clamp(1rem, 4.2vw, 1.35rem);
 }
 
-.snapshot-card .impact-grade,
-.snapshot-card .impact-grade strong {
+.snapshot-card .impact-score,
+.snapshot-card .impact-score strong {
   color: var(--text);
 }
 
-.snapshot-card .impact-grade small,
+.snapshot-card .impact-score small,
 .snapshot-card > small {
   color: var(--muted);
   font-size: 0.66rem;
@@ -6283,9 +6179,6 @@ form.account-card,
 .review-details-card .stat-table th,
 .review-details-card .stat-table td,
 .review-details-card .impact-takeaway,
-.review-details-card .archetype-story p,
-.review-details-card .archetype-focus strong,
-.review-details-card .archetype-reasons span,
 .review-details-card .review-explainer-card p {
   overflow-wrap: anywhere;
 }
@@ -6374,13 +6267,6 @@ form.account-card,
     text-align: right;
   }
 
-  .review-details-card .archetype-bar {
-    grid-template-columns: minmax(0, 1fr) 34px;
-  }
-
-  .review-details-card .archetype-bar span {
-    grid-column: 1 / -1;
-  }
 }
 
 /* Taste Skill cascade lock: final rendered polish overrides */
@@ -6453,7 +6339,6 @@ form.account-card,
 .game-day-status-card,
 .quick-actions-card,
 .development-card,
-.archetype-card,
 .impact-card,
 .possession-impact-card,
 .edit-tools-card,

@@ -11,7 +11,7 @@ LaxHornet is a mobile-first offline PWA for tracking youth lacrosse stats during
 - Faceoff Win and Faceoff Loss tracking with faceoff win percentage
 - Grouped live stat buttons with high-frequency events first and specialty stats lower on the screen
 - Undo last event, save game, end game, review, and delete game actions
-- 0-100 Game Impact score for each game, with season Average Impact
+- Bounded 0-100 proprietary LaxHornet Game Impact summary with recorded-input breakdown and evidence limitations
 - Per-player season totals and averages from saved games
 - Offline-ready `manifest.json` and service worker
 - Optional user profiles with approved team access for parents
@@ -104,9 +104,9 @@ Use **Team** when multiple parents need to track or view stats for the same appr
 
 Best practice: choose one official Parent Tracker for each player/game. Multiple parents can sync and review the same stats, but two Parent Tracker accounts logging the same player at the same time can create duplicate events.
 
-## Game Impact Scoring
+## LaxHornet Game Impact Summary
 
-Game Impact is a 0-100 score that estimates how much a player helped create possessions, convert possessions, protect possessions, and prevent opponent scoring chances. Game Review shows the Game Impact score for one game. Season Dashboard shows Average Impact across saved games.
+Game Impact is a LaxHornet-created summary of selected recorded events. It is not a coach grade, player rating, ranking, or complete measure of performance or development. Missing or incorrectly recorded events can change the result. Game Review shows the bounded numeric summary beside its recorded contribution inputs. Season Dashboard shows the average of those saved-game summaries with the same limitations.
 
 Game Impact is position-weighted:
 
@@ -114,7 +114,7 @@ Game Impact is position-weighted:
 - Midfield: higher possession and hustle; medium scoring and defense.
 - Defense / LSM: higher defense and hustle; medium possession; lower scoring.
 - Faceoff / Draw: very high possession; medium defense and hustle; lower scoring.
-- Goalie: very high goalie weight; medium possession and hustle; lower defense; scoring is not graded.
+- Goalie: very high goalie weight; medium possession and hustle; lower defense; scoring events receive no additional weight.
 
 The raw event values behind the score are:
 

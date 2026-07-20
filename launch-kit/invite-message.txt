@@ -21,4 +21,4 @@ iPhone install:
 3. Tap Add to Home Screen.
 4. Open LaxHornet from the new icon.
 
-LaxHornet tracks goals, assists, shots, saves, faceoffs, ground balls, clears, turnovers, penalties, Game Impact, Average Impact, Effort Score, and season totals. Live Share also lets family watch updates from another iPhone, phone, tablet, or computer.
+LaxHornet tracks goals, assists, shots, saves, faceoffs, ground balls, clears, turnovers, penalties, support events, possession metrics, and season totals. Live Share also lets family watch read-only updates from another iPhone, phone, tablet, or computer.
