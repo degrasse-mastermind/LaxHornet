@@ -6,9 +6,9 @@ Status: executable destructive rollback for disposable staging only.
 
 The rollback removes only the additive Release 1 objects:
 
-- Six public `lh_*` RPC wrappers.
+- Nine public `lh_*` RPC wrappers.
 - The private `lh_trust_private` schema and helper functions.
-- The 21 new `public.lh_*` staging tables.
+- The 20 new `public.lh_*` staging tables.
 
 It does not alter legacy LaxHornet tables, runtime files, service-worker
 caches, Project One UI, or production data.
@@ -61,4 +61,4 @@ where schema_name = 'lh_trust_private';
 
 Because this release has no runtime cutover, rollback requires no app version,
 cache, or client migration. To restore the staging gate, reapply the migration
-and rerun all 24 SQL tests.
+and rerun all 33 SQL tests.

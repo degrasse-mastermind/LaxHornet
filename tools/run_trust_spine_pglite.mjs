@@ -34,6 +34,10 @@ try {
     create role authenticated nologin;
     create schema auth;
     create schema extensions;
+    create table auth.users(
+      id uuid primary key,
+      email text
+    );
     create or replace function extensions.digest(value bytea, algorithm text)
     returns bytea
     language sql
@@ -56,14 +60,78 @@ try {
     grant execute on function auth.uid() to anon, authenticated;
     grant execute on function extensions.digest(bytea, text) to anon, authenticated;
 
-    create table public.games(id text primary key);
-    create table public.events(id text primary key);
-    create table public.teams(id text primary key);
-    create table public.roster_players(id text primary key);
-    insert into public.games(id) values ('legacy-game-sentinel');
-    insert into public.events(id) values ('legacy-event-sentinel');
-    insert into public.teams(id) values ('legacy-team-sentinel');
-    insert into public.roster_players(id) values ('legacy-player-sentinel');
+    create table public.teams(
+      id text primary key,
+      name text not null,
+      invite_code text not null unique,
+      tracker_code text unique,
+      created_by uuid,
+      created_at timestamptz not null default now()
+    );
+    create table public.team_members(
+      id text primary key,
+      team_id text not null,
+      user_id uuid not null,
+      role text not null default 'member',
+      created_at timestamptz not null default now(),
+      unique(team_id, user_id)
+    );
+    create table public.roster_players(
+      id text primary key,
+      team_id text not null,
+      name text not null,
+      number text not null default '',
+      position text not null default '',
+      active boolean not null default true,
+      created_at timestamptz not null default now()
+    );
+    create table public.player_claims(
+      id text primary key,
+      team_id text not null,
+      roster_player_id text not null,
+      user_id uuid not null,
+      created_at timestamptz not null default now(),
+      unique(team_id, user_id, roster_player_id)
+    );
+    create table public.games(
+      id text primary key,
+      player_id text,
+      user_id uuid,
+      share_code text not null unique,
+      is_shared boolean not null default false,
+      opponent text not null,
+      game_date date not null,
+      location text,
+      game_type text,
+      period_format text not null default 'quarters',
+      player_snapshot jsonb not null default '{}'::jsonb,
+      current_quarter text not null default 'Q1',
+      status text not null default 'in-progress',
+      created_at timestamptz not null default now(),
+      saved_at timestamptz,
+      ended_at timestamptz,
+      team_id text,
+      roster_player_id text
+    );
+    create table public.events(
+      id text primary key,
+      game_id text,
+      user_id uuid,
+      timestamp timestamptz,
+      quarter text,
+      stat_type text,
+      stat_label text,
+      category text,
+      point_value integer not null default 0
+    );
+    insert into public.teams(id, name, invite_code)
+    values ('legacy-team-sentinel', 'Legacy Sentinel', 'SENTINEL');
+    insert into public.roster_players(id, team_id, name)
+    values ('legacy-player-sentinel', 'legacy-team-sentinel', 'Legacy Sentinel Player');
+    insert into public.games(id, share_code, opponent, game_date)
+    values ('legacy-game-sentinel', 'LEGACY-SENTINEL', 'Legacy Opponent', date '2026-01-01');
+    insert into public.events(id, game_id)
+    values ('legacy-event-sentinel', 'legacy-game-sentinel');
   `);
 
   await db.exec(migration);

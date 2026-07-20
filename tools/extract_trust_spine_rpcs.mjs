@@ -11,12 +11,19 @@ const functionNames = [
   "lh_trust_private.lh_live_share_event_fields",
   "lh_trust_private.lh_sensitive_export_game_fields",
   "lh_trust_private.lh_sensitive_export_event_fields",
+  "lh_trust_private.lh_sensitive_export_annotation_fields",
   "lh_trust_private.lh_active_grants_for_user",
+  "lh_trust_private.lh_register_team_scope_impl",
+  "lh_trust_private.lh_register_player_scope_impl",
+  "lh_trust_private.lh_register_game_scope_impl",
   "lh_trust_private.lh_create_event_impl",
   "lh_trust_private.lh_correct_event_impl",
   "lh_trust_private.lh_tombstone_event_impl",
   "lh_trust_private.lh_public_live_share_game_impl",
   "lh_trust_private.lh_record_sensitive_export_impl",
+  "public.lh_register_team_scope",
+  "public.lh_register_player_scope",
+  "public.lh_register_game_scope",
   "public.lh_resolve_active_grants",
   "public.lh_create_event",
   "public.lh_correct_event",
@@ -46,9 +53,8 @@ const header = `-- LaxHornet Trust Spine Release 1 RPC evidence
 -- This file extracts exact definitions from the implementation migration.
 -- It is review evidence, not a standalone migration.
 --
--- Deliberate gap: no public or private restore-event RPC exists in Release 1.
--- Restore operation tables and lifecycle records exist, but runtime restore
--- cannot be exercised through the approved public RPC surface.
+-- Release 1 makes tombstones permanent. No restore operation, table, helper,
+-- or public RPC exists in the approved surface.
 `;
 
 const blocks = functionNames.map(

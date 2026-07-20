@@ -37,6 +37,12 @@ Do not implement in Release 1:
 - Offline disclosure release.
 - Offline authoritative evidence adjudication.
 - Offline coach-context release.
+- Event restoration after a permanent tombstone.
+- Annotation mutation and annotation revision history.
+
+Release 1 intentionally provides no restore operation type, table, helper, or
+public RPC. A future restoration design would require a separately reviewed
+authority model and must not reuse or silently reverse a Release 1 tombstone.
 
 ## Deferred analytics
 

@@ -4,7 +4,7 @@
 -- This migration is additive. It does not alter legacy LaxHornet tables,
 -- existing RLS policies, existing RPCs, runtime code, or production data.
 -- The Trust Spine tables have RLS enabled and forced. No table privileges are
--- granted to anon or authenticated. Only the six explicitly granted staging
+-- granted to anon or authenticated. Only the nine explicitly granted staging
 -- RPC wrappers are reachable through the Data API.
 
 begin;
@@ -22,7 +22,8 @@ revoke all on schema lh_trust_private from anon, authenticated;
 create table public.lh_team_scopes (
   team_id text primary key,
   team_name_snapshot text not null default '',
-  registered_at timestamptz not null default now()
+  registered_at timestamptz not null default now(),
+  snapshot_refreshed_at timestamptz not null default now()
 );
 
 create table public.lh_player_scopes (
@@ -32,6 +33,7 @@ create table public.lh_player_scopes (
   jersey_snapshot text not null default '',
   position_snapshot text not null default '',
   registered_at timestamptz not null default now(),
+  snapshot_refreshed_at timestamptz not null default now(),
   primary key (team_id, roster_player_id)
 );
 
@@ -45,6 +47,7 @@ create table public.lh_game_scopes (
   final_score_for integer,
   final_score_against integer,
   registered_at timestamptz not null default now(),
+  snapshot_refreshed_at timestamptz not null default now(),
   constraint lh_game_scopes_player_scope_fk
     foreign key (team_id, roster_player_id)
     references public.lh_player_scopes(team_id, roster_player_id)
@@ -210,11 +213,14 @@ create table public.lh_event_effective_versions (
   team_id text not null,
   roster_player_id text not null,
   server_event_version integer not null,
+  accepted_revision_sequence integer not null default 0,
   lifecycle_state text not null default 'active',
   effective_evidence jsonb not null,
   updated_at timestamptz not null default now(),
   constraint lh_event_effective_versions_version_positive
     check (server_event_version > 0),
+  constraint lh_event_effective_versions_revision_sequence_nonnegative
+    check (accepted_revision_sequence >= 0),
   constraint lh_event_effective_versions_state_check
     check (lifecycle_state in ('active', 'tombstoned')),
   constraint lh_event_effective_versions_event_scope_fk
@@ -244,7 +250,7 @@ create table public.lh_event_operations (
   client_created_at timestamptz,
   server_received_at timestamptz not null default now(),
   constraint lh_event_operations_type_check
-    check (operation_type in ('create_event', 'correct_event', 'tombstone_event', 'restore_event')),
+    check (operation_type in ('create_event', 'correct_event', 'tombstone_event')),
   constraint lh_event_operations_outcome_class_check
     check (outcome_class in ('accepted', 'rejected', 'conflicted')),
   constraint lh_event_operations_unique_client_operation
@@ -262,7 +268,7 @@ create table public.lh_event_operation_attempts (
   outcome_code text not null,
   received_at timestamptz not null default now(),
   constraint lh_event_operation_attempts_type_check
-    check (operation_type in ('create_event', 'correct_event', 'tombstone_event', 'restore_event')),
+    check (operation_type in ('create_event', 'correct_event', 'tombstone_event')),
   constraint lh_event_operation_attempts_outcome_check
     check (outcome_class in ('accepted', 'rejected', 'conflicted'))
 );
@@ -271,7 +277,8 @@ create table public.lh_event_create_operations (
   operation_id text primary key references public.lh_event_operations(operation_id) on delete restrict,
   event_id text not null,
   game_id text not null references public.lh_game_scopes(game_id) on delete restrict,
-  evidence jsonb not null
+  evidence jsonb not null,
+  annotations jsonb not null default '{}'::jsonb
 );
 
 create table public.lh_event_correction_operations (
@@ -295,36 +302,24 @@ create table public.lh_event_tombstone_operations (
     check (base_server_event_version > 0)
 );
 
-create table public.lh_event_restore_operations (
-  operation_id text primary key references public.lh_event_operations(operation_id) on delete restrict,
-  event_id text not null references public.lh_events(event_id) on delete restrict,
-  game_id text not null references public.lh_game_scopes(game_id) on delete restrict,
-  tombstone_id text not null,
-  base_server_event_version integer not null,
-  restore_reason text not null default '',
-  constraint lh_event_restore_operations_base_positive
-    check (base_server_event_version > 0)
-);
-
 create table public.lh_event_revisions (
   revision_id text primary key,
-  operation_id text not null references public.lh_event_operations(operation_id) on delete restrict,
+  operation_id text references public.lh_event_operations(operation_id) on delete restrict,
+  adjudication_id text,
   event_id text not null references public.lh_events(event_id) on delete restrict,
   game_id text not null references public.lh_game_scopes(game_id) on delete restrict,
   revision_sequence integer not null,
   base_server_event_version integer not null,
-  proposed_evidence_fields jsonb not null,
+  accepted_evidence_fields jsonb not null,
   prior_evidence_snapshot jsonb not null,
-  accepted_evidence_snapshot jsonb,
-  outcome_class text not null,
-  outcome_code text not null,
+  accepted_evidence_snapshot jsonb not null,
   actor_user_id uuid not null,
   actor_grant_id text references public.lh_access_grants(id) on delete restrict,
   recorded_at timestamptz not null default now(),
   constraint lh_event_revisions_sequence_positive check (revision_sequence > 0),
   constraint lh_event_revisions_base_positive check (base_server_event_version > 0),
-  constraint lh_event_revisions_outcome_check
-    check (outcome_class in ('accepted', 'rejected', 'conflicted')),
+  constraint lh_event_revisions_source_check
+    check (num_nonnulls(operation_id, adjudication_id) = 1),
   constraint lh_event_revisions_unique_sequence unique (event_id, revision_sequence)
 );
 
@@ -341,24 +336,6 @@ create table public.lh_event_tombstones (
   constraint lh_event_tombstones_sequence_positive check (tombstone_sequence > 0),
   constraint lh_event_tombstones_unique_sequence unique (event_id, tombstone_sequence)
 );
-
-create table public.lh_event_restorations (
-  restoration_id text primary key,
-  operation_id text not null unique references public.lh_event_operations(operation_id) on delete restrict,
-  event_id text not null references public.lh_events(event_id) on delete restrict,
-  game_id text not null references public.lh_game_scopes(game_id) on delete restrict,
-  tombstone_id text not null references public.lh_event_tombstones(tombstone_id) on delete restrict,
-  actor_user_id uuid not null,
-  actor_grant_id text references public.lh_access_grants(id) on delete restrict,
-  reason text not null default '',
-  recorded_at timestamptz not null default now()
-);
-
-alter table public.lh_event_restore_operations
-  add constraint lh_event_restore_operations_tombstone_fk
-  foreign key (tombstone_id)
-  references public.lh_event_tombstones(tombstone_id)
-  on delete restrict;
 
 create table public.lh_event_conflicts (
   conflict_id text primary key,
@@ -394,6 +371,25 @@ create table public.lh_conflict_adjudications (
     check (decision in ('keep_effective', 'accept_proposed', 'accept_custom_patch')),
   constraint lh_conflict_adjudications_unique_sequence
     unique (conflict_id, adjudication_sequence)
+);
+
+alter table public.lh_event_revisions
+  add constraint lh_event_revisions_adjudication_fk
+  foreign key (adjudication_id)
+  references public.lh_conflict_adjudications(adjudication_id)
+  on delete restrict;
+
+-- Notes and process/custom tags are annotations, not authoritative event
+-- evidence. Release 1 stores only the initial annotation payload. Annotation
+-- mutation is deliberately deferred rather than being misrepresented as an
+-- evidence correction.
+create table public.lh_event_annotations (
+  event_id text primary key references public.lh_events(event_id) on delete restrict,
+  game_id text not null references public.lh_game_scopes(game_id) on delete restrict,
+  annotations jsonb not null default '{}'::jsonb,
+  created_by_user_id uuid not null,
+  created_by_grant_id text not null references public.lh_access_grants(id) on delete restrict,
+  created_at timestamptz not null default now()
 );
 
 create table public.lh_live_share_tokens (
@@ -455,9 +451,13 @@ create index lh_event_operations_game_idx on public.lh_event_operations(game_id,
 create index lh_event_operation_attempts_client_idx
   on public.lh_event_operation_attempts(actor_user_id, client_operation_id, received_at desc);
 create index lh_event_revisions_event_idx on public.lh_event_revisions(event_id, revision_sequence);
-create index lh_event_revisions_operation_idx on public.lh_event_revisions(operation_id);
+create unique index lh_event_revisions_operation_idx
+  on public.lh_event_revisions(operation_id)
+  where operation_id is not null;
+create unique index lh_event_revisions_adjudication_idx
+  on public.lh_event_revisions(adjudication_id)
+  where adjudication_id is not null;
 create index lh_event_tombstones_event_idx on public.lh_event_tombstones(event_id, tombstone_sequence desc);
-create index lh_event_restorations_event_idx on public.lh_event_restorations(event_id, recorded_at desc);
 create index lh_event_conflicts_event_idx on public.lh_event_conflicts(event_id, recorded_at desc);
 create index lh_conflict_adjudications_conflict_idx
   on public.lh_conflict_adjudications(conflict_id, adjudication_sequence desc);
@@ -497,10 +497,17 @@ as $$
     'stat_label',
     'category',
     'point_value',
-    'tags',
-    'note',
     'field_zone'
   ]::text[];
+$$;
+
+create or replace function lh_trust_private.lh_annotation_fields()
+returns text[]
+language sql
+immutable
+set search_path = ''
+as $$
+  select array['note', 'tags']::text[];
 $$;
 
 create or replace function lh_trust_private.lh_live_share_game_fields()
@@ -577,10 +584,17 @@ as $$
     'stat_label',
     'category',
     'point_value',
-    'tags',
-    'note',
     'field_zone'
   ]::text[];
+$$;
+
+create or replace function lh_trust_private.lh_sensitive_export_annotation_fields()
+returns text[]
+language sql
+immutable
+set search_path = ''
+as $$
+  select array['note', 'tags']::text[];
 $$;
 
 create or replace function lh_trust_private.lh_valid_evidence(
@@ -614,10 +628,23 @@ as $$
     and (not (p_value ? 'stat_label') or pg_catalog.jsonb_typeof(p_value -> 'stat_label') = 'string')
     and (not (p_value ? 'category') or pg_catalog.jsonb_typeof(p_value -> 'category') = 'string')
     and (not (p_value ? 'point_value') or pg_catalog.jsonb_typeof(p_value -> 'point_value') = 'number')
-    and (not (p_value ? 'tags') or pg_catalog.jsonb_typeof(p_value -> 'tags') = 'array')
-    and (not (p_value ? 'note') or pg_catalog.jsonb_typeof(p_value -> 'note') = 'string')
     and (not (p_value ? 'field_zone') or pg_catalog.jsonb_typeof(p_value -> 'field_zone') = 'string')
     and (p_require_complete or p_value <> '{}'::jsonb);
+$$;
+
+create or replace function lh_trust_private.lh_valid_annotations(p_value jsonb)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select
+    lh_trust_private.lh_jsonb_has_only_keys(
+      p_value,
+      lh_trust_private.lh_annotation_fields()
+    )
+    and (not (p_value ? 'tags') or pg_catalog.jsonb_typeof(p_value -> 'tags') = 'array')
+    and (not (p_value ? 'note') or pg_catalog.jsonb_typeof(p_value -> 'note') = 'string');
 $$;
 
 alter table public.lh_events
@@ -632,13 +659,21 @@ alter table public.lh_event_create_operations
   add constraint lh_event_create_evidence_allowlist
   check (lh_trust_private.lh_valid_evidence(evidence, true));
 
+alter table public.lh_event_create_operations
+  add constraint lh_event_create_annotations_allowlist
+  check (lh_trust_private.lh_valid_annotations(annotations));
+
+alter table public.lh_event_annotations
+  add constraint lh_event_annotations_allowlist
+  check (lh_trust_private.lh_valid_annotations(annotations));
+
 alter table public.lh_event_correction_operations
   add constraint lh_event_correction_evidence_allowlist
   check (lh_trust_private.lh_valid_evidence(changed_evidence_fields, false));
 
 alter table public.lh_event_revisions
-  add constraint lh_event_revisions_proposed_allowlist
-  check (lh_trust_private.lh_valid_evidence(proposed_evidence_fields, false));
+  add constraint lh_event_revisions_accepted_fields_allowlist
+  check (lh_trust_private.lh_valid_evidence(accepted_evidence_fields, false));
 
 alter table public.lh_event_revisions
   add constraint lh_event_revisions_prior_allowlist
@@ -646,10 +681,7 @@ alter table public.lh_event_revisions
 
 alter table public.lh_event_revisions
   add constraint lh_event_revisions_accepted_allowlist
-  check (
-    accepted_evidence_snapshot is null
-    or lh_trust_private.lh_valid_evidence(accepted_evidence_snapshot, true)
-  );
+  check (lh_trust_private.lh_valid_evidence(accepted_evidence_snapshot, true));
 
 alter table public.lh_event_conflicts
   add constraint lh_event_conflicts_current_allowlist
@@ -710,10 +742,6 @@ create trigger lh_event_tombstone_operations_immutable
 before update or delete on public.lh_event_tombstone_operations
 for each row execute function lh_trust_private.lh_forbid_mutation();
 
-create trigger lh_event_restore_operations_immutable
-before update or delete on public.lh_event_restore_operations
-for each row execute function lh_trust_private.lh_forbid_mutation();
-
 create trigger lh_event_revisions_immutable
 before update or delete on public.lh_event_revisions
 for each row execute function lh_trust_private.lh_forbid_mutation();
@@ -722,8 +750,8 @@ create trigger lh_event_tombstones_immutable
 before update or delete on public.lh_event_tombstones
 for each row execute function lh_trust_private.lh_forbid_mutation();
 
-create trigger lh_event_restorations_immutable
-before update or delete on public.lh_event_restorations
+create trigger lh_event_annotations_immutable
+before update or delete on public.lh_event_annotations
 for each row execute function lh_trust_private.lh_forbid_mutation();
 
 create trigger lh_event_conflicts_immutable
@@ -737,6 +765,49 @@ for each row execute function lh_trust_private.lh_forbid_mutation();
 create trigger lh_security_audit_immutable
 before update or delete on public.lh_security_audit_events
 for each row execute function lh_trust_private.lh_forbid_mutation();
+
+create or replace function lh_trust_private.lh_validate_accepted_revision()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  source_operation public.lh_event_operations%rowtype;
+  source_adjudication public.lh_conflict_adjudications%rowtype;
+begin
+  if new.operation_id is not null then
+    select * into source_operation
+    from public.lh_event_operations
+    where operation_id = new.operation_id;
+
+    if not found
+      or source_operation.operation_type <> 'correct_event'
+      or source_operation.outcome_class <> 'accepted'
+    then
+      raise exception 'Revision source must be an accepted correction'
+        using errcode = '23514';
+    end if;
+  else
+    select * into source_adjudication
+    from public.lh_conflict_adjudications
+    where adjudication_id = new.adjudication_id;
+
+    if not found
+      or source_adjudication.decision not in ('accept_proposed', 'accept_custom_patch')
+    then
+      raise exception 'Revision source must be an accepting conflict adjudication'
+        using errcode = '23514';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger lh_event_revisions_validate_accepted
+before insert on public.lh_event_revisions
+for each row execute function lh_trust_private.lh_validate_accepted_revision();
 
 -- Active grant resolution is based on the latest append-only lifecycle entry,
 -- an accepted state, and a non-expired grant.
@@ -1258,16 +1329,285 @@ as $$
   );
 $$;
 
-create or replace function lh_trust_private.lh_next_revision_sequence(p_event_id text)
-returns integer
+create or replace function lh_trust_private.lh_can_register_legacy_scope(
+  p_user_id uuid,
+  p_team_id text,
+  p_roster_player_id text default null
+)
+returns boolean
 language sql
 stable
 security definer
 set search_path = ''
 as $$
-  select coalesce(max(revision_sequence), 0) + 1
-  from public.lh_event_revisions
-  where event_id = p_event_id;
+  select
+    exists (
+      select 1
+      from public.team_members as member
+      where member.user_id = p_user_id
+        and member.team_id = p_team_id
+        and member.role = 'admin'
+    )
+    or (
+      p_roster_player_id is not null
+      and exists (
+        select 1
+        from public.player_claims as claim
+        where claim.user_id = p_user_id
+          and claim.team_id = p_team_id
+          and claim.roster_player_id = p_roster_player_id
+      )
+    );
+$$;
+
+create or replace function lh_trust_private.lh_register_team_scope_impl(p_team_id text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_id uuid := auth.uid();
+  canonical_team public.teams%rowtype;
+begin
+  if actor_id is null then
+    return pg_catalog.jsonb_build_object('outcome', 'rejected', 'code', 'unauthorized');
+  end if;
+
+  select * into canonical_team
+  from public.teams
+  where id = p_team_id;
+
+  if not found then
+    return pg_catalog.jsonb_build_object('outcome', 'rejected', 'code', 'team_not_found');
+  end if;
+
+  if not lh_trust_private.lh_can_register_legacy_scope(actor_id, p_team_id, null) then
+    return pg_catalog.jsonb_build_object('outcome', 'rejected', 'code', 'unauthorized_scope');
+  end if;
+
+  insert into public.lh_team_scopes(
+    team_id,
+    team_name_snapshot,
+    registered_at,
+    snapshot_refreshed_at
+  )
+  values (canonical_team.id, canonical_team.name, pg_catalog.now(), pg_catalog.now())
+  on conflict (team_id) do update
+  set
+    team_name_snapshot = excluded.team_name_snapshot,
+    snapshot_refreshed_at = pg_catalog.now();
+
+  return pg_catalog.jsonb_build_object(
+    'outcome', 'accepted',
+    'code', 'team_scope_registered',
+    'teamId', canonical_team.id
+  );
+end;
+$$;
+
+create or replace function lh_trust_private.lh_register_player_scope_impl(
+  p_team_id text,
+  p_roster_player_id text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_id uuid := auth.uid();
+  canonical_team public.teams%rowtype;
+  canonical_player public.roster_players%rowtype;
+begin
+  if actor_id is null then
+    return pg_catalog.jsonb_build_object('outcome', 'rejected', 'code', 'unauthorized');
+  end if;
+
+  select * into canonical_team
+  from public.teams
+  where id = p_team_id;
+
+  select * into canonical_player
+  from public.roster_players
+  where id = p_roster_player_id
+    and team_id = p_team_id
+    and active is true;
+
+  if canonical_team.id is null or canonical_player.id is null then
+    return pg_catalog.jsonb_build_object(
+      'outcome', 'rejected', 'code', 'invalid_player_team_scope'
+    );
+  end if;
+
+  if not lh_trust_private.lh_can_register_legacy_scope(
+    actor_id,
+    p_team_id,
+    p_roster_player_id
+  ) then
+    return pg_catalog.jsonb_build_object('outcome', 'rejected', 'code', 'unauthorized_scope');
+  end if;
+
+  insert into public.lh_team_scopes(
+    team_id,
+    team_name_snapshot,
+    registered_at,
+    snapshot_refreshed_at
+  )
+  values (canonical_team.id, canonical_team.name, pg_catalog.now(), pg_catalog.now())
+  on conflict (team_id) do update
+  set
+    team_name_snapshot = excluded.team_name_snapshot,
+    snapshot_refreshed_at = pg_catalog.now();
+
+  insert into public.lh_player_scopes(
+    team_id,
+    roster_player_id,
+    player_name_snapshot,
+    jersey_snapshot,
+    position_snapshot,
+    registered_at,
+    snapshot_refreshed_at
+  )
+  values (
+    canonical_team.id,
+    canonical_player.id,
+    canonical_player.name,
+    canonical_player.number,
+    canonical_player.position,
+    pg_catalog.now(),
+    pg_catalog.now()
+  )
+  on conflict (team_id, roster_player_id) do update
+  set
+    player_name_snapshot = excluded.player_name_snapshot,
+    jersey_snapshot = excluded.jersey_snapshot,
+    position_snapshot = excluded.position_snapshot,
+    snapshot_refreshed_at = pg_catalog.now();
+
+  return pg_catalog.jsonb_build_object(
+    'outcome', 'accepted',
+    'code', 'player_scope_registered',
+    'teamId', canonical_team.id,
+    'rosterPlayerId', canonical_player.id
+  );
+end;
+$$;
+
+create or replace function lh_trust_private.lh_register_game_scope_impl(p_game_id text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_id uuid := auth.uid();
+  canonical_game public.games%rowtype;
+  canonical_team public.teams%rowtype;
+  canonical_player public.roster_players%rowtype;
+  existing_game_scope public.lh_game_scopes%rowtype;
+begin
+  if actor_id is null then
+    return pg_catalog.jsonb_build_object('outcome', 'rejected', 'code', 'unauthorized');
+  end if;
+
+  select * into canonical_game
+  from public.games
+  where id = p_game_id;
+
+  if not found
+    or canonical_game.team_id is null
+    or canonical_game.roster_player_id is null
+  then
+    return pg_catalog.jsonb_build_object(
+      'outcome', 'rejected', 'code', 'game_scope_incomplete'
+    );
+  end if;
+
+  select * into canonical_team
+  from public.teams
+  where id = canonical_game.team_id;
+
+  select * into canonical_player
+  from public.roster_players
+  where id = canonical_game.roster_player_id
+    and team_id = canonical_game.team_id
+    and active is true;
+
+  if canonical_team.id is null or canonical_player.id is null then
+    return pg_catalog.jsonb_build_object(
+      'outcome', 'rejected', 'code', 'invalid_game_player_team_scope'
+    );
+  end if;
+
+  if not lh_trust_private.lh_can_register_legacy_scope(
+    actor_id,
+    canonical_game.team_id,
+    canonical_game.roster_player_id
+  ) then
+    return pg_catalog.jsonb_build_object('outcome', 'rejected', 'code', 'unauthorized_scope');
+  end if;
+
+  select * into existing_game_scope
+  from public.lh_game_scopes
+  where game_id = p_game_id
+  for update;
+
+  if found
+    and (
+      existing_game_scope.team_id <> canonical_game.team_id
+      or existing_game_scope.roster_player_id <> canonical_game.roster_player_id
+    )
+  then
+    return pg_catalog.jsonb_build_object(
+      'outcome', 'rejected', 'code', 'historical_game_identity_mismatch'
+    );
+  end if;
+
+  perform lh_trust_private.lh_register_player_scope_impl(
+    canonical_game.team_id,
+    canonical_game.roster_player_id
+  );
+
+  insert into public.lh_game_scopes(
+    game_id,
+    team_id,
+    roster_player_id,
+    opponent_snapshot,
+    game_date_snapshot,
+    period_format_snapshot,
+    registered_at,
+    snapshot_refreshed_at
+  )
+  values (
+    canonical_game.id,
+    canonical_game.team_id,
+    canonical_game.roster_player_id,
+    canonical_game.opponent,
+    canonical_game.game_date,
+    case
+      when canonical_game.period_format in ('quarters', 'halves')
+        then canonical_game.period_format
+      else 'quarters'
+    end,
+    pg_catalog.now(),
+    pg_catalog.now()
+  )
+  on conflict (game_id) do update
+  set
+    opponent_snapshot = excluded.opponent_snapshot,
+    game_date_snapshot = excluded.game_date_snapshot,
+    period_format_snapshot = excluded.period_format_snapshot,
+    snapshot_refreshed_at = pg_catalog.now();
+
+  return pg_catalog.jsonb_build_object(
+    'outcome', 'accepted',
+    'code', 'game_scope_registered',
+    'gameId', canonical_game.id,
+    'teamId', canonical_game.team_id,
+    'rosterPlayerId', canonical_game.roster_player_id
+  );
+end;
 $$;
 
 create or replace function lh_trust_private.lh_create_event_impl(p_operation jsonb)
@@ -1282,6 +1622,7 @@ declare
   event_id text := p_operation ->> 'event_id';
   game_id text := p_operation ->> 'game_id';
   evidence jsonb := p_operation -> 'evidence';
+  annotations jsonb := coalesce(p_operation -> 'annotations', '{}'::jsonb);
   request_hash text := lh_trust_private.lh_operation_hash(p_operation);
   replay jsonb;
   grant_id text;
@@ -1310,13 +1651,21 @@ begin
 
   if not lh_trust_private.lh_jsonb_has_only_keys(
     p_operation,
-    array['client_operation_id', 'event_id', 'game_id', 'evidence', 'client_created_at']
+    array[
+      'client_operation_id',
+      'event_id',
+      'game_id',
+      'evidence',
+      'annotations',
+      'client_created_at'
+    ]
   )
     or event_id is null
     or event_id = ''
     or game_id is null
     or game_id = ''
     or not lh_trust_private.lh_valid_evidence(evidence, true)
+    or not lh_trust_private.lh_valid_annotations(annotations)
   then
     select * into operation
     from lh_trust_private.lh_record_operation(
@@ -1394,8 +1743,14 @@ begin
     request_hash, 'accepted', 'created', 1, grant_id, client_time
   );
 
-  insert into public.lh_event_create_operations(operation_id, event_id, game_id, evidence)
-  values (operation.operation_id, event_id, game_id, evidence);
+  insert into public.lh_event_create_operations(
+    operation_id,
+    event_id,
+    game_id,
+    evidence,
+    annotations
+  )
+  values (operation.operation_id, event_id, game_id, evidence, annotations);
 
   insert into public.lh_events(
     event_id,
@@ -1415,6 +1770,23 @@ begin
     grant_id,
     evidence
   );
+
+  if annotations <> '{}'::jsonb then
+    insert into public.lh_event_annotations(
+      event_id,
+      game_id,
+      annotations,
+      created_by_user_id,
+      created_by_grant_id
+    )
+    values (
+      event_id,
+      game_id,
+      annotations,
+      actor_id,
+      grant_id
+    );
+  end if;
 
   insert into public.lh_event_effective_versions(
     event_id,
@@ -1578,14 +1950,11 @@ begin
   where exists (
     select 1
     from public.lh_event_revisions as revisions,
-      lateral pg_catalog.jsonb_object_keys(revisions.proposed_evidence_fields) as accepted(key)
+      lateral pg_catalog.jsonb_object_keys(revisions.accepted_evidence_fields) as accepted(key)
     where revisions.event_id = p_operation ->> 'event_id'
-      and revisions.outcome_class = 'accepted'
       and revisions.base_server_event_version >= base_version
       and accepted.key = proposed.key
   );
-
-  revision_sequence := lh_trust_private.lh_next_revision_sequence(event_id);
 
   if cardinality(overlapping_fields) > 0
     and base_version < effective.server_event_version
@@ -1626,37 +1995,6 @@ begin
     coalesce(p_operation ->> 'correction_reason', '')
   );
 
-  insert into public.lh_event_revisions(
-    revision_id,
-    operation_id,
-    event_id,
-    game_id,
-    revision_sequence,
-    base_server_event_version,
-    proposed_evidence_fields,
-    prior_evidence_snapshot,
-    accepted_evidence_snapshot,
-    outcome_class,
-    outcome_code,
-    actor_user_id,
-    actor_grant_id
-  )
-  values (
-    pg_catalog.gen_random_uuid()::text,
-    operation.operation_id,
-    event_id,
-    game_id,
-    revision_sequence,
-    base_version,
-    changes,
-    effective.effective_evidence,
-    case when outcome_class = 'accepted' then merged_evidence else null end,
-    outcome_class,
-    outcome_code,
-    actor_id,
-    grant_id
-  );
-
   if outcome_class = 'conflicted' then
     insert into public.lh_event_conflicts(
       conflict_id,
@@ -1681,9 +2019,43 @@ begin
       changes
     );
   else
+    -- The effective row is locked above. Its accepted revision counter is the
+    -- transaction-safe allocator for authoritative evidence history.
+    revision_sequence := effective.accepted_revision_sequence + 1;
+
+    insert into public.lh_event_revisions(
+      revision_id,
+      operation_id,
+      adjudication_id,
+      event_id,
+      game_id,
+      revision_sequence,
+      base_server_event_version,
+      accepted_evidence_fields,
+      prior_evidence_snapshot,
+      accepted_evidence_snapshot,
+      actor_user_id,
+      actor_grant_id
+    )
+    values (
+      pg_catalog.gen_random_uuid()::text,
+      operation.operation_id,
+      null,
+      event_id,
+      game_id,
+      revision_sequence,
+      base_version,
+      changes,
+      effective.effective_evidence,
+      merged_evidence,
+      actor_id,
+      grant_id
+    );
+
     update public.lh_event_effective_versions
     set
       server_event_version = result_version,
+      accepted_revision_sequence = revision_sequence,
       effective_evidence = merged_evidence,
       updated_at = pg_catalog.now()
     where lh_event_effective_versions.event_id = p_operation ->> 'event_id';
@@ -1712,7 +2084,6 @@ declare
   operation public.lh_event_operations%rowtype;
   outcome_code text;
   client_time timestamptz;
-  next_sequence integer;
 begin
   if actor_id is null then
     return pg_catalog.jsonb_build_object('outcome', 'rejected', 'code', 'unauthorized');
@@ -1837,11 +2208,6 @@ begin
     coalesce(p_operation ->> 'tombstone_reason', '')
   );
 
-  select coalesce(max(tombstone_sequence), 0) + 1
-  into next_sequence
-  from public.lh_event_tombstones
-  where lh_event_tombstones.event_id = p_operation ->> 'event_id';
-
   insert into public.lh_event_tombstones(
     tombstone_id,
     operation_id,
@@ -1857,7 +2223,7 @@ begin
     operation.operation_id,
     event_id,
     game_id,
-    next_sequence,
+    1,
     actor_id,
     grant_id,
     coalesce(p_operation ->> 'tombstone_reason', '')
@@ -2042,7 +2408,8 @@ begin
     pg_catalog.jsonb_build_object(
       'exportType', p_export_type,
       'gameFields', to_jsonb(lh_trust_private.lh_sensitive_export_game_fields()),
-      'eventFields', to_jsonb(lh_trust_private.lh_sensitive_export_event_fields())
+      'eventFields', to_jsonb(lh_trust_private.lh_sensitive_export_event_fields()),
+      'annotationFields', to_jsonb(lh_trust_private.lh_sensitive_export_annotation_fields())
     )
   );
 
@@ -2051,7 +2418,8 @@ begin
     'code', 'export_audit_recorded',
     'auditId', audit_id,
     'gameFields', to_jsonb(lh_trust_private.lh_sensitive_export_game_fields()),
-    'eventFields', to_jsonb(lh_trust_private.lh_sensitive_export_event_fields())
+    'eventFields', to_jsonb(lh_trust_private.lh_sensitive_export_event_fields()),
+    'annotationFields', to_jsonb(lh_trust_private.lh_sensitive_export_annotation_fields())
   );
 end;
 $$;
@@ -2059,6 +2427,42 @@ $$;
 -- Public Data API wrappers. The privilege-bearing implementations remain in
 -- the non-exposed private schema with fixed search paths and explicit auth/scope
 -- checks.
+create or replace function public.lh_register_team_scope(p_team_id text)
+returns jsonb
+language sql
+volatile
+security definer
+set search_path = ''
+as $$
+  select lh_trust_private.lh_register_team_scope_impl(p_team_id);
+$$;
+
+create or replace function public.lh_register_player_scope(
+  p_team_id text,
+  p_roster_player_id text
+)
+returns jsonb
+language sql
+volatile
+security definer
+set search_path = ''
+as $$
+  select lh_trust_private.lh_register_player_scope_impl(
+    p_team_id,
+    p_roster_player_id
+  );
+$$;
+
+create or replace function public.lh_register_game_scope(p_game_id text)
+returns jsonb
+language sql
+volatile
+security definer
+set search_path = ''
+as $$
+  select lh_trust_private.lh_register_game_scope_impl(p_game_id);
+$$;
+
 create or replace function public.lh_resolve_active_grants()
 returns table (
   grant_id text,
@@ -2071,7 +2475,7 @@ returns table (
 )
 language sql
 stable
-security invoker
+security definer
 set search_path = ''
 as $$
   select *
@@ -2082,7 +2486,7 @@ create or replace function public.lh_create_event(p_operation jsonb)
 returns jsonb
 language sql
 volatile
-security invoker
+security definer
 set search_path = ''
 as $$
   select lh_trust_private.lh_create_event_impl(p_operation);
@@ -2092,7 +2496,7 @@ create or replace function public.lh_correct_event(p_operation jsonb)
 returns jsonb
 language sql
 volatile
-security invoker
+security definer
 set search_path = ''
 as $$
   select lh_trust_private.lh_correct_event_impl(p_operation);
@@ -2102,7 +2506,7 @@ create or replace function public.lh_tombstone_event(p_operation jsonb)
 returns jsonb
 language sql
 volatile
-security invoker
+security definer
 set search_path = ''
 as $$
   select lh_trust_private.lh_tombstone_event_impl(p_operation);
@@ -2112,7 +2516,7 @@ create or replace function public.lh_public_live_share_game(p_share_code text)
 returns jsonb
 language sql
 stable
-security invoker
+security definer
 set search_path = ''
 as $$
   select lh_trust_private.lh_public_live_share_game_impl(p_share_code);
@@ -2125,7 +2529,7 @@ create or replace function public.lh_record_sensitive_export(
 returns jsonb
 language sql
 volatile
-security invoker
+security definer
 set search_path = ''
 as $$
   select lh_trust_private.lh_record_sensitive_export_impl(p_export_type, p_game_id);
@@ -2150,10 +2554,9 @@ begin
     'lh_event_create_operations',
     'lh_event_correction_operations',
     'lh_event_tombstone_operations',
-    'lh_event_restore_operations',
     'lh_event_revisions',
     'lh_event_tombstones',
-    'lh_event_restorations',
+    'lh_event_annotations',
     'lh_event_conflicts',
     'lh_conflict_adjudications',
     'lh_live_share_tokens',
@@ -2171,21 +2574,21 @@ end;
 $$;
 
 revoke all on all functions in schema lh_trust_private from public, anon, authenticated;
-grant usage on schema lh_trust_private to anon, authenticated;
+revoke all on schema lh_trust_private from public, anon, authenticated;
 
-grant execute on function lh_trust_private.lh_active_grants_for_user(uuid, timestamptz)
-  to authenticated;
-grant execute on function lh_trust_private.lh_create_event_impl(jsonb)
-  to authenticated;
-grant execute on function lh_trust_private.lh_correct_event_impl(jsonb)
-  to authenticated;
-grant execute on function lh_trust_private.lh_tombstone_event_impl(jsonb)
-  to authenticated;
-grant execute on function lh_trust_private.lh_public_live_share_game_impl(text)
-  to anon, authenticated;
-grant execute on function lh_trust_private.lh_record_sensitive_export_impl(text, text)
-  to authenticated;
+alter function public.lh_register_team_scope(text) owner to postgres;
+alter function public.lh_register_player_scope(text, text) owner to postgres;
+alter function public.lh_register_game_scope(text) owner to postgres;
+alter function public.lh_resolve_active_grants() owner to postgres;
+alter function public.lh_create_event(jsonb) owner to postgres;
+alter function public.lh_correct_event(jsonb) owner to postgres;
+alter function public.lh_tombstone_event(jsonb) owner to postgres;
+alter function public.lh_public_live_share_game(text) owner to postgres;
+alter function public.lh_record_sensitive_export(text, text) owner to postgres;
 
+revoke execute on function public.lh_register_team_scope(text) from public, anon, authenticated;
+revoke execute on function public.lh_register_player_scope(text, text) from public, anon, authenticated;
+revoke execute on function public.lh_register_game_scope(text) from public, anon, authenticated;
 revoke execute on function public.lh_resolve_active_grants() from public, anon, authenticated;
 revoke execute on function public.lh_create_event(jsonb) from public, anon, authenticated;
 revoke execute on function public.lh_correct_event(jsonb) from public, anon, authenticated;
@@ -2193,6 +2596,9 @@ revoke execute on function public.lh_tombstone_event(jsonb) from public, anon, a
 revoke execute on function public.lh_public_live_share_game(text) from public, anon, authenticated;
 revoke execute on function public.lh_record_sensitive_export(text, text) from public, anon, authenticated;
 
+grant execute on function public.lh_register_team_scope(text) to authenticated;
+grant execute on function public.lh_register_player_scope(text, text) to authenticated;
+grant execute on function public.lh_register_game_scope(text) to authenticated;
 grant execute on function public.lh_resolve_active_grants() to authenticated;
 grant execute on function public.lh_create_event(jsonb) to authenticated;
 grant execute on function public.lh_correct_event(jsonb) to authenticated;

@@ -122,12 +122,12 @@ test("Release 1 scope excludes deferred roles and systems", () => {
   }
 });
 
-test("All 21 Trust Spine tables are in the deny-all RLS list", () => {
+test("All 20 Trust Spine tables are in the deny-all RLS list", () => {
   const createdTables = matches(
     migration,
     /create\s+table\s+public\.(lh_[a-z0-9_]+)\s*\(/gi,
   ).map((match) => match[1]);
-  assert.equal(createdTables.length, 21, "Unexpected Trust Spine table count");
+  assert.equal(createdTables.length, 20, "Unexpected Trust Spine table count");
 
   const denyAllBlock = migration.match(
     /foreach\s+table_name\s+in\s+array\s+array\[(?<tables>[\s\S]*?)\]\s+loop/i,
@@ -178,8 +178,11 @@ test("Staging rollback removes exactly the additive Trust Spine tables", () => {
   }
 });
 
-test("Only the six approved public RPCs are created and granted", () => {
+test("Only the nine approved public RPCs are created and granted", () => {
   const expected = [
+    "lh_register_team_scope",
+    "lh_register_player_scope",
+    "lh_register_game_scope",
     "lh_resolve_active_grants",
     "lh_create_event",
     "lh_correct_event",
@@ -201,19 +204,37 @@ test("Only the six approved public RPCs are created and granted", () => {
   }
 });
 
-test("Public RPC wrappers are invokers and privilege-bearing functions are private", () => {
+test("Public RPC wrappers are fixed-path definers and private helpers are unreachable", () => {
   const publicBlocks = matches(
     migration,
     /create\s+or\s+replace\s+function\s+public\.lh_[\s\S]*?\$\$;/gi,
   );
-  assert.equal(publicBlocks.length, 6);
+  assert.equal(publicBlocks.length, 9);
   for (const block of publicBlocks) {
-    assert.match(block[0], /security invoker/i);
+    assert.match(block[0], /security definer/i);
     assert.match(block[0], /set search_path = ''/i);
   }
   assert.match(
     migration,
     /create\s+or\s+replace\s+function\s+lh_trust_private\.lh_create_event_impl[\s\S]*?security definer[\s\S]*?set search_path = ''/i,
+  );
+  assert.match(
+    migration,
+    /revoke all on schema lh_trust_private from public, anon, authenticated/i,
+  );
+  assert.match(
+    migration,
+    /revoke all on all functions in schema lh_trust_private from public, anon, authenticated/i,
+  );
+  assert.equal(
+    /grant\s+usage\s+on\s+schema\s+lh_trust_private/i.test(migration),
+    false,
+    "Private schema usage is granted to a browser role",
+  );
+  assert.equal(
+    /grant\s+execute\s+on\s+function\s+lh_trust_private\./i.test(migration),
+    false,
+    "Private helper execution is granted to a browser role",
   );
 });
 
@@ -234,31 +255,90 @@ test("Grant lifecycle and constrained provenance are represented", () => {
   assert.match(migration, /lh_validate_grant_lifecycle/i);
 });
 
-test("Create, correction, tombstone, and restore operation records are separate", () => {
+test("Create, correction, and permanent tombstone operation records are separate", () => {
   for (const tableName of [
     "lh_event_create_operations",
     "lh_event_correction_operations",
     "lh_event_tombstone_operations",
-    "lh_event_restore_operations",
   ]) {
     assert.match(migration, new RegExp(`create table public\\.${tableName}\\b`, "i"));
   }
+  assert.equal(/restore_event|lh_event_restore|lh_event_restoration/i.test(migration), false);
 });
 
-test("Accepted, rejected, conflicted, and append-only adjudication semantics exist", () => {
+test("Operations preserve all outcomes while revisions preserve accepted evidence only", () => {
   assert.match(migration, /check \(outcome_class in \('accepted', 'rejected', 'conflicted'\)\)/i);
   assert.match(migration, /create table public\.lh_event_conflicts/i);
   assert.match(migration, /create table public\.lh_conflict_adjudications/i);
   assert.match(migration, /lh_conflict_adjudications_immutable/i);
+  assert.match(migration, /accepted_evidence_fields jsonb not null/i);
+  assert.match(migration, /lh_validate_accepted_revision/i);
+  const revisionTable = migration.match(
+    /create table public\.lh_event_revisions\s*\(([\s\S]*?)\n\);/i,
+  )?.[1] || "";
+  assert.equal(
+    /outcome_class|outcome_code|proposed_evidence_fields/i.test(revisionTable),
+    false,
+    "Revision rows still carry rejected/conflicted outcomes",
+  );
 });
 
-test("Evidence, Live Share, and export field allowlists are explicit", () => {
+test("Scope registration is canonical, idempotent, and does not issue grants", () => {
+  for (const helper of [
+    "lh_register_team_scope_impl",
+    "lh_register_player_scope_impl",
+    "lh_register_game_scope_impl",
+  ]) {
+    assert.match(migration, new RegExp(`function\\s+lh_trust_private\\.${helper}\\b`, "i"));
+  }
+  assert.match(migration, /on conflict \(team_id\) do update/i);
+  assert.match(migration, /on conflict \(team_id, roster_player_id\) do update/i);
+  assert.match(migration, /on conflict \(game_id\) do update/i);
+  assert.match(migration, /historical_game_identity_mismatch/i);
+  assert.match(migration, /invalid_game_player_team_scope/i);
+  const registrationSection = migration.slice(
+    migration.indexOf("function lh_trust_private.lh_can_register_legacy_scope"),
+    migration.indexOf("function lh_trust_private.lh_create_event_impl"),
+  );
+  assert.equal(
+    /insert\s+into\s+public\.lh_access_grants/i.test(registrationSection),
+    false,
+    "Scope registration issues access grants",
+  );
+});
+
+test("Accepted revision sequencing uses the locked effective-row counter", () => {
+  assert.match(migration, /accepted_revision_sequence integer not null default 0/i);
+  assert.match(
+    migration,
+    /select \* into effective[\s\S]*?from public\.lh_event_effective_versions[\s\S]*?for update;/i,
+  );
+  assert.match(
+    migration,
+    /revision_sequence := effective\.accepted_revision_sequence \+ 1/i,
+  );
+  assert.match(
+    migration,
+    /accepted_revision_sequence = revision_sequence/i,
+  );
+  assert.equal(/lh_next_revision_sequence|max\(revision_sequence\)/i.test(migration), false);
+});
+
+test("Evidence, annotations, Live Share, and export field allowlists are explicit", () => {
   assert.match(migration, /lh_evidence_fields\(\)/i);
+  assert.match(migration, /lh_annotation_fields\(\)/i);
+  assert.match(migration, /lh_valid_annotations/i);
+  assert.match(migration, /create table public\.lh_event_annotations/i);
   assert.match(migration, /lh_live_share_game_fields\(\)/i);
   assert.match(migration, /lh_live_share_event_fields\(\)/i);
   assert.match(migration, /lh_sensitive_export_game_fields\(\)/i);
   assert.match(migration, /lh_sensitive_export_event_fields\(\)/i);
+  assert.match(migration, /lh_sensitive_export_annotation_fields\(\)/i);
   assert.match(migration, /lh_jsonb_has_only_keys/i);
+  const evidenceFields = migration.match(
+    /function lh_trust_private\.lh_evidence_fields\(\)[\s\S]*?\$\$;/i,
+  )?.[0] || "";
+  assert.equal(/'note'|'tags'/i.test(evidenceFields), false);
 });
 
 test("The SQL suite covers every required staging scenario", () => {
@@ -283,11 +363,18 @@ test("The SQL suite covers every required staging scenario", () => {
     "export audit",
     "adjudication update",
     "RLS posture",
+    "private helper invocation",
+    "accepted revision",
+    "annotation fields",
+    "scope registration",
+    "tombstones are permanent",
+    "inactive Live Share token",
+    "concurrency-safe revision counter",
   ];
   for (const marker of requiredMarkers) {
     assert.match(sqlTests, new RegExp(marker, "i"), `Missing test marker: ${marker}`);
   }
-  assert.match(sqlTests, /sqlTestsPassed', 24/i);
+  assert.match(sqlTests, /sqlTestsPassed', 33/i);
   assert.match(sqlTests, /rollback;/i);
 });
 

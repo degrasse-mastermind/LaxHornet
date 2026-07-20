@@ -31,7 +31,7 @@ The migration:
 - Enables and forces RLS on every new table.
 - Revokes all direct table privileges from `PUBLIC`, `anon`, and
   `authenticated`.
-- Exposes only six narrow public RPC wrappers.
+- Exposes only nine narrow public RPC wrappers.
 - Does not alter legacy LaxHornet tables, runtime code, caches, or UI.
 
 ## 3. Run the SQL acceptance suite
@@ -43,7 +43,7 @@ psql $env:LAXHORNET_STAGING_DATABASE_URL -v ON_ERROR_STOP=1 -f "docs/methodnorth
 Expected final result:
 
 ```json
-{"suite":"LaxHornet Trust Spine Release 1","fixtures":"synthetic","transaction":"rolled_back","sqlTestsPassed":24}
+{"suite":"LaxHornet Trust Spine Release 1","fixtures":"synthetic","transaction":"rolled_back","sqlTestsPassed":33}
 ```
 
 The SQL suite is transactional and rolls back its synthetic fixtures. The
@@ -59,7 +59,7 @@ node --check app.js
 
 ## 5. Inspect deny-all posture
 
-Confirm all 21 new tables have both RLS flags and no browser-role table grants:
+Confirm all 20 new tables have both RLS flags and no browser-role table grants:
 
 ```sql
 select c.relname, c.relrowsecurity, c.relforcerowsecurity
@@ -78,11 +78,30 @@ where table_schema = 'public'
 
 The second query must return zero rows.
 
-## 6. Release decision
+Confirm private helpers are not client reachable:
+
+```sql
+select routine_name, grantee
+from information_schema.routine_privileges
+where routine_schema = 'lh_trust_private'
+  and grantee in ('PUBLIC', 'anon', 'authenticated');
+```
+
+This query must return zero rows. Also inspect the Supabase API settings and
+confirm `lh_trust_private` is not listed as an exposed schema.
+
+## 6. Real-session and concurrency checks
+
+Use synthetic Supabase Auth users for parent, coach, and team-admin grants.
+Exercise each public wrapper through PostgREST, attempt private helper calls,
+and run same-event corrections from separate authenticated sessions. Record
+raw requests and responses with secrets removed.
+
+## 7. Release decision
 
 Do not begin a pilot until:
 
-- The migration and all 24 SQL tests pass on an isolated LaxHornet Supabase
+- The migration and all 33 SQL tests pass on an isolated LaxHornet Supabase
   staging target.
 - The public RPCs are exercised through real Supabase Auth/PostgREST sessions.
 - Live Share is verified unauthenticated and exposes only the allowlisted
@@ -99,3 +118,6 @@ Stop and roll back staging if:
 - Any tombstoned event can be recreated or corrected.
 - Any unallowlisted field appears in Live Share or export manifests.
 - A duplicate operation ID can change its original payload.
+- The private schema is exposed through the API.
+- A real separate-session correction test produces duplicate or lost accepted
+  evidence.

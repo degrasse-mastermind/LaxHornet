@@ -68,3 +68,15 @@ Nothing was removed from production code, production SQL, runtime config, or exi
 The current app can continue as the current product, but it does not yet meet the Trust Spine Release 1 standard for immutable evidence, durable tombstones, explicit operation receipts, active grant authority, public-safe Live Share projections, or correction conflict handling.
 
 Production migration and Project One UI remain blocked until the LH-00 review accepts a narrowed staging implementation plan and test suite.
+
+## Release 1 hardening addendum
+
+The additive Trust Spine staging implementation now includes private-helper
+isolation, permanent tombstones, accepted-only revisions, explicit annotation
+separation, authorized legacy scope registration, effective-row revision
+sequencing, nine audited public RPC wrappers, 33 SQL acceptance groups, and a
+rollback-preservation test.
+
+This does not change the production gate result. A disposable Supabase staging
+environment was unavailable, so real Auth/PostgREST/Realtime/concurrency and
+remote rollback proof remain required before browser integration.

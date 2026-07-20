@@ -18,6 +18,78 @@ begin;
 -- admin_b:       99999999-9999-4999-8999-999999999999
 -- renewed_user:  aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa
 
+-- Canonical legacy fixtures used only to exercise the scope-registration
+-- bridge. They are rolled back with the suite.
+insert into auth.users(id, email)
+values
+  ('11111111-1111-4111-8111-111111111111', 'parent-a@example.test'),
+  ('22222222-2222-4222-8222-222222222222', 'coach-a@example.test'),
+  ('33333333-3333-4333-8333-333333333333', 'coach-player@example.test'),
+  ('44444444-4444-4444-8444-444444444444', 'admin-a@example.test'),
+  ('55555555-5555-4555-8555-555555555555', 'pending@example.test'),
+  ('66666666-6666-4666-8666-666666666666', 'expired@example.test'),
+  ('77777777-7777-4777-8777-777777777777', 'revoked@example.test'),
+  ('88888888-8888-4888-8888-888888888888', 'parent-b@example.test'),
+  ('99999999-9999-4999-8999-999999999999', 'admin-b@example.test'),
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'renewed@example.test')
+on conflict (id) do nothing;
+
+insert into public.teams(id, name, invite_code, tracker_code, created_by)
+values
+  ('legacy-team-a', 'Legacy Demo Hornets', 'LEGACYA', 'TRACKA',
+    '44444444-4444-4444-8444-444444444444'),
+  ('legacy-team-b', 'Legacy Other Team', 'LEGACYB', 'TRACKB',
+    '99999999-9999-4999-8999-999999999999');
+
+insert into public.team_members(id, team_id, user_id, role)
+values
+  ('legacy-member-admin-a', 'legacy-team-a',
+    '44444444-4444-4444-8444-444444444444', 'admin'),
+  ('legacy-member-admin-b', 'legacy-team-b',
+    '99999999-9999-4999-8999-999999999999', 'admin');
+
+insert into public.roster_players(id, team_id, name, number, position, active)
+values
+  ('legacy-player-a', 'legacy-team-a', 'Offline Demo Player', '12', 'Midfield', true),
+  ('legacy-player-b', 'legacy-team-b', 'Other Offline Player', '88', 'Defense', true);
+
+insert into public.player_claims(id, team_id, roster_player_id, user_id)
+values (
+  'legacy-claim-parent-a',
+  'legacy-team-a',
+  'legacy-player-a',
+  '11111111-1111-4111-8111-111111111111'
+);
+
+insert into public.games(
+  id,
+  player_id,
+  user_id,
+  share_code,
+  opponent,
+  game_date,
+  period_format,
+  player_snapshot,
+  current_quarter,
+  status,
+  team_id,
+  roster_player_id
+)
+values (
+  'offline-local-game-a',
+  'legacy-player-a',
+  '11111111-1111-4111-8111-111111111111',
+  'OFFLINE-LOCAL-SHARE',
+  'Offline Opponent',
+  date '2026-07-20',
+  'halves',
+  '{"name":"Offline Demo Player","number":"12"}'::jsonb,
+  'H1',
+  'in-progress',
+  'legacy-team-a',
+  'legacy-player-a'
+);
+
 insert into public.lh_team_scopes(team_id, team_name_snapshot)
 values
   ('team-a', 'Branford Demo Hornets'),
@@ -676,9 +748,11 @@ begin
         "stat_label":"Ground Ball",
         "category":"Possession",
         "point_value":2,
-        "tags":["Contested"],
-        "note":"Private test note",
         "field_zone":"midfield"
+      },
+      "annotations":{
+        "tags":["Contested"],
+        "note":"Private test note"
       }
     }'::jsonb
   );
@@ -688,6 +762,19 @@ begin
 end;
 $test$;
 reset role;
+
+do $test$
+begin
+  if not exists (
+    select 1
+    from public.lh_event_annotations
+    where event_id = 'event-main'
+      and annotations ->> 'note' = 'Private test note'
+  ) then
+    raise exception 'TEST 6 failed: private annotations were not separated';
+  end if;
+end;
+$test$;
 
 -- 7. Cross-player and cross-team create attempts are denied.
 set local role authenticated;
@@ -942,12 +1029,12 @@ declare
 begin
   result := public.lh_correct_event(
     '{
-      "client_operation_id":"corr-note",
+      "client_operation_id":"corr-label",
       "event_id":"event-main",
       "game_id":"game-a1",
       "base_server_event_version":1,
-      "changes":{"note":"Updated private note"},
-      "correction_reason":"Note correction"
+      "changes":{"stat_label":"Loose Ball Win"},
+      "correction_reason":"Label correction"
     }'::jsonb
   );
   if result ->> 'outcome' <> 'accepted'
@@ -1004,12 +1091,12 @@ declare
 begin
   result := public.lh_correct_event(
     '{
-      "client_operation_id":"corr-note",
+      "client_operation_id":"corr-label",
       "event_id":"event-main",
       "game_id":"game-a1",
       "base_server_event_version":1,
-      "changes":{"note":"Updated private note"},
-      "correction_reason":"Note correction"
+      "changes":{"stat_label":"Loose Ball Win"},
+      "correction_reason":"Label correction"
     }'::jsonb
   );
   if result ->> 'outcome' <> 'accepted'
@@ -1023,7 +1110,7 @@ reset role;
 
 do $test$
 begin
-  if (select count(*) from public.lh_event_revisions where event_id = 'event-main') <> 3 then
+  if (select count(*) from public.lh_event_revisions where event_id = 'event-main') <> 2 then
     raise exception 'TEST 15 failed: replay created a duplicate revision';
   end if;
 end;
@@ -1042,12 +1129,12 @@ declare
 begin
   result := public.lh_correct_event(
     '{
-      "client_operation_id":"corr-note",
+      "client_operation_id":"corr-label",
       "event_id":"event-main",
       "game_id":"game-a1",
       "base_server_event_version":1,
-      "changes":{"note":"Tampered duplicate payload"},
-      "correction_reason":"Note correction"
+      "changes":{"stat_label":"Tampered duplicate payload"},
+      "correction_reason":"Label correction"
     }'::jsonb
   );
   if result ->> 'outcome' <> 'rejected'
@@ -1107,7 +1194,7 @@ begin
       "event_id":"event-main",
       "game_id":"game-a1",
       "base_server_event_version":4,
-      "changes":{"note":"Should not resurrect"}
+      "changes":{"stat_label":"Should not resurrect"}
     }'::jsonb
   );
   recreate := public.lh_create_event(
@@ -1171,10 +1258,9 @@ begin
         "stat_label":"Successful Clear",
         "category":"Possession",
         "point_value":1,
-        "tags":[],
-        "note":"",
         "field_zone":"defensive_end"
-      }
+      },
+      "annotations":{"tags":[],"note":""}
     }'::jsonb
   );
   corrected := public.lh_correct_event(
@@ -1243,7 +1329,7 @@ begin
       "event_id":"event-revocation-case",
       "game_id":"game-a1",
       "base_server_event_version":2,
-      "changes":{"note":"Offline correction after authority changed"}
+      "changes":{"category":"Transition"}
     }'::jsonb
   );
   if replay ->> 'outcome' <> 'accepted'
@@ -1344,8 +1430,9 @@ declare
   ]'::jsonb;
   expected_event_fields jsonb := '[
     "event_id", "occurred_at", "period", "stat_type", "stat_label",
-    "category", "point_value", "tags", "note", "field_zone"
+    "category", "point_value", "field_zone"
   ]'::jsonb;
+  expected_annotation_fields jsonb := '["note", "tags"]'::jsonb;
 begin
   response := public.lh_record_sensitive_export('player_json', 'game-a1');
   if response ->> 'outcome' <> 'accepted'
@@ -1362,6 +1449,11 @@ begin
   if response -> 'eventFields' <> expected_event_fields then
     raise exception 'TEST 22 failed: event export manifest drifted: %',
       response -> 'eventFields';
+  end if;
+
+  if response -> 'annotationFields' <> expected_annotation_fields then
+    raise exception 'TEST 22 failed: annotation export manifest drifted: %',
+      response -> 'annotationFields';
   end if;
 end;
 $test$;
@@ -1441,10 +1533,9 @@ declare
     'lh_event_create_operations',
     'lh_event_correction_operations',
     'lh_event_tombstone_operations',
-    'lh_event_restore_operations',
     'lh_event_revisions',
     'lh_event_tombstones',
-    'lh_event_restorations',
+    'lh_event_annotations',
     'lh_event_conflicts',
     'lh_conflict_adjudications',
     'lh_live_share_tokens',
@@ -1477,9 +1568,378 @@ begin
 end;
 $test$;
 
+-- 25. Authenticated clients cannot invoke private helpers directly.
+set local role authenticated;
+select pg_catalog.set_config(
+  'request.jwt.claims',
+  '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}',
+  true
+);
+do $test$
+declare
+  denied boolean := false;
+begin
+  begin
+    perform lh_trust_private.lh_active_grants_for_user(
+      auth.uid(),
+      pg_catalog.now()
+    );
+  exception when insufficient_privilege then
+    denied := true;
+  end;
+
+  if not denied then
+    raise exception 'TEST 25 failed: private helper invocation was not denied';
+  end if;
+end;
+$test$;
+reset role;
+
+-- 26. Revision history contains accepted evidence only. Rejected and
+-- conflicted operations have no revision row.
+do $test$
+declare
+  sequences integer[];
+begin
+  select pg_catalog.array_agg(revision_sequence order by revision_sequence)
+  into sequences
+  from public.lh_event_revisions
+  where event_id = 'event-main';
+
+  if sequences <> array[1, 2] then
+    raise exception 'TEST 26 failed: accepted revision sequence drifted: %', sequences;
+  end if;
+
+  if exists (
+    select 1
+    from public.lh_event_revisions as revision
+    join public.lh_event_operations as operation
+      on operation.operation_id = revision.operation_id
+    where operation.outcome_class <> 'accepted'
+  ) then
+    raise exception 'TEST 26 failed: non-accepted operation created a revision';
+  end if;
+
+  if exists (
+    select 1
+    from public.lh_event_revisions
+    where accepted_evidence_snapshot is null
+  ) then
+    raise exception 'TEST 26 failed: accepted revision has no accepted snapshot';
+  end if;
+end;
+$test$;
+
+-- 27. Annotation fields cannot be submitted as evidence corrections and
+-- initial annotations never enter the authoritative evidence object.
+set local role authenticated;
+select pg_catalog.set_config(
+  'request.jwt.claims',
+  '{"sub":"22222222-2222-4222-8222-222222222222","role":"authenticated"}',
+  true
+);
+do $test$
+declare
+  response jsonb;
+begin
+  response := public.lh_correct_event(
+    '{
+      "client_operation_id":"annotation-as-evidence",
+      "event_id":"event-coach-team",
+      "game_id":"game-a2",
+      "base_server_event_version":1,
+      "changes":{"note":"Must remain an annotation"}
+    }'::jsonb
+  );
+
+  if response ->> 'outcome' <> 'rejected'
+    or response ->> 'code' <> 'invalid_input'
+  then
+    raise exception 'TEST 27 failed: annotation entered correction history: %', response;
+  end if;
+
+end;
+$test$;
+reset role;
+
+do $test$
+begin
+  if exists (
+    select 1
+    from public.lh_event_effective_versions
+    where event_id = 'event-main'
+      and (effective_evidence ? 'note' or effective_evidence ? 'tags')
+  ) then
+    raise exception 'TEST 27 failed: annotations leaked into effective evidence';
+  end if;
+end;
+$test$;
+
+-- 28. Existing legacy scopes can be registered and refreshed idempotently
+-- without manufacturing a Trust Spine grant.
+set local role authenticated;
+select pg_catalog.set_config(
+  'request.jwt.claims',
+  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',
+  true
+);
+do $test$
+declare
+  team_result jsonb;
+  player_result jsonb;
+  game_result jsonb;
+  replay_result jsonb;
+  grant_count_before integer;
+begin
+  select count(*) into grant_count_before
+  from public.lh_resolve_active_grants();
+
+  team_result := public.lh_register_team_scope('legacy-team-a');
+  player_result := public.lh_register_player_scope('legacy-team-a', 'legacy-player-a');
+  game_result := public.lh_register_game_scope('offline-local-game-a');
+
+  replay_result := public.lh_register_game_scope('offline-local-game-a');
+
+  if team_result ->> 'outcome' <> 'accepted'
+    or player_result ->> 'outcome' <> 'accepted'
+    or game_result ->> 'outcome' <> 'accepted'
+    or replay_result ->> 'outcome' <> 'accepted'
+  then
+    raise exception 'TEST 28 failed: scope registration: %, %, %, %',
+      team_result, player_result, game_result, replay_result;
+  end if;
+
+  if (select count(*) from public.lh_resolve_active_grants()) <> grant_count_before then
+    raise exception 'TEST 28 failed: scope registration manufactured a grant';
+  end if;
+end;
+$test$;
+reset role;
+
+do $test$
+begin
+  if (select count(*) from public.lh_team_scopes where team_id = 'legacy-team-a') <> 1
+    or (
+      select count(*)
+      from public.lh_player_scopes
+      where team_id = 'legacy-team-a'
+        and roster_player_id = 'legacy-player-a'
+    ) <> 1
+    or (
+      select count(*)
+      from public.lh_game_scopes
+      where game_id = 'offline-local-game-a'
+    ) <> 1
+  then
+    raise exception 'TEST 28 failed: idempotent scope row counts';
+  end if;
+
+  if exists (
+    select 1
+    from public.lh_access_grants
+    where team_id = 'legacy-team-a'
+  ) then
+    raise exception 'TEST 28 failed: scope registration manufactured a grant';
+  end if;
+end;
+$test$;
+
+-- 29. Cross-team, cross-player, and unauthorized scope registration is denied.
+set local role authenticated;
+select pg_catalog.set_config(
+  'request.jwt.claims',
+  '{"sub":"44444444-4444-4444-8444-444444444444","role":"authenticated"}',
+  true
+);
+do $test$
+declare
+  invalid_player jsonb;
+begin
+  invalid_player := public.lh_register_player_scope(
+    'legacy-team-a',
+    'legacy-player-b'
+  );
+  if invalid_player ->> 'outcome' <> 'rejected'
+    or invalid_player ->> 'code' <> 'invalid_player_team_scope'
+  then
+    raise exception 'TEST 29 failed: cross-team player registration: %', invalid_player;
+  end if;
+end;
+$test$;
+
+select pg_catalog.set_config(
+  'request.jwt.claims',
+  '{"sub":"11111111-1111-4111-8111-111111111111","role":"authenticated"}',
+  true
+);
+do $test$
+declare
+  unauthorized_team jsonb;
+begin
+  unauthorized_team := public.lh_register_team_scope('legacy-team-b');
+  if unauthorized_team ->> 'outcome' <> 'rejected'
+    or unauthorized_team ->> 'code' <> 'unauthorized_scope'
+  then
+    raise exception 'TEST 29 failed: unauthorized team registration: %', unauthorized_team;
+  end if;
+end;
+$test$;
+reset role;
+
+-- 30. Tombstones are permanent in Release 1; no restore table, operation, or
+-- public/private restore function exists.
+do $test$
+begin
+  if pg_catalog.to_regclass('public.lh_event_restore_operations') is not null
+    or pg_catalog.to_regclass('public.lh_event_restorations') is not null
+    or exists (
+      select 1
+      from pg_catalog.pg_proc as procedure
+      join pg_catalog.pg_namespace as namespace
+        on namespace.oid = procedure.pronamespace
+      where namespace.nspname in ('public', 'lh_trust_private')
+        and procedure.proname like '%restore%event%'
+    )
+  then
+    raise exception 'TEST 30 failed: restore-event scope remains';
+  end if;
+end;
+$test$;
+
+-- 31. Expired and revoked anonymous Live Share tokens fail closed.
+insert into public.lh_live_share_tokens(
+  token_id,
+  token_hash,
+  game_id,
+  created_by_user_id,
+  created_by_grant_id,
+  created_at,
+  expires_at,
+  revoked_at
+)
+values
+  (
+    'share-expired',
+    pg_catalog.encode(
+      extensions.digest(pg_catalog.convert_to('EXPIRED-SHARE', 'UTF8'), 'sha256'),
+      'hex'
+    ),
+    'game-a1',
+    '22222222-2222-4222-8222-222222222222',
+    'grant-coach-team-a',
+    pg_catalog.now() - interval '2 days',
+    pg_catalog.now() - interval '1 day',
+    null
+  ),
+  (
+    'share-revoked',
+    pg_catalog.encode(
+      extensions.digest(pg_catalog.convert_to('REVOKED-SHARE', 'UTF8'), 'sha256'),
+      'hex'
+    ),
+    'game-a1',
+    '22222222-2222-4222-8222-222222222222',
+    'grant-coach-team-a',
+    pg_catalog.now() - interval '1 day',
+    pg_catalog.now() + interval '1 day',
+    pg_catalog.now()
+  );
+
+set local role anon;
+select pg_catalog.set_config('request.jwt.claims', '{"role":"anon"}', true);
+do $test$
+begin
+  if public.lh_public_live_share_game('expired-share') is not null
+    or public.lh_public_live_share_game('revoked-share') is not null
+  then
+    raise exception 'TEST 31 failed: inactive Live Share token returned data';
+  end if;
+end;
+$test$;
+reset role;
+
+-- 32. Public wrappers are postgres-owned SECURITY DEFINER entrypoints with
+-- explicit role grants; private helpers remain unreachable.
+do $test$
+declare
+  expected_public text[] := array[
+    'lh_register_team_scope(text)',
+    'lh_register_player_scope(text,text)',
+    'lh_register_game_scope(text)',
+    'lh_resolve_active_grants()',
+    'lh_create_event(jsonb)',
+    'lh_correct_event(jsonb)',
+    'lh_tombstone_event(jsonb)',
+    'lh_public_live_share_game(text)',
+    'lh_record_sensitive_export(text,text)'
+  ];
+  function_signature text;
+  function_oid regprocedure;
+begin
+  if pg_catalog.has_schema_privilege('anon', 'lh_trust_private', 'USAGE')
+    or pg_catalog.has_schema_privilege('authenticated', 'lh_trust_private', 'USAGE')
+  then
+    raise exception 'TEST 32 failed: private schema usage remains';
+  end if;
+
+  foreach function_signature in array expected_public
+  loop
+    function_oid := ('public.' || function_signature)::regprocedure;
+
+    if (
+      select owner.rolname <> 'postgres' or procedure.prosecdef is not true
+      from pg_catalog.pg_proc as procedure
+      join pg_catalog.pg_roles as owner on owner.oid = procedure.proowner
+      where procedure.oid = function_oid
+    ) then
+      raise exception 'TEST 32 failed: owner/security mode for %', function_signature;
+    end if;
+
+    if not pg_catalog.has_function_privilege(
+      'authenticated',
+      function_oid,
+      'EXECUTE'
+    ) then
+      raise exception 'TEST 32 failed: authenticated grant missing for %',
+        function_signature;
+    end if;
+  end loop;
+
+  if pg_catalog.has_function_privilege(
+    'anon',
+    'public.lh_create_event(jsonb)',
+    'EXECUTE'
+  ) then
+    raise exception 'TEST 32 failed: anon can create evidence';
+  end if;
+end;
+$test$;
+
+-- 33. The effective-row counter and accepted revisions agree, proving the
+-- sequence allocator does not use max(sequence)+1.
+do $test$
+declare
+  accepted_counter integer;
+  accepted_max integer;
+begin
+  select accepted_revision_sequence into accepted_counter
+  from public.lh_event_effective_versions
+  where event_id = 'event-main';
+
+  select coalesce(max(revision_sequence), 0) into accepted_max
+  from public.lh_event_revisions
+  where event_id = 'event-main';
+
+  if accepted_counter <> accepted_max or accepted_counter <> 2 then
+    raise exception 'TEST 33 failed: concurrency-safe revision counter: %, %',
+      accepted_counter, accepted_max;
+  end if;
+end;
+$test$;
+
 select pg_catalog.jsonb_build_object(
   'suite', 'LaxHornet Trust Spine Release 1',
-  'sqlTestsPassed', 24,
+  'sqlTestsPassed', 33,
   'fixtures', 'synthetic',
   'transaction', 'rolled_back'
 ) as trust_spine_test_result;

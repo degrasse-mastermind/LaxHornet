@@ -11,13 +11,17 @@ staging target; local contract and Postgres-compatible execution have passed.
   `docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_TESTS.sql`
 - Repository contract suite:
   `tools/test_trust_spine_release1.mjs`
+- Postgres-compatible migration/rollback runner:
+  `tools/run_trust_spine_pglite.mjs`
+- Real Auth/PostgREST and separate-request concurrency suite:
+  `tools/test_trust_spine_remote.mjs`
 - Staging rollback:
   `docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_ROLLBACK.sql`
 
 ## SQL acceptance coverage
 
 The transactional SQL suite uses synthetic identities, teams, players, games,
-grants, events, and share tokens. It covers 24 acceptance groups:
+grants, events, and share tokens. It covers 33 acceptance groups:
 
 1. Parent grant boundary.
 2. Coach grant boundary.
@@ -42,7 +46,16 @@ grants, events, and share tokens. It covers 24 acceptance groups:
 21. Public-safe Live Share allowlisting.
 22. Exact sensitive-export manifest and audit recording.
 23. Append-only conflict adjudication.
-24. RLS/privilege posture on every new table.
+24. Core evidence and annotation separation.
+25. Scope-registration idempotency.
+26. Cross-team and cross-player registration denial.
+27. Scope registration creates no grant.
+28. Private helper invocation denial.
+29. Accepted-only revision history.
+30. Tombstone permanence and absence of restore objects.
+31. Expired/revoked anonymous share-token denial.
+32. Public RPC owner, fixed-path, and grant matrix.
+33. RLS/privilege posture on every new table.
 
 ## Repository contract coverage
 
@@ -52,11 +65,13 @@ The Node suite asserts:
 - Trust Spine foreign keys never target deletable legacy tables.
 - Internal foreign keys use preservation-safe `ON DELETE RESTRICT`.
 - Deferred roles and systems are absent.
-- All 21 tables are included in the deny-all RLS loop.
+- All 20 tables are included in the deny-all RLS loop.
 - Browser roles receive no table grants.
-- Only the six approved public RPCs exist.
-- Public wrappers are invokers; privilege-bearing functions are private.
-- Lifecycle, provenance, operation, conflict, and allowlist contracts exist.
+- Only the nine approved public RPCs exist.
+- Public wrappers are fixed-path security definers; implementation functions
+  are private and client-inaccessible.
+- Lifecycle, provenance, operation, conflict, accepted-only revision,
+  annotation, scope-registration, sequencing, and allowlist contracts exist.
 - SQL markers cover every required acceptance scenario.
 - Existing account-scoped local storage isolates accounts.
 - Next-game focus storage isolates account, team, and roster player.
@@ -81,7 +96,9 @@ psql $env:LAXHORNET_STAGING_DATABASE_URL -v ON_ERROR_STOP=1 -f "docs/methodnorth
 
 ## Remaining staging-only verification
 
-The SQL suite proves database semantics. Before pilot, also exercise the six
+The SQL suite proves database semantics. Before pilot, also exercise the nine
 RPCs through real Supabase Auth/PostgREST sessions and verify unauthenticated
-Live Share behavior. This environment did not have a connected LaxHornet
-staging project, so those network-edge checks remain a hard release gate.
+Live Share behavior. Run concurrent same-event corrections from separate
+authenticated sessions. This environment had only the production LaxHornet
+project and no disposable branch, so those network-edge checks remain a hard
+release gate.

@@ -15,6 +15,9 @@ drop function if exists public.lh_tombstone_event(jsonb);
 drop function if exists public.lh_correct_event(jsonb);
 drop function if exists public.lh_create_event(jsonb);
 drop function if exists public.lh_resolve_active_grants();
+drop function if exists public.lh_register_game_scope(text);
+drop function if exists public.lh_register_player_scope(text, text);
+drop function if exists public.lh_register_team_scope(text);
 
 -- CASCADE removes only private helper functions and their triggers on lh_*
 -- staging tables. Public wrappers were removed above.
@@ -27,12 +30,11 @@ alter table if exists public.lh_access_invitations
 
 drop table if exists public.lh_security_audit_events;
 drop table if exists public.lh_live_share_tokens;
+drop table if exists public.lh_event_annotations;
+drop table if exists public.lh_event_revisions;
 drop table if exists public.lh_conflict_adjudications;
 drop table if exists public.lh_event_conflicts;
-drop table if exists public.lh_event_restorations;
-drop table if exists public.lh_event_restore_operations;
 drop table if exists public.lh_event_tombstones;
-drop table if exists public.lh_event_revisions;
 drop table if exists public.lh_event_tombstone_operations;
 drop table if exists public.lh_event_correction_operations;
 drop table if exists public.lh_event_create_operations;
