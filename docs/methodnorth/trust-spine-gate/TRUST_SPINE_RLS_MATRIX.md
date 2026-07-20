@@ -1,6 +1,7 @@
 ﻿# Trust Spine RLS Matrix
 
-Status: proposed authorization/RLS matrix for Release 1. This is not applied.
+Status: implemented by the Release 1 staging migration. It has not been applied
+to production or cut into the runtime.
 
 ## Active roles
 
@@ -20,7 +21,7 @@ Deferred:
 
 Every protected read/write must resolve to an active, unexpired, unrevoked `lh_access_grants` row. Pending invitations and client-submitted labels never authorize access.
 
-## Proposed table/RPC access
+## Implemented staging table/RPC access
 
 | Surface | Parent | Coach | Team admin | Public share viewer | Notes |
 |---|---|---|---|---|---|

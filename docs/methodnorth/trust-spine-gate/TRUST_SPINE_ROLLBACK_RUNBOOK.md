@@ -1,88 +1,64 @@
-﻿# Trust Spine Rollback Runbook
+# Trust Spine Release 1 Staging Rollback
 
-Status: proposed rollback plan for future staging/pilot only.
+Status: executable destructive rollback for disposable staging only.
 
-## Rollback principle
+## Scope
 
-Rollback may disable new Trust Spine paths, but it must not delete production evidence, revisions, tombstones, grant history, or audit records merely to simplify recovery.
+The rollback removes only the additive Release 1 objects:
 
-## Immediate rollback levers
+- Six public `lh_*` RPC wrappers.
+- The private `lh_trust_private` schema and helper functions.
+- The 21 new `public.lh_*` staging tables.
 
-1. Disable client routing to Trust Spine RPCs.
-2. Disable new correction/tombstone submit buttons or route them back to legacy flow only if safe.
-3. Disable public-safe projection cutover and return to legacy Live Share only if no private fields were introduced to ordinary tables.
-4. Stop shadow writes if they are causing failures.
-5. Keep foundation tables read-only for investigation.
+It does not alter legacy LaxHornet tables, runtime files, service-worker
+caches, Project One UI, or production data.
 
-## Application version
+## Warning
 
-Rollback must name the exact app version to restore before any pilot:
+The rollback permanently deletes Trust Spine staging grants, event evidence,
+operation receipts, revisions, tombstones, conflicts, and audit records. Do
+not run it on production or on staging evidence that must be retained.
 
-- Static assets.
-- `app.js`.
-- `styles.css`.
-- `service-worker.js`.
-- `version.json`.
-- `manifest.json` if touched.
+## Run
 
-No app version is changed by this package.
+First prove the target is staging:
 
-## Database paths disabled
+```powershell
+psql $env:LAXHORNET_STAGING_DATABASE_URL -v ON_ERROR_STOP=1 -c "select current_database(), current_user, inet_server_addr();"
+```
 
-Rollback should disable:
+Then execute:
 
-- Correction RPC entrypoint.
-- Tombstone RPC entrypoint.
-- Grant-management RPC entrypoint.
-- Public-safe Live Share RPC if broken.
-- Sensitive export audit RPC if broken.
+```powershell
+psql $env:LAXHORNET_STAGING_DATABASE_URL -v ON_ERROR_STOP=1 -f "docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_ROLLBACK.sql"
+```
 
-Rollback should not:
+## Verify
 
-- Drop revision rows.
-- Drop tombstones.
-- Delete access-grant history.
-- Delete audit events.
+Both checks must return zero rows:
 
-## Queued offline operations
+```sql
+select tablename
+from pg_catalog.pg_tables
+where schemaname = 'public'
+  and tablename like 'lh\_%' escape '\';
 
-If rollback occurs while clients have queued operations:
+select routine_name
+from information_schema.routines
+where routine_schema = 'public'
+  and routine_name like 'lh\_%' escape '\';
+```
 
-- Mark queued operations as waiting locally.
-- Do not replay them through legacy direct updates.
-- Do not silently discard them.
-- Let user export local drafts if access was revoked or server path is disabled.
+The private schema must also be absent:
 
-## Cache invalidation
+```sql
+select schema_name
+from information_schema.schemata
+where schema_name = 'lh_trust_private';
+```
 
-If runtime assets were part of rollback:
+## Recovery
 
-- Bump static version and cache name.
-- Confirm `version.json` reports the rollback version.
-- Verify installed/home-screen app receives the update.
-
-## Session handling
-
-If access policy behavior changed:
-
-- Force profile/grant refresh.
-- Consider sign-out for pilot accounts if stale JWT/app state could preserve old UI.
-- Do not rely on client labels or hidden UI for rollback safety.
-
-## Live Share/export after rollback
-
-Before re-enabling public share/export:
-
-- Confirm no private foundation fields are on ordinary wildcard-selected tables.
-- Confirm share code still reads only intended public data.
-- Confirm export output is expected for the selected export mode.
-
-## Re-enable after rollback
-
-Before re-enable:
-
-- Reconcile queued operations by operation ID.
-- Deduplicate accepted operations.
-- Preserve conflicts.
-- Verify tombstoned events are not resurrected.
-- Run acceptance matrix again.
+Because this release has no runtime cutover, rollback requires no app version,
+cache, or client migration. To restore the staging gate, reapply the migration
+and rerun all 24 SQL tests.

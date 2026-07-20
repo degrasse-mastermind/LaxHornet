@@ -1,114 +1,101 @@
-﻿# Trust Spine Migration Runbook
+# Trust Spine Release 1 Staging Runbook
 
-Status: staging-only proposal. Do not run against production without LH-00 approval.
+Status: executable staging gate. Never run against production.
 
-## Phase A: tests before schema
+## Preconditions
 
-Write tests first for:
+- Use an isolated, data-less LaxHornet Supabase branch or separate staging project.
+- Confirm the target project reference is not the production project reference.
+- Set `LAXHORNET_STAGING_DATABASE_URL` to the staging direct database connection.
+- Require `psql` with `ON_ERROR_STOP`.
+- Do not run from a browser client or the production SQL editor.
 
-- Authorization matrix.
-- Direct event update/delete denial.
-- Correction RPC acceptance.
-- Duplicate operation replay.
-- Concurrent corrections.
-- Revoked grant replay.
-- Tombstone replay.
-- Live Share projection allowlist.
-- Export allowlist.
-- Rollback behavior.
+## 1. Prove the target
 
-Deliverable: `TRUST_SPINE_TEST_PLAN.md` plus executable tests when staging is approved.
+```powershell
+psql $env:LAXHORNET_STAGING_DATABASE_URL -v ON_ERROR_STOP=1 -c "select current_database(), current_user, inet_server_addr();"
+```
 
-## Phase B: deny-all additive schema
+Record the output in the release evidence. Stop if the database cannot be
+independently identified as staging.
 
-In staging only:
+## 2. Apply the additive deny-all migration
 
-1. Apply only additive Trust Spine tables.
-2. Enable RLS on every new table.
-3. Grant no ordinary `anon`/`authenticated` table access.
-4. Add indexes for grant lookup and revision lookup.
-5. Verify direct table access is denied.
+```powershell
+psql $env:LAXHORNET_STAGING_DATABASE_URL -v ON_ERROR_STOP=1 -f "docs/methodnorth/trust-spine-gate/TRUST_SPINE_SCHEMA_PROPOSAL.sql"
+```
 
-Do not alter existing production tables in this phase unless LH-00 approves a specific compatibility column/index.
+The migration:
 
-## Phase C: shadow writes
+- Creates only `lh_*` tables plus the private `lh_trust_private` schema.
+- Enables and forces RLS on every new table.
+- Revokes all direct table privileges from `PUBLIC`, `anon`, and
+  `authenticated`.
+- Exposes only six narrow public RPC wrappers.
+- Does not alter legacy LaxHornet tables, runtime code, caches, or UI.
 
-Where safe in staging:
+## 3. Run the SQL acceptance suite
 
-1. Continue current app behavior.
-2. Write candidate correction operations/revisions in parallel.
-3. Do not change reads.
-4. Compare current effective events to shadow revisions.
-5. Log mismatches.
+```powershell
+psql $env:LAXHORNET_STAGING_DATABASE_URL -v ON_ERROR_STOP=1 -f "docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_TESTS.sql"
+```
 
-Exit criteria:
+Expected final result:
 
-- No duplicate revisions for same operation ID.
-- No cross-team grant resolution.
-- No private data in shadow Live Share projection.
+```json
+{"suite":"LaxHornet Trust Spine Release 1","fixtures":"synthetic","transaction":"rolled_back","sqlTestsPassed":24}
+```
 
-## Phase D: authenticated security testing
+The SQL suite is transactional and rolls back its synthetic fixtures. The
+schema remains installed for inspection.
 
-Use real authenticated sessions for:
+## 4. Run repository contract checks
 
-- Parent on authorized player.
-- Parent on another player in same team.
-- Parent on another team.
-- Team-scoped coach.
-- Player-scoped coach.
-- Team admin without coach grant.
-- User with multiple grants.
-- Revoked grant.
-- Expired grant.
-- Pending invitation.
-- Unauthenticated Live Share viewer.
+```powershell
+node tools/test_trust_spine_release1.mjs
+git diff --check
+node --check app.js
+```
 
-Attempt:
+## 5. Inspect deny-all posture
 
-- Direct event update.
-- Direct event delete.
-- Direct revision update/delete.
-- Cross-team correction.
-- Client role spoof.
-- Live Share private-field read.
+Confirm all 21 new tables have both RLS flags and no browser-role table grants:
 
-## Phase E: narrow pilot
+```sql
+select c.relname, c.relrowsecurity, c.relforcerowsecurity
+from pg_catalog.pg_class c
+join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public'
+  and c.relname like 'lh\_%' escape '\'
+order by c.relname;
 
-After LH-00 approval:
+select grantee, table_name, privilege_type
+from information_schema.role_table_grants
+where table_schema = 'public'
+  and table_name like 'lh\_%' escape '\'
+  and grantee in ('PUBLIC', 'anon', 'authenticated');
+```
 
-- Enable one controlled team/account only.
-- Keep old path available for rollback.
-- Monitor correction outcomes, sync failures, duplicate operation IDs, and disclosure tests.
+The second query must return zero rows.
 
-## Phase F: surface-by-surface cutover
+## 6. Release decision
 
-Cut over one path at a time:
+Do not begin a pilot until:
 
-1. Public-safe Live Share projection.
-2. Sensitive export allowlists/audit.
-3. Event correction RPC for post-game edits.
-4. Event tombstone RPC for deletes.
-5. Live event capture operation receipts.
-6. Legacy direct mutation removal.
-
-Do not replace all legacy behavior in one release.
-
-## Phase G: legacy deprecation
-
-Remove legacy checks only after:
-
-- Parity metrics pass.
-- Rollback is proven.
-- Data-retention review is complete.
-- LH-00 explicitly approves.
+- The migration and all 24 SQL tests pass on an isolated LaxHornet Supabase
+  staging target.
+- The public RPCs are exercised through real Supabase Auth/PostgREST sessions.
+- Live Share is verified unauthenticated and exposes only the allowlisted
+  projection.
+- The rollback script has been rehearsed on disposable staging.
 
 ## Stop conditions
 
-Stop and report if:
+Stop and roll back staging if:
 
-- Secure role enforcement cannot be expressed and proven.
-- Direct client event mutation cannot be blocked safely.
-- Conflict handling would destroy evidence.
-- Offline replay can duplicate or resurrect evidence.
-- Live Share can see private foundation records.
-- Rollback requires deleting production data.
+- The target cannot be proven non-production.
+- Any direct table privilege exists for `anon` or `authenticated`.
+- Any cross-team or cross-player test succeeds.
+- Any tombstoned event can be recreated or corrected.
+- Any unallowlisted field appears in Live Share or export manifests.
+- A duplicate operation ID can change its original payload.
