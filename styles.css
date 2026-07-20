@@ -1499,6 +1499,11 @@ button:focus-visible,
     var(--lh-panel-gradient);
 }
 
+.access-request-row.email-request-target {
+  border-color: #e81010;
+  box-shadow: 0 0 0 3px rgba(232, 16, 16, 0.12);
+}
+
 .request-main {
   min-width: 0;
 }

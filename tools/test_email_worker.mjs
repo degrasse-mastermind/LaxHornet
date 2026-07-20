@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  buildNotificationAppUrl,
   buildIdempotencyKey,
   escapeHtml,
   isAllowedEventType,
@@ -54,8 +55,36 @@ const rendered = renderNotificationEmail(row, { siteUrl: "https://laxhornet.mybr
 assert.match(rendered.text, /Your request is ready & waiting\./);
 assert.match(rendered.html, /request &lt;received&gt;/);
 assert.doesNotMatch(rendered.html, /<received>/);
+assert.equal(rendered.appUrl, "https://laxhornet.mybranford.com/app.html");
 assert.equal(buildIdempotencyKey(row), "team_access_requested_user/notify-request-user-test");
 assert.throws(() => renderNotificationEmail({ ...row, event_type: "unsupported" }), /Unsupported/);
+
+const adminRequestUrl = new URL(
+  buildNotificationAppUrl(
+    {
+      id: "notify-request-admin-request-123",
+      event_type: "team_access_requested_admin",
+      payload: { team_id: "team-456", request_id: "request-123" },
+    },
+    "https://laxhornet.mybranford.com",
+  ),
+);
+assert.equal(adminRequestUrl.pathname, "/app.html");
+assert.equal(adminRequestUrl.searchParams.get("open"), "team-request");
+assert.equal(adminRequestUrl.searchParams.get("team"), "team-456");
+assert.equal(adminRequestUrl.searchParams.get("request"), "request-123");
+
+const legacyAdminRequestUrl = new URL(
+  buildNotificationAppUrl(
+    {
+      id: "notify-request-admin-legacy-request-789",
+      event_type: "team_access_requested_admin",
+      payload: { team_id: "team-legacy" },
+    },
+    "https://laxhornet.mybranford.com",
+  ),
+);
+assert.equal(legacyAdminRequestUrl.searchParams.get("request"), "legacy-request-789");
 
 assert.match(workerSource, /x-laxhornet-worker-secret/);
 assert.match(workerSource, /dryRun/);

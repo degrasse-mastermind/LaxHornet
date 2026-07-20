@@ -25,7 +25,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v275";
+const APP_VERSION = "v276";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -551,6 +551,9 @@ const app = document.querySelector("#app");
 const startupParams = new URLSearchParams(window.location.search);
 const startupShareCode = startupParams.get("share")?.trim().toUpperCase() || "";
 const startupAuthStatus = startupParams.get("auth") || "";
+const startupOpenTarget = startupParams.get("open")?.trim().toLowerCase() || "";
+const startupTeamId = startupParams.get("team")?.trim().slice(0, 160) || "";
+const startupRequestId = startupParams.get("request")?.trim().slice(0, 200) || "";
 const rawSupabaseClient =
   window.supabase?.createClient && SUPABASE_CONFIG.url && SUPABASE_CONFIG.publishableKey
     ? window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.publishableKey)
@@ -568,6 +571,7 @@ let waitingServiceWorker = null;
 let reloadingForUpdate = false;
 let serviceWorkerRegistration = null;
 let deferredInstallPrompt = null;
+let startupDeepLinkHandled = false;
 const initialStoredState = readStoredAccountState();
 
 const state = {
@@ -2353,6 +2357,34 @@ function navigate(screen) {
   recoverAdminTeamContext();
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function applyStartupDeepLink() {
+  if (startupDeepLinkHandled || startupOpenTarget !== "team-request" || !state.authUser) return false;
+  if (!isReviewerAccount()) {
+    startupDeepLinkHandled = true;
+    state.screen = "more";
+    showToast("Team admin access is required to review this request");
+    return true;
+  }
+
+  state.adminViewMode = "admin";
+  const request = state.teamAccessRequests.find((item) => item.id === startupRequestId);
+  const targetTeamId = request?.teamId || startupTeamId;
+  if (targetTeamId && state.teams.some((team) => team.id === targetTeamId)) {
+    state.activeTeamId = targetTeamId;
+  }
+  state.screen = "team";
+  startupDeepLinkHandled = true;
+  persistAll();
+  render();
+  window.setTimeout(() => {
+    const requestCard = [...document.querySelectorAll("[data-team-access-request]")].find(
+      (element) => element.dataset.teamAccessRequest === startupRequestId,
+    );
+    requestCard?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, 100);
+  return true;
 }
 
 function upsertGame(game) {
@@ -4548,7 +4580,7 @@ async function handleAuthSubmit(formData) {
   if (state.authUser && needsParentProfileSetup()) state.screen = "profileSetup";
   state.syncStatus = state.authUser ? "Signed in" : "Check your email to confirm your account";
   if (state.authUser) await loadCloudGames({ silent: true });
-  render();
+  if (!applyStartupDeepLink()) render();
   showToast(state.syncStatus);
 }
 
@@ -6536,8 +6568,9 @@ function renderParentRequestRow(request = {}, options = {}) {
   const showApprovalActions = request.status === "pending" && options.showReviewActions !== false;
   const showReminder = requestNeedsPlayerVerification(request) && options.showReminder !== false;
   const reminderBusy = state.reminderBusyId === request.id;
+  const emailTarget = startupOpenTarget === "team-request" && startupRequestId === request.id;
   return `
-    <div class="access-request-row detailed ${showReminder ? "needs-verification" : ""}">
+    <div class="access-request-row detailed ${showReminder ? "needs-verification" : ""} ${emailTarget ? "email-request-target" : ""}" data-team-access-request="${escapeHTML(request.id)}">
       <div class="request-main">
         <div class="request-title-line">
           <strong>${escapeHTML(displayName)}</strong>
@@ -12365,7 +12398,7 @@ async function initApp() {
         await loadUserProfile({ silent: true });
         await loadCloudGames({ silent: true });
       }
-      render();
+      if (!applyStartupDeepLink()) render();
     });
     if (state.authUser) {
       await loadUserProfile({ silent: true });
@@ -12378,6 +12411,8 @@ async function initApp() {
   } else if (startupAuthStatus === "verified") {
     state.screen = "authSuccess";
     render();
+  } else if (applyStartupDeepLink()) {
+    // The deep link renders after account and team data are ready.
   } else {
     render();
   }

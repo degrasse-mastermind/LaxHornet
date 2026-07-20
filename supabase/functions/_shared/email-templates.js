@@ -58,13 +58,33 @@ export function buildIdempotencyKey(row) {
   return `${eventType}/${queueId}`.slice(0, 256);
 }
 
+function requestIdFromQueueRow(row) {
+  const payloadRequestId = String(row?.payload?.request_id || "").trim();
+  if (payloadRequestId) return payloadRequestId;
+  const queueId = String(row?.id || "");
+  const prefix = "notify-request-admin-";
+  return queueId.startsWith(prefix) ? queueId.slice(prefix.length) : "";
+}
+
+export function buildNotificationAppUrl(row, siteUrl) {
+  const url = new URL(`${normalizeSiteUrl(siteUrl)}/app.html`);
+  if (row?.event_type !== "team_access_requested_admin") return url.toString();
+
+  const teamId = String(row?.payload?.team_id || "").trim();
+  const requestId = requestIdFromQueueRow(row);
+  url.searchParams.set("open", "team-request");
+  if (teamId) url.searchParams.set("team", teamId);
+  if (requestId) url.searchParams.set("request", requestId);
+  return url.toString();
+}
+
 export function renderNotificationEmail(row, options = {}) {
   if (!isAllowedEventType(row?.event_type)) {
     throw new Error(`Unsupported notification event type: ${String(row?.event_type || "missing")}`);
   }
 
   const siteUrl = normalizeSiteUrl(options.siteUrl);
-  const appUrl = `${siteUrl}/app.html`;
+  const appUrl = buildNotificationAppUrl(row, siteUrl);
   const subject = String(row.subject || "LaxHornet account update").trim().slice(0, 180);
   const body = String(row.body || "").trim().slice(0, 4000);
   const ctaLabel = EVENT_CTA_LABELS[row.event_type] || "Open LaxHornet";
