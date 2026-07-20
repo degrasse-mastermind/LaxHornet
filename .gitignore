@@ -1,3 +1,7 @@
 LaxHornet-github-pages.zip
 LaxHornet-github-pages/
 qa/
+.env
+.env.*
+!.env.example
+supabase/.temp/

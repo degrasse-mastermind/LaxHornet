@@ -50,7 +50,8 @@ These flows already exist in the app and database.
 - `team_access_rejected`
 - `player_verification_reminder`
 
-Recommended queue columns to add before wiring the sender:
+The queue delivery columns below are implemented in `supabase-schema.sql` and
+`supabase-notification-delivery-update.sql`:
 
 ```sql
 alter table public.notification_queue
@@ -69,7 +70,10 @@ Keep queue row IDs deterministic, such as `notify-request-user-{request_id}`. Us
 
 ## Sender Function Structure
 
-Create a Supabase Edge Function such as `send-laxhornet-email-queue`.
+The checked-in sender is `supabase/functions/send-laxhornet-email-queue/index.ts`.
+It uses a private `x-laxhornet-worker-secret` header, defaults every invocation
+to dry-run, accepts at most 10 explicit queue IDs, and only sends the five
+allowlisted LaxHornet transactional event types.
 
 Responsibilities:
 
@@ -118,7 +122,33 @@ Scheduled job or admin action
 
 ## Resend Webhooks
 
-Add a second Edge Function such as `resend-webhook`.
+The checked-in delivery handler is `supabase/functions/resend-webhook/index.ts`.
+It verifies Resend's signed webhook headers before reconciling provider message
+IDs with queue rows.
+
+## Safe Deployment and Backlog Handling
+
+The sender is intentionally fail-closed:
+
+1. Deploy both functions with JWT verification disabled only because each
+   function performs its own authentication.
+2. Set `QUEUE_WORKER_SECRET`, `RESEND_API_KEY`,
+   `RESEND_WEBHOOK_SECRET`, `EMAIL_FROM_NOTIFICATIONS`,
+   `EMAIL_REPLY_TO`, and `SITE_URL` as Edge Function secrets.
+3. Invoke the sender with `{ "dryRun": true }` first.
+4. Test one newly-created queue row by passing its ID in `queueIds`.
+5. Review old pending rows before sending them. Do not release stale access
+   notifications as a bulk batch without an explicit decision.
+
+Example dry-run request:
+
+```bash
+curl -X POST \
+  "https://ulbmjcvnyznvmjgpstno.supabase.co/functions/v1/send-laxhornet-email-queue" \
+  -H "Content-Type: application/json" \
+  -H "x-laxhornet-worker-secret: $QUEUE_WORKER_SECRET" \
+  -d '{"dryRun":true,"limit":5}'
+```
 
 Track these outcomes:
 

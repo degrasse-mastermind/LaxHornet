@@ -117,10 +117,45 @@ create table if not exists public.notification_queue (
   subject text not null,
   body text not null,
   payload jsonb not null default '{}'::jsonb,
+  template_key text not null default '',
   status text not null default 'pending',
+  attempts integer not null default 0,
+  last_attempt_at timestamptz,
+  last_error text not null default '',
+  provider_message_id text not null default '',
   created_at timestamptz not null default now(),
-  sent_at timestamptz
+  sent_at timestamptz,
+  delivered_at timestamptz,
+  bounced_at timestamptz,
+  complained_at timestamptz,
+  suppressed_at timestamptz
 );
+
+alter table public.notification_queue
+  add column if not exists template_key text not null default '',
+  add column if not exists attempts integer not null default 0,
+  add column if not exists last_attempt_at timestamptz,
+  add column if not exists last_error text not null default '',
+  add column if not exists provider_message_id text not null default '',
+  add column if not exists delivered_at timestamptz,
+  add column if not exists bounced_at timestamptz,
+  add column if not exists complained_at timestamptz,
+  add column if not exists suppressed_at timestamptz;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.notification_queue'::regclass
+      and conname = 'notification_queue_status_check'
+  ) then
+    alter table public.notification_queue
+      add constraint notification_queue_status_check
+      check (status in ('pending', 'sending', 'sent', 'failed', 'bounced', 'complained', 'suppressed', 'held'));
+  end if;
+end;
+$$;
 
 alter table public.games add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table public.games add column if not exists is_shared boolean not null default false;

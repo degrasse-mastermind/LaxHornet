@@ -33,7 +33,24 @@ notification_table = re.search(
     re.IGNORECASE | re.DOTALL,
 )
 table_body = notification_table.group(1) if notification_table else ""
-for column in ["event_type", "recipient_email", "subject", "body", "payload", "status", "sent_at"]:
+for column in [
+    "event_type",
+    "recipient_email",
+    "subject",
+    "body",
+    "payload",
+    "template_key",
+    "status",
+    "attempts",
+    "last_attempt_at",
+    "last_error",
+    "provider_message_id",
+    "sent_at",
+    "delivered_at",
+    "bounced_at",
+    "complained_at",
+    "suppressed_at",
+]:
     check(f"notification_queue has {column}", column in table_body)
 
 new_user = function_body(SCHEMA, "laxhornet_handle_new_user")
@@ -77,10 +94,25 @@ for event_type in [
 ]:
     check(f"plan documents {event_type}", event_type in DOC)
 
-if not (ROOT / "supabase" / "functions" / "send-laxhornet-email-queue" / "index.ts").exists():
+sender_source = ROOT / "supabase" / "functions" / "send-laxhornet-email-queue" / "index.ts"
+webhook_source = ROOT / "supabase" / "functions" / "resend-webhook" / "index.ts"
+
+if not sender_source.exists():
     warnings.append("No send-laxhornet-email-queue Edge Function source is checked in yet.")
-if not (ROOT / "supabase" / "functions" / "resend-webhook" / "index.ts").exists():
+else:
+    sender = sender_source.read_text(encoding="utf-8")
+    check("sender requires a private worker secret", "x-laxhornet-worker-secret" in sender)
+    check("sender defaults to dry-run", "dryRun" in sender)
+    check("sender uses Resend idempotency keys", "Idempotency-Key" in sender)
+
+if not webhook_source.exists():
     warnings.append("No resend-webhook Edge Function source is checked in yet.")
+else:
+    webhook = webhook_source.read_text(encoding="utf-8")
+    check("webhook verifies a Resend signing secret", "RESEND_WEBHOOK_SECRET" in webhook)
+    check("webhook records delivered messages", "email.delivered" in webhook)
+    check("webhook records bounced messages", "email.bounced" in webhook)
+    check("webhook records complaints", "email.complained" in webhook)
 
 failed = [item for item in checks if not item[1]]
 for name, ok, detail in checks:

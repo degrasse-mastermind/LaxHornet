@@ -1,0 +1,7 @@
+project_id = "ulbmjcvnyznvmjgpstno"
+
+[functions.send-laxhornet-email-queue]
+verify_jwt = false
+
+[functions.resend-webhook]
+verify_jwt = false
