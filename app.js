@@ -25,7 +25,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v276";
+const APP_VERSION = "v277";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -12186,7 +12186,7 @@ function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("service-worker.js")
+      .register("service-worker.js", { updateViaCache: "none" })
       .then((registration) => {
         serviceWorkerRegistration = registration;
         watchServiceWorkerUpdates(registration);
@@ -12202,7 +12202,7 @@ function registerServiceWorker() {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (reloadingForUpdate) return;
     reloadingForUpdate = true;
-    window.location.reload();
+    reloadWithFreshMarker(state.availableVersion || APP_VERSION);
   });
 }
 
@@ -12353,12 +12353,6 @@ async function applyAppUpdate() {
       const worker = waitingServiceWorker || registration.waiting;
       if (worker) {
         waitingServiceWorker = worker;
-        await clearLaxHornetCaches().catch(() => {});
-        navigator.serviceWorker?.addEventListener?.("controllerchange", () => {
-          if (reloadingForUpdate) return;
-          reloadingForUpdate = true;
-          reloadWithFreshMarker(targetVersion);
-        }, { once: true });
         worker.postMessage({ type: "SKIP_WAITING" });
         window.setTimeout(() => {
           if (!reloadingForUpdate) {
