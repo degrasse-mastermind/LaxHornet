@@ -118,5 +118,11 @@ begin
 end;
 $laxhornet_delete_event$;
 
+-- PostgreSQL grants new functions to PUBLIC by default. These SECURITY DEFINER
+-- RPCs must be callable only by signed-in users; authorization is then enforced
+-- again inside each function.
+revoke execute on function public.laxhornet_delete_game(text) from public, anon;
+revoke execute on function public.laxhornet_delete_event(text) from public, anon;
+
 grant execute on function public.laxhornet_delete_game(text) to authenticated;
 grant execute on function public.laxhornet_delete_event(text) to authenticated;
