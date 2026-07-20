@@ -446,28 +446,56 @@ language plpgsql
 security definer
 set search_path = public
 as $laxhornet_remove_roster_player$
+declare
+  target_player public.roster_players%rowtype;
 begin
   if (select auth.uid()) is null then
     raise exception 'Sign in required';
   end if;
 
-  if not (select public.laxhornet_can_edit_team(p_team_id)) then
-    raise exception 'Team editor access required';
+  if not ((select public.laxhornet_is_platform_reviewer()) or (select public.laxhornet_team_role(p_team_id)) = 'admin') then
+    raise exception 'Team admin access required';
   end if;
 
-  return query
-  update public.roster_players
-  set active = false
+  select *
+  into target_player
+  from public.roster_players
   where roster_players.id = p_roster_player_id
     and roster_players.team_id = p_team_id
-  returning
-    roster_players.id,
-    roster_players.team_id,
-    roster_players.name,
-    roster_players.number,
-    roster_players.position,
-    roster_players.active,
-    roster_players.created_at;
+  limit 1
+  for update;
+
+  if not found then
+    raise exception 'Roster player not found';
+  end if;
+
+  update public.roster_players
+  set active = false
+  where roster_players.id = target_player.id
+    and roster_players.team_id = target_player.team_id;
+
+  delete from public.player_claims claims
+  where claims.team_id = target_player.team_id
+    and claims.roster_player_id = target_player.id;
+
+  update public.team_access_requests requests
+  set status = 'player_removed',
+      reviewed_by = (select auth.uid()),
+      reviewed_at = now()
+  where requests.team_id = target_player.team_id
+    and requests.status in ('pending', 'approved')
+    and regexp_replace(lower(trim(coalesce(requests.child_jersey_number, ''))), '^#\s*', '')
+      = regexp_replace(lower(trim(coalesce(target_player.number, ''))), '^#\s*', '');
+
+  return query
+  select
+    target_player.id,
+    target_player.team_id,
+    target_player.name,
+    target_player.number,
+    target_player.position,
+    false,
+    target_player.created_at;
 end;
 $laxhornet_remove_roster_player$;
 

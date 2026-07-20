@@ -100,6 +100,13 @@ create table if not exists public.team_access_requests (
   constraint team_access_requests_team_user_key unique (team_id, user_id)
 );
 
+alter table public.team_access_requests
+  drop constraint if exists team_access_requests_status_check;
+
+alter table public.team_access_requests
+  add constraint team_access_requests_status_check
+  check (status in ('pending', 'approved', 'rejected', 'player_removed'));
+
 create table if not exists public.player_claims (
   id text primary key,
   team_id text not null references public.teams(id) on delete cascade,
@@ -1016,10 +1023,24 @@ as $$
         and not exists (
           select 1
           from public.player_claims claims
+          join public.roster_players claimed_players
+            on claimed_players.id = claims.roster_player_id
+           and claimed_players.team_id = claims.team_id
           where claims.team_id = requests.team_id
             and claims.user_id = requests.user_id
+            and claimed_players.active = true
+            and regexp_replace(lower(trim(coalesce(claimed_players.number, ''))), '^#\s*', '')
+              = regexp_replace(lower(trim(coalesce(requests.child_jersey_number, ''))), '^#\s*', '')
         )
       )
+    )
+    and exists (
+      select 1
+      from public.roster_players requested_players
+      where requested_players.team_id = requests.team_id
+        and requested_players.active = true
+        and regexp_replace(lower(trim(coalesce(requested_players.number, ''))), '^#\s*', '')
+          = regexp_replace(lower(trim(coalesce(requests.child_jersey_number, ''))), '^#\s*', '')
     )
     and ((select public.laxhornet_is_platform_reviewer()) or (select public.laxhornet_team_role(requests.team_id)) = 'admin')
   order by
@@ -1081,7 +1102,8 @@ begin
   into request_row
   from public.team_access_requests
   where id = request_id
-  limit 1;
+  limit 1
+  for update;
 
   if not found then
     raise exception 'Team access request not found';
@@ -1091,11 +1113,9 @@ begin
     raise exception 'Team admin access required';
   end if;
 
-  update public.team_access_requests
-  set status = case when approve then 'approved' else 'rejected' end,
-      reviewed_by = (select auth.uid()),
-      reviewed_at = now()
-  where id = request_id;
+  if request_row.status <> 'pending' then
+    raise exception 'Team access request is no longer pending';
+  end if;
 
   if approve then
     if trim(coalesce(request_row.child_jersey_number, '')) = '' then
@@ -1107,9 +1127,11 @@ begin
     from public.roster_players
     where roster_players.team_id = request_row.team_id
       and roster_players.active = true
-      and trim(roster_players.number) = trim(request_row.child_jersey_number)
+      and regexp_replace(lower(trim(coalesce(roster_players.number, ''))), '^#\s*', '')
+        = regexp_replace(lower(trim(coalesce(request_row.child_jersey_number, ''))), '^#\s*', '')
     order by roster_players.created_at asc
-    limit 1;
+    limit 1
+    for update;
 
     if not found then
       raise exception 'No active roster player found for jersey #% on this team', request_row.child_jersey_number;
@@ -1130,6 +1152,13 @@ begin
     on conflict on constraint player_claims_team_user_key do update
     set roster_player_id = excluded.roster_player_id;
   end if;
+
+  update public.team_access_requests
+  set status = case when approve then 'approved' else 'rejected' end,
+      reviewed_by = (select auth.uid()),
+      reviewed_at = now()
+  where id = request_id
+    and status = 'pending';
 
   insert into public.notification_queue (id, event_type, recipient_email, subject, body, payload)
   values (
@@ -1519,6 +1548,8 @@ language plpgsql
 security definer
 set search_path = public
 as $laxhornet_remove_roster_player$
+declare
+  target_player public.roster_players%rowtype;
 begin
   if (select auth.uid()) is null then
     raise exception 'Sign in required';
@@ -1528,19 +1559,45 @@ begin
     raise exception 'Team admin access required';
   end if;
 
-  return query
-  update public.roster_players
-  set active = false
+  select *
+  into target_player
+  from public.roster_players
   where roster_players.id = p_roster_player_id
     and roster_players.team_id = p_team_id
-  returning
-    roster_players.id,
-    roster_players.team_id,
-    roster_players.name,
-    roster_players.number,
-    roster_players.position,
-    roster_players.active,
-    roster_players.created_at;
+  limit 1
+  for update;
+
+  if not found then
+    raise exception 'Roster player not found';
+  end if;
+
+  update public.roster_players
+  set active = false
+  where roster_players.id = target_player.id
+    and roster_players.team_id = target_player.team_id;
+
+  delete from public.player_claims claims
+  where claims.team_id = target_player.team_id
+    and claims.roster_player_id = target_player.id;
+
+  update public.team_access_requests requests
+  set status = 'player_removed',
+      reviewed_by = (select auth.uid()),
+      reviewed_at = now()
+  where requests.team_id = target_player.team_id
+    and requests.status in ('pending', 'approved')
+    and regexp_replace(lower(trim(coalesce(requests.child_jersey_number, ''))), '^#\s*', '')
+      = regexp_replace(lower(trim(coalesce(target_player.number, ''))), '^#\s*', '');
+
+  return query
+  select
+    target_player.id,
+    target_player.team_id,
+    target_player.name,
+    target_player.number,
+    target_player.position,
+    false,
+    target_player.created_at;
 end;
 $laxhornet_remove_roster_player$;
 

@@ -5160,6 +5160,7 @@ async function removeRosterPlayer() {
   }
   const removedRosterPlayer = rosterPlayerFromSupabaseRow(removedRosterRow);
   applyRosterPlayerUpdate({ ...removedRosterPlayer, active: false });
+  await loadTeamAccessRequests({ silent: true });
   render();
   showToast(`${playerTitle(player)} removed from roster`);
 }

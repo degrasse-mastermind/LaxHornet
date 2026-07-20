@@ -45,10 +45,24 @@ as $$
         and not exists (
           select 1
           from public.player_claims claims
+          join public.roster_players claimed_players
+            on claimed_players.id = claims.roster_player_id
+           and claimed_players.team_id = claims.team_id
           where claims.team_id = requests.team_id
             and claims.user_id = requests.user_id
+            and claimed_players.active = true
+            and regexp_replace(lower(trim(coalesce(claimed_players.number, ''))), '^#\s*', '')
+              = regexp_replace(lower(trim(coalesce(requests.child_jersey_number, ''))), '^#\s*', '')
         )
       )
+    )
+    and exists (
+      select 1
+      from public.roster_players requested_players
+      where requested_players.team_id = requests.team_id
+        and requested_players.active = true
+        and regexp_replace(lower(trim(coalesce(requested_players.number, ''))), '^#\s*', '')
+          = regexp_replace(lower(trim(coalesce(requests.child_jersey_number, ''))), '^#\s*', '')
     )
     and ((select public.laxhornet_is_platform_reviewer()) or (select public.laxhornet_team_role(requests.team_id)) = 'admin')
   order by
