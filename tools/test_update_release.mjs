@@ -41,6 +41,12 @@ expect(
   appJs.includes('.register("service-worker.js", { updateViaCache: "none" })'),
   "service worker registration must bypass the browser HTTP cache",
 );
+expect(
+  appJs.includes("let registrationUpdateFailed = false;")
+    && appJs.includes("registrationUpdateFailed = true;")
+    && appJs.includes("if (registrationUpdateFailed && !serverVersion)"),
+  "manual update checks must tolerate a service-worker registration update failure",
+);
 
 const waitingWorkerPath = appJs.slice(appJs.indexOf("async function applyAppUpdate()"));
 const postMessageIndex = waitingWorkerPath.indexOf('worker.postMessage({ type: "SKIP_WAITING" })');

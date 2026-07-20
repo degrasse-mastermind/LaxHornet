@@ -25,7 +25,7 @@ const SUPABASE_CONFIG = {
 };
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v277";
+const APP_VERSION = "v278";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -12260,9 +12260,14 @@ async function checkForAppUpdate(options = {}) {
   try {
     const serverVersion = await fetchServerAppVersion().catch(() => "");
     const registration = serviceWorkerRegistration || (await navigator.serviceWorker.getRegistration());
+    let registrationUpdateFailed = false;
     if (registration) {
       serviceWorkerRegistration = registration;
-      await registration.update();
+      try {
+        await registration.update();
+      } catch {
+        registrationUpdateFailed = true;
+      }
       if (registration.waiting && navigator.serviceWorker.controller) {
         if (serverVersion && serverVersion === APP_VERSION) {
           clearUpdateAvailableState();
@@ -12282,6 +12287,11 @@ async function checkForAppUpdate(options = {}) {
       state.availableVersion = serverVersion;
       render();
       if (options.manual) showToast(`Update found: ${serverVersion}`);
+      return;
+    }
+
+    if (registrationUpdateFailed && !serverVersion) {
+      if (options.manual) showToast("Update check unavailable. Try again.");
       return;
     }
 
