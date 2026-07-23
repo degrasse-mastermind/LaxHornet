@@ -20,6 +20,7 @@ const STORAGE_KEYS = {
   onboardingIntent: "laxhornet.onboardingIntent",
   nextGameFocus: "laxhornet.nextGameFocus",
   familyRecapFocus: "laxhornet.familyRecapFocus",
+  trustSpineSync: "laxhornet.trustSpineSync.v1",
 };
 
 const RUNTIME_CONFIG = window.LAXHORNET_RUNTIME_CONFIG || {};
@@ -582,6 +583,7 @@ const supabaseClientLoadIssue = Boolean(rawSupabaseClient && !supabaseClient);
 
 let sharedGameChannel = null;
 let sharedGamePollTimer = null;
+let trustSpineSyncInFlight = null;
 let lastSyncErrorAt = 0;
 let activeStorageUserId = "";
 let waitingServiceWorker = null;
@@ -634,6 +636,7 @@ const state = {
   adminViewMode: initialStoredState.adminViewMode,
   onboardingIntent: initialStoredState.onboardingIntent,
   nextGameFocus: initialStoredState.nextGameFocus,
+  trustSpineSync: initialStoredState.trustSpineSync,
   focusEditorContext: "",
   gameSetupReturnScreen: "home",
   signupDraft: null,
@@ -715,7 +718,81 @@ function readStoredAccountState(userId = activeStorageUserId) {
     deletedEventIds: loadJSON(STORAGE_KEYS.deletedEvents, []),
     onboardingIntent: loadJSON(STORAGE_KEYS.onboardingIntent, "child"),
     nextGameFocus: normalizeNextGameFocus(loadJSON(STORAGE_KEYS.nextGameFocus, null)),
+    trustSpineSync: normalizeTrustSpineSyncState(loadJSON(STORAGE_KEYS.trustSpineSync, null)),
     adminViewMode,
+  };
+}
+
+function normalizeTrustSpineSyncState(value = null) {
+  const source = value && typeof value === "object" ? value : {};
+  const records = source.events && typeof source.events === "object" ? source.events : {};
+  const gameScopes = source.gameScopes && typeof source.gameScopes === "object" ? source.gameScopes : {};
+  return {
+    version: 1,
+    gameScopes: Object.fromEntries(
+      Object.entries(gameScopes)
+        .filter(([gameId, scope]) => gameId && scope && typeof scope === "object")
+        .map(([gameId, scope]) => [
+          gameId,
+          {
+            gameId,
+            accountId: String(scope.accountId || "").trim(),
+            teamId: String(scope.teamId || "").trim(),
+            rosterPlayerId: String(scope.rosterPlayerId || "").trim(),
+            registeredAt: String(scope.registeredAt || "").trim(),
+          },
+        ]),
+    ),
+    events: Object.fromEntries(
+      Object.entries(records)
+        .filter(([eventId, record]) => eventId && record && typeof record === "object")
+        .map(([eventId, record]) => [
+          eventId,
+          {
+            accountId: String(record.accountId || "").trim(),
+            teamId: String(record.teamId || "").trim(),
+            rosterPlayerId: String(record.rosterPlayerId || "").trim(),
+            gameId: String(record.gameId || "").trim(),
+            eventId,
+            serverEventVersion: Math.max(0, Number(record.serverEventVersion || 0)),
+            lifecycleState: String(record.lifecycleState || "pending").trim(),
+            acceptedEvidence:
+              record.acceptedEvidence && typeof record.acceptedEvidence === "object"
+                ? { ...record.acceptedEvidence }
+                : {},
+            pendingOperations: Array.isArray(record.pendingOperations)
+              ? record.pendingOperations
+                  .filter((operation) => operation && typeof operation === "object")
+                  .map((operation) => ({
+                    kind: String(operation.kind || "").trim(),
+                    clientOperationId: String(operation.clientOperationId || "").trim(),
+                    clientCreatedAt: String(operation.clientCreatedAt || "").trim(),
+                    eventEvidence:
+                      operation.eventEvidence && typeof operation.eventEvidence === "object"
+                        ? { ...operation.eventEvidence }
+                        : {},
+                    rpcPayload:
+                      operation.rpcPayload && typeof operation.rpcPayload === "object"
+                        ? { ...operation.rpcPayload }
+                        : null,
+                    attempts: Math.max(0, Number(operation.attempts || 0)),
+                    lastAttemptAt: String(operation.lastAttemptAt || "").trim(),
+                    lastError: String(operation.lastError || "").trim(),
+                  }))
+                  .filter((operation) => operation.kind && operation.clientOperationId)
+              : [],
+            acceptedReceipts: Array.isArray(record.acceptedReceipts)
+              ? record.acceptedReceipts.slice(-20)
+              : [],
+            conflict:
+              record.conflict && typeof record.conflict === "object"
+                ? { ...record.conflict }
+                : null,
+            lastError: String(record.lastError || "").trim(),
+            updatedAt: String(record.updatedAt || "").trim(),
+          },
+        ]),
+    ),
   };
 }
 
@@ -2265,6 +2342,7 @@ function persistAll() {
   saveJSON(STORAGE_KEYS.adminViewMode, state.adminViewMode === "tracker" ? "tracker" : "admin");
   saveJSON(STORAGE_KEYS.onboardingIntent, state.onboardingIntent || "child");
   saveJSON(STORAGE_KEYS.nextGameFocus, normalizeNextGameFocus(state.nextGameFocus));
+  saveJSON(STORAGE_KEYS.trustSpineSync, normalizeTrustSpineSyncState(state.trustSpineSync));
   if (state.nextGameFocus?.text && nextGameFocusMatchesPlayer(state.nextGameFocus, state.player)) {
     saveScopedNextGameFocus(state.nextGameFocus, state.player);
   }
@@ -2298,6 +2376,7 @@ function applyStoredAccountState(userId) {
   state.adminViewMode = stored.adminViewMode;
   state.onboardingIntent = stored.onboardingIntent;
   state.nextGameFocus = stored.nextGameFocus;
+  state.trustSpineSync = stored.trustSpineSync;
   state.games = stored.games;
   state.activeGame = stored.activeGame;
   state.trackingSession = stored.trackingSession;
@@ -2459,6 +2538,7 @@ function saveReviewedGame(game, message = "Game updated") {
   if (state.activeGame?.id === updatedGame.id) {
     state.activeGame = updatedGame;
   }
+  queueTrustSpineGameReconciliation(updatedGame);
   persistAll();
   syncGameToSupabase(updatedGame, { includeEvents: true });
   showToast(message);
@@ -2485,7 +2565,7 @@ function makeGame(formData) {
     rosterPlayerId,
     shareCode: makeShareCode(),
     userId: currentUserId() || "",
-    isShared: formData.get("liveShare") === "on",
+    isShared: Boolean(teamId && rosterPlayerId && formData.get("liveShare") === "on"),
     periodFormat,
     opponent: formData.get("opponent")?.trim() || "Opponent",
     date: formData.get("date") || todayISO(),
@@ -3048,6 +3128,7 @@ function logEvent(statKey) {
     quarter: event.quarter,
     timestamp: event.timestamp,
   };
+  queueTrustSpineEvent(state.activeGame, event);
   persistAll();
   syncLoggedEvent(state.activeGame, event);
   render();
@@ -3067,9 +3148,12 @@ function undoLastEvent() {
   rollbackScoreIncrement(state.activeGame, removed);
   state.activeGame.savedAt = new Date().toISOString();
   state.lastEventConfirmation = null;
+  queueTrustSpineTombstone(state.activeGame, removed, "Undo last event");
   persistAll();
   deleteSupabaseEvent(removed.id);
-  syncGameToSupabase(state.activeGame);
+  syncGameToSupabase(state.activeGame).then((synced) => {
+    if (synced) flushTrustSpineSync({ gameId: state.activeGame?.id || removed.gameId });
+  });
   render();
   showToast(`Undo last event: ${removed.statLabel}`);
 }
@@ -3359,6 +3443,7 @@ async function deleteEvent(gameId, eventId) {
     events: game.events.filter((item) => item.id !== eventId),
   };
   rememberDeletedEvent(eventId);
+  queueTrustSpineTombstone(game, event, "Tracker event deleted");
   state.addingReviewEvent = false;
   if (state.editingEventId === eventId) state.editingEventId = null;
   if (state.tagEditingEventId === eventId) state.tagEditingEventId = null;
@@ -3430,7 +3515,11 @@ function csvEscape(value) {
 
 function exportGamesForScope(scope = "selected_player", gameId = "") {
   if (scope === "current_game") {
-    const selected = visibleGames().find((game) => game.id === gameId) || currentReviewGame();
+    const requestedGame = state.games.find((game) => game.id === gameId);
+    const selected =
+      (requestedGame && canShowGameForCurrentAccess(requestedGame) ? requestedGame : null) ||
+      visibleGames().find((game) => game.id === gameId) ||
+      currentReviewGame();
     return selected ? [selected] : [];
   }
   return visibleGames();
@@ -5169,6 +5258,400 @@ async function deleteActiveTeam() {
   showToast(`${team.name} deleted`);
 }
 
+function trustSpineBridgeEnabled() {
+  return SECURE_DISCLOSURE_RUNTIME_READY && Boolean(supabaseClient) && Boolean(currentUserId());
+}
+
+function hasCanonicalTrustSpineScope(game = {}) {
+  return Boolean(String(gameTeamId(game)).trim() && String(gameRosterPlayerId(game)).trim());
+}
+
+function personalGameLiveShareMessage() {
+  return "Secure Live Share is available for games connected to a team roster player. You can continue tracking and reviewing this personal game.";
+}
+
+function stableTrustSpineValue(value) {
+  if (Array.isArray(value)) return value.map(stableTrustSpineValue);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.keys(value)
+      .sort()
+      .map((key) => [key, stableTrustSpineValue(value[key])]),
+  );
+}
+
+function stableTrustSpineJSON(value) {
+  return JSON.stringify(stableTrustSpineValue(value));
+}
+
+function trustSpineHash(value) {
+  const text = typeof value === "string" ? value : stableTrustSpineJSON(value);
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function trustSpineOperationId(kind, gameId, eventId, value = {}) {
+  return `lh-${kind}-${trustSpineHash({ gameId, eventId, value })}`;
+}
+
+function trustSpineEvidenceForEvent(event = {}) {
+  const normalized = normalizeEvent(event, event.gameId || "");
+  return {
+    occurred_at: String(normalized.timestamp || new Date().toISOString()),
+    period: String(normalized.quarter || "Q1"),
+    stat_type: String(normalized.statType || "note"),
+    stat_label: String(normalized.statLabel || "Note"),
+    category: String(normalized.category || "Note"),
+    point_value: Number.isFinite(Number(normalized.pointValue)) ? Number(normalized.pointValue) : 0,
+    field_zone: String(normalized.fieldZone || ""),
+  };
+}
+
+function trustSpineEvidenceChanges(previous = {}, next = {}) {
+  return Object.fromEntries(
+    Object.keys(next)
+      .filter((key) => stableTrustSpineJSON(previous[key]) !== stableTrustSpineJSON(next[key]))
+      .map((key) => [key, next[key]]),
+  );
+}
+
+function trustSpineState() {
+  if (
+    !state.trustSpineSync
+    || state.trustSpineSync.version !== 1
+    || typeof state.trustSpineSync.events !== "object"
+    || typeof state.trustSpineSync.gameScopes !== "object"
+  ) {
+    state.trustSpineSync = normalizeTrustSpineSyncState(state.trustSpineSync);
+  }
+  return state.trustSpineSync;
+}
+
+function trustSpineGameById(gameId) {
+  if (state.activeGame?.id === gameId) return normalizeGame(state.activeGame);
+  const game = state.games.find((item) => item.id === gameId);
+  return game ? normalizeGame(game) : null;
+}
+
+function trustSpineEventRecord(game, eventId) {
+  const syncState = trustSpineState();
+  const existing = syncState.events[eventId];
+  if (existing) return existing;
+  const record = {
+    accountId: String(currentUserId() || ""),
+    teamId: String(gameTeamId(game)),
+    rosterPlayerId: String(gameRosterPlayerId(game)),
+    gameId: String(game.id || ""),
+    eventId: String(eventId || ""),
+    serverEventVersion: 0,
+    lifecycleState: "pending",
+    acceptedEvidence: {},
+    pendingOperations: [],
+    acceptedReceipts: [],
+    conflict: null,
+    lastError: "",
+    updatedAt: new Date().toISOString(),
+  };
+  syncState.events[eventId] = record;
+  return record;
+}
+
+function trustSpinePendingOperation(record, kind) {
+  return record.pendingOperations.find((operation) => operation.kind === kind);
+}
+
+function enqueueTrustSpineOperation(record, operation) {
+  if (!operation?.kind || !operation.clientOperationId) return;
+  if (record.pendingOperations.some((item) => item.clientOperationId === operation.clientOperationId)) return;
+  record.pendingOperations.push({
+    kind: operation.kind,
+    clientOperationId: operation.clientOperationId,
+    clientCreatedAt: operation.clientCreatedAt || new Date().toISOString(),
+    eventEvidence: operation.eventEvidence && typeof operation.eventEvidence === "object" ? { ...operation.eventEvidence } : {},
+    rpcPayload: operation.rpcPayload && typeof operation.rpcPayload === "object" ? { ...operation.rpcPayload } : null,
+    attempts: 0,
+    lastAttemptAt: "",
+    lastError: "",
+  });
+  record.updatedAt = new Date().toISOString();
+}
+
+function queueTrustSpineEvent(game, event) {
+  if (!SECURE_DISCLOSURE_RUNTIME_READY || !currentUserId() || !hasCanonicalTrustSpineScope(game) || !event?.id) return;
+  const normalizedEvent = normalizeEvent(event, game.id);
+  const evidence = trustSpineEvidenceForEvent(normalizedEvent);
+  const record = trustSpineEventRecord(game, normalizedEvent.id);
+  if (record.lifecycleState === "tombstoned") return;
+
+  if (record.serverEventVersion < 1) {
+    if (!trustSpinePendingOperation(record, "create")) {
+      const clientCreatedAt = String(normalizedEvent.timestamp || new Date().toISOString());
+      const rpcPayload = {
+        client_operation_id: trustSpineOperationId("create", game.id, normalizedEvent.id, evidence),
+        event_id: normalizedEvent.id,
+        game_id: game.id,
+        evidence,
+        annotations: {},
+        client_created_at: clientCreatedAt,
+      };
+      enqueueTrustSpineOperation(record, {
+        kind: "create",
+        clientOperationId: rpcPayload.client_operation_id,
+        clientCreatedAt,
+        eventEvidence: evidence,
+        rpcPayload,
+      });
+    }
+    return;
+  }
+
+  if (record.conflict) return;
+  const changes = trustSpineEvidenceChanges(record.acceptedEvidence, evidence);
+  if (!Object.keys(changes).length || trustSpinePendingOperation(record, "correct")) return;
+  const clientCreatedAt = String(normalizedEvent.correctedAt || new Date().toISOString());
+  const operationSeed = {
+    baseServerEventVersion: record.serverEventVersion,
+    changes,
+    clientCreatedAt,
+  };
+  const rpcPayload = {
+    client_operation_id: trustSpineOperationId("correct", game.id, normalizedEvent.id, operationSeed),
+    event_id: normalizedEvent.id,
+    game_id: game.id,
+    base_server_event_version: record.serverEventVersion,
+    changes,
+    correction_reason: "Tracker event corrected",
+    client_created_at: clientCreatedAt,
+  };
+  enqueueTrustSpineOperation(record, {
+    kind: "correct",
+    clientOperationId: rpcPayload.client_operation_id,
+    clientCreatedAt,
+    eventEvidence: changes,
+    rpcPayload,
+  });
+}
+
+function queueTrustSpineTombstone(game, event, reason = "Tracker event removed") {
+  if (!SECURE_DISCLOSURE_RUNTIME_READY || !currentUserId() || !hasCanonicalTrustSpineScope(game) || !event?.id) return;
+  const record = trustSpineEventRecord(game, event.id);
+  if (record.lifecycleState === "tombstoned" || trustSpinePendingOperation(record, "tombstone")) return;
+  const clientCreatedAt = new Date().toISOString();
+  enqueueTrustSpineOperation(record, {
+    kind: "tombstone",
+    clientOperationId: trustSpineOperationId("tombstone", game.id, event.id, {
+      baseServerEventVersion: record.serverEventVersion,
+      reason,
+      clientCreatedAt,
+    }),
+    clientCreatedAt,
+    eventEvidence: {},
+    rpcPayload: null,
+  });
+}
+
+function queueTrustSpineGameReconciliation(game) {
+  if (!SECURE_DISCLOSURE_RUNTIME_READY || !currentUserId() || !hasCanonicalTrustSpineScope(game)) return;
+  const normalized = normalizeGame(game);
+  const presentEventIds = new Set(normalized.events.map((event) => event.id));
+  normalized.events.forEach((event) => queueTrustSpineEvent(normalized, event));
+  Object.values(trustSpineState().events)
+    .filter((record) => record.gameId === normalized.id && !presentEventIds.has(record.eventId) && isDeletedEvent(record.eventId))
+    .forEach((record) => queueTrustSpineTombstone(normalized, { id: record.eventId }, "Tracker event deleted"));
+  persistAll();
+}
+
+function trustSpineScopeMatches(game, scope = {}) {
+  return (
+    scope.accountId === String(currentUserId() || "")
+    && scope.teamId === String(gameTeamId(game))
+    && scope.rosterPlayerId === String(gameRosterPlayerId(game))
+  );
+}
+
+async function ensureTrustSpineGameScope(game) {
+  if (!trustSpineBridgeEnabled() || !hasCanonicalTrustSpineScope(game) || state.isOffline) return false;
+  const syncState = trustSpineState();
+  const existing = syncState.gameScopes[game.id];
+  if (existing && trustSpineScopeMatches(game, existing)) return true;
+  const { data, error } = await supabaseClient.rpc("lh_register_game_scope", { p_game_id: game.id });
+  if (error || data?.outcome !== "accepted") {
+    const detail = readableSupabaseError(error || { message: data?.code || "game_scope_unavailable" });
+    state.syncStatus = "Secure sharing is waiting for synchronization";
+    state.cloudError = detail;
+    persistAll();
+    return false;
+  }
+  syncState.gameScopes[game.id] = {
+    gameId: game.id,
+    accountId: String(currentUserId() || ""),
+    teamId: String(gameTeamId(game)),
+    rosterPlayerId: String(gameRosterPlayerId(game)),
+    registeredAt: new Date().toISOString(),
+  };
+  persistAll();
+  return true;
+}
+
+function trustSpineRpcForOperation(kind) {
+  if (kind === "create") return "lh_create_event";
+  if (kind === "correct") return "lh_correct_event";
+  if (kind === "tombstone") return "lh_tombstone_event";
+  return "";
+}
+
+function trustSpinePayloadForOperation(record, operation) {
+  if (operation.kind !== "tombstone") return operation.rpcPayload;
+  if (record.serverEventVersion < 1) return null;
+  return {
+    client_operation_id: operation.clientOperationId,
+    event_id: record.eventId,
+    game_id: record.gameId,
+    base_server_event_version: record.serverEventVersion,
+    tombstone_reason: "Tracker event removed",
+    client_created_at: operation.clientCreatedAt,
+  };
+}
+
+function acceptTrustSpineOperation(record, operation, result) {
+  record.serverEventVersion = Math.max(record.serverEventVersion, Number(result.serverEventVersion || 0));
+  if (operation.kind === "create") {
+    record.lifecycleState = "active";
+    record.acceptedEvidence = { ...operation.eventEvidence };
+  } else if (operation.kind === "correct") {
+    record.lifecycleState = "active";
+    record.acceptedEvidence = { ...record.acceptedEvidence, ...operation.eventEvidence };
+  } else if (operation.kind === "tombstone") {
+    record.lifecycleState = "tombstoned";
+  }
+  record.pendingOperations = record.pendingOperations.filter((item) => item.clientOperationId !== operation.clientOperationId);
+  record.acceptedReceipts = [...record.acceptedReceipts, {
+    clientOperationId: operation.clientOperationId,
+    kind: operation.kind,
+    code: String(result.code || ""),
+    serverEventVersion: record.serverEventVersion,
+    acceptedAt: new Date().toISOString(),
+  }].slice(-20);
+  record.conflict = null;
+  record.lastError = "";
+  record.updatedAt = new Date().toISOString();
+}
+
+async function processTrustSpineOperation(record, operation) {
+  const rpcName = trustSpineRpcForOperation(operation.kind);
+  const rpcPayload = trustSpinePayloadForOperation(record, operation);
+  if (!rpcName || !rpcPayload) return false;
+  operation.attempts += 1;
+  operation.lastAttemptAt = new Date().toISOString();
+  const { data, error } = await supabaseClient.rpc(rpcName, { p_operation: rpcPayload });
+  if (error) {
+    operation.lastError = readableSupabaseError(error) || "Secure event synchronization failed";
+    record.lastError = operation.lastError;
+    record.updatedAt = new Date().toISOString();
+    return false;
+  }
+  if (data?.outcome === "accepted") {
+    acceptTrustSpineOperation(record, operation, data);
+    return true;
+  }
+  record.pendingOperations = record.pendingOperations.filter((item) => item.clientOperationId !== operation.clientOperationId);
+  if (data?.outcome === "conflicted") {
+    record.conflict = {
+      code: String(data.code || "event_conflict"),
+      serverEventVersion: Number(data.serverEventVersion || record.serverEventVersion),
+      clientOperationId: operation.clientOperationId,
+      detectedAt: new Date().toISOString(),
+    };
+  }
+  record.serverEventVersion = Math.max(record.serverEventVersion, Number(data?.serverEventVersion || 0));
+  record.lastError = String(data?.code || "Secure event synchronization was rejected");
+  record.updatedAt = new Date().toISOString();
+  return false;
+}
+
+async function flushTrustSpineSync(options = {}) {
+  if (!trustSpineBridgeEnabled() || state.isOffline) return false;
+  if (trustSpineSyncInFlight) return trustSpineSyncInFlight;
+  trustSpineSyncInFlight = (async () => {
+    const gameId = String(options.gameId || "");
+    const records = Object.values(trustSpineState().events)
+      .filter((record) => !gameId || record.gameId === gameId)
+      .sort((left, right) => left.gameId.localeCompare(right.gameId) || left.eventId.localeCompare(right.eventId));
+    const gameIds = [...new Set(records.map((record) => record.gameId))];
+    for (const targetGameId of gameIds) {
+      const game = trustSpineGameById(targetGameId);
+      if (!game || !hasCanonicalTrustSpineScope(game)) continue;
+      if (!(await ensureTrustSpineGameScope(game))) continue;
+      const gameRecords = records.filter((record) => record.gameId === targetGameId);
+      for (const kind of ["create", "correct", "tombstone"]) {
+        for (const record of gameRecords) {
+          const pending = record.pendingOperations.filter((operation) => operation.kind === kind);
+          for (const operation of pending) {
+            await processTrustSpineOperation(record, operation);
+          }
+        }
+      }
+    }
+    persistAll();
+    return true;
+  })();
+  try {
+    return await trustSpineSyncInFlight;
+  } finally {
+    trustSpineSyncInFlight = null;
+  }
+}
+
+function trustSpineGameSynchronizationStatus(game) {
+  const syncState = trustSpineState();
+  const scope = syncState.gameScopes[game.id];
+  const events = normalizeGame(game).events.filter((event) => !isDeletedEvent(event.id));
+  const records = events.map((event) => syncState.events[event.id]).filter(Boolean);
+  const pending = records.some((record) => record.pendingOperations.length);
+  const conflict = records.some((record) => record.conflict || record.lastError);
+  const synchronized = (
+    trustSpineScopeMatches(game, scope)
+    && records.length === events.length
+    && records.every((record, index) => (
+      record.serverEventVersion >= 1
+      && record.lifecycleState === "active"
+      && stableTrustSpineJSON(record.acceptedEvidence) === stableTrustSpineJSON(trustSpineEvidenceForEvent(events[index]))
+    ))
+    && !pending
+    && !conflict
+  );
+  return { synchronized, pending, conflict };
+}
+
+async function reconcileTrustSpineGame(game) {
+  if (!trustSpineBridgeEnabled() || !hasCanonicalTrustSpineScope(game)) return false;
+  queueTrustSpineGameReconciliation(game);
+  if (state.isOffline) {
+    state.syncStatus = "Secure sharing is waiting for synchronization";
+    persistAll();
+    return false;
+  }
+  if (!(await ensureTrustSpineGameScope(game))) return false;
+  await flushTrustSpineSync({ gameId: game.id });
+  queueTrustSpineGameReconciliation(game);
+  await flushTrustSpineSync({ gameId: game.id });
+  const status = trustSpineGameSynchronizationStatus(game);
+  if (!status.synchronized) {
+    state.syncStatus = status.conflict
+      ? "Secure sharing needs a correction review"
+      : "Secure sharing is waiting for synchronization";
+    persistAll();
+    return false;
+  }
+  if (/secure sharing/i.test(state.syncStatus || "")) state.syncStatus = "Synced";
+  persistAll();
+  return true;
+}
+
 async function syncGameToSupabase(game, options = {}) {
   if (!supabaseClient || !game) return false;
   if (isDeletedGame(game.id)) return false;
@@ -5237,10 +5720,20 @@ async function syncGameToSupabase(game, options = {}) {
     : skipped.length
     ? "Synced; setup update recommended"
     : "Synced";
+  if (
+    options.includeEvents
+    && SECURE_DISCLOSURE_RUNTIME_READY
+    && hasCanonicalTrustSpineScope(normalized)
+    && !detachedMissingTeam
+  ) {
+    await reconcileTrustSpineGame(normalized);
+  }
   return true;
 }
 
 async function syncLoggedEvent(game, event) {
+  queueTrustSpineEvent(game, event);
+  persistAll();
   if (!supabaseClient || !game || !event) return;
   if (gameTeamId(game) && !canEditGame(game)) {
     state.syncStatus = "Verify your player before saving team stats";
@@ -5278,6 +5771,9 @@ async function syncLoggedEvent(game, event) {
       : skipped.length
       ? "Synced; setup update recommended"
       : "Synced";
+    if (SECURE_DISCLOSURE_RUNTIME_READY && hasCanonicalTrustSpineScope(game) && !detachedMissingTeam) {
+      await reconcileTrustSpineGame(game);
+    }
   }
 }
 
@@ -5510,6 +6006,13 @@ async function loadSharedGame(shareCode) {
 async function copyShareLink() {
   const game = state.activeGame || currentReviewGame();
   if (!game) return;
+  if (!hasCanonicalTrustSpineScope(game)) {
+    state.liveSharePromptGameId = "";
+    state.syncStatus = "Personal game saved privately";
+    showToast(personalGameLiveShareMessage());
+    render();
+    return;
+  }
   state.liveSharePromptGameId = game.id;
   render();
 }
@@ -5530,10 +6033,26 @@ async function copyLiveShareLinkNow(gameId) {
     showToast("Sign in to use Live Share");
     return;
   }
+  if (!hasCanonicalTrustSpineScope(game)) {
+    state.liveSharePromptGameId = "";
+    state.syncStatus = "Personal game saved privately";
+    showToast(personalGameLiveShareMessage());
+    render();
+    return;
+  }
   if (TRUSTED_DISCLOSURE_FEATURES.liveShareTokenRpc) {
-    const registration = await supabaseClient.rpc("lh_register_game_scope", { p_game_id: game.id });
-    if (registration.error || registration.data?.outcome !== "accepted") {
-      reportSyncError(registration.error || { message: registration.data?.code || "Live Share scope unavailable" });
+    const legacySynced = await syncGameToSupabase(game, { includeEvents: true });
+    if (!legacySynced) {
+      state.syncStatus = "Secure sharing is waiting for synchronization";
+      showToast("Secure sharing is waiting for synchronization. Your game remains saved.");
+      render();
+      return;
+    }
+    const trustSpineSynced = await reconcileTrustSpineGame(game);
+    if (!trustSpineSynced) {
+      state.syncStatus = "Secure sharing is waiting for synchronization";
+      showToast("Secure sharing is waiting for synchronization. Your game remains saved.");
+      render();
       return;
     }
     const tokenResult = await supabaseClient.rpc("lh_create_live_share_token", {
@@ -6165,14 +6684,24 @@ function renderLiveShareModal() {
   if (!state.liveSharePromptGameId) return "";
   const game = (state.activeGame?.id === state.liveSharePromptGameId ? state.activeGame : null) || state.games.find((item) => item.id === state.liveSharePromptGameId);
   if (!game) return "";
+  const liveShareAvailable = hasCanonicalTrustSpineScope(game);
   return `
     <section class="modal-backdrop" role="presentation">
       <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="liveShareTitle">
         <h3 id="liveShareTitle">Live Share</h3>
-        <p class="muted small">Anyone with this link can view the live game timeline. Only share it with people you trust.</p>
+        <p class="muted small">${
+          liveShareAvailable
+            ? "Anyone with this link can view the live game timeline. Only share it with people you trust."
+            : escapeHTML(personalGameLiveShareMessage())
+        }</p>
         <div class="edit-actions">
-          <button class="btn positive" type="button" data-action="confirm-copy-share-link" data-game-id="${escapeHTML(game.id)}">Copy Live Share Link</button>
-          <button class="btn danger-outline" type="button" data-action="turn-off-live-share" data-game-id="${escapeHTML(game.id)}">Turn Off Live Share</button>
+          ${
+            liveShareAvailable
+              ? `<button class="btn positive" type="button" data-action="confirm-copy-share-link" data-game-id="${escapeHTML(game.id)}">Copy Live Share Link</button>
+                 <button class="btn danger-outline" type="button" data-action="turn-off-live-share" data-game-id="${escapeHTML(game.id)}">Turn Off Live Share</button>`
+              : `<button class="btn secondary" type="button" data-action="close-live-share">Continue Tracking</button>
+                 <button class="btn positive" type="button" data-nav="player">Select a Roster Player</button>`
+          }
         </div>
       </div>
     </section>
@@ -7822,6 +8351,10 @@ function renderStartGame() {
   const availablePlayers = visiblePlayers();
   const focus = openNextGameFocusForPlayer(state.player);
   const focusEditorOpen = state.focusEditorContext === "start";
+  const liveShareAvailable = hasCanonicalTrustSpineScope({
+    teamId: state.player.teamId || "",
+    rosterPlayerId: state.player.rosterPlayerId || (state.player.teamId ? state.player.id : ""),
+  });
   return renderShell(`
     <section class="screen-title">
       <h2>Set up game</h2>
@@ -7895,10 +8428,15 @@ function renderStartGame() {
           </div>
           <div class="field">
             <label for="liveShare">Live Share</label>
-            <select id="liveShare" name="liveShare">
+            <select id="liveShare" name="liveShare" ${liveShareAvailable ? "" : "disabled"}>
               <option value="off">Off</option>
-              <option value="on">On</option>
+              ${liveShareAvailable ? `<option value="on">On</option>` : ""}
             </select>
+            ${
+              liveShareAvailable
+                ? ""
+                : `<p class="field-help">${escapeHTML(personalGameLiveShareMessage())}</p>`
+            }
           </div>
         </div>
         <button class="btn positive" type="submit" ${viewOnlyTeamPlayer ? "disabled" : ""}>Start Tracking</button>
@@ -7990,7 +8528,8 @@ function liveSyncChipLabel() {
 }
 
 function renderLiveStatusChips(game) {
-  const liveShareLabel = game.isShared ? "Live Share On" : "Live Share Off";
+  const liveShareAvailable = hasCanonicalTrustSpineScope(game);
+  const liveShareLabel = liveShareAvailable ? (game.isShared ? "Live Share On" : "Live Share Off") : "Live Share Unavailable";
   return `
     <div class="live-status-chips" aria-label="Game save and share status">
       <span>${escapeHTML(liveSyncChipLabel())}</span>
@@ -8139,6 +8678,7 @@ function renderLiveTracker() {
   const recentEvents = [...game.events].reverse().slice(0, 5);
   const periods = periodsForGame(game);
   const statusLine = `${escapeHTML(game.currentQuarter)} <span aria-hidden="true">&middot;</span> vs ${escapeHTML(game.opponent || "Opponent")}`;
+  const liveShareAvailable = hasCanonicalTrustSpineScope(game);
   const liveMeta = [formatDate(game.date), periodFormatLabel(game), game.location]
     .filter(Boolean)
     .map((item) => escapeHTML(item))
@@ -8149,8 +8689,13 @@ function renderLiveTracker() {
       <h2>${statusLine}</h2>
       <p class="live-meta">
         <span>${liveMeta}</span>
-        <button class="live-share-link" type="button" data-action="copy-share-link">Live Share</button>
+        ${
+          liveShareAvailable
+            ? `<button class="live-share-link" type="button" data-action="copy-share-link">Live Share</button>`
+            : `<span class="live-share-link" aria-label="Live Share unavailable for personal games">Live Share unavailable</span>`
+        }
       </p>
+      ${liveShareAvailable ? "" : `<p class="field-help">${escapeHTML(personalGameLiveShareMessage())}</p>`}
       ${renderLiveStatusChips(game)}
     </section>
 
@@ -12106,6 +12651,10 @@ function handleClick(event) {
     if (action.dataset.action === "copy-share-link") copyShareLink();
     if (action.dataset.action === "confirm-copy-share-link") copyLiveShareLinkNow(action.dataset.gameId);
     if (action.dataset.action === "turn-off-live-share") turnOffLiveShare(action.dataset.gameId);
+    if (action.dataset.action === "close-live-share") {
+      state.liveSharePromptGameId = "";
+      render();
+    }
     if (action.dataset.action === "cancel-team-access-review") {
       state.pendingTeamAccessReview = null;
       render();
@@ -12559,8 +13108,14 @@ window.addEventListener("online", async () => {
   state.isOffline = false;
   if (state.authUser) {
     await loadCloudGames({ silent: true });
-    state.syncStatus = "Synced";
-    showToast("Synced to your account");
+    await flushTrustSpineSync();
+    const hasPendingTrustSpineWork = Object.values(trustSpineState().events).some(
+      (record) => record.pendingOperations.length || record.conflict || record.lastError,
+    );
+    state.syncStatus = hasPendingTrustSpineWork ? "Secure sharing is waiting for synchronization" : "Synced";
+    showToast(hasPendingTrustSpineWork ? "Game saved; secure sharing is still synchronizing" : "Synced to your account");
+    persistAll();
+    render();
     return;
   }
   if (state.syncStatus === "Saved on this phone") state.syncStatus = "Synced";
