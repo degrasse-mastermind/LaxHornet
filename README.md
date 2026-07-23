@@ -22,15 +22,15 @@ LaxHornet is a mobile-first offline PWA for tracking youth lacrosse stats during
 
 ## Minimum-Necessary Disclosure
 
-The hardened disclosure path is staged behind `window.LAXHORNET_RUNTIME_CONFIG` feature flags. Production defaults remain off until the Trust Spine RPCs and token lifecycle have passed disposable-staging verification.
+The hardened disclosure path has passed isolated staging and managed preview verification. It remains staged behind `window.LAXHORNET_RUNTIME_CONFIG` feature flags, and all production defaults remain off until a deliberate Trust Spine cutover is approved.
 
-- **Live Share:** backend-allowlisted game and event facts only; no notes, tags, process context, account data, corrections, focus records, or generated recommendations. The trusted viewer polls the public-safe RPC instead of subscribing to ordinary game/event tables.
+- **Hardened Live Share path:** backend-allowlisted game and event facts only; no notes, tags, process context, account data, corrections, focus records, or generated recommendations. The trusted viewer polls the public-safe RPC instead of subscribing to ordinary game/event tables. This path is verified outside production but is not active in production yet; the legacy fallback remains an unresolved cutover risk.
 - **Share Recap:** a short, user-previewed summary with cautious interpretation, a conversation prompt, and an optional focus only when the user adds it.
 - **CSV Data Export:** selected player or one selected game. Recorded facts are included by default; descriptive tags, private process tags, and notes each require an explicit checkbox.
 - **Private Full Backup:** broader recovery data with a sensitive-data warning and explicit confirmation. It downloads directly and does not invoke native/public sharing.
 - **Import:** previews and merges only new, authorized games. It does not restore claims, team membership, roster authority, account ownership, deleted games, or Live Share state, and it never replaces an existing same-ID game.
 
-The staging migration and evidence suite are under `review-evidence/product-alignment-remediation-v2/`. They must not be applied to production as part of this sprint.
+The staging migration and evidence suite are under `review-evidence/product-alignment-remediation-v2/`. They must not be applied to production as part of this release-hygiene correction. Current users should avoid sensitive or private information in notes or tags for games they intend to share, and should treat every Private Full Backup as a sensitive recovery artifact.
 
 ## Local Setup
 

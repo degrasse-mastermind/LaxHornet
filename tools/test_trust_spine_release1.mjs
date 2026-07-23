@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
-import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { validateReleaseContainmentFromEnvironment } from "./release_containment.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
@@ -439,27 +439,27 @@ test("Next-game focus keys isolate account, team, and roster player", () => {
   assert.match(aTeamAPlayer1, /user\.account-a\.team\.team-a\.player\.player-1$/);
 });
 
-test("No production runtime or cache file is modified by this implementation", () => {
-  const gitOutput = execFileSync(
-    "git",
-    ["status", "--short", "--untracked-files=all"],
-    { cwd: repoRoot, encoding: "utf8" },
-  );
-  const protectedFiles = [
-    "app.js",
-    "app.html",
-    "styles.css",
-    "service-worker.js",
-    "version.json",
-    "supabase-schema.sql",
-  ];
-  for (const fileName of protectedFiles) {
+test("Phase-aware release containment preserves the authorized Trust Spine SQL", () => {
+  const containment = validateReleaseContainmentFromEnvironment(repoRoot);
+  if (containment.mode === "standalone") {
+    assert.equal(containment.releaseDeltaFiles.some((file) => file.endsWith(".sql")), false);
     assert.equal(
-      new RegExp(`(^|\\s)${fileName.replace(".", "\\.")}$`, "m").test(gitOutput),
+      containment.releaseDeltaFiles.some((file) => file.startsWith("supabase/migrations/")),
       false,
-      `${fileName} was modified`,
     );
+    assert.equal(
+      containment.releaseDeltaFiles.some((file) => file.startsWith("supabase/rollback/")),
+      false,
+    );
+  } else {
+    assert.equal(containment.supabaseTreeMatchesAuthorizedRef, true);
+    assert.deepEqual(containment.postAuthorizationDatabaseFiles, []);
+    assert.equal(containment.authorizedSupabaseDeltaFiles.length, 7);
   }
+  assert.match(appSource, /publicLiveShareRpc:\s*RUNTIME_CONFIG\.publicLiveShareRpc === true/);
+  assert.match(appSource, /liveShareTokenRpc:\s*RUNTIME_CONFIG\.liveShareTokenRpc === true/);
+  assert.match(appSource, /exportAuditRpc:\s*RUNTIME_CONFIG\.exportAuditRpc === true/);
+  assert.match(appSource, /\.select\("\*, events\(\*\)"\)/);
 });
 
 const failed = results.filter((result) => result.status === "FAIL");

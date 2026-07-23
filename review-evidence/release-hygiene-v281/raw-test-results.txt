@@ -1,0 +1,499 @@
+LaxHornet v281 release-hygiene raw test results
+Branch: review/release-hygiene-v281
+Base: d1c5ada83a1247973b44ebfd1c33be78f4bc2dc7
+Run: 2026-07-23T00:55:54.6155532-04:00
+
+===== JavaScript syntax =====
+EXIT CODE: 0
+
+===== v281 release coordination, cache, and installed update contracts =====
+Update release checks passed for v281.
+EXIT CODE: 0
+
+===== Release-hygiene containment =====
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'access-and-trust.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'coach-alignment.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'index.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'parent-experience.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'player-development.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'privacy.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'program-value.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rollout-guide.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'service-worker.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'styles.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'terms.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_minimum_disclosure.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_product_alignment_browser.cjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_trust_spine_release1.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_update_release.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tracking-framework.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'version.json', LF will be replaced by CRLF the next time Git touches it
+Release hygiene checks passed (37/37).
+PASS: version manifest identifies v281
+PASS: browser runtime identifies v281
+PASS: service-worker cache identifies v281
+PASS: publicLiveShareRpc requires deliberate true runtime configuration
+PASS: liveShareTokenRpc requires deliberate true runtime configuration
+PASS: exportAuditRpc requires deliberate true runtime configuration
+PASS: browser runtime does not enable trusted disclosure flags
+PASS: legacy Live Share fallback remains pending explicit cutover
+PASS: active runtime, public, and support files contain no staging project reference
+PASS: no publishable key appears outside the existing production app configuration
+PASS: app default remains scoped to the established production project
+PASS: release branch changes no SQL
+PASS: canonical forward migrations are unchanged
+PASS: canonical rollback files are unchanged
+PASS: impactValueForEvent is unchanged from origin/main
+PASS: possessionRuleForEvent is unchanged from origin/main
+PASS: calculatePossessionImpact is unchanged from origin/main
+PASS: calculateGameImpact is unchanged from origin/main
+PASS: calculateTotals is unchanged from origin/main
+PASS: calculateSeasonTotalsFromGames is unchanged from origin/main
+PASS: publicLiveShareGameFromPayload is unchanged from origin/main
+PASS: README.md identifies isolated staging proof
+PASS: README.md identifies managed preview proof
+PASS: README.md says production activation is pending
+PASS: README.md retains sensitive-data caution
+PASS: access-and-trust.html identifies isolated staging proof
+PASS: access-and-trust.html identifies managed preview proof
+PASS: access-and-trust.html says production activation is pending
+PASS: access-and-trust.html retains sensitive-data caution
+PASS: privacy.html identifies isolated staging proof
+PASS: privacy.html identifies managed preview proof
+PASS: privacy.html says production activation is pending
+PASS: privacy.html retains sensitive-data caution
+PASS: terms.html identifies isolated staging proof
+PASS: terms.html identifies managed preview proof
+PASS: terms.html says production activation is pending
+PASS: terms.html retains sensitive-data caution
+EXIT CODE: 0
+
+===== Minimum disclosure =====
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'access-and-trust.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'coach-alignment.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'index.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'parent-experience.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'player-development.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'privacy.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'program-value.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rollout-guide.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'service-worker.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'styles.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'terms.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_minimum_disclosure.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_product_alignment_browser.cjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_trust_spine_release1.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_update_release.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tracking-framework.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'version.json', LF will be replaced by CRLF the next time Git touches it
+Minimum-disclosure checks passed (40/40).
+PASS: trusted Live Share is off by default
+PASS: trusted token lifecycle is off by default
+PASS: trusted export audit is off by default
+PASS: shared viewers receive public-view status copy
+PASS: secure Live Share returns before the legacy wildcard path
+PASS: secure Live Share calls the public-safe RPC
+PASS: secure Live Share uses allowlisted polling
+PASS: secure cutover removes ordinary table subscriptions
+PASS: public payload mapping cannot render notes or tags
+PASS: staging denies anonymous ordinary game/event reads
+PASS: base rollback is executable in the Supabase SQL editor without psql meta-commands
+PASS: only the public-safe Live Share RPC is granted anonymously
+PASS: staging has explicit token create/revoke RPCs
+PASS: server stores only the token hash
+PASS: public token resolution enforces expiration
+PASS: remote tests cover unknown, expired, and revoked tokens
+PASS: CSV defaults to the selected player scope
+PASS: CSV annotations require explicit inclusion
+PASS: full backup requires explicit confirmation
+PASS: full backup never invokes native/public sharing
+PASS: trusted export auditing is integrated behind its flag
+PASS: export audit stores metadata and outcome
+PASS: export audit does not store exported payloads
+PASS: account backup audit is scoped to the signed-in account
+PASS: security-definer function ownership is explicit
+PASS: import cannot grant player or team access
+PASS: import cannot replace team, roster, or player authority state
+PASS: imported games cannot reactivate Live Share tokens
+PASS: import explains that existing games are not replaced
+PASS: import cannot resurrect locally deleted games
+PASS: recap excludes private event notes and private process intelligence
+PASS: privacy, terms, access, and README distinguish output purposes
+PASS: mobile export/import confirmations have dedicated accessible layout
+PASS: remote suite asserts exact allowlists and ordinary-table denial
+PASS: release hygiene coordinates the service worker and version manifest
+PASS: production Supabase schema remains unchanged
+PASS: release hygiene changes no SQL or canonical migration history
+PASS: public copy distinguishes staged proof from production activation
+PASS: live tracking controls remain intact
+PASS: Game Review, Season Review, and offline persistence remain present
+EXIT CODE: 0
+
+===== Product Alignment source regressions =====
+Product alignment checks passed (33/33).
+PASS: letter-grade generator is removed
+PASS: letter-grade renderer is removed
+PASS: archetype generator is removed from active code
+PASS: archetype share-card generator is removed
+PASS: active app code contains no archetype reads, generation, or presentation
+PASS: archetype presentation CSS is removed
+PASS: public, legal, README, and launch copy contain no archetype claims
+PASS: hidden DOM and CSS contain no retired impact-grade class
+PASS: app contains the required proprietary Game Impact limitation
+PASS: public/legal documentation contains the required Game Impact limitation
+PASS: app states the missing-event limitation
+PASS: low-data review uses the required insufficient-evidence state
+PASS: Game Review visibly labels recorded evidence
+PASS: Game Review visibly labels interpretation
+PASS: Game Review visibly labels the optional focus
+PASS: recap begins with recorded contributions
+PASS: recap separates cautious interpretation
+PASS: recap includes a conversation starter
+PASS: recap includes focus only when explicitly added
+PASS: no letter grade appears in app or public copy
+PASS: CSV reframes the numeric export field as proprietary
+PASS: JSON export documents Impact provenance and evidence limits
+PASS: share recap excludes private process context from prompt selection
+PASS: Live Share suppresses private notes
+PASS: Live Share filters private process tags
+PASS: user-recorded process tags do not generate automatic game patterns
+PASS: user-recorded process tags do not generate season conclusions
+PASS: no external AI model integration was added
+PASS: live tracking retains Undo, Save, End Game, and Cancel Game controls
+PASS: recap copy and share actions remain wired
+PASS: legacy saved games remain normalization-compatible without deleting unknown fields
+PASS: offline/local persistence paths remain present
+PASS: no player comparison or ranking presentation was introduced
+EXIT CODE: 0
+
+===== Product Alignment browser regressions =====
+SAMPLE FAMILY RECAP
+Demo vs Madison Demo
+Recorded contributions
+1 goal, 1 assist, 1 ground ball, 1 successful clear
+
+What this may suggest
+Based on the recorded events, scoring may have been an important part of this game.
+
+Conversation starter
+After winning the ball, what could help make the next pass or carry cleaner?
+PASS: public homepage contains no player archetype/profile claim
+PASS: public homepage contains no Game Impact letter grade
+PASS: demo tracker renders
+PASS: demo review renders
+PASS: rendered numeric Impact includes its proprietary limitation
+PASS: rendered review separates evidence, interpretation, and focus
+PASS: rendered demo contains no grade or archetype output
+PASS: rendered DOM contains no retired impact-grade element
+PASS: rendered DOM contains no archetype card
+PASS: 390px demo has no horizontal page overflow
+PASS: runtime Family Recap separates evidence, interpretation, and conversation prompt
+PASS: runtime Family Recap excludes grades, archetypes, private notes, and private process tags
+PASS: runtime low-data review suppresses developmental takeaway and shows the required limitation
+PASS: runtime public event rendering excludes private notes and process tags
+PASS: browser Product Alignment checks make no hosted Supabase request
+Browser product alignment checks passed (15/15).
+EXIT CODE: 0
+
+===== Trust Spine contracts =====
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'access-and-trust.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'coach-alignment.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'index.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'parent-experience.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'player-development.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'privacy.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'program-value.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rollout-guide.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'service-worker.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'styles.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'terms.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_minimum_disclosure.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_product_alignment_browser.cjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_trust_spine_release1.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_update_release.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tracking-framework.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'version.json', LF will be replaced by CRLF the next time Git touches it
+PASS Migration is additive and does not alter legacy runtime tables
+PASS Trust Spine foreign keys preserve evidence and never target legacy tables
+PASS Release 1 scope excludes deferred roles and systems
+PASS All 20 Trust Spine tables are in the deny-all RLS list
+PASS No direct Trust Spine table grants are given to browser roles
+PASS Staging rollback removes exactly the additive Trust Spine tables
+PASS Only the nine approved public RPCs are created and granted
+PASS Public RPC wrappers are fixed-path definers and private helpers are unreachable
+PASS Grant lifecycle and constrained provenance are represented
+PASS Create, correction, and permanent tombstone operation records are separate
+PASS Operations preserve all outcomes while revisions preserve accepted evidence only
+PASS Scope registration is canonical, idempotent, and does not issue grants
+PASS Accepted revision sequencing uses the locked effective-row counter
+PASS Evidence, annotations, Live Share, and export field allowlists are explicit
+PASS The SQL suite covers every required staging scenario
+PASS LaxHornet account storage keys isolate users
+PASS Next-game focus keys isolate account, team, and roster player
+PASS Release hygiene preserves Trust Spine SQL and keeps trusted disclosure disabled
+
+18/18 local contract tests passed.
+EXIT CODE: 0
+
+===== Cancel Game =====
+PASS: new game with no events is removed
+PASS: cancel clears active game and tracking session
+PASS: cancel writes a durable game tombstone
+PASS: cancel returns to home
+PASS: online cancel requests one cloud deletion
+PASS: game with several events is fully removed
+PASS: unrelated games remain unchanged
+PASS: Keep Tracking leaves game and events unchanged
+PASS: offline cancel queues no immediate cloud call
+PASS: offline tombstone prevents cloud resurrection after reload
+PASS: canceled game is excluded from export source
+PASS: resumed saved game is preserved
+PASS: resumed saved game does not call cloud delete
+PASS: unauthorized cancel cannot change the game
+PASS: cancel is idempotent after active game is cleared
+PASS: Cancel Game is a secondary live control
+PASS: confirmation uses required warning copy
+PASS: confirmation has Keep Tracking and Cancel Game actions
+PASS: new tracking sessions are marked at game creation
+PASS: legacy sessions default to preservation-safe existing origin
+PASS: cancel clears active and review pointers
+PASS: cancel uses durable game tombstone
+PASS: cancel never completes or reviews the game
+PASS: cancel uses RPC-only cloud deletion
+PASS: game deletion has no direct table delete fallback
+PASS: saved-session exit does not call cloud deletion
+PASS: modal is accessible
+PASS: Escape and Tab handling are implemented
+PASS: Keep Tracking restores focus to cancel control
+PASS: Save, End Game, and Undo controls remain
+PASS: normal navigation does not invoke cancellation
+PASS: cloud merge filters deleted games
+PASS: cloud reload flushes tombstones before merge
+
+33 cancel-game checks passed.
+EXIT CODE: 0
+
+===== Delete permissions =====
+PASS: delete installer revokes PUBLIC and anon from public.laxhornet_delete_game(text)
+PASS: delete installer grants authenticated access to public.laxhornet_delete_game(text)
+PASS: security hardening restores authenticated access to public.laxhornet_delete_game(text)
+PASS: main schema grants authenticated access to public.laxhornet_delete_game(text)
+PASS: permission patch revokes PUBLIC and anon from public.laxhornet_delete_game(text)
+PASS: permission patch grants authenticated access to public.laxhornet_delete_game(text)
+PASS: delete installer revokes PUBLIC and anon from public.laxhornet_delete_event(text)
+PASS: delete installer grants authenticated access to public.laxhornet_delete_event(text)
+PASS: security hardening restores authenticated access to public.laxhornet_delete_event(text)
+PASS: main schema grants authenticated access to public.laxhornet_delete_event(text)
+PASS: permission patch revokes PUBLIC and anon from public.laxhornet_delete_event(text)
+PASS: permission patch grants authenticated access to public.laxhornet_delete_event(text)
+PASS: permission patch is transactional
+PASS: permission patch verifies effective privileges
+PASS: main schema removes default PUBLIC function execution
+PASS: delete game RPC rejects missing authentication
+PASS: delete event RPC rejects missing authentication
+
+17 delete RPC permission checks passed.
+EXIT CODE: 0
+
+===== Player-removal cleanup =====
+PASS: canonical schema permits player_removed status
+PASS: standalone migration permits player_removed status
+PASS: canonical removal RPC exists
+PASS: canonical removal RPC requires sign-in
+PASS: canonical removal RPC requires team admin or reviewer
+PASS: canonical removal RPC locks exact roster player
+PASS: canonical removal RPC marks player inactive
+PASS: canonical removal RPC removes only exact player claims
+PASS: canonical removal RPC preserves team membership
+PASS: canonical removal RPC resolves only matching pending or approved requests
+PASS: canonical removal RPC records player_removed
+PASS: canonical removal RPC leaves failures to roll back the transaction
+PASS: migration removal RPC exists
+PASS: migration removal RPC requires sign-in
+PASS: migration removal RPC requires team admin or reviewer
+PASS: migration removal RPC locks exact roster player
+PASS: migration removal RPC marks player inactive
+PASS: migration removal RPC removes only exact player claims
+PASS: migration removal RPC preserves team membership
+PASS: migration removal RPC resolves only matching pending or approved requests
+PASS: migration removal RPC records player_removed
+PASS: migration removal RPC leaves failures to roll back the transaction
+PASS: roster repair removal RPC exists
+PASS: roster repair removal RPC requires sign-in
+PASS: roster repair removal RPC requires team admin or reviewer
+PASS: roster repair removal RPC locks exact roster player
+PASS: roster repair removal RPC marks player inactive
+PASS: roster repair removal RPC removes only exact player claims
+PASS: roster repair removal RPC preserves team membership
+PASS: roster repair removal RPC resolves only matching pending or approved requests
+PASS: roster repair removal RPC records player_removed
+PASS: roster repair removal RPC leaves failures to roll back the transaction
+PASS: canonical pending-request RPC requires an active roster match
+PASS: canonical pending-request RPC excludes terminal player_removed requests
+PASS: canonical pending-request RPC checks the claim for the requested jersey
+PASS: migration pending-request RPC requires an active roster match
+PASS: migration pending-request RPC excludes terminal player_removed requests
+PASS: migration pending-request RPC checks the claim for the requested jersey
+PASS: reminder repair pending-request RPC requires an active roster match
+PASS: reminder repair pending-request RPC excludes terminal player_removed requests
+PASS: reminder repair pending-request RPC checks the claim for the requested jersey
+PASS: canonical approval RPC locks the request
+PASS: canonical approval RPC rejects terminal requests
+PASS: canonical approval RPC locks the active roster match
+PASS: canonical approval RPC updates only a still-pending request
+PASS: migration approval RPC locks the request
+PASS: migration approval RPC rejects terminal requests
+PASS: migration approval RPC locks the active roster match
+PASS: migration approval RPC updates only a still-pending request
+PASS: admin UI refreshes Parent Requests after player removal
+PASS: an explicit request can reopen a player_removed request
+PASS: removing a player hides its Parent Request
+PASS: removing a player removes the exact claim
+PASS: requests for other players remain unchanged
+PASS: claims for other players remain unchanged
+PASS: a parent with another player claim keeps that access
+PASS: parent team membership is preserved
+PASS: approved request becomes player_removed
+PASS: re-adding the jersey does not reactivate the old request
+PASS: an explicit new request can be submitted for the re-added player
+PASS: unauthorized cleanup leaves all data unchanged
+PASS: cleanup failure rolls the modeled transaction back
+PASS: migration is explicitly transactional
+PASS: migration revokes public and anon execution
+
+64 passed; 0 failed
+EXIT CODE: 0
+
+===== Release-hygiene browser disclosure =====
+PASS: anonymous shared-game screen renders
+PASS: anonymous shared-game entry remains read-only and code-scoped
+PASS: anonymous shared-game screen has no 390px horizontal overflow
+PASS: CSV export dialog requires a selected scope
+PASS: CSV export keeps private process tags optional
+PASS: CSV export keeps private notes optional
+PASS: private backup confirmation identifies sensitive recovery data
+PASS: private backup is distinguished from public sharing
+PASS: private backup requires explicit confirmation
+PASS: import review states authority boundaries
+PASS: import review states merge behavior
+PASS: Help identifies staged and preview proof
+PASS: Help says hardened production activation is pending
+PASS: Help warns against sensitive notes and tags
+PASS: update-available banner exposes the update action
+PASS: browser verification made no hosted Supabase request
+Browser evidence: C:\Users\user\Documents\LaxHornet\review-evidence\release-hygiene-v281\browser
+Release-hygiene browser checks passed (16/16).
+EXIT CODE: 0
+
+===== Active runtime staging and publishable-key scan =====
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'access-and-trust.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'coach-alignment.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'index.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'parent-experience.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'player-development.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'privacy.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'program-value.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rollout-guide.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'service-worker.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'styles.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'terms.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_minimum_disclosure.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_product_alignment_browser.cjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_trust_spine_release1.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_update_release.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tracking-framework.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'version.json', LF will be replaced by CRLF the next time Git touches it
+Release hygiene checks passed (37/37).
+PASS: version manifest identifies v281
+PASS: browser runtime identifies v281
+PASS: service-worker cache identifies v281
+PASS: publicLiveShareRpc requires deliberate true runtime configuration
+PASS: liveShareTokenRpc requires deliberate true runtime configuration
+PASS: exportAuditRpc requires deliberate true runtime configuration
+PASS: browser runtime does not enable trusted disclosure flags
+PASS: legacy Live Share fallback remains pending explicit cutover
+PASS: active runtime, public, and support files contain no staging project reference
+PASS: no publishable key appears outside the existing production app configuration
+PASS: app default remains scoped to the established production project
+PASS: release branch changes no SQL
+PASS: canonical forward migrations are unchanged
+PASS: canonical rollback files are unchanged
+PASS: impactValueForEvent is unchanged from origin/main
+PASS: possessionRuleForEvent is unchanged from origin/main
+PASS: calculatePossessionImpact is unchanged from origin/main
+PASS: calculateGameImpact is unchanged from origin/main
+PASS: calculateTotals is unchanged from origin/main
+PASS: calculateSeasonTotalsFromGames is unchanged from origin/main
+PASS: publicLiveShareGameFromPayload is unchanged from origin/main
+PASS: README.md identifies isolated staging proof
+PASS: README.md identifies managed preview proof
+PASS: README.md says production activation is pending
+PASS: README.md retains sensitive-data caution
+PASS: access-and-trust.html identifies isolated staging proof
+PASS: access-and-trust.html identifies managed preview proof
+PASS: access-and-trust.html says production activation is pending
+PASS: access-and-trust.html retains sensitive-data caution
+PASS: privacy.html identifies isolated staging proof
+PASS: privacy.html identifies managed preview proof
+PASS: privacy.html says production activation is pending
+PASS: privacy.html retains sensitive-data caution
+PASS: terms.html identifies isolated staging proof
+PASS: terms.html identifies managed preview proof
+PASS: terms.html says production activation is pending
+PASS: terms.html retains sensitive-data caution
+EXIT CODE: 0
+
+===== Historical staging-reference inventory =====
+review-evidence\release-hygiene-v281\README.md:70:No active runtime or public file contains a staging project reference. Historical
+review-evidence\release-hygiene-v281\raw-test-results.txt:54:PASS: active runtime, public, and support files contain no staging project reference
+review-evidence\release-hygiene-v281\raw-test-results.txt:426:.\supabase-email-communication-setup.md:147:  "https://ulbmjcvnyznvmjgpstno.supabase.co/functions/v1/send-laxhornet-email-queue" \
+review-evidence\release-hygiene-v281\raw-test-results.txt:427:.\README.md:83:https://ulbmjcvnyznvmjgpstno.supabase.co
+review-evidence\release-hygiene-v281\raw-test-results.txt:428:.\app.js:25:  url: RUNTIME_CONFIG.supabaseUrl || "https://ulbmjcvnyznvmjgpstno.supabase.co",
+review-evidence\release-hygiene-v281\raw-test-results.txt:437:review-evidence\product-alignment-remediation-v2\logs\remote-staging-results.json:3:  "projectHost": "jafhrhgseiwrohqrhcof.supabase.co",
+review-evidence\release-hygiene-v281\raw-test-results.txt:438:review-evidence\product-alignment-remediation-v2\logs\remote-staging-checked-in-test.txt:3:  "projectHost": "jafhrhgseiwrohqrhcof.supabase.co",
+review-evidence\trust-spine-release1-hardening-7cf83f3\STAGING_ENVIRONMENT_EVIDENCE.json:3:  "projectRef": "ulbmjcvnyznvmjgpstno",
+review-evidence\product-alignment-remediation-v2\logs\remote-staging-results.json:3:  "projectHost": "jafhrhgseiwrohqrhcof.supabase.co",
+review-evidence\product-alignment-remediation-v2\logs\remote-staging-checked-in-test.txt:3:  "projectHost": "jafhrhgseiwrohqrhcof.supabase.co",
+review-evidence\trust-spine-release1-e73b7b1\implementation-files\docs\methodnorth\trust-spine-gate\TRUST_SPINE_MIGRATION_RUNBOOK.md:8:- Confirm the target project reference is not the production project reference.
+EXIT CODE: 0
+
+===== SQL and canonical migration diff =====
+EXIT CODE: 0
+
+===== Git diff check =====
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'access-and-trust.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'coach-alignment.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'index.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'parent-experience.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'player-development.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'privacy.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'program-value.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'rollout-guide.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'service-worker.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'styles.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'terms.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_minimum_disclosure.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_product_alignment_browser.cjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_trust_spine_release1.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_update_release.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tracking-framework.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'version.json', LF will be replaced by CRLF the next time Git touches it
+EXIT CODE: 0
+
+===== Build, lint, typecheck =====
+NOT CONFIGURED: no package.json or equivalent command manifest is present for this static PWA.

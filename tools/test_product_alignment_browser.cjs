@@ -18,7 +18,21 @@ async function expectCheck(condition, message) {
     "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
   ].find((candidate) => candidate && fs.existsSync(candidate));
   const browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.addInitScript(() => {
+    window.LAXHORNET_RUNTIME_CONFIG = {
+      supabaseUrl: "http://127.0.0.1:9",
+      supabasePublishableKey: "synthetic-local-browser-test",
+    };
+  });
+  const page = await context.newPage();
+  await page.route("http://127.0.0.1:9/**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  const hostedSupabaseRequests = [];
+  page.on("request", (request) => {
+    if (/https:\/\/[a-z]{20}\.supabase\.co/i.test(request.url())) hostedSupabaseRequests.push(request.url());
+  });
 
   await page.goto(`${baseUrl}/?fresh=product-alignment-browser`, { waitUntil: "networkidle" });
   const landingText = await page.locator("body").innerText();
@@ -112,6 +126,7 @@ async function expectCheck(condition, message) {
       && !runtimeChecks.publicEventHtml.includes("Good Decision, Unsuccessful Execution"),
     "runtime public event rendering excludes private notes and process tags",
   );
+  await expectCheck(hostedSupabaseRequests.length === 0, "browser Product Alignment checks make no hosted Supabase request");
 
   console.log("SAMPLE FAMILY RECAP");
   console.log(runtimeChecks.recap.text);

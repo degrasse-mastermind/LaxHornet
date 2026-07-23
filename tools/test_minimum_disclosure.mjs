@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { validateReleaseContainmentFromEnvironment } from "./release_containment.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
@@ -29,12 +29,12 @@ const importEnd = app.indexOf("function cancelPendingImport", importStart);
 const importSource = app.slice(importStart, importEnd);
 const backupStart = app.indexOf("function fullBackupPayload");
 const backupEnd = app.indexOf("function openExportDialog", backupStart);
-const changedFiles = execFileSync("git", ["diff", "--name-only", "d98ab0542a0c2fce23f5731ff034af348f364835"], { cwd: root, encoding: "utf8" })
-  .trim()
-  .split(/\r?\n/)
-  .filter(Boolean);
+const containment = validateReleaseContainmentFromEnvironment(root);
+const changedFiles = containment.releaseDeltaFiles;
 
 expect(app.includes("publicLiveShareRpc: RUNTIME_CONFIG.publicLiveShareRpc === true"), "trusted Live Share is off by default");
+expect(app.includes("liveShareTokenRpc: RUNTIME_CONFIG.liveShareTokenRpc === true"), "trusted token lifecycle is off by default");
+expect(app.includes("exportAuditRpc: RUNTIME_CONFIG.exportAuditRpc === true"), "trusted export audit is off by default");
 expect(app.includes("Read-only live updates"), "shared viewers receive public-view status copy");
 expect(secureLoadStart >= 0 && secureReturn >= 0 && (legacyWildcard < 0 || secureReturn < legacyWildcard), "secure Live Share returns before the legacy wildcard path");
 expect(app.includes('supabaseClient.rpc("lh_public_live_share_game"'), "secure Live Share calls the public-safe RPC");
@@ -66,8 +66,27 @@ expect(app.includes("buildFamilyRecap") && app.includes("publicRecapIntelligence
 expect([privacy, terms, trust, readme].every((text) => text.includes("Live Share")) && readme.includes("Minimum-Necessary Disclosure"), "privacy, terms, access, and README distinguish output purposes");
 expect(styles.includes(".disclosure-modal") && styles.includes(".confirm-check"), "mobile export/import confirmations have dedicated accessible layout");
 expect(remote.includes("allowedGameKeys") && remote.includes("allowedEventKeys") && remote.includes("Anonymous ordinary-table read exposed"), "remote suite asserts exact allowlists and ordinary-table denial");
-expect(!changedFiles.includes("service-worker.js") && !changedFiles.includes("version.json"), "service worker and version files remain unchanged");
+expect(changedFiles.includes("service-worker.js") && changedFiles.includes("version.json"), "release hygiene coordinates the service worker and version manifest");
 expect(!changedFiles.some((file) => file.endsWith("supabase-schema.sql")), "production Supabase schema remains unchanged");
+if (containment.mode === "standalone") {
+  expect(
+    !changedFiles.some((file) => file.endsWith(".sql") || file.startsWith("supabase/migrations/")),
+    "standalone release-hygiene delta changes no SQL or canonical migration history",
+  );
+} else {
+  expect(
+    containment.supabaseTreeMatchesAuthorizedRef,
+    "combined Supabase tree matches the authorized PR #9 ref exactly",
+  );
+  expect(
+    containment.postAuthorizationDatabaseFiles.length === 0,
+    "release-hygiene delta does not alter canonical database files",
+  );
+}
+expect(
+  [privacy, terms, trust, readme].every((text) => /staging/i.test(text) && /not (?:yet )?active in production|production activation|production defaults remain off/i.test(text)),
+  "public copy distinguishes staged proof from production activation",
+);
 expect(app.includes('data-action="undo"') && app.includes('data-action="cancel-game"') && app.includes('data-action="end-game"'), "live tracking controls remain intact");
 expect(app.includes("function renderReview()") && app.includes("function renderDashboard()") && app.includes("function persistAll()"), "Game Review, Season Review, and offline persistence remain present");
 
