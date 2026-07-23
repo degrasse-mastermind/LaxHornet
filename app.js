@@ -33,15 +33,22 @@ const TRUSTED_DISCLOSURE_FEATURES = Object.freeze({
   liveShareTokenRpc: RUNTIME_CONFIG.liveShareTokenRpc === true,
   exportAuditRpc: RUNTIME_CONFIG.exportAuditRpc === true,
 });
+const REQUIRED_SCHEMA_CAPABILITY = Number(RUNTIME_CONFIG.minimumSchemaCapability || 1);
+const BACKEND_CAPABILITY_CACHE_MS = 60 * 1000;
 const SECURE_DISCLOSURE_RUNTIME_READY = Object.values(TRUSTED_DISCLOSURE_FEATURES).every(Boolean);
+const GAME_SCOPE_TYPES = Object.freeze({
+  TEAM_ROSTER: "team_roster",
+  PERSONAL: "personal",
+});
 const PUBLIC_LIVE_SHARE_POLL_MS = 4000;
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v282";
+const APP_VERSION = "v283";
 window.LAXHORNET_DISCLOSURE_STATUS = Object.freeze({
   appVersion: APP_VERSION,
   ready: SECURE_DISCLOSURE_RUNTIME_READY,
   features: TRUSTED_DISCLOSURE_FEATURES,
+  requiredSchemaCapability: REQUIRED_SCHEMA_CAPABILITY,
 });
 
 const PERIOD_FORMATS = {
@@ -584,6 +591,12 @@ const supabaseClientLoadIssue = Boolean(rawSupabaseClient && !supabaseClient);
 let sharedGameChannel = null;
 let sharedGamePollTimer = null;
 let trustSpineSyncInFlight = null;
+let gameEventOperationService = null;
+let backendCapabilityState = {
+  value: null,
+  checkedAt: 0,
+  error: "",
+};
 let lastSyncErrorAt = 0;
 let activeStorageUserId = "";
 let waitingServiceWorker = null;
@@ -1586,6 +1599,22 @@ function gameRosterPlayerId(game = {}) {
   return game.rosterPlayerId || game.roster_player_id || game.playerSnapshot?.rosterPlayerId || game.player_snapshot?.roster_player_id || "";
 }
 
+function gameScopeType(game = {}) {
+  const explicit = String(game.scopeType || game.scope_type || "").trim().toLowerCase();
+  if (Object.values(GAME_SCOPE_TYPES).includes(explicit)) return explicit;
+  return gameTeamId(game) && gameRosterPlayerId(game)
+    ? GAME_SCOPE_TYPES.TEAM_ROSTER
+    : GAME_SCOPE_TYPES.PERSONAL;
+}
+
+function isTeamRosterGame(game = {}) {
+  return gameScopeType(game) === GAME_SCOPE_TYPES.TEAM_ROSTER;
+}
+
+function isPersonalGame(game = {}) {
+  return gameScopeType(game) === GAME_SCOPE_TYPES.PERSONAL;
+}
+
 function gamePlayerSnapshot(game = {}) {
   return normalizePlayer(game.playerSnapshot || game.player_snapshot || state.player);
 }
@@ -2304,6 +2333,7 @@ function normalizeGame(game = {}, fallbackPlayer = null) {
   return {
     ...game,
     id,
+    scopeType: gameScopeType({ ...game, teamId, rosterPlayerId }),
     playerId: playerId || playerSnapshot.id || "",
     teamId,
     rosterPlayerId,
@@ -2538,9 +2568,8 @@ function saveReviewedGame(game, message = "Game updated") {
   if (state.activeGame?.id === updatedGame.id) {
     state.activeGame = updatedGame;
   }
-  queueTrustSpineGameReconciliation(updatedGame);
   persistAll();
-  syncGameToSupabase(updatedGame, { includeEvents: true });
+  syncGameToSupabase(updatedGame);
   showToast(message);
 }
 
@@ -2558,8 +2587,10 @@ function makeGame(formData) {
   const player = { ...state.player };
   const teamId = player.teamId || "";
   const rosterPlayerId = player.rosterPlayerId || (teamId ? player.id : "");
+  const scopeType = teamId && rosterPlayerId ? GAME_SCOPE_TYPES.TEAM_ROSTER : GAME_SCOPE_TYPES.PERSONAL;
   return {
     id: uid("game"),
+    scopeType,
     playerId: player.id,
     teamId,
     rosterPlayerId,
@@ -3074,7 +3105,7 @@ function saveActiveGame(message = "Game saved locally") {
   state.activeGame.savedAt = new Date().toISOString();
   upsertGame(state.activeGame);
   persistAll();
-  syncGameToSupabase(state.activeGame, { includeEvents: true });
+  reconcileGameEventOperations(state.activeGame);
   showToast(message);
 }
 
@@ -3090,47 +3121,47 @@ function logEvent(statKey) {
   }
 
   const stat = STAT_BY_KEY[statKey];
-  const scoreChange = applyScoreIncrementForStat(state.activeGame, statKey);
-  const scoreContext = scoreContextForGame(state.activeGame, state.activeGame.currentQuarter);
   let note = "";
   if (statKey === "note") {
     note = window.prompt("Add a quick note")?.trim() || "";
     if (!note) return;
   }
 
-  const event = {
-    id: uid("event"),
-    gameId: state.activeGame.id,
-    userId: state.activeGame.userId || currentUserId() || "",
-    teamId: state.activeGame.teamId || "",
-    rosterPlayerId: state.activeGame.rosterPlayerId || "",
-    timestamp: new Date().toISOString(),
-    quarter: state.activeGame.currentQuarter,
-    statType: stat.key,
-    statLabel: stat.label,
-    category: stat.category,
-    pointValue: stat.points,
-    tags: [],
-    note,
-    fieldZone: "",
-    ...scoreContext,
-    scoreAutoIncrement: scoreChange.side,
-    scoreForBeforeEvent: scoreChange.beforeFor,
-    scoreAgainstBeforeEvent: scoreChange.beforeAgainst,
-  };
-
-  state.activeGame.events.push(event);
-  state.activeGame.savedAt = new Date().toISOString();
-  state.lastEventConfirmation = {
-    gameId: state.activeGame.id,
-    eventId: event.id,
-    label: stat.label,
-    quarter: event.quarter,
-    timestamp: event.timestamp,
-  };
-  queueTrustSpineEvent(state.activeGame, event);
-  persistAll();
-  syncLoggedEvent(state.activeGame, event);
+  const operation = createGameEventOperation(state.activeGame, () => {
+    const scoreChange = applyScoreIncrementForStat(state.activeGame, statKey);
+    const scoreContext = scoreContextForGame(state.activeGame, state.activeGame.currentQuarter);
+    const event = {
+      id: uid("event"),
+      gameId: state.activeGame.id,
+      userId: state.activeGame.userId || currentUserId() || "",
+      teamId: state.activeGame.teamId || "",
+      rosterPlayerId: state.activeGame.rosterPlayerId || "",
+      timestamp: new Date().toISOString(),
+      quarter: state.activeGame.currentQuarter,
+      statType: stat.key,
+      statLabel: stat.label,
+      category: stat.category,
+      pointValue: stat.points,
+      tags: [],
+      note,
+      fieldZone: "",
+      ...scoreContext,
+      scoreAutoIncrement: scoreChange.side,
+      scoreForBeforeEvent: scoreChange.beforeFor,
+      scoreAgainstBeforeEvent: scoreChange.beforeAgainst,
+    };
+    state.activeGame.events.push(event);
+    state.activeGame.savedAt = new Date().toISOString();
+    state.lastEventConfirmation = {
+      gameId: state.activeGame.id,
+      eventId: event.id,
+      label: stat.label,
+      quarter: event.quarter,
+      timestamp: event.timestamp,
+    };
+    return { game: state.activeGame, event };
+  });
+  const event = operation.event;
   render();
   showToast(`${stat.label} added · ${event.quarter} ${formatTime(event.timestamp)}`);
 }
@@ -3144,18 +3175,16 @@ function undoLastEvent() {
     showToast("View-only team access");
     return;
   }
-  const removed = state.activeGame.events.pop();
-  rollbackScoreIncrement(state.activeGame, removed);
-  state.activeGame.savedAt = new Date().toISOString();
-  state.lastEventConfirmation = null;
-  queueTrustSpineTombstone(state.activeGame, removed, "Undo last event");
-  persistAll();
-  deleteSupabaseEvent(removed.id);
-  syncGameToSupabase(state.activeGame).then((synced) => {
-    if (synced) flushTrustSpineSync({ gameId: state.activeGame?.id || removed.gameId });
+  const operation = tombstoneGameEventOperation(state.activeGame, "Undo last event", () => {
+    const removed = state.activeGame.events.pop();
+    rollbackScoreIncrement(state.activeGame, removed);
+    state.activeGame.savedAt = new Date().toISOString();
+    state.lastEventConfirmation = null;
+    rememberDeletedEvent(removed.id);
+    return { game: state.activeGame, event: removed };
   });
   render();
-  showToast(`Undo last event: ${removed.statLabel}`);
+  showToast(`Undo last event: ${operation.event.statLabel}`);
 }
 
 function updateActiveGameScore(side = "") {
@@ -3217,14 +3246,15 @@ function addNoteToLastEvent() {
   }
   const note = window.prompt(`Add note for ${confirmation.label}`)?.trim() || "";
   if (!note) return;
-  state.activeGame.events[eventIndex] = {
-    ...state.activeGame.events[eventIndex],
-    note,
-    correctedAt: new Date().toISOString(),
-  };
-  state.activeGame.savedAt = new Date().toISOString();
-  persistAll();
-  syncLoggedEvent(state.activeGame, state.activeGame.events[eventIndex]);
+  correctGameEventOperation(state.activeGame, () => {
+    state.activeGame.events[eventIndex] = {
+      ...state.activeGame.events[eventIndex],
+      note,
+      correctedAt: new Date().toISOString(),
+    };
+    state.activeGame.savedAt = new Date().toISOString();
+    return { game: state.activeGame, event: state.activeGame.events[eventIndex] };
+  });
   render();
   showToast("Note added");
 }
@@ -3371,7 +3401,7 @@ function confirmEndGame() {
   state.gameSavedSummaryId = completedGame.id;
   state.lastEventConfirmation = null;
   persistAll();
-  syncGameToSupabase(completedGame, { includeEvents: true });
+  reconcileGameEventOperations(completedGame);
   render();
   showToast(`Game saved. Review ${possessiveName(playerFirstName(gamePlayerSnapshot(completedGame)))} impact.`);
 }
@@ -3438,23 +3468,21 @@ async function deleteEvent(gameId, eventId) {
   if (!event) return;
   if (!window.confirm(`Delete ${event.statLabel}?`)) return;
 
-  const updatedGame = {
-    ...removeScoreIncrementFromGameTotal(game, event),
-    events: game.events.filter((item) => item.id !== eventId),
-  };
-  rememberDeletedEvent(eventId);
-  queueTrustSpineTombstone(game, event, "Tracker event deleted");
-  state.addingReviewEvent = false;
-  if (state.editingEventId === eventId) state.editingEventId = null;
-  if (state.tagEditingEventId === eventId) state.tagEditingEventId = null;
-  saveReviewedGame(updatedGame, "Event deleted");
-  const cloudDeleted = await deleteSupabaseEvent(eventId);
-  if (cloudDeleted) {
-    clearResolvedCloudDeleteError();
-  } else if (supabaseClient && currentUserId() && !state.cloudError) {
-    reportCloudDeleteNeedsUpdate("event");
-    persistAll();
-  }
+  tombstoneGameEventOperation(game, "Tracker event deleted", () => {
+    const updatedGame = normalizeGame({
+      ...removeScoreIncrementFromGameTotal(game, event),
+      events: game.events.filter((item) => item.id !== eventId),
+      savedAt: new Date().toISOString(),
+    });
+    rememberDeletedEvent(eventId);
+    state.addingReviewEvent = false;
+    if (state.editingEventId === eventId) state.editingEventId = null;
+    if (state.tagEditingEventId === eventId) state.tagEditingEventId = null;
+    upsertGame(updatedGame);
+    if (state.activeGame?.id === updatedGame.id) state.activeGame = updatedGame;
+    return { game: updatedGame, event };
+  });
+  showToast("Event deleted");
   render();
 }
 
@@ -3487,25 +3515,25 @@ function saveEventTags(gameId, eventId) {
     return;
   }
   const tags = uniqueTags(state.tagDraftTags);
-  updateReviewGame(
-    gameId,
-    (game) => ({
+  correctGameEventOperation(game, () => {
+    const updatedEvent = {
+      ...game.events.find((event) => event.id === eventId),
+      tags,
+      tagsUpdatedAt: new Date().toISOString(),
+    };
+    const updatedGame = normalizeGame({
       ...game,
-      events: game.events.map((event) =>
-        event.id === eventId
-          ? {
-              ...event,
-              tags,
-              tagsUpdatedAt: new Date().toISOString(),
-            }
-          : event,
-      ),
-    }),
-    "Tags saved",
-  );
+      events: game.events.map((event) => (event.id === eventId ? updatedEvent : event)),
+      savedAt: new Date().toISOString(),
+    });
+    upsertGame(updatedGame);
+    if (state.activeGame?.id === updatedGame.id) state.activeGame = updatedGame;
+    return { game: updatedGame, event: updatedEvent };
+  });
   state.tagEditingEventId = null;
   state.tagDraftTags = [];
   render();
+  showToast("Tags saved");
 }
 
 function csvEscape(value) {
@@ -3676,6 +3704,9 @@ async function recordSensitiveExportAudit(exportType, scopeType, scopeId) {
     throw new Error("Secure export is temporarily unavailable. Tracking and reviews are still available.");
   }
   if (!supabaseClient || !currentUserId()) throw new Error("Sign in before exporting sensitive data.");
+  if (!(await backendCapabilityAvailable("exportAudit"))) {
+    throw new Error("Secure export is temporarily unavailable. Tracking and reviews are still available.");
+  }
   const { data, error } = await supabaseClient.rpc("lh_record_disclosure_export", {
     p_export_type: exportType,
     p_scope_type: scopeType,
@@ -3960,6 +3991,74 @@ function reportSecureDisclosureUnavailable(feature = "Secure sharing") {
   state.syncStatus = `${feature} temporarily unavailable`;
   showToast(`${feature} is temporarily unavailable. Tracking is still available.`);
   render();
+}
+
+function normalizeBackendCapabilities(value = {}) {
+  const source = Array.isArray(value) ? value[0] || {} : value || {};
+  return {
+    schemaVersion: Number(source.schemaVersion ?? source.schema_version ?? 0),
+    trustSpineEvents: source.trustSpineEvents === true || source.trust_spine_events === true,
+    secureLiveShare: source.secureLiveShare === true || source.secure_live_share === true,
+    exportAudit: source.exportAudit === true || source.export_audit === true,
+    personalGameSharing: source.personalGameSharing === true || source.personal_game_sharing === true,
+  };
+}
+
+function validBackendCapabilities(capabilities = {}) {
+  return Number.isInteger(capabilities.schemaVersion)
+    && capabilities.schemaVersion >= REQUIRED_SCHEMA_CAPABILITY;
+}
+
+async function fetchBackendCapabilities(options = {}) {
+  const now = Date.now();
+  if (
+    !options.force
+    && backendCapabilityState.value
+    && now - backendCapabilityState.checkedAt < BACKEND_CAPABILITY_CACHE_MS
+  ) {
+    return backendCapabilityState.value;
+  }
+  if (!supabaseClient || state.isOffline) {
+    backendCapabilityState = {
+      value: null,
+      checkedAt: now,
+      error: state.isOffline ? "offline" : "account_service_unavailable",
+    };
+    return null;
+  }
+  const { data, error } = await supabaseClient.rpc("lh_release_capabilities");
+  const capabilities = normalizeBackendCapabilities(data);
+  if (error || !validBackendCapabilities(capabilities)) {
+    backendCapabilityState = {
+      value: null,
+      checkedAt: now,
+      error: readableSupabaseError(error) || "capability_mismatch",
+    };
+    return null;
+  }
+  backendCapabilityState = {
+    value: capabilities,
+    checkedAt: now,
+    error: "",
+  };
+  return capabilities;
+}
+
+async function backendCapabilityAvailable(feature, options = {}) {
+  const capabilities = await fetchBackendCapabilities(options);
+  return Boolean(capabilities?.[feature]);
+}
+
+async function requireSecureCapability(feature, label, options = {}) {
+  if (!SECURE_DISCLOSURE_RUNTIME_READY || !TRUSTED_DISCLOSURE_FEATURES[options.runtimeFlag || feature]) {
+    reportSecureDisclosureUnavailable(label);
+    return false;
+  }
+  if (!(await backendCapabilityAvailable(feature, options))) {
+    reportSecureDisclosureUnavailable(label);
+    return false;
+  }
+  return true;
 }
 
 function reportCloudDeleteNeedsUpdate(recordLabel = "item") {
@@ -4510,7 +4609,7 @@ async function syncLocalGamesToCloud() {
     if (state.activeGame?.id === normalized.id) state.activeGame = normalized;
     const index = state.games.findIndex((item) => item.id === normalized.id);
     if (index >= 0) state.games[index] = normalized;
-    const synced = await syncGameToSupabase(normalized, { includeEvents: true });
+    const synced = await reconcileGameEventOperations(normalized);
     if (synced) uploaded += 1;
   }
   return uploaded;
@@ -5263,11 +5362,43 @@ function trustSpineBridgeEnabled() {
 }
 
 function hasCanonicalTrustSpineScope(game = {}) {
-  return Boolean(String(gameTeamId(game)).trim() && String(gameRosterPlayerId(game)).trim());
+  return isTeamRosterGame(game)
+    && Boolean(String(gameTeamId(game)).trim() && String(gameRosterPlayerId(game)).trim());
 }
 
 function personalGameLiveShareMessage() {
   return "Secure Live Share is available for games connected to a team roster player. You can continue tracking and reviewing this personal game.";
+}
+
+function secureLiveShareEligibility(game = {}) {
+  if (!hasCanonicalTrustSpineScope(game)) {
+    return {
+      available: false,
+      reason: "personal_game",
+      message: personalGameLiveShareMessage(),
+    };
+  }
+  if (!SECURE_DISCLOSURE_RUNTIME_READY || !TRUSTED_DISCLOSURE_FEATURES.liveShareTokenRpc) {
+    return {
+      available: false,
+      reason: "runtime_unavailable",
+      message: "Live Share is temporarily unavailable. Tracking and private review remain available.",
+    };
+  }
+  if (!backendCapabilityState.value?.secureLiveShare) {
+    return {
+      available: false,
+      reason: backendCapabilityState.error || "capability_unconfirmed",
+      message: state.isOffline
+        ? "Live Share will be checked when this phone is back online. Tracking remains available."
+        : "Live Share is temporarily unavailable while the app checks secure sharing support. Tracking remains available.",
+    };
+  }
+  return {
+    available: true,
+    reason: "",
+    message: "",
+  };
 }
 
 function stableTrustSpineValue(value) {
@@ -5652,6 +5783,45 @@ async function reconcileTrustSpineGame(game) {
   return true;
 }
 
+function eventOperationService() {
+  if (gameEventOperationService) return gameEventOperationService;
+  const factory = window.LaxHornetEventOperations?.createEventOperationService;
+  if (typeof factory !== "function") {
+    throw new Error("Event operation service is unavailable");
+  }
+  gameEventOperationService = factory({
+    persistLocal: persistAll,
+    queueEvent: queueTrustSpineEvent,
+    queueTombstone: queueTrustSpineTombstone,
+    queueReconciliation: queueTrustSpineGameReconciliation,
+    syncLegacyEvent: syncLoggedEvent,
+    syncLegacyGame: syncGameToSupabase,
+    deleteLegacyEvent: deleteSupabaseEvent,
+    flushAuthoritativeQueue: flushTrustSpineSync,
+    reconcileAuthoritativeGame: reconcileTrustSpineGame,
+    canUseCloud: () => Boolean(supabaseClient && currentUserId() && !state.isOffline),
+    requiresAuthoritativeHistory: (game) => isTeamRosterGame(game),
+    reportError: reportSyncError,
+  });
+  return gameEventOperationService;
+}
+
+function createGameEventOperation(game, applyLocal) {
+  return eventOperationService().createGameEventOperation({ game, applyLocal });
+}
+
+function correctGameEventOperation(game, applyLocal) {
+  return eventOperationService().correctGameEventOperation({ game, applyLocal });
+}
+
+function tombstoneGameEventOperation(game, reason, applyLocal) {
+  return eventOperationService().tombstoneGameEventOperation({ game, reason, applyLocal });
+}
+
+function reconcileGameEventOperations(game) {
+  return eventOperationService().reconcileGameEventOperations(game);
+}
+
 async function syncGameToSupabase(game, options = {}) {
   if (!supabaseClient || !game) return false;
   if (isDeletedGame(game.id)) return false;
@@ -5720,27 +5890,17 @@ async function syncGameToSupabase(game, options = {}) {
     : skipped.length
     ? "Synced; setup update recommended"
     : "Synced";
-  if (
-    options.includeEvents
-    && SECURE_DISCLOSURE_RUNTIME_READY
-    && hasCanonicalTrustSpineScope(normalized)
-    && !detachedMissingTeam
-  ) {
-    await reconcileTrustSpineGame(normalized);
-  }
   return true;
 }
 
 async function syncLoggedEvent(game, event) {
-  queueTrustSpineEvent(game, event);
-  persistAll();
-  if (!supabaseClient || !game || !event) return;
+  if (!supabaseClient || !game || !event) return false;
   if (gameTeamId(game) && !canEditGame(game)) {
     state.syncStatus = "Verify your player before saving team stats";
-    return;
+    return false;
   }
   const gameSynced = await syncGameToSupabase(game);
-  if (!gameSynced) return;
+  if (!gameSynced) return false;
   let eventRow = eventToSupabaseRow(event);
   let detachedMissingTeam = false;
   let { error, skipped } = await upsertWithOptionalColumns("events", eventRow, [
@@ -5765,16 +5925,15 @@ async function syncLoggedEvent(game, event) {
   }
   if (error) {
     reportSyncError(error);
+    return false;
   } else {
     state.syncStatus = detachedMissingTeam
       ? "Synced without team link"
       : skipped.length
       ? "Synced; setup update recommended"
       : "Synced";
-    if (SECURE_DISCLOSURE_RUNTIME_READY && hasCanonicalTrustSpineScope(game) && !detachedMissingTeam) {
-      await reconcileTrustSpineGame(game);
-    }
   }
+  return true;
 }
 
 async function deleteSupabaseEvent(eventId, options = {}) {
@@ -5933,10 +6092,6 @@ function schedulePublicLiveSharePoll(code) {
 function subscribeToSharedGame(gameId) {
   if (!supabaseClient || !gameId) return;
   stopSharedGameTransport();
-  if (!SECURE_DISCLOSURE_RUNTIME_READY) {
-    reportSecureDisclosureUnavailable("Live Share");
-    return;
-  }
   if (TRUSTED_DISCLOSURE_FEATURES.publicLiveShareRpc) {
     schedulePublicLiveSharePoll(state.sharedCode);
     return;
@@ -5965,10 +6120,7 @@ async function loadSharedGame(shareCode) {
   }
 
   stopSharedGameTransport();
-  if (!SECURE_DISCLOSURE_RUNTIME_READY) {
-    reportSecureDisclosureUnavailable("Live Share");
-    return;
-  }
+  if (!(await requireSecureCapability("secureLiveShare", "Live Share", { runtimeFlag: "publicLiveShareRpc" }))) return;
   if (TRUSTED_DISCLOSURE_FEATURES.publicLiveShareRpc) {
     try {
       const sharedGame = await fetchPublicLiveShareGame(code);
@@ -5980,27 +6132,7 @@ async function loadSharedGame(shareCode) {
     }
     return;
   }
-
-  const { data, error } = await supabaseClient
-    .from("games")
-    .select("*, events(*)")
-    .eq("share_code", code)
-    .maybeSingle();
-
-  if (error) {
-    reportSyncError(error);
-    return;
-  }
-
-  if (!data) {
-    showToast("Shared game not found");
-    return;
-  }
-
-  state.sharedGame = gameFromSupabaseRow(data, data.events || []);
-  state.syncStatus = "Watching live";
-  subscribeToSharedGame(state.sharedGame.id);
-  render();
+  reportSecureDisclosureUnavailable("Live Share");
 }
 
 async function copyShareLink() {
@@ -6024,10 +6156,7 @@ async function copyLiveShareLinkNow(gameId) {
     showToast("Live Share is not available");
     return;
   }
-  if (!SECURE_DISCLOSURE_RUNTIME_READY) {
-    reportSecureDisclosureUnavailable("Live Share");
-    return;
-  }
+  if (!(await requireSecureCapability("secureLiveShare", "Live Share", { runtimeFlag: "liveShareTokenRpc" }))) return;
   if (!currentUserId()) {
     state.syncStatus = "Sign in for Live Share";
     showToast("Sign in to use Live Share");
@@ -6041,15 +6170,8 @@ async function copyLiveShareLinkNow(gameId) {
     return;
   }
   if (TRUSTED_DISCLOSURE_FEATURES.liveShareTokenRpc) {
-    const legacySynced = await syncGameToSupabase(game, { includeEvents: true });
-    if (!legacySynced) {
-      state.syncStatus = "Secure sharing is waiting for synchronization";
-      showToast("Secure sharing is waiting for synchronization. Your game remains saved.");
-      render();
-      return;
-    }
-    const trustSpineSynced = await reconcileTrustSpineGame(game);
-    if (!trustSpineSynced) {
+    const synchronized = await reconcileGameEventOperations(game);
+    if (!synchronized) {
       state.syncStatus = "Secure sharing is waiting for synchronization";
       showToast("Secure sharing is waiting for synchronization. Your game remains saved.");
       render();
@@ -6081,24 +6203,7 @@ async function copyLiveShareLinkNow(gameId) {
     }
     return;
   }
-  game.isShared = true;
-  game.userId = game.userId || currentUserId() || "";
-  if (state.activeGame?.id === game.id) state.activeGame = game;
-  upsertGame(game);
-  persistAll();
-  const synced = await syncGameToSupabase(game, { includeEvents: true });
-  if (!synced) return;
-  const link = shareLinkForGame(game);
-  try {
-    await navigator.clipboard.writeText(link);
-    state.liveSharePromptGameId = "";
-    render();
-    showToast("Live Share link copied");
-  } catch {
-    window.prompt("Copy this share link", link);
-    state.liveSharePromptGameId = "";
-    render();
-  }
+  reportSecureDisclosureUnavailable("Live Share");
 }
 
 async function turnOffLiveShare(gameId) {
@@ -6108,10 +6213,7 @@ async function turnOffLiveShare(gameId) {
     render();
     return;
   }
-  if (!SECURE_DISCLOSURE_RUNTIME_READY) {
-    reportSecureDisclosureUnavailable("Live Share");
-    return;
-  }
+  if (!(await requireSecureCapability("secureLiveShare", "Live Share", { runtimeFlag: "liveShareTokenRpc" }))) return;
   if (TRUSTED_DISCLOSURE_FEATURES.liveShareTokenRpc && supabaseClient) {
     const { data, error } = await supabaseClient.rpc("lh_revoke_live_share_tokens", { p_game_id: game.id });
     if (error || data?.outcome !== "accepted") {
@@ -6127,7 +6229,7 @@ async function turnOffLiveShare(gameId) {
   }
   state.liveSharePromptGameId = "";
   persistAll();
-  syncGameToSupabase(game, { includeEvents: true });
+  syncGameToSupabase(game);
   render();
   showToast("Live Share turned off");
 }
@@ -6684,7 +6786,8 @@ function renderLiveShareModal() {
   if (!state.liveSharePromptGameId) return "";
   const game = (state.activeGame?.id === state.liveSharePromptGameId ? state.activeGame : null) || state.games.find((item) => item.id === state.liveSharePromptGameId);
   if (!game) return "";
-  const liveShareAvailable = hasCanonicalTrustSpineScope(game);
+  const liveShareEligibility = secureLiveShareEligibility(game);
+  const liveShareAvailable = liveShareEligibility.available;
   return `
     <section class="modal-backdrop" role="presentation">
       <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="liveShareTitle">
@@ -6692,7 +6795,7 @@ function renderLiveShareModal() {
         <p class="muted small">${
           liveShareAvailable
             ? "Anyone with this link can view the live game timeline. Only share it with people you trust."
-            : escapeHTML(personalGameLiveShareMessage())
+            : escapeHTML(liveShareEligibility.message)
         }</p>
         <div class="edit-actions">
           ${
@@ -8045,6 +8148,73 @@ function renderPlayersTeamsPage() {
   `);
 }
 
+function operationalHealthSnapshot() {
+  const records = Object.values(trustSpineState().events);
+  const pending = records.reduce((count, record) => count + record.pendingOperations.length, 0);
+  const failed = records.filter((record) => record.lastError).length;
+  const conflicted = records.filter((record) => record.conflict).length;
+  const acceptedAt = records
+    .flatMap((record) => record.acceptedReceipts || [])
+    .map((receipt) => receipt.acceptedAt)
+    .filter(Boolean)
+    .sort()
+    .at(-1) || "";
+  const capabilities = backendCapabilityState.value;
+  return {
+    appVersion: APP_VERSION,
+    cacheVersion: `laxhornet-${APP_VERSION}`,
+    schemaVersion: capabilities?.schemaVersion || 0,
+    runtimeReady: SECURE_DISCLOSURE_RUNTIME_READY,
+    pending,
+    failed,
+    conflicted,
+    acceptedAt,
+    liveShareReady: Boolean(TRUSTED_DISCLOSURE_FEATURES.liveShareTokenRpc && capabilities?.secureLiveShare),
+    exportAuditReady: Boolean(TRUSTED_DISCLOSURE_FEATURES.exportAuditRpc && capabilities?.exportAudit),
+    anonymousTables: "Denied by release contract",
+    legacyCompatibility: "Present",
+    manifestRelease: "v283",
+  };
+}
+
+function renderOperationalHealth() {
+  const health = operationalHealthSnapshot();
+  const rows = [
+    ["App", health.appVersion],
+    ["Expected cache", health.cacheVersion],
+    ["Database capability", health.schemaVersion ? `v${health.schemaVersion}` : "Not checked"],
+    ["Secure runtime", health.runtimeReady ? "Ready" : "Unavailable"],
+    ["Pending operations", String(health.pending)],
+    ["Failed operations", String(health.failed)],
+    ["Conflicts", String(health.conflicted)],
+    ["Last accepted sync", health.acceptedAt ? formatDateTime(health.acceptedAt) : "None on this device"],
+    ["Secure token RPC", health.liveShareReady ? "Ready" : "Not confirmed"],
+    ["Export audit RPC", health.exportAuditReady ? "Ready" : "Not confirmed"],
+    ["Anonymous table access", health.anonymousTables],
+    ["Legacy compatibility", health.legacyCompatibility],
+    ["Release manifest", health.manifestRelease],
+  ];
+  return `
+    <section class="card pad admin-portal-card operational-health-card">
+      <div class="section-head compact-head">
+        <div>
+          <h3>Release &amp; Sync Health</h3>
+          <p class="muted small">Operational status only. No player or family information appears here.</p>
+        </div>
+        <button class="mini-btn light" type="button" data-action="refresh-release-health">Refresh</button>
+      </div>
+      <div class="operational-health-grid">
+        ${rows.map(([label, value]) => `
+          <div>
+            <span>${escapeHTML(label)}</span>
+            <strong>${escapeHTML(value)}</strong>
+          </div>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
 function renderAdminPortal() {
   if (!isPlatformReviewer()) {
     return renderShell(`
@@ -8120,6 +8290,7 @@ function renderAdminPortal() {
             </button>
           </div>
         </section>
+        ${renderOperationalHealth()}
       </section>
     </section>
   `, { hideNav: true });
@@ -8351,10 +8522,12 @@ function renderStartGame() {
   const availablePlayers = visiblePlayers();
   const focus = openNextGameFocusForPlayer(state.player);
   const focusEditorOpen = state.focusEditorContext === "start";
-  const liveShareAvailable = hasCanonicalTrustSpineScope({
+  const liveShareEligibility = secureLiveShareEligibility({
+    scopeType: state.player.teamId ? GAME_SCOPE_TYPES.TEAM_ROSTER : GAME_SCOPE_TYPES.PERSONAL,
     teamId: state.player.teamId || "",
     rosterPlayerId: state.player.rosterPlayerId || (state.player.teamId ? state.player.id : ""),
   });
+  const liveShareAvailable = liveShareEligibility.available;
   return renderShell(`
     <section class="screen-title">
       <h2>Set up game</h2>
@@ -8435,7 +8608,7 @@ function renderStartGame() {
             ${
               liveShareAvailable
                 ? ""
-                : `<p class="field-help">${escapeHTML(personalGameLiveShareMessage())}</p>`
+                : `<p class="field-help">${escapeHTML(liveShareEligibility.message)}</p>`
             }
           </div>
         </div>
@@ -8528,7 +8701,7 @@ function liveSyncChipLabel() {
 }
 
 function renderLiveStatusChips(game) {
-  const liveShareAvailable = hasCanonicalTrustSpineScope(game);
+  const liveShareAvailable = secureLiveShareEligibility(game).available;
   const liveShareLabel = liveShareAvailable ? (game.isShared ? "Live Share On" : "Live Share Off") : "Live Share Unavailable";
   return `
     <div class="live-status-chips" aria-label="Game save and share status">
@@ -8678,7 +8851,8 @@ function renderLiveTracker() {
   const recentEvents = [...game.events].reverse().slice(0, 5);
   const periods = periodsForGame(game);
   const statusLine = `${escapeHTML(game.currentQuarter)} <span aria-hidden="true">&middot;</span> vs ${escapeHTML(game.opponent || "Opponent")}`;
-  const liveShareAvailable = hasCanonicalTrustSpineScope(game);
+  const liveShareEligibility = secureLiveShareEligibility(game);
+  const liveShareAvailable = liveShareEligibility.available;
   const liveMeta = [formatDate(game.date), periodFormatLabel(game), game.location]
     .filter(Boolean)
     .map((item) => escapeHTML(item))
@@ -8692,10 +8866,10 @@ function renderLiveTracker() {
         ${
           liveShareAvailable
             ? `<button class="live-share-link" type="button" data-action="copy-share-link">Live Share</button>`
-            : `<span class="live-share-link" aria-label="Live Share unavailable for personal games">Live Share unavailable</span>`
+            : `<span class="live-share-link" aria-label="Live Share unavailable">Live Share unavailable</span>`
         }
       </p>
-      ${liveShareAvailable ? "" : `<p class="field-help">${escapeHTML(personalGameLiveShareMessage())}</p>`}
+      ${liveShareAvailable ? "" : `<p class="field-help">${escapeHTML(liveShareEligibility.message)}</p>`}
       ${renderLiveStatusChips(game)}
     </section>
 
@@ -12377,36 +12551,44 @@ function handleSubmit(event) {
     const stat = STAT_BY_KEY[formData.get("statType")];
     if (!stat) return;
     const eventQuarter = formData.get("quarter") || periodsForGame(game)[0];
-    const scoreChange = applyScoreIncrementForStat(game, stat.key);
-    const scoreContext = scoreContextForGame(game, eventQuarter);
-
-    const newEvent = {
-      id: uid("event"),
-      gameId: game.id,
-      userId: game.userId || currentUserId() || "",
-      teamId: gameTeamId(game),
-      rosterPlayerId: gameRosterPlayerId(game),
-      timestamp: new Date().toISOString(),
-      quarter: eventQuarter,
-      statType: stat.key,
-      statLabel: stat.label,
-      category: stat.category,
-      pointValue: stat.points,
-      tags: [],
-      note: formData.get("note")?.trim() || "",
-      fieldZone: formData.get("fieldZone") || "",
-      correctedAt: new Date().toISOString(),
-      ...scoreContext,
-      scoreAutoIncrement: scoreChange.side,
-      scoreForBeforeEvent: scoreChange.beforeFor,
-      scoreAgainstBeforeEvent: scoreChange.beforeAgainst,
-    };
-
-    state.addingReviewEvent = false;
-    state.editingEventId = null;
-    state.tagEditingEventId = null;
-    saveReviewedGame({ ...game, events: [...game.events, newEvent] }, "Event added");
+    createGameEventOperation(game, () => {
+      const scoreChange = applyScoreIncrementForStat(game, stat.key);
+      const scoreContext = scoreContextForGame(game, eventQuarter);
+      const newEvent = {
+        id: uid("event"),
+        gameId: game.id,
+        userId: game.userId || currentUserId() || "",
+        teamId: gameTeamId(game),
+        rosterPlayerId: gameRosterPlayerId(game),
+        timestamp: new Date().toISOString(),
+        quarter: eventQuarter,
+        statType: stat.key,
+        statLabel: stat.label,
+        category: stat.category,
+        pointValue: stat.points,
+        tags: [],
+        note: formData.get("note")?.trim() || "",
+        fieldZone: formData.get("fieldZone") || "",
+        correctedAt: new Date().toISOString(),
+        ...scoreContext,
+        scoreAutoIncrement: scoreChange.side,
+        scoreForBeforeEvent: scoreChange.beforeFor,
+        scoreAgainstBeforeEvent: scoreChange.beforeAgainst,
+      };
+      const updatedGame = normalizeGame({
+        ...game,
+        events: [...game.events, newEvent],
+        savedAt: new Date().toISOString(),
+      });
+      state.addingReviewEvent = false;
+      state.editingEventId = null;
+      state.tagEditingEventId = null;
+      upsertGame(updatedGame);
+      if (state.activeGame?.id === updatedGame.id) state.activeGame = updatedGame;
+      return { game: updatedGame, event: newEvent };
+    });
     render();
+    showToast("Event added");
   }
 
   if (form.dataset.form === "event-edit") {
@@ -12422,23 +12604,32 @@ function handleSubmit(event) {
     const stat = STAT_BY_KEY[formData.get("statType")];
     if (!stat) return;
 
-    const updatedEvents = [...game.events];
-    updatedEvents[eventIndex] = {
-      ...updatedEvents[eventIndex],
-      statType: stat.key,
-      statLabel: stat.label,
-      quarter: formData.get("quarter") || updatedEvents[eventIndex].quarter,
-      note: formData.get("note")?.trim() || "",
-      category: stat.category,
-      pointValue: stat.points,
-      tags: uniqueTags(updatedEvents[eventIndex].tags),
-      fieldZone: formData.get("fieldZone") || "",
-      correctedAt: new Date().toISOString(),
-    };
-
-    state.editingEventId = null;
-    saveReviewedGame({ ...game, events: updatedEvents }, "Event corrected");
+    correctGameEventOperation(game, () => {
+      const updatedEvents = [...game.events];
+      updatedEvents[eventIndex] = {
+        ...updatedEvents[eventIndex],
+        statType: stat.key,
+        statLabel: stat.label,
+        quarter: formData.get("quarter") || updatedEvents[eventIndex].quarter,
+        note: formData.get("note")?.trim() || "",
+        category: stat.category,
+        pointValue: stat.points,
+        tags: uniqueTags(updatedEvents[eventIndex].tags),
+        fieldZone: formData.get("fieldZone") || "",
+        correctedAt: new Date().toISOString(),
+      };
+      const updatedGame = normalizeGame({
+        ...game,
+        events: updatedEvents,
+        savedAt: new Date().toISOString(),
+      });
+      state.editingEventId = null;
+      upsertGame(updatedGame);
+      if (state.activeGame?.id === updatedGame.id) state.activeGame = updatedGame;
+      return { game: updatedGame, event: updatedEvents[eventIndex] };
+    });
     render();
+    showToast("Event corrected");
   }
 
   if (form.dataset.form === "game-edit") {
@@ -12691,6 +12882,12 @@ function handleClick(event) {
     if (action.dataset.action === "sync-cloud-games") loadCloudGames();
     if (action.dataset.action === "check-app-update") checkForAppUpdate({ manual: true });
     if (action.dataset.action === "sync-team-roster") loadCloudTeams();
+    if (action.dataset.action === "refresh-release-health") {
+      fetchBackendCapabilities({ force: true }).then((capabilities) => {
+        showToast(capabilities ? "Release health refreshed" : "Backend capability could not be confirmed");
+        render();
+      });
+    }
     if (action.dataset.action === "send-verification-reminder") sendPlayerVerificationReminder(action.dataset.requestId);
     if (action.dataset.action === "copy-roster-summary") copyRosterSummary();
     if (action.dataset.action === "add-player") addPlayer();
@@ -13066,6 +13263,7 @@ async function initApp() {
     supabaseClient.auth.onAuthStateChange(async (_event, session) => {
       setAuthUser(session?.user || null);
       state.syncStatus = state.authUser ? "Signed in" : "Signed out";
+      await fetchBackendCapabilities({ force: true }).catch(() => null);
       if (state.authUser) {
         await loadUserProfile({ silent: true });
         await loadCloudGames({ silent: true });
@@ -13077,6 +13275,8 @@ async function initApp() {
       await loadCloudGames({ silent: true });
     }
   }
+
+  await fetchBackendCapabilities().catch(() => null);
 
   if (startupShareCode) {
     loadSharedGame(startupShareCode);
@@ -13108,7 +13308,7 @@ window.addEventListener("online", async () => {
   state.isOffline = false;
   if (state.authUser) {
     await loadCloudGames({ silent: true });
-    await flushTrustSpineSync();
+    await eventOperationService().retryGameEventOperations();
     const hasPendingTrustSpineWork = Object.values(trustSpineState().events).some(
       (record) => record.pendingOperations.length || record.conflict || record.lastError,
     );

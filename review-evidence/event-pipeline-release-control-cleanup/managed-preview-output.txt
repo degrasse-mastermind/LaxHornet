@@ -1,0 +1,4 @@
+Managed-preview activation checks passed (76/76).
+Preview host requests observed: 59
+Foreign hosted-project requests observed: 0
+Synthetic cleanup: Trust Spine rows 0; Auth users 0.

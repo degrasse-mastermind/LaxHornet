@@ -1,0 +1,7 @@
+{
+  "environment": "authorized managed preview",
+  "resetAfterTest": true,
+  "trustSpineFixtureRowsRemaining": 0,
+  "syntheticAuthUsersRemaining": 0,
+  "productionContacted": false
+}

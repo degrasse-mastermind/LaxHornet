@@ -1,0 +1,66 @@
+{
+  "game": {
+    "game_id": "v283-mrxcqptt-6795a8-game-a",
+    "opponent": "Madison Demo",
+    "position": "Midfield",
+    "game_date": "2026-07-23",
+    "team_name": "Branford Demo Hornets",
+    "player_name": "Demo Player",
+    "jersey_number": "12",
+    "period_format": "quarters",
+    "final_score_for": 6,
+    "final_score_against": 4
+  },
+  "events": [
+    {
+      "period": "Q1",
+      "category": "Offense",
+      "event_id": "event-mrxcqu4s-viutpb",
+      "stat_type": "assist",
+      "field_zone": "Offensive",
+      "stat_label": "Assist",
+      "occurred_at": "2026-07-23T10:12:04.492Z",
+      "point_value": 3
+    },
+    {
+      "period": "Q1",
+      "category": "Offense",
+      "event_id": "event-mrxcqvkq-hgf4uk",
+      "stat_type": "goal",
+      "field_zone": "",
+      "stat_label": "Goal",
+      "occurred_at": "2026-07-23T10:12:06.362Z",
+      "point_value": 5
+    },
+    {
+      "period": "Q1",
+      "category": "Effort / IQ",
+      "event_id": "event-mrxcqz55-7r8wii",
+      "stat_type": "groundBall",
+      "field_zone": "",
+      "stat_label": "Ground Ball",
+      "occurred_at": "2026-07-23T10:12:10.985Z",
+      "point_value": 2
+    },
+    {
+      "period": "Q1",
+      "category": "Possession / IQ",
+      "event_id": "capability-mismatch-1784801531135",
+      "stat_type": "smartPlay",
+      "field_zone": "",
+      "stat_label": "Smart Play",
+      "occurred_at": "2026-07-23T10:12:11.135Z",
+      "point_value": 1
+    },
+    {
+      "period": "Q1",
+      "category": "Possession / IQ",
+      "event_id": "v283-mrxcqptt-6795a8-event-a",
+      "stat_type": "groundBall",
+      "field_zone": "Midfield",
+      "stat_label": "Ground Ball",
+      "occurred_at": "2026-07-23T18:10:00.000Z",
+      "point_value": 2
+    }
+  ]
+}

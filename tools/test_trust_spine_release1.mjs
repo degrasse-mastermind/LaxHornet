@@ -3,7 +3,10 @@ import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
-import { validateReleaseContainmentFromEnvironment } from "./release_containment.mjs";
+import {
+  APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
+  validateReleaseContainmentFromEnvironment,
+} from "./release_containment.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
@@ -451,6 +454,13 @@ test("Phase-aware release containment preserves the authorized Trust Spine SQL",
       containment.releaseDeltaFiles.some((file) => file.startsWith("supabase/rollback/")),
       false,
     );
+  } else if (containment.mode === "additive") {
+    assert.deepEqual(
+      [...containment.allowedAdditiveDatabaseFiles].sort(),
+      [...APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS].sort(),
+    );
+    assert.deepEqual(containment.postAuthorizationDatabaseFiles, []);
+    assert.equal(containment.supabaseTreeMatchesAuthorizedRef, null);
   } else {
     assert.equal(containment.supabaseTreeMatchesAuthorizedRef, true);
     assert.deepEqual(containment.postAuthorizationDatabaseFiles, []);

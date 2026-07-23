@@ -4,7 +4,7 @@ const http = require("node:http");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const evidenceRoot = path.join(root, "review-evidence", "secure-disclosure-activation-v282");
+const evidenceRoot = path.join(root, "review-evidence", "event-pipeline-release-control-cleanup");
 const browserDir = path.join(evidenceRoot, "browser");
 const port = Number(process.env.LAXHORNET_ACTIVATION_PORT || 5258);
 const baseUrl = `http://127.0.0.1:${port}`;
@@ -67,7 +67,7 @@ function startServer() {
       }
       let body = fs.readFileSync(resolved.target);
       if (resolved.missingConfig && resolved.target.endsWith("app.html")) {
-        body = Buffer.from(body.toString("utf8").replace(/\s*<script src="runtime-config\.js\?v=282" defer><\/script>/, ""));
+        body = Buffer.from(body.toString("utf8").replace(/\s*<script src="runtime-config\.js\?v=283" defer><\/script>/, ""));
       }
       response.writeHead(200, {
         "Cache-Control": "no-store",
@@ -125,6 +125,20 @@ async function installApiRoutes(page, options = {}) {
     const pathname = new URL(url).pathname;
     const post = request.postDataJSON?.() || {};
     localApiRequests.push({ method: request.method(), pathname });
+    if (pathname.endsWith("/lh_release_capabilities")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          schemaVersion: 1,
+          trustSpineEvents: true,
+          secureLiveShare: options.disableCapability !== true,
+          exportAudit: true,
+          personalGameSharing: false,
+        }),
+      });
+      return;
+    }
     if (pathname.endsWith("/lh_public_live_share_game")) {
       if (options.failPublicRpc) {
         await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: "synthetic unavailable" }) });
@@ -295,8 +309,11 @@ async function installApiRoutes(page, options = {}) {
   });
 }
 
-async function newContext(browser) {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+async function newContext(browser, options = {}) {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    ...options,
+  });
   await context.addInitScript(() => {
     window.LAXHORNET_RUNTIME_CONFIG = {
       supabaseUrl: "http://127.0.0.1:9",
@@ -339,7 +356,7 @@ async function newContext(browser) {
         new Response("window.LAXHORNET_RUNTIME_CONFIG={publicLiveShareRpc:false,liveShareTokenRpc:false,exportAuditRpc:false};"),
       );
     });
-    await securePage.goto(`${baseUrl}/app.html?share=SYNTHETICSECURECODE&fresh=v282-browser`, { waitUntil: "domcontentloaded" });
+    await securePage.goto(`${baseUrl}/app.html?share=SYNTHETICSECURECODE&fresh=v283-browser`, { waitUntil: "domcontentloaded" });
     try {
       await securePage.getByText("Ground Ball", { exact: false }).first().waitFor();
     } catch (error) {
@@ -351,14 +368,17 @@ async function newContext(browser) {
     const scriptOrder = await securePage.evaluate(() => window.LAXHORNET_SCRIPT_ORDER);
     check(status?.ready === true, "all three secure disclosure flags are active");
     check(Object.values(status?.features || {}).every(Boolean), "runtime status reports every disclosure feature true");
-    check(JSON.stringify(scriptOrder) === JSON.stringify(["runtime-config", "app"]), "runtime-config executes before app.js");
+    check(
+      JSON.stringify(scriptOrder) === JSON.stringify(["runtime-config", "app"]),
+      "runtime-config executes before app.js while the event service loads without changing the diagnostic marker",
+    );
     check((await securePage.locator("body").innerText()).includes("Ground Ball"), "public-safe payload renders an allowlisted event");
     check(!(await securePage.locator("body").innerText()).includes("private-note-marker"), "public UI contains no private note");
     check(!(await securePage.locator("body").innerText()).includes("private-tag-marker"), "public UI contains no private tag");
     const publicRpcCalls = localApiRequests.filter((item) => item.pathname.endsWith("/lh_public_live_share_game")).length;
     check(publicRpcCalls >= 2, "public-safe polling repeats the RPC request");
     check(!localApiRequests.some((item) => /\/rest\/v1\/(?:games|events)$/.test(item.pathname)), "secure viewer makes no ordinary games/events request");
-    check((await securePage.evaluate(() => caches.keys())).every((key) => key !== "laxhornet-v281"), "v282 activation removes the stale v281 cache");
+    check((await securePage.evaluate(() => caches.keys())).every((key) => key !== "laxhornet-v281"), "v283 activation removes the stale v281 cache");
     await securePage.screenshot({ path: path.join(browserDir, "01-secure-live-share.png"), fullPage: true });
     const neutralTokens = await securePage.evaluate(async () => {
       await loadSharedGame("UNKNOWNSECURECODE");
@@ -369,8 +389,9 @@ async function newContext(browser) {
     });
     check(neutralTokens.unknown === null && neutralTokens.expired === null, "unknown and expired tokens remain neutral");
 
-    await securePage.goto(`${baseUrl}/app.html?fresh=v282-token`, { waitUntil: "domcontentloaded" });
-    const tokenResult = await securePage.evaluate(async () => {
+    await securePage.goto(`${baseUrl}/app.html?fresh=v283-token`, { waitUntil: "domcontentloaded" });
+    await securePage.getByRole("button", { name: "Log In" }).waitFor();
+    const seededTrackerState = await securePage.evaluate(() => {
       setAuthUser({ id: "synthetic-admin-user", email: "synthetic-admin@example.invalid" });
       const player = {
         id: "synthetic-player",
@@ -390,46 +411,70 @@ async function newContext(browser) {
         date: "2026-07-23",
         currentQuarter: "Q1",
         playerSnapshot: player,
-        events: [
-          {
-            id: "bridge-event-2",
-            gameId: "synthetic-secure-game",
-            teamId: "synthetic-team",
-            rosterPlayerId: "synthetic-player",
-            timestamp: "2026-07-23T12:05:00.000Z",
-            quarter: "Q2",
-            statType: "causedTurnover",
-            statLabel: "Caused Turnover",
-            category: "Defense",
-            pointValue: 3,
-            fieldZone: "Defensive",
-            note: "private-note-marker",
-            tags: ["private-tag-marker"],
-          },
-          {
-            id: "bridge-event-1",
-            gameId: "synthetic-secure-game",
-            teamId: "synthetic-team",
-            rosterPlayerId: "synthetic-player",
-            timestamp: "2026-07-23T12:00:00.000Z",
-            quarter: "Q1",
-            statType: "groundBall",
-            statLabel: "Ground Ball",
-            category: "Effort / IQ",
-            pointValue: 2,
-            fieldZone: "Midfield",
-            note: "another-private-note",
-            tags: ["decision:good"],
-          },
-        ],
+        events: [],
       });
       state.player = normalizePlayer(player);
+      state.userProfile = normalizeUserProfile({
+        userId: "synthetic-admin-user",
+        email: "synthetic-admin@example.invalid",
+        firstName: "Demo",
+        lastName: "Parent",
+        onboardingCompleted: true,
+      });
       state.players = [state.player];
       state.activePlayerId = state.player.id;
       state.teams = [{ id: "synthetic-team", name: "Branford Demo Hornets", role: "tracker", cloudBacked: true }];
       state.playerClaims = [{ teamId: "synthetic-team", rosterPlayerId: "synthetic-player", userId: "synthetic-admin-user" }];
       state.activeGame = game;
       state.games = [game];
+      state.screen = "live";
+      const originalUid = uid;
+      const eventIds = ["bridge-event-1", "bridge-event-2"];
+      uid = (prefix) => prefix === "event" && eventIds.length ? eventIds.shift() : originalUid(prefix);
+      render();
+      const groundBallButton = document.querySelector('[data-stat="groundBall"]');
+      const causedTurnoverButton = document.querySelector('[data-stat="causedTurnover"]');
+      groundBallButton?.click();
+      return {
+        screen: state.screen,
+        activeGameId: state.activeGame?.id || "",
+        groundBallButtons: groundBallButton ? 1 : 0,
+        causedTurnoverButtons: causedTurnoverButton ? 1 : 0,
+        eventCount: state.activeGame?.events?.length || 0,
+        toast: state.toast || "",
+      };
+    });
+    check(
+      seededTrackerState.screen === "live"
+        && seededTrackerState.activeGameId === "synthetic-secure-game"
+        && seededTrackerState.groundBallButtons > 0
+        && seededTrackerState.causedTurnoverButtons > 0,
+      "synthetic roster-connected game renders the real live tracker",
+    );
+    check(
+      seededTrackerState.eventCount === 1,
+      `first live tracker button records immediately (observed ${seededTrackerState.eventCount}; ${seededTrackerState.toast || "no message"})`,
+    );
+    await securePage.locator('[data-stat="causedTurnover"]').first().click();
+    const localTrackerEvents = await securePage.evaluate(() => state.activeGame.events.map((event) => event.id));
+    if (localTrackerEvents.length !== 2) {
+      throw new Error(`Synthetic tracker did not record two events: ${JSON.stringify(seededTrackerState)}`);
+    }
+    const [primaryEventId, secondaryEventId] = localTrackerEvents;
+    check(localTrackerEvents.length === 2, "two events are recorded through the live tracking UI");
+    check(
+      await securePage.evaluate(() => loadJSON(STORAGE_KEYS.activeGame, null)?.events?.length === 2),
+      "live tracker events persist locally before secure sharing",
+    );
+
+    const tokenResult = await securePage.evaluate(async ({ primaryEventId, secondaryEventId }) => {
+      const game = state.activeGame;
+      const first = game.events.find((event) => event.id === primaryEventId);
+      const second = game.events.find((event) => event.id === secondaryEventId);
+      first.note = "another-private-note";
+      first.tags = ["decision:good"];
+      second.note = "private-note-marker";
+      second.tags = ["private-tag-marker"];
       await copyLiveShareLinkNow(game.id);
       const createdCode = state.activeGame.shareCode;
       const acceptedAudit = await recordSensitiveExportAudit("player_csv", "player", "synthetic-player");
@@ -457,7 +502,7 @@ async function newContext(browser) {
         shared: state.activeGame.isShared,
         syncState: state.trustSpineSync,
       };
-    });
+    }, { primaryEventId, secondaryEventId });
     check(tokenResult.createdCode === "SYNTHETICSECURECODE", "signed-in token creation uses the approved RPC");
     check(tokenResult.shared === true, "team-scoped secure Live Share remains available after synchronization");
     check(tokenResult.acceptedAudit?.outcome === "accepted", "authorized export audit succeeds");
@@ -473,17 +518,17 @@ async function newContext(browser) {
       [...trustApi.events.values()]
         .sort((left, right) => left.evidence.occurred_at.localeCompare(right.evidence.occurred_at))
         .map((event) => event.eventId)
-        .join(",") === "bridge-event-1,bridge-event-2",
+        .join(",") === localTrackerEvents.join(","),
       "secure events preserve chronological ordering",
     );
     const initialBridgeTimeline = await securePage.evaluate(async () => {
       await loadSharedGame("SYNTHETICSECURECODE");
       return state.sharedGame?.events?.map((event) => event.id) || [];
     });
-    check(initialBridgeTimeline.join(",") === "bridge-event-1,bridge-event-2", "newly reconciled events appear in the secure public timeline");
-    const createReplay = await securePage.evaluate(async () => {
+    check(initialBridgeTimeline.join(",") === localTrackerEvents.join(","), "newly reconciled events appear in the secure public timeline");
+    const createReplay = await securePage.evaluate(async (primaryEventId) => {
       const game = state.activeGame;
-      const event = game.events.find((item) => item.id === "bridge-event-1");
+      const event = game.events.find((item) => item.id === primaryEventId);
       const evidence = trustSpineEvidenceForEvent(event);
       return supabaseClient.rpc("lh_create_event", {
         p_operation: {
@@ -495,12 +540,12 @@ async function newContext(browser) {
           client_created_at: event.timestamp,
         },
       });
-    });
+    }, primaryEventId);
     check(createReplay.data?.outcome === "accepted" && createReplay.data?.code === "created", "retry of the same create operation is idempotent");
 
-    const correctionResult = await securePage.evaluate(async () => {
+    const correctionResult = await securePage.evaluate(async (primaryEventId) => {
       const game = state.activeGame;
-      const event = game.events.find((item) => item.id === "bridge-event-1");
+      const event = game.events.find((item) => item.id === primaryEventId);
       event.fieldZone = "Offensive";
       event.note = "private correction note";
       event.tags = ["private correction tag"];
@@ -511,22 +556,22 @@ async function newContext(browser) {
         synchronized,
         record: state.trustSpineSync.events[event.id],
       };
-    });
+    }, primaryEventId);
     check(correctionResult.synchronized === true, "event correction synchronizes through the approved correction RPC");
-    check(trustApi.events.get("bridge-event-1")?.evidence.field_zone === "Offensive", "correction updates the secure public event evidence");
+    check(trustApi.events.get(primaryEventId)?.evidence.field_zone === "Offensive", "correction updates the secure public event evidence");
     check(
-      !("note" in (trustApi.events.get("bridge-event-1")?.evidence || {})) && !("tags" in (trustApi.events.get("bridge-event-1")?.evidence || {})),
+      !("note" in (trustApi.events.get(primaryEventId)?.evidence || {})) && !("tags" in (trustApi.events.get(primaryEventId)?.evidence || {})),
       "correction keeps private notes and tags outside public evidence",
     );
-    const correctedPublicZone = await securePage.evaluate(async () => {
+    const correctedPublicZone = await securePage.evaluate(async (primaryEventId) => {
       await loadSharedGame("SYNTHETICSECURECODE");
-      return state.sharedGame?.events?.find((event) => event.id === "bridge-event-1")?.fieldZone || "";
-    });
+      return state.sharedGame?.events?.find((event) => event.id === primaryEventId)?.fieldZone || "";
+    }, primaryEventId);
     check(correctedPublicZone === "Offensive", "corrected evidence is visible through the public-safe RPC");
 
-    const staleConflict = await securePage.evaluate(async () => {
+    const staleConflict = await securePage.evaluate(async (primaryEventId) => {
       const game = state.activeGame;
-      const event = game.events.find((item) => item.id === "bridge-event-1");
+      const event = game.events.find((item) => item.id === primaryEventId);
       const record = state.trustSpineSync.events[event.id];
       record.serverEventVersion = 1;
       event.stat_label = undefined;
@@ -539,13 +584,13 @@ async function newContext(browser) {
         conflict: state.trustSpineSync.events[event.id].conflict,
         syncStatus: state.syncStatus,
       };
-    });
+    }, primaryEventId);
     check(staleConflict.synchronized === false && staleConflict.conflict?.code === "same_field_conflict", "stale correction produces a controlled conflict");
     check(/correction review/i.test(staleConflict.syncStatus), "stale correction is surfaced instead of silently overwriting a newer version");
 
-    const tombstoneResult = await securePage.evaluate(async () => {
+    const tombstoneResult = await securePage.evaluate(async (secondaryEventId) => {
       const game = state.activeGame;
-      const event = game.events.find((item) => item.id === "bridge-event-2");
+      const event = game.events.find((item) => item.id === secondaryEventId);
       queueTrustSpineTombstone(game, event, "Synthetic browser deletion");
       const pending = state.trustSpineSync.events[event.id].pendingOperations.find((operation) => operation.kind === "tombstone");
       const operationPayload = trustSpinePayloadForOperation(state.trustSpineSync.events[event.id], pending);
@@ -558,15 +603,15 @@ async function newContext(browser) {
         replay: replay.data,
         lifecycleState: state.trustSpineSync.events[event.id].lifecycleState,
       };
-    });
+    }, secondaryEventId);
     check(tombstoneResult.lifecycleState === "tombstoned", "event deletion records a Trust Spine tombstone");
-    check(trustApi.events.get("bridge-event-2")?.lifecycleState === "tombstoned", "tombstone removes the event from the secure public timeline");
+    check(trustApi.events.get(secondaryEventId)?.lifecycleState === "tombstoned", "tombstone removes the event from the secure public timeline");
     check(tombstoneResult.replay?.outcome === "accepted" && tombstoneResult.replay?.code === "tombstoned", "duplicate tombstone retry is idempotent");
     const tombstonedPublicIds = await securePage.evaluate(async () => {
       await loadSharedGame("SYNTHETICSECURECODE");
       return state.sharedGame?.events?.map((event) => event.id) || [];
     });
-    check(tombstonedPublicIds.join(",") === "bridge-event-1", "public-safe timeline omits tombstoned events");
+    check(tombstonedPublicIds.join(",") === primaryEventId, "public-safe timeline omits tombstoned events");
     const revocationResult = await securePage.evaluate(async () => {
       await turnOffLiveShare("synthetic-secure-game");
       await loadSharedGame("SYNTHETICSECURECODE");
@@ -578,12 +623,20 @@ async function newContext(browser) {
     check(revocationResult.shared === false && revocationResult.publicGame === null, "token revocation disables the public view");
 
     const personalRequestStart = localApiRequests.length;
-    const personalContext = await newContext(browser);
+    const personalContext = await newContext(browser, { serviceWorkers: "block" });
     const personalPage = await personalContext.newPage();
     await installApiRoutes(personalPage);
-    await personalPage.goto(`${baseUrl}/app.html?fresh=v282-personal-boundary`, { waitUntil: "domcontentloaded" });
+    await personalPage.goto(`${baseUrl}/app.html?fresh=v283-personal-boundary`, { waitUntil: "domcontentloaded" });
+    await personalPage.getByRole("button", { name: "Log In" }).waitFor();
     const personalResult = await personalPage.evaluate(async () => {
       setAuthUser({ id: "synthetic-parent-user", email: "synthetic-parent@example.invalid" });
+      state.userProfile = normalizeUserProfile({
+        userId: "synthetic-parent-user",
+        email: "synthetic-parent@example.invalid",
+        firstName: "Demo",
+        lastName: "Parent",
+        onboardingCompleted: true,
+      });
       state.userProfile = normalizeUserProfile({
         userId: "synthetic-parent-user",
         email: "synthetic-parent@example.invalid",
@@ -653,12 +706,20 @@ async function newContext(browser) {
     await personalContext.close();
 
     const failedTokenCallsBefore = localApiRequests.filter((item) => item.pathname.endsWith("/lh_create_live_share_token")).length;
-    const reconciliationFailureContext = await newContext(browser);
+    const reconciliationFailureContext = await newContext(browser, { serviceWorkers: "block" });
     const reconciliationFailurePage = await reconciliationFailureContext.newPage();
     await installApiRoutes(reconciliationFailurePage, { failCreate: true });
-    await reconciliationFailurePage.goto(`${baseUrl}/app.html?fresh=v282-reconcile-failure`, { waitUntil: "domcontentloaded" });
+    await reconciliationFailurePage.goto(`${baseUrl}/app.html?fresh=v283-reconcile-failure`, { waitUntil: "domcontentloaded" });
+    await reconciliationFailurePage.getByRole("button", { name: "Log In" }).waitFor();
     const reconciliationFailure = await reconciliationFailurePage.evaluate(async () => {
       setAuthUser({ id: "synthetic-failure-user", email: "synthetic-failure@example.invalid" });
+      state.userProfile = normalizeUserProfile({
+        userId: "synthetic-failure-user",
+        email: "synthetic-failure@example.invalid",
+        firstName: "Demo",
+        lastName: "Failure",
+        onboardingCompleted: true,
+      });
       const player = {
         id: "failure-player",
         rosterPlayerId: "failure-player",
@@ -709,12 +770,20 @@ async function newContext(browser) {
     check(/waiting for synchronization/i.test(reconciliationFailure.status), "reconciliation failure explains that secure sharing is waiting");
     await reconciliationFailureContext.close();
 
-    const offlineBridgeContext = await newContext(browser);
+    const offlineBridgeContext = await newContext(browser, { serviceWorkers: "block" });
     const offlineBridgePage = await offlineBridgeContext.newPage();
     await installApiRoutes(offlineBridgePage);
-    await offlineBridgePage.goto(`${baseUrl}/app.html?fresh=v282-offline-bridge`, { waitUntil: "domcontentloaded" });
+    await offlineBridgePage.goto(`${baseUrl}/app.html?fresh=v283-offline-bridge`, { waitUntil: "domcontentloaded" });
+    await offlineBridgePage.getByRole("button", { name: "Log In" }).waitFor();
     await offlineBridgePage.evaluate(() => {
       setAuthUser({ id: "synthetic-offline-user", email: "synthetic-offline@example.invalid" });
+      state.userProfile = normalizeUserProfile({
+        userId: "synthetic-offline-user",
+        email: "synthetic-offline@example.invalid",
+        firstName: "Demo",
+        lastName: "Offline",
+        onboardingCompleted: true,
+      });
       const player = normalizePlayer({
         id: "offline-roster-player",
         rosterPlayerId: "offline-roster-player",
@@ -773,7 +842,7 @@ async function newContext(browser) {
       if (/https:\/\/[a-z]{20}\.supabase\.co/i.test(request.url())) hostedRequests.push(request.url());
     });
     await installApiRoutes(missingPage);
-    await missingPage.goto(`${baseUrl}/missing-config/app.html?fresh=v282-missing`, { waitUntil: "domcontentloaded" });
+    await missingPage.goto(`${baseUrl}/missing-config/app.html?fresh=v283-missing`, { waitUntil: "domcontentloaded" });
     const missingStatus = await missingPage.evaluate(() => window.LAXHORNET_DISCLOSURE_STATUS);
     check(missingStatus?.ready === false, "missing runtime-config is detected");
     await missingPage.evaluate(() => loadSharedGame("SYNTHETICSECURECODE"));
@@ -799,10 +868,36 @@ async function newContext(browser) {
     check(localEventCount === 1, "local tracking remains available when secure disclosure configuration is missing");
     await missingPage.screenshot({ path: path.join(browserDir, "02-missing-config-bounded.png"), fullPage: true });
 
-    const failureContext = await newContext(browser);
+    const capabilityContext = await newContext(browser, { serviceWorkers: "block" });
+    const capabilityPage = await capabilityContext.newPage();
+    await installApiRoutes(capabilityPage, { disableCapability: true });
+    await capabilityPage.goto(`${baseUrl}/app.html?fresh=v283-capability-mismatch`, { waitUntil: "domcontentloaded" });
+    await capabilityPage.evaluate(() => loadSharedGame("SYNTHETICSECURECODE"));
+    await capabilityPage.waitForTimeout(200);
+    const capabilityText = await capabilityPage.locator("body").innerText();
+    check(
+      /unavailable/i.test(capabilityText),
+      `backend capability mismatch blocks secure sharing with bounded copy (${capabilityText.split("\n").find((line) => /unavailable/i.test(line)) || "copy missing"})`,
+    );
+    const capabilityLocalCount = await capabilityPage.evaluate(() => {
+      state.activeGame = normalizeGame({
+        id: "synthetic-capability-local-game",
+        opponent: "Local Opponent",
+        date: "2026-07-23",
+        currentQuarter: "Q1",
+        playerSnapshot: { id: "local-player", name: "Demo Player", number: "12", team: "Local Team", position: "Midfield" },
+        events: [],
+      });
+      logEvent("groundBall");
+      return state.activeGame.events.length;
+    });
+    check(capabilityLocalCount === 1, "backend capability mismatch does not block local tracking");
+    await capabilityContext.close();
+
+    const failureContext = await newContext(browser, { serviceWorkers: "block" });
     const failurePage = await failureContext.newPage();
     await installApiRoutes(failurePage, { failPublicRpc: true });
-    await failurePage.goto(`${baseUrl}/app.html?share=SYNTHETICSECURECODE&fresh=v282-rpc-failure`, { waitUntil: "domcontentloaded" });
+    await failurePage.goto(`${baseUrl}/app.html?share=SYNTHETICSECURECODE&fresh=v283-rpc-failure`, { waitUntil: "domcontentloaded" });
     await failurePage
       .waitForFunction(() => document.body.innerText.includes("Secure Live Share is temporarily unavailable"), null, { timeout: 2000 })
       .catch(() => {});
@@ -819,10 +914,10 @@ async function newContext(browser) {
     const updatePage = await updateContext.newPage();
     await installApiRoutes(updatePage);
     await updatePage.route("**/version.json*", (route) =>
-      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ version: "v283" }) }),
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ version: "v284" }) }),
     );
-    await updatePage.goto(`${baseUrl}/app.html?fresh=v282-update`, { waitUntil: "domcontentloaded" });
-    await updatePage.evaluate(() => showUpdateAvailable(null, "v283"));
+    await updatePage.goto(`${baseUrl}/app.html?fresh=v283-update`, { waitUntil: "domcontentloaded" });
+    await updatePage.evaluate(() => showUpdateAvailable(null, "v284"));
     await updatePage.getByText("Update available", { exact: true }).waitFor();
     check((await updatePage.locator("body").innerText()).includes("Update Now"), "delayed service-worker activation exposes a clear update action");
     await updatePage.screenshot({ path: path.join(browserDir, "03-update-path.png"), fullPage: true });

@@ -1,5 +1,5 @@
-const CACHE_NAME = "laxhornet-v282";
-const RUNTIME_CONFIG_ASSET = "./runtime-config.js?v=282";
+const CACHE_NAME = "laxhornet-v283";
+const RUNTIME_CONFIG_ASSET = "./runtime-config.js?v=283";
 const APP_ASSETS = [
   "./",
   "./index.html",
@@ -20,12 +20,13 @@ const APP_ASSETS = [
   "./launch-kit/parent-email.html",
   "./launch-kit/admin-launch-checklist.html",
   "./launch-kit/laxhornet-qr.png",
-  "./landing.css?v=282",
-  "./styles.css?v=282",
+  "./landing.css?v=283",
+  "./styles.css?v=283",
   "./assets/supabase.min.js?v=253",
   RUNTIME_CONFIG_ASSET,
-  "./app.js?v=282",
-  "./manifest.json?v=282",
+  "./event-operation-service.js?v=283",
+  "./app.js?v=283",
+  "./manifest.json?v=283",
   "./assets/icon.svg?v=11",
   "./assets/LHicon.png?v=1",
   "./assets/LHbanner.png?v=3",
@@ -77,7 +78,7 @@ self.addEventListener("fetch", (event) => {
             (cached) =>
               cached ||
               new Response(
-                "window.LAXHORNET_RUNTIME_CONFIG=Object.freeze({...(window.LAXHORNET_RUNTIME_CONFIG||{}),publicLiveShareRpc:true,liveShareTokenRpc:true,exportAuditRpc:true});",
+                "window.LAXHORNET_RUNTIME_CONFIG=Object.freeze({...(window.LAXHORNET_RUNTIME_CONFIG||{}),publicLiveShareRpc:true,liveShareTokenRpc:true,exportAuditRpc:true,minimumSchemaCapability:1});",
                 { headers: { "Content-Type": "application/javascript; charset=utf-8" } },
               ),
           ),

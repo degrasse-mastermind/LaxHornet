@@ -5,7 +5,7 @@ const path = require("node:path");
 const { chromium } = require("playwright");
 
 const root = path.resolve(__dirname, "..");
-const evidenceRoot = path.join(root, "review-evidence", "secure-disclosure-activation-v282");
+const evidenceRoot = path.join(root, "review-evidence", "event-pipeline-release-control-cleanup");
 const browserDir = path.join(evidenceRoot, "browser");
 const previewRef = process.env.LAXHORNET_PREVIEW_PROJECT_REF || "";
 const expectedPreviewRefHash = "434ca80780dda1b0840ba453d4d8db948e82ccb6d39979fe9b146914fc143f38";
@@ -37,7 +37,7 @@ if (createHash("sha256").update(previewRef).digest("hex") !== expectedPreviewRef
 
 fs.mkdirSync(browserDir, { recursive: true });
 
-const runId = `v282-${Date.now().toString(36)}-${randomBytes(3).toString("hex")}`;
+const runId = `v283-${Date.now().toString(36)}-${randomBytes(3).toString("hex")}`;
 const fixture = {
   teamA: `${runId}-team-a`,
   teamB: `${runId}-team-b`,
@@ -538,7 +538,7 @@ async function runBrowserBridge(parentSession) {
   }, { url: previewOrigin, key: publishableKey });
   const trackerPage = await trackerContext.newPage();
   recordBrowserNetwork(trackerPage, "authenticated-tracker");
-  await trackerPage.goto(`${localOrigin}/app.html?fresh=v282-managed-preview-tracker`, {
+  await trackerPage.goto(`${localOrigin}/app.html?fresh=v283-managed-preview-tracker`, {
     waitUntil: "domcontentloaded",
   });
   const authResult = await trackerPage.evaluate(async (session) => {
@@ -623,7 +623,7 @@ async function runBrowserBridge(parentSession) {
   await trackerPage.locator('[data-stat="assist"]').click();
   await trackerPage.locator('[data-stat="successfulClear"]').click();
   const initialSync = await trackerPage.evaluate(async () => {
-    const synchronized = await reconcileTrustSpineGame(state.activeGame);
+    const synchronized = await reconcileGameEventOperations(state.activeGame);
     return {
       synchronized,
       eventIds: state.activeGame.events.map((event) => event.id),
@@ -636,6 +636,12 @@ async function runBrowserBridge(parentSession) {
   check(initialSync.synchronized && initialSync.pending === 0, "ordinary tracker events synchronized into Trust Spine");
   check(initialSync.eventIds.length === 3, "existing local event and two tracker events reconciled before sharing");
 
+  const capabilityReady = await trackerPage.evaluate(async () => {
+    const capabilities = await fetchBackendCapabilities({ force: true });
+    render();
+    return capabilities;
+  });
+  check(capabilityReady?.secureLiveShare === true, "managed tracker confirms secure Live Share capability");
   await trackerPage.getByRole("button", { name: "Live Share", exact: true }).click();
   await trackerPage.getByRole("button", { name: "Copy Live Share Link", exact: true }).click();
   await trackerPage.waitForFunction(() => /^[A-F0-9]{32}$/.test(state.activeGame?.shareCode || ""), null, { timeout: 30000 });
@@ -651,7 +657,7 @@ async function runBrowserBridge(parentSession) {
   }, { url: previewOrigin, key: publishableKey });
   const viewerPage = await viewerContext.newPage();
   recordBrowserNetwork(viewerPage, "anonymous-viewer");
-  await viewerPage.goto(`${localOrigin}/app.html?share=${encodeURIComponent(shareCode)}&fresh=v282-managed-preview-viewer`, {
+  await viewerPage.goto(`${localOrigin}/app.html?share=${encodeURIComponent(shareCode)}&fresh=v283-managed-preview-viewer`, {
     waitUntil: "domcontentloaded",
   });
   await viewerPage.getByText("Ground Ball", { exact: false }).first().waitFor({ timeout: 30000 });
@@ -660,7 +666,7 @@ async function runBrowserBridge(parentSession) {
 
   await trackerPage.locator('[data-stat="goal"]').click();
   const addedEvent = await trackerPage.evaluate(async (knownIds) => {
-    await reconcileTrustSpineGame(state.activeGame);
+    await reconcileGameEventOperations(state.activeGame);
     const event = state.activeGame.events.find((item) => !knownIds.includes(item.id));
     return { id: event?.id || "", label: event?.statLabel || "" };
   }, initialSync.eventIds);
@@ -675,12 +681,14 @@ async function runBrowserBridge(parentSession) {
   const correctedEventId = initialSync.eventIds.find((id) => id !== fixture.eventA);
   const correctionResult = await trackerPage.evaluate(async (eventId) => {
     const event = state.activeGame.events.find((item) => item.id === eventId);
-    event.fieldZone = "Offensive";
-    event.note = "SYNTHETIC_PRIVATE_CORRECTION_NOTE";
-    event.tags = ["SYNTHETIC_PRIVATE_CORRECTION_TAG"];
-    event.correctedAt = new Date().toISOString();
-    queueTrustSpineGameReconciliation(state.activeGame);
-    const synchronized = await reconcileTrustSpineGame(state.activeGame);
+    const operation = correctGameEventOperation(state.activeGame, () => {
+      event.fieldZone = "Offensive";
+      event.note = "SYNTHETIC_PRIVATE_CORRECTION_NOTE";
+      event.tags = ["SYNTHETIC_PRIVATE_CORRECTION_TAG"];
+      event.correctedAt = new Date().toISOString();
+      return { game: state.activeGame, event };
+    });
+    const synchronized = await operation.cloudPromise;
     return { synchronized, eventId };
   }, correctedEventId);
   check(correctionResult.synchronized, "tracker correction synchronized through the approved correction RPC");
@@ -693,11 +701,17 @@ async function runBrowserBridge(parentSession) {
   const tombstonedEventId = initialSync.eventIds.find((id) => id !== fixture.eventA && id !== correctedEventId);
   const tombstoneResult = await trackerPage.evaluate(async (eventId) => {
     const event = state.activeGame.events.find((item) => item.id === eventId);
-    queueTrustSpineTombstone(state.activeGame, event, "Synthetic managed-preview deletion");
-    state.activeGame.events = state.activeGame.events.filter((item) => item.id !== eventId);
-    state.games = [state.activeGame];
-    rememberDeletedEvent(eventId);
-    await flushTrustSpineSync({ gameId: state.activeGame.id });
+    const operation = tombstoneGameEventOperation(
+      state.activeGame,
+      "Synthetic managed-preview deletion",
+      () => {
+        state.activeGame.events = state.activeGame.events.filter((item) => item.id !== eventId);
+        state.games = [state.activeGame];
+        rememberDeletedEvent(eventId);
+        return { game: state.activeGame, event };
+      },
+    );
+    await operation.cloudPromise;
     return state.trustSpineSync.events[eventId]?.lifecycleState || "";
   }, tombstonedEventId);
   check(tombstoneResult === "tombstoned", "tracker deletion synchronized as a Trust Spine tombstone");
@@ -707,11 +721,124 @@ async function runBrowserBridge(parentSession) {
   }, tombstonedEventId);
   check(!tombstonedStillPublic, "secure viewer removed the tombstoned event");
 
+  await trackerContext.setOffline(true);
+  await trackerPage.locator('[data-stat="groundBall"]').click();
+  const offlineEvidence = await trackerPage.evaluate(() => ({
+    pending: Object.values(state.trustSpineSync.events).reduce(
+      (sum, record) => sum + (record.pendingOperations?.length || 0),
+      0,
+    ),
+    savedLocally: state.activeGame.events.some((event) => event.statType === "groundBall"),
+  }));
+  check(
+    offlineEvidence.savedLocally && offlineEvidence.pending >= 1,
+    "offline tracker event is saved locally with a pending authoritative operation",
+    offlineEvidence,
+  );
+  await trackerContext.setOffline(false);
+  const retryEvidence = await trackerPage.evaluate(async () => ({
+    synchronized: await eventOperationService().retryGameEventOperations(state.activeGame.id),
+    pending: Object.values(state.trustSpineSync.events).reduce(
+      (sum, record) => sum + (record.pendingOperations?.length || 0),
+      0,
+    ),
+  }));
+  check(
+    retryEvidence.synchronized && retryEvidence.pending === 0,
+    "offline operation reconciles through the canonical retry service",
+    retryEvidence,
+  );
+
   const body = await viewerPage.locator("body").innerText();
   const status = await viewerPage.evaluate(() => window.LAXHORNET_DISCLOSURE_STATUS);
+  const capabilities = await trackerPage.evaluate(() => fetchBackendCapabilities({ force: true }));
+  const capabilityMismatch = await trackerPage.evaluate(async () => {
+    backendCapabilityState = { value: null, checkedAt: Date.now(), error: "capability_mismatch" };
+    const eligibility = secureLiveShareEligibility(state.activeGame);
+    const trackedBefore = state.activeGame.events.length;
+    const operation = createGameEventOperation(state.activeGame, () => {
+      const event = normalizeEvent({
+        id: `capability-mismatch-${Date.now()}`,
+        gameId: state.activeGame.id,
+        timestamp: new Date().toISOString(),
+        quarter: state.activeGame.currentQuarter,
+        statType: "smartPlay",
+        statLabel: "Smart Play",
+        category: "Possession / IQ",
+        pointValue: 1,
+      }, state.activeGame.id);
+      state.activeGame.events.push(event);
+      return { game: state.activeGame, event };
+    });
+    const trackedLocally = state.activeGame.events.length === trackedBefore + 1;
+    await fetchBackendCapabilities({ force: true });
+    return {
+      shareAvailable: eligibility.available,
+      reason: eligibility.reason,
+      trackedLocally,
+      synchronizedAfterRecovery: await operation.cloudPromise,
+    };
+  });
+  const health = await trackerPage.evaluate(() => operationalHealthSnapshot());
+  const personalBoundary = await trackerPage.evaluate(() => {
+    const personalGame = normalizeGame({
+      id: "synthetic-personal-game",
+      userId: currentUserId(),
+      teamId: "",
+      rosterPlayerId: "",
+      scopeType: GAME_SCOPE_TYPES.PERSONAL,
+      opponent: "Private Practice",
+      date: "2026-07-23",
+      playerSnapshot: {
+        id: "synthetic-personal-player",
+        name: "Private Demo Player",
+        number: "9",
+        position: "Midfield",
+      },
+      events: [],
+    });
+    const eligibility = secureLiveShareEligibility(personalGame);
+    return {
+      scopeType: personalGame.scopeType,
+      available: eligibility.available,
+      reason: eligibility.reason,
+    };
+  });
   const scriptOrder = await viewerPage.evaluate(() => window.LAXHORNET_SCRIPT_ORDER);
   check(status?.ready === true, "managed browser reports secure disclosure ready");
   check(Object.values(status?.features || {}).every(Boolean), "managed browser reports all three secure flags true");
+  check(
+    capabilities?.schemaVersion >= 1
+      && capabilities?.trustSpineEvents === true
+      && capabilities?.secureLiveShare === true
+      && capabilities?.exportAudit === true
+      && capabilities?.personalGameSharing === false,
+    "managed browser confirms the v283 backend capability contract",
+    capabilities,
+  );
+  check(
+    capabilityMismatch.shareAvailable === false
+      && capabilityMismatch.reason === "capability_mismatch"
+      && capabilityMismatch.trackedLocally === true
+      && capabilityMismatch.synchronizedAfterRecovery === true,
+    "capability mismatch blocks sharing while local tracking remains available",
+    capabilityMismatch,
+  );
+  check(
+    health?.appVersion === "v283"
+      && health?.schemaVersion >= 1
+      && !JSON.stringify(health).includes("Demo Player")
+      && !JSON.stringify(health).includes(userEmails.parent),
+    "administrative health output contains operational data only",
+    health,
+  );
+  check(
+    personalBoundary.scopeType === "personal"
+      && personalBoundary.available === false
+      && personalBoundary.reason === "personal_game",
+    "personal games remain private and ineligible for Live Share",
+    personalBoundary,
+  );
   check(JSON.stringify(scriptOrder) === JSON.stringify(["runtime-config", "app"]), "managed browser executes runtime-config before app.js");
   check(body.includes("Ground Ball"), "managed browser renders an allowlisted event");
   check(!body.includes("SYNTHETIC_PRIVATE_NOTE"), "managed browser excludes the private note");
@@ -734,11 +861,12 @@ async function runBrowserBridge(parentSession) {
     path: path.join(browserDir, "04-managed-preview-live-share.png"),
     fullPage: true,
   });
+  const finalEventCount = await trackerPage.evaluate(() => state.activeGame.events.length);
   await trackerContext.close();
   await viewerContext.close();
   return {
     shareCode,
-    expectedPublicEventCount: 3,
+    expectedPublicEventCount: finalEventCount,
     initialEventCount: initialSync.eventIds.length,
     polledEventId: addedEvent.id,
     correctedEventId,
@@ -789,7 +917,7 @@ function writeEvidence(rpcEvidence) {
   fs.writeFileSync(
     path.join(evidenceRoot, "managed-preview-results.json"),
     `${JSON.stringify({
-      suite: "LaxHornet v282 managed-preview activation",
+      suite: "LaxHornet v283 event pipeline and release control",
       environment: "authorized managed preview",
       synthetic: true,
       testsPassed: results.length,
@@ -834,7 +962,7 @@ function writeEvidence(rpcEvidence) {
 (async () => {
   let rpcEvidence;
   try {
-    await resetPreview("pre-test");
+    await waitForPreviewReady();
     const users = {
       admin: await createAuthUser("admin"),
       coach: await createAuthUser("coach"),

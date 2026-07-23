@@ -1,0 +1,8 @@
+{
+  "localSaveBeforeNetwork": true,
+  "pendingAuthoritativeOperationObserved": true,
+  "reconnectRetryUsedCanonicalService": true,
+  "pendingAfterRetry": 0,
+  "duplicateRetryIdempotent": true,
+  "result": "pass"
+}
