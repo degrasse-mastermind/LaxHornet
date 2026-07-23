@@ -86,6 +86,15 @@ if (containment.mode === "standalone") {
     containment.postAuthorizationDatabaseFiles.length === 0,
     "additive cleanup has no post-authorization database changes",
   );
+} else if (containment.mode === "canonical_plus_additive") {
+  expect(
+    containment.combinedSupabaseTreeMatchesApprovedRefs,
+    "combined Supabase tree matches the approved canonical and additive file identities",
+  );
+  expect(
+    containment.postAuthorizationDatabaseFiles.length === 0,
+    "combined release contains no unapproved database files",
+  );
 } else {
   expect(
     containment.supabaseTreeMatchesAuthorizedRef,

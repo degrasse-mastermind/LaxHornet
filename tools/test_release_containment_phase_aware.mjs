@@ -5,6 +5,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import {
   APPROVED_AUTHORIZED_DB_PATHS,
+  APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
   ReleaseContainmentError,
   validateReleaseContainment,
   validateReleaseContainmentFromEnvironment,
@@ -215,6 +216,146 @@ try {
         repoRoot: tempRoot,
         releaseBaseRef: "release-base",
         authorizedDbRef: "authorized-db-ref",
+      }),
+    );
+  });
+
+  git(["switch", "-c", "approved-additive", "combined"]);
+  for (const [index, file] of APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS.entries()) {
+    write(file, `approved additive file ${index + 1}\n`);
+  }
+  commit("Synthetic approved additive capability package");
+  git(["tag", "approved-additive-ref"]);
+
+  test("exact additive package passes the existing additive phase", () => {
+    const result = validateReleaseContainment({
+      repoRoot: tempRoot,
+      releaseBaseRef: "combined",
+      headRef: "approved-additive-ref",
+      allowedAdditiveDbPaths: APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
+    });
+    assert.equal(result.mode, "additive");
+    assert.deepEqual(
+      [...result.allowedAdditiveDatabaseFiles].sort(),
+      [...APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS].sort(),
+    );
+  });
+
+  git(["switch", "-c", "canonical-plus-additive"]);
+  write("app.js", "export const version = 'final-combined';\n");
+  commit("Synthetic final combined release");
+
+  test("canonical plus additive mode accepts the exact approved final tree", () => {
+    const result = validateReleaseContainment({
+      repoRoot: tempRoot,
+      releaseBaseRef: "release-base",
+      authorizedDbRef: "authorized-db-ref",
+      approvedAdditiveRef: "approved-additive-ref",
+    });
+    assert.equal(result.mode, "canonical_plus_additive");
+    assert.equal(result.supabaseTreeMatchesAuthorizedRef, null);
+    assert.equal(result.canonicalSupabaseFilesMatchAuthorizedRef, true);
+    assert.equal(result.combinedSupabaseTreeMatchesApprovedRefs, true);
+    assert.deepEqual(
+      [...result.allowedAdditiveDatabaseFiles].sort(),
+      [...APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS].sort(),
+    );
+  });
+
+  git(["switch", "-c", "combined-canonical-edit", "canonical-plus-additive"]);
+  append(APPROVED_AUTHORIZED_DB_PATHS[1], "tampered canonical migration\n");
+  commit("Tamper combined canonical migration");
+  test("canonical plus additive mode rejects a modified canonical migration", () => {
+    expectContainmentFailure("COMBINED_SUPABASE_FILE_IDENTITY_MISMATCH", () =>
+      validateReleaseContainment({
+        repoRoot: tempRoot,
+        releaseBaseRef: "release-base",
+        authorizedDbRef: "authorized-db-ref",
+        approvedAdditiveRef: "approved-additive-ref",
+      }),
+    );
+  });
+
+  git(["switch", "-c", "combined-canonical-missing", "canonical-plus-additive"]);
+  git(["rm", APPROVED_AUTHORIZED_DB_PATHS[2]]);
+  commit("Remove combined canonical migration");
+  test("canonical plus additive mode rejects a missing canonical migration", () => {
+    expectContainmentFailure("COMBINED_SUPABASE_PATH_SET_MISMATCH", () =>
+      validateReleaseContainment({
+        repoRoot: tempRoot,
+        releaseBaseRef: "release-base",
+        authorizedDbRef: "authorized-db-ref",
+        approvedAdditiveRef: "approved-additive-ref",
+      }),
+    );
+  });
+
+  git(["switch", "-c", "combined-additive-edit", "canonical-plus-additive"]);
+  append(APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS[0], "tampered capability migration\n");
+  commit("Tamper combined capability migration");
+  test("canonical plus additive mode rejects a modified capability migration", () => {
+    expectContainmentFailure("COMBINED_SUPABASE_FILE_IDENTITY_MISMATCH", () =>
+      validateReleaseContainment({
+        repoRoot: tempRoot,
+        releaseBaseRef: "release-base",
+        authorizedDbRef: "authorized-db-ref",
+        approvedAdditiveRef: "approved-additive-ref",
+      }),
+    );
+  });
+
+  git(["switch", "-c", "combined-additive-rollback-edit", "canonical-plus-additive"]);
+  append(APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS[1], "tampered capability rollback\n");
+  commit("Tamper combined capability rollback");
+  test("canonical plus additive mode rejects a modified capability rollback", () => {
+    expectContainmentFailure("COMBINED_SUPABASE_FILE_IDENTITY_MISMATCH", () =>
+      validateReleaseContainment({
+        repoRoot: tempRoot,
+        releaseBaseRef: "release-base",
+        authorizedDbRef: "authorized-db-ref",
+        approvedAdditiveRef: "approved-additive-ref",
+      }),
+    );
+  });
+
+  git(["switch", "-c", "combined-unexpected-migration", "canonical-plus-additive"]);
+  write("supabase/migrations/20260723050000_unexpected.sql", "select 1;\n");
+  commit("Add unexpected combined migration");
+  test("canonical plus additive mode rejects an unexpected migration", () => {
+    expectContainmentFailure("COMBINED_SUPABASE_PATH_SET_MISMATCH", () =>
+      validateReleaseContainment({
+        repoRoot: tempRoot,
+        releaseBaseRef: "release-base",
+        authorizedDbRef: "authorized-db-ref",
+        approvedAdditiveRef: "approved-additive-ref",
+      }),
+    );
+  });
+
+  git(["switch", "-c", "combined-unexpected-rollback", "canonical-plus-additive"]);
+  write("supabase/rollback/20260723050000_unexpected_rollback.sql", "select 1;\n");
+  commit("Add unexpected combined rollback");
+  test("canonical plus additive mode rejects unexpected rollback SQL", () => {
+    expectContainmentFailure("COMBINED_SUPABASE_PATH_SET_MISMATCH", () =>
+      validateReleaseContainment({
+        repoRoot: tempRoot,
+        releaseBaseRef: "release-base",
+        authorizedDbRef: "authorized-db-ref",
+        approvedAdditiveRef: "approved-additive-ref",
+      }),
+    );
+  });
+
+  git(["switch", "-c", "combined-unexpected-function", "canonical-plus-additive"]);
+  write("supabase/functions/unexpected/index.ts", "export default () => 'unexpected';\n");
+  commit("Add unexpected combined Supabase function");
+  test("canonical plus additive mode rejects unexpected Supabase function code", () => {
+    expectContainmentFailure("COMBINED_SUPABASE_PATH_SET_MISMATCH", () =>
+      validateReleaseContainment({
+        repoRoot: tempRoot,
+        releaseBaseRef: "release-base",
+        authorizedDbRef: "authorized-db-ref",
+        approvedAdditiveRef: "approved-additive-ref",
       }),
     );
   });

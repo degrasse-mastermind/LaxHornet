@@ -86,6 +86,24 @@ function changedFiles(repoRoot, fromCommit, toCommit) {
     .filter(Boolean);
 }
 
+function listFilesAt(repoRoot, ref, treePath = "") {
+  const args = ["ls-tree", "-r", "--name-only", ref];
+  if (treePath) args.push("--", treePath);
+  const output = runGit(repoRoot, args);
+  return output
+    .split(/\r?\n/)
+    .map((file) => file.trim().replaceAll("\\", "/"))
+    .filter(Boolean);
+}
+
+function blobIdAt(repoRoot, ref, file) {
+  try {
+    return runGit(repoRoot, ["rev-parse", `${ref}:${file}`]);
+  } catch {
+    return "";
+  }
+}
+
 function isAncestor(repoRoot, ancestorCommit, descendantCommit) {
   const result = spawnSync("git", ["merge-base", "--is-ancestor", ancestorCommit, descendantCommit], {
     cwd: repoRoot,
@@ -144,10 +162,77 @@ function assertExactAuthorizedSupabaseDelta(files) {
   }
 }
 
+function assertMatchingFileSet(expectedFiles, actualFiles, code, message) {
+  const expected = new Set(expectedFiles);
+  const actual = new Set(actualFiles);
+  const unexpected = [...actual].filter((file) => !expected.has(file)).sort();
+  const missing = [...expected].filter((file) => !actual.has(file)).sort();
+  if (unexpected.length || missing.length) {
+    throw new ReleaseContainmentError(code, message, { unexpected, missing });
+  }
+}
+
+function assertMatchingBlobIdentities(repoRoot, expectedSources, headCommit, code, message) {
+  const mismatched = [];
+  for (const [file, sourceRef] of expectedSources) {
+    const expectedBlob = blobIdAt(repoRoot, sourceRef, file);
+    const actualBlob = blobIdAt(repoRoot, headCommit, file);
+    if (!expectedBlob || expectedBlob !== actualBlob) {
+      mismatched.push({
+        file,
+        expectedSource: sourceRef,
+        expectedBlob: expectedBlob || null,
+        actualBlob: actualBlob || null,
+      });
+    }
+  }
+  if (mismatched.length) {
+    throw new ReleaseContainmentError(code, message, { mismatched });
+  }
+}
+
+function validateCanonicalPlusAdditiveTree({
+  repoRoot,
+  authorizedDbCommit,
+  approvedAdditiveCommit,
+  headCommit,
+}) {
+  const canonicalSupabaseFiles = listFilesAt(repoRoot, authorizedDbCommit, "supabase");
+  const expectedSupabaseSources = new Map(
+    canonicalSupabaseFiles.map((file) => [file, authorizedDbCommit]),
+  );
+  for (const file of APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS) {
+    if (!blobIdAt(repoRoot, approvedAdditiveCommit, file)) {
+      throw new ReleaseContainmentError(
+        "APPROVED_ADDITIVE_FILE_MISSING",
+        "The approved cleanup ref is missing a required capability file.",
+        { file, approvedAdditiveCommit },
+      );
+    }
+    expectedSupabaseSources.set(file, approvedAdditiveCommit);
+  }
+
+  const headSupabaseFiles = listFilesAt(repoRoot, headCommit, "supabase");
+  assertMatchingFileSet(
+    [...expectedSupabaseSources.keys()],
+    headSupabaseFiles,
+    "COMBINED_SUPABASE_PATH_SET_MISMATCH",
+    "The combined Supabase tree contains missing or unexpected paths.",
+  );
+  assertMatchingBlobIdentities(
+    repoRoot,
+    expectedSupabaseSources,
+    headCommit,
+    "COMBINED_SUPABASE_FILE_IDENTITY_MISMATCH",
+    "The combined Supabase tree does not match the approved canonical and additive file identities.",
+  );
+}
+
 export function validateReleaseContainment({
   repoRoot,
   releaseBaseRef = "origin/main",
   authorizedDbRef = "",
+  approvedAdditiveRef = "",
   allowedAdditiveDbPaths = [],
   headRef = "HEAD",
 } = {}) {
@@ -164,6 +249,7 @@ export function validateReleaseContainment({
   const headCommit = resolveCommit(normalizedRoot, headRef, "HEAD_REF_UNAVAILABLE");
   const releaseDeltaFiles = changedFiles(normalizedRoot, releaseBaseCommit, headCommit);
   const normalizedAuthorizedRef = String(authorizedDbRef || "").trim();
+  const normalizedApprovedAdditiveRef = String(approvedAdditiveRef || "").trim();
 
   if (!normalizedAuthorizedRef) {
     const allowedAdditive = new Set(
@@ -214,6 +300,50 @@ export function validateReleaseContainment({
     authorizedDbCommit,
   );
   assertExactAuthorizedSupabaseDelta(authorizedDeltaFiles);
+
+  if (normalizedApprovedAdditiveRef) {
+    const approvedAdditiveCommit = resolveCommit(
+      normalizedRoot,
+      normalizedApprovedAdditiveRef,
+      "APPROVED_ADDITIVE_REF_UNAVAILABLE",
+    );
+    if (!isAncestor(normalizedRoot, approvedAdditiveCommit, headCommit)) {
+      throw new ReleaseContainmentError(
+        "APPROVED_ADDITIVE_REF_NOT_IN_HEAD",
+        "Combined integration HEAD does not contain the approved additive cleanup ref.",
+        { normalizedApprovedAdditiveRef, headRef },
+      );
+    }
+
+    validateCanonicalPlusAdditiveTree({
+      repoRoot: normalizedRoot,
+      authorizedDbCommit,
+      approvedAdditiveCommit,
+      headCommit,
+    });
+
+    return {
+      mode: "canonical_plus_additive",
+      repoRoot: normalizedRoot,
+      releaseBaseRef,
+      releaseBaseCommit,
+      authorizedDbRef: normalizedAuthorizedRef,
+      authorizedDbCommit,
+      approvedAdditiveRef: normalizedApprovedAdditiveRef,
+      approvedAdditiveCommit,
+      headRef,
+      headCommit,
+      releaseDeltaFiles,
+      authorizedSupabaseDeltaFiles: authorizedDeltaFiles.filter(
+        (file) => file === "supabase" || file.startsWith("supabase/"),
+      ),
+      allowedAdditiveDatabaseFiles: [...APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS],
+      postAuthorizationDatabaseFiles: [],
+      supabaseTreeMatchesAuthorizedRef: null,
+      canonicalSupabaseFilesMatchAuthorizedRef: true,
+      combinedSupabaseTreeMatchesApprovedRefs: true,
+    };
+  }
 
   const supabaseChangesAfterAuthorization = changedFiles(
     normalizedRoot,
@@ -276,6 +406,10 @@ export function validateReleaseContainmentFromEnvironment(repoRoot, options = {}
     authorizedDbRef:
       options.authorizedDbRef ??
       process.env.LAXHORNET_AUTHORIZED_DB_REF?.trim() ??
+      "",
+    approvedAdditiveRef:
+      options.approvedAdditiveRef ??
+      process.env.LAXHORNET_APPROVED_ADDITIVE_REF?.trim() ??
       "",
     allowedAdditiveDbPaths:
       options.allowedAdditiveDbPaths

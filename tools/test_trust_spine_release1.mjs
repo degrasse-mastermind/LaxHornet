@@ -461,6 +461,16 @@ test("Phase-aware release containment preserves the authorized Trust Spine SQL",
     );
     assert.deepEqual(containment.postAuthorizationDatabaseFiles, []);
     assert.equal(containment.supabaseTreeMatchesAuthorizedRef, null);
+  } else if (containment.mode === "canonical_plus_additive") {
+    assert.equal(containment.supabaseTreeMatchesAuthorizedRef, null);
+    assert.equal(containment.canonicalSupabaseFilesMatchAuthorizedRef, true);
+    assert.equal(containment.combinedSupabaseTreeMatchesApprovedRefs, true);
+    assert.deepEqual(containment.postAuthorizationDatabaseFiles, []);
+    assert.equal(containment.authorizedSupabaseDeltaFiles.length, 7);
+    assert.deepEqual(
+      [...containment.allowedAdditiveDatabaseFiles].sort(),
+      [...APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS].sort(),
+    );
   } else {
     assert.equal(containment.supabaseTreeMatchesAuthorizedRef, true);
     assert.deepEqual(containment.postAuthorizationDatabaseFiles, []);

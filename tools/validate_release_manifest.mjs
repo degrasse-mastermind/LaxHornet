@@ -1,7 +1,13 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import {
+  APPROVED_AUTHORIZED_DB_PATHS,
+  APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
+  validateReleaseContainment,
+} from "./release_containment.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const manifestPath = path.join(root, "release", "laxhornet-release-manifest.json");
@@ -15,7 +21,10 @@ const expect = (condition, message) => {
   if (!condition) failures.push(message);
 };
 const git = (...args) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+const gitBuffer = (...args) => execFileSync("git", args, { cwd: root });
 const gitFile = (ref, file) => git("show", `${ref}:${file}`);
+const gitFileSha256 = (ref, file) =>
+  createHash("sha256").update(gitBuffer("show", `${ref}:${file}`)).digest("hex");
 const existsAt = (ref, file) => {
   try {
     git("cat-file", "-e", `${ref}:${file}`);
@@ -29,11 +38,59 @@ for (const [name, ref] of [
   ["databaseCandidate", manifest.databaseCandidate],
   ["preCutoverRuntime", manifest.preCutoverRuntime],
   ["activationCandidate", manifest.activationCandidate],
+  ["cleanupCandidate", manifest.cleanupCandidate],
 ]) {
   try {
     expect(git("cat-file", "-t", ref) === "commit", `${name} must reference an available commit`);
   } catch {
     expect(false, `${name} commit is unavailable: ${ref}`);
+  }
+}
+
+expect(
+  manifest.databaseTreeMode === "canonical_plus_additive",
+  "databaseTreeMode must identify the canonical-plus-additive release boundary",
+);
+
+const identities = manifest.approvedDatabaseFileIdentities || {};
+expect(identities.algorithm === "sha256", "approved database identities must use sha256");
+expect(
+  identities.canonicalSourceRef === manifest.databaseCandidate,
+  "canonical identity source must match databaseCandidate",
+);
+expect(
+  identities.additiveSourceRef === manifest.cleanupCandidate,
+  "additive identity source must match cleanupCandidate",
+);
+
+const canonicalIdentityPaths = Object.keys(identities.canonical || {}).sort();
+const additiveIdentityPaths = Object.keys(identities.additive || {}).sort();
+expect(
+  JSON.stringify(canonicalIdentityPaths) === JSON.stringify([...APPROVED_AUTHORIZED_DB_PATHS].sort()),
+  "manifest must identify exactly the approved PR #9 canonical files",
+);
+expect(
+  JSON.stringify(additiveIdentityPaths)
+    === JSON.stringify([...APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS].sort()),
+  "manifest must identify exactly the approved PR #12 additive files",
+);
+
+for (const [file, expectedHash] of Object.entries(identities.canonical || {})) {
+  expect(existsAt(manifest.databaseCandidate, file), `canonical source is missing identity file: ${file}`);
+  if (existsAt(manifest.databaseCandidate, file)) {
+    expect(
+      gitFileSha256(manifest.databaseCandidate, file) === expectedHash,
+      `canonical source hash does not match the approved identity: ${file}`,
+    );
+  }
+}
+for (const [file, expectedHash] of Object.entries(identities.additive || {})) {
+  expect(existsAt(manifest.cleanupCandidate, file), `cleanup source is missing identity file: ${file}`);
+  if (existsAt(manifest.cleanupCandidate, file)) {
+    expect(
+      gitFileSha256(manifest.cleanupCandidate, file) === expectedHash,
+      `cleanup source hash does not match the approved identity: ${file}`,
+    );
   }
 }
 
@@ -73,6 +130,42 @@ for (const file of manifest.canonicalForwardMigrations) {
         `combined ref rewrites approved migration: ${file}`,
       );
     }
+  }
+}
+
+if (requireCombined) {
+  for (const [file, expectedHash] of [
+    ...Object.entries(identities.canonical || {}),
+    ...Object.entries(identities.additive || {}),
+  ]) {
+    expect(existsAt(combinedRef, file), `combined ref is missing approved identity file: ${file}`);
+    if (existsAt(combinedRef, file)) {
+      expect(
+        gitFileSha256(combinedRef, file) === expectedHash,
+        `combined ref does not match the approved file identity: ${file}`,
+      );
+    }
+  }
+
+  try {
+    const releaseBase = git("merge-base", manifest.databaseCandidate, manifest.preCutoverRuntime);
+    const containment = validateReleaseContainment({
+      repoRoot: root,
+      releaseBaseRef: releaseBase,
+      authorizedDbRef: manifest.databaseCandidate,
+      approvedAdditiveRef: manifest.cleanupCandidate,
+      headRef: combinedRef,
+    });
+    expect(
+      containment.mode === "canonical_plus_additive",
+      "combined ref must validate in canonical_plus_additive mode",
+    );
+    expect(
+      containment.combinedSupabaseTreeMatchesApprovedRefs === true,
+      "combined Supabase tree must match both approved source refs",
+    );
+  } catch (error) {
+    expect(false, `combined release containment failed: ${error.code || error.message}`);
   }
 }
 

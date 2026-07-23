@@ -1,18 +1,32 @@
-import { readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const evidenceFile = path.join(
-  root,
-  "review-evidence",
-  "event-pipeline-release-control-cleanup",
-  "regression-output.txt",
-);
+const evidenceFile =
+  process.env.LAXHORNET_REGRESSION_EVIDENCE_FILE ||
+  path.join(
+    root,
+    "review-evidence",
+    "event-pipeline-release-control-cleanup",
+    "regression-output.txt",
+  );
 const python = process.env.LAXHORNET_PYTHON || "python";
-const baseRef = process.env.LAXHORNET_RELEASE_BASE_REF || "7cf58df9a43ce235fc6068bd4c50549e05906de4";
+const manifest = JSON.parse(
+  readFileSync(path.join(root, "release", "laxhornet-release-manifest.json"), "utf8"),
+);
+const git = (...args) =>
+  spawnSync("git", args, { cwd: root, encoding: "utf8" });
+const isAncestorOfHead = (ref) => git("merge-base", "--is-ancestor", ref, "HEAD").status === 0;
+const combinedMode =
+  isAncestorOfHead(manifest.databaseCandidate) &&
+  isAncestorOfHead(manifest.cleanupCandidate);
+const defaultBaseRef = combinedMode
+  ? git("merge-base", manifest.databaseCandidate, manifest.preCutoverRuntime).stdout.trim()
+  : "7cf58df9a43ce235fc6068bd4c50549e05906de4";
+const baseRef = process.env.LAXHORNET_RELEASE_BASE_REF || defaultBaseRef;
 const additivePaths = [
   "supabase/migrations/20260723040000_event_pipeline_capabilities.sql",
   "supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql",
@@ -28,7 +42,14 @@ const tests = [
   { name: "event-operation service contracts", command: process.execPath, args: ["tools/test_event_operation_service.mjs"] },
   { name: "game scope and capability contracts", command: process.execPath, args: ["tools/test_game_scope_capabilities.mjs"] },
   { name: "v283 update release", command: process.execPath, args: ["tools/test_update_release.mjs"] },
-  { name: "release manifest validation", command: process.execPath, args: ["tools/validate_release_manifest.mjs"] },
+  {
+    name: "release manifest validation",
+    command: process.execPath,
+    args: [
+      "tools/validate_release_manifest.mjs",
+      ...(combinedMode ? ["--require-combined", "--combined-ref=HEAD"] : []),
+    ],
+  },
   { name: "release containment phase-aware", command: process.execPath, args: ["tools/test_release_containment_phase_aware.mjs"] },
   { name: "release hygiene", command: process.execPath, args: ["tools/test_release_hygiene.mjs"] },
   { name: "minimum disclosure", command: process.execPath, args: ["tools/test_minimum_disclosure.mjs"] },
@@ -71,6 +92,12 @@ for (const test of tests) {
       ...process.env,
       LAXHORNET_RELEASE_BASE_REF: baseRef,
       LAXHORNET_ALLOWED_ADDITIVE_DB_PATHS: additivePaths,
+      ...(combinedMode
+        ? {
+            LAXHORNET_AUTHORIZED_DB_REF: manifest.databaseCandidate,
+            LAXHORNET_APPROVED_ADDITIVE_REF: manifest.cleanupCandidate,
+          }
+        : {}),
     },
   });
   const exitCode = Number.isInteger(result.status) ? result.status : 1;
@@ -85,7 +112,11 @@ for (const test of tests) {
   );
 }
 
-log.push(`TOTAL: ${tests.length - failed} passed, ${failed} failed`, "");
+log.push(
+  `MODE: ${combinedMode ? "canonical_plus_additive" : "stacked_additive"}`,
+  `TOTAL: ${tests.length - failed} passed, ${failed} failed`,
+  "",
+);
 writeFileSync(evidenceFile, log.join("\n"));
 console.log(log.at(-2));
 

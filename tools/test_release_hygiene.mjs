@@ -106,6 +106,24 @@ if (containment.mode === "standalone" || containment.mode === "additive") {
     check(!changedFiles.some((file) => file.startsWith("supabase/migrations/")), "standalone release-hygiene delta does not alter canonical migrations");
     check(!changedFiles.some((file) => file.startsWith("supabase/rollback/")), "standalone release-hygiene delta does not alter canonical rollbacks");
   }
+} else if (containment.mode === "canonical_plus_additive") {
+  check(
+    containment.combinedSupabaseTreeMatchesApprovedRefs,
+    "combined Supabase tree matches the approved PR #9 canonical and PR #12 additive identities",
+  );
+  check(containment.postAuthorizationDatabaseFiles.length === 0, "combined release adds no unapproved database files");
+  check(
+    containment.authorizedSupabaseDeltaFiles.length === 7,
+    "combined integration contains only the seven approved PR #9 canonical Supabase files",
+  );
+  check(
+    JSON.stringify([...containment.allowedAdditiveDatabaseFiles].sort())
+      === JSON.stringify([
+        "supabase/migrations/20260723040000_event_pipeline_capabilities.sql",
+        "supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql",
+      ]),
+    "combined integration contains only the approved PR #12 additive capability package",
+  );
 } else {
   check(containment.supabaseTreeMatchesAuthorizedRef, "combined Supabase tree matches the authorized PR #9 ref exactly");
   check(containment.postAuthorizationDatabaseFiles.length === 0, "release-hygiene delta does not alter the authorized database candidate");
