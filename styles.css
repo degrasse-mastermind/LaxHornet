@@ -4009,6 +4009,10 @@ form.account-card .account-actions .btn.auth-demo-light {
   overscroll-behavior: contain;
 }
 
+.disclosure-modal .safety-note {
+  color: #59636f;
+}
+
 .export-inclusion-list {
   display: grid;
   gap: 8px;

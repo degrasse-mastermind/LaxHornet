@@ -6,10 +6,10 @@
     <meta name="theme-color" content="#0b0c0e" />
     <meta name="description" content="How LaxHornet handles team codes, roster matching, parent approvals, offline use, Live Share, privacy, and trust boundaries." />
     <title>Access and Trust | LaxHornet</title>
-    <link rel="manifest" href="manifest.json?v=280" />
+    <link rel="manifest" href="manifest.json?v=281" />
     <link rel="icon" href="assets/LHicon.png?v=1" type="image/png" />
     <link rel="apple-touch-icon" href="assets/LHicon.png?v=1" />
-    <link rel="stylesheet" href="landing.css?v=280" />
+    <link rel="stylesheet" href="landing.css?v=281" />
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -78,9 +78,15 @@
               private recovery backup are different actions. LaxHornet presents them separately
               so a broad backup is not mistaken for a family-facing share.
             </p>
+            <p>
+              A more restrictive Live Share path has passed isolated staging and managed preview
+              verification. Production activation still requires a deliberate cutover. Until
+              then, current Live Share remains read-only, and users should avoid sensitive or
+              private information in notes or tags for games they intend to share.
+            </p>
           </div>
           <div class="content-stack">
-            <article class="content-card"><span>Live Share</span><h3>Recorded game facts only</h3><p>The hardened public view excludes notes, tags, process context, account details, corrections, and recommendations.</p></article>
+            <article class="content-card"><span>Live Share</span><h3>Hardened path pending activation</h3><p>The verified staging and preview path limits disclosure to allowlisted game and event facts, but that path is not yet active in production.</p></article>
             <article class="content-card"><span>Recap</span><h3>Preview before sharing</h3><p>A short conversation aid uses summarized facts, cautious interpretation, a prompt, and only an explicitly added focus.</p></article>
             <article class="content-card"><span>CSV</span><h3>Choose scope and annotations</h3><p>Users select one game or the active player. Notes and tag types are off until explicitly included.</p></article>
             <article class="content-card"><span>Private Backup</span><h3>Sensitive recovery file</h3><p>A confirmation is required. Restore does not grant access, replace existing games, or activate Live Share.</p></article>

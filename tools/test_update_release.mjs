@@ -16,6 +16,7 @@ const appJs = read("app.js");
 const serviceWorker = read("service-worker.js");
 const appHtml = read("app.html");
 const indexHtml = read("index.html");
+const rootHtmlFiles = fs.readdirSync(root).filter((file) => file.endsWith(".html"));
 
 expect(version === `v${versionNumber}` && versionNumber.length > 0, "version.json must contain a v-prefixed release");
 expect(appJs.includes(`const APP_VERSION = "${version}";`), "app.js APP_VERSION must match version.json");
@@ -37,9 +38,36 @@ for (const [file, content, assets] of [
   }
 }
 
+for (const file of rootHtmlFiles) {
+  const content = read(file);
+  if (content.includes("manifest.json?v=")) {
+    expect(content.includes(`manifest.json?v=${versionNumber}`), `${file} manifest must use the current release marker`);
+  }
+  if (content.includes("landing.css?v=")) {
+    expect(content.includes(`landing.css?v=${versionNumber}`), `${file} landing stylesheet must use the current release marker`);
+  }
+  if (content.includes("styles.css?v=")) {
+    expect(content.includes(`styles.css?v=${versionNumber}`), `${file} app stylesheet must use the current release marker`);
+  }
+}
+
+for (const [file, content] of [
+  ["app.js", appJs],
+  ["service-worker.js", serviceWorker],
+  ["app.html", appHtml],
+  ["index.html", indexHtml],
+]) {
+  expect(!content.includes("v280"), `${file} must not retain the prior v280 release identity`);
+}
+
 expect(
   appJs.includes('.register("service-worker.js", { updateViaCache: "none" })'),
   "service worker registration must bypass the browser HTTP cache",
+);
+expect(
+  serviceWorker.includes('requestUrl.pathname.endsWith("/version.json")')
+    && serviceWorker.includes('fetch(event.request, { cache: "no-store" })'),
+  "installed-app update checks must bypass the service-worker cache for version.json",
 );
 expect(
   appJs.includes("let registrationUpdateFailed = false;")

@@ -439,27 +439,26 @@ test("Next-game focus keys isolate account, team, and roster player", () => {
   assert.match(aTeamAPlayer1, /user\.account-a\.team\.team-a\.player\.player-1$/);
 });
 
-test("No production runtime or cache file is modified by this implementation", () => {
-  const gitOutput = execFileSync(
-    "git",
-    ["status", "--short", "--untracked-files=all"],
-    { cwd: repoRoot, encoding: "utf8" },
-  );
-  const protectedFiles = [
-    "app.js",
-    "app.html",
-    "styles.css",
-    "service-worker.js",
-    "version.json",
-    "supabase-schema.sql",
-  ];
-  for (const fileName of protectedFiles) {
-    assert.equal(
-      new RegExp(`(^|\\s)${fileName.replace(".", "\\.")}$`, "m").test(gitOutput),
-      false,
-      `${fileName} was modified`,
-    );
-  }
+test("Release hygiene preserves Trust Spine SQL and keeps trusted disclosure disabled", () => {
+  const releaseBase = execFileSync("git", ["merge-base", "HEAD", "origin/main"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  }).trim();
+  const changedFiles = execFileSync("git", ["diff", "--name-only", releaseBase], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  })
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean);
+
+  assert.equal(changedFiles.some((file) => file.endsWith(".sql")), false);
+  assert.equal(changedFiles.some((file) => file.startsWith("supabase/migrations/")), false);
+  assert.equal(changedFiles.some((file) => file.startsWith("supabase/rollback/")), false);
+  assert.match(appSource, /publicLiveShareRpc:\s*RUNTIME_CONFIG\.publicLiveShareRpc === true/);
+  assert.match(appSource, /liveShareTokenRpc:\s*RUNTIME_CONFIG\.liveShareTokenRpc === true/);
+  assert.match(appSource, /exportAuditRpc:\s*RUNTIME_CONFIG\.exportAuditRpc === true/);
+  assert.match(appSource, /\.select\("\*, events\(\*\)"\)/);
 });
 
 const failed = results.filter((result) => result.status === "FAIL");

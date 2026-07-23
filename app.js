@@ -33,7 +33,7 @@ const TRUSTED_DISCLOSURE_FEATURES = Object.freeze({
 const PUBLIC_LIVE_SHARE_POLL_MS = 4000;
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v280";
+const APP_VERSION = "v281";
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -10534,7 +10534,7 @@ function renderSharedGame() {
     return renderShell(`
       <section class="screen-title">
         <h2>Shared Game</h2>
-        <p>${code ? `Loading share code ${code}...` : "Enter a share code from the Parent Tracker phone."}</p>
+        <p>${code ? `Loading read-only share code ${code}...` : "Enter a share code from the Parent Tracker phone to open a read-only game."}</p>
       </section>
       <form class="card pad form-grid" data-form="watch-share">
         <div class="field">
@@ -11039,6 +11039,7 @@ function renderHelp() {
       <div class="card pad">
         <h3>Sharing, Export, and Backup</h3>
         <p class="muted small"><strong>Live Share</strong> is a read-only game view. <strong>Share Recap</strong> is a short summary you preview before copying. <strong>CSV</strong> exports one selected scope and keeps notes and tags off unless you include them. <strong>Private Full Backup</strong> is a sensitive recovery file and requires confirmation.</p>
+        <p class="muted small">A more restrictive Live Share path has passed isolated staging and managed preview verification, but it is not active in production yet. Until a deliberate production cutover is approved, avoid sensitive or private information in notes or tags for games you intend to share.</p>
         <p class="muted small">Restoring a backup adds eligible saved games without changing team access, roster authority, account ownership, or Live Share.</p>
       </div>
       <div class="card pad">
