@@ -20,10 +20,17 @@ const STORAGE_KEYS = {
   familyRecapFocus: "laxhornet.familyRecapFocus",
 };
 
+const RUNTIME_CONFIG = window.LAXHORNET_RUNTIME_CONFIG || {};
 const SUPABASE_CONFIG = {
-  url: "https://ulbmjcvnyznvmjgpstno.supabase.co",
-  publishableKey: "sb_publishable_-RUc79OPosRLNP5B6JIH2A_f3I_2A0M",
+  url: RUNTIME_CONFIG.supabaseUrl || "https://ulbmjcvnyznvmjgpstno.supabase.co",
+  publishableKey: RUNTIME_CONFIG.supabasePublishableKey || "sb_publishable_-RUc79OPosRLNP5B6JIH2A_f3I_2A0M",
 };
+const TRUSTED_DISCLOSURE_FEATURES = Object.freeze({
+  publicLiveShareRpc: RUNTIME_CONFIG.publicLiveShareRpc === true,
+  liveShareTokenRpc: RUNTIME_CONFIG.liveShareTokenRpc === true,
+  exportAuditRpc: RUNTIME_CONFIG.exportAuditRpc === true,
+});
+const PUBLIC_LIVE_SHARE_POLL_MS = 4000;
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
 const APP_VERSION = "v280";
@@ -566,6 +573,7 @@ const supabaseClient =
 const supabaseClientLoadIssue = Boolean(rawSupabaseClient && !supabaseClient);
 
 let sharedGameChannel = null;
+let sharedGamePollTimer = null;
 let lastSyncErrorAt = 0;
 let activeStorageUserId = "";
 let waitingServiceWorker = null;
@@ -612,6 +620,8 @@ const state = {
   teamAddPlayerExpanded: false,
   teamAccessExpanded: false,
   exportToolsExpanded: false,
+  exportDialog: null,
+  pendingImport: null,
   helpExpanded: false,
   adminViewMode: initialStoredState.adminViewMode,
   onboardingIntent: initialStoredState.onboardingIntent,
@@ -3410,7 +3420,19 @@ function csvEscape(value) {
   return `"${text.replaceAll('"', '""')}"`;
 }
 
-function buildCSV() {
+function exportGamesForScope(scope = "selected_player", gameId = "") {
+  if (scope === "current_game") {
+    const selected = visibleGames().find((game) => game.id === gameId) || currentReviewGame();
+    return selected ? [selected] : [];
+  }
+  return visibleGames();
+}
+
+function buildCSV(options = {}) {
+  const scope = options.scope || "selected_player";
+  const includeNotes = options.includeNotes === true;
+  const includePublicTags = options.includePublicTags === true;
+  const includeProcessTags = options.includeProcessTags === true;
   const headers = [
     "gameId",
     "playerId",
@@ -3441,16 +3463,18 @@ function buildCSV() {
     "scoreMarginAtEvent",
     "scoreStateAtEvent",
     "gameSegmentAtEvent",
-    "tags",
-    "note",
     "fieldZone",
   ];
-  const rows = state.games.flatMap((game) => {
+  if (includePublicTags) headers.push("publicTags");
+  if (includeProcessTags) headers.push("privateProcessTags");
+  if (includeNotes) headers.push("privateNote");
+
+  const rows = exportGamesForScope(scope, options.gameId).flatMap((game) => {
     const normalizedGame = normalizeGame(game);
     const player = gamePlayerSnapshot(normalizedGame);
     const totals = calculateTotals(normalizedGame.events, player);
     return normalizedGame.events.map((event) => {
-      return [
+      const row = [
         normalizedGame.id,
         gamePlayerId(normalizedGame),
         gameTeamId(normalizedGame),
@@ -3480,10 +3504,12 @@ function buildCSV() {
         event.scoreMarginAtEvent ?? "",
         event.scoreStateAtEvent || "",
         event.gameSegmentAtEvent || "",
-        event.tags,
-        event.note,
         event.fieldZone,
       ];
+      if (includePublicTags) row.push(publicEventTags(event.tags));
+      if (includeProcessTags) row.push(uniqueTags(event.tags).filter(isPrivateReviewTag));
+      if (includeNotes) row.push(event.note || "");
+      return row;
     });
   });
   return [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
@@ -3501,15 +3527,17 @@ function downloadFile(filename, content, type) {
   URL.revokeObjectURL(url);
 }
 
-function exportCSV() {
-  downloadFile(`laxhornet-events-${todayISO()}.csv`, buildCSV(), "text/csv;charset=utf-8");
-  showToast("CSV exported");
-}
-
-function exportJSON() {
-  const payload = {
+function fullBackupPayload() {
+  return {
     app: "LaxHornet",
-    version: 3,
+    version: 4,
+    purpose: "private-account-recovery",
+    sensitive: true,
+    importPolicy: {
+      restoresAuthorization: false,
+      activatesLiveShare: false,
+      replacesExistingGames: false,
+    },
     impactModel: {
       version: "game-impact-v2-position-weighted",
       scale: "0-100",
@@ -3534,15 +3562,96 @@ function exportJSON() {
     activeTeamId: state.activeTeamId,
     games: state.games.map(normalizeGame),
   };
-  downloadFile(
-    `laxhornet-backup-${todayISO()}.json`,
-    JSON.stringify(payload, null, 2),
-    "application/json;charset=utf-8",
-  );
-  showToast("JSON backup exported");
 }
 
-function importJSONFile(file) {
+function openExportDialog(type) {
+  state.exportDialog = type === "full_backup" ? "full_backup" : "csv";
+  render();
+}
+
+function closeExportDialog() {
+  state.exportDialog = null;
+  render();
+}
+
+async function recordSensitiveExportAudit(exportType, scopeType, scopeId) {
+  if (!TRUSTED_DISCLOSURE_FEATURES.exportAuditRpc) return { skipped: true };
+  if (!supabaseClient || !currentUserId()) throw new Error("Sign in before exporting sensitive data.");
+  const { data, error } = await supabaseClient.rpc("lh_record_disclosure_export", {
+    p_export_type: exportType,
+    p_scope_type: scopeType,
+    p_scope_id: scopeId || null,
+    p_outcome: "accepted",
+  });
+  if (error || data?.outcome !== "accepted") throw error || new Error(data?.code || "Export audit failed");
+  return data;
+}
+
+async function confirmExportFromDialog() {
+  const type = state.exportDialog;
+  if (!type) return;
+  try {
+    if (type === "csv") {
+      const scope = document.querySelector("#csvExportScope")?.value || "selected_player";
+      const gameId = document.querySelector("#csvExportGame")?.value || "";
+      const includeNotes = Boolean(document.querySelector("#csvIncludeNotes")?.checked);
+      const includePublicTags = Boolean(document.querySelector("#csvIncludePublicTags")?.checked);
+      const includeProcessTags = Boolean(document.querySelector("#csvIncludeProcessTags")?.checked);
+      const games = exportGamesForScope(scope, gameId);
+      if (!games.length) throw new Error("No games are available for that export scope.");
+      const scopeId = scope === "current_game" ? games[0].id : state.player.rosterPlayerId || state.player.id;
+      await recordSensitiveExportAudit("player_csv", scope === "current_game" ? "game" : "player", scopeId);
+      downloadFile(
+        `laxhornet-events-${todayISO()}.csv`,
+        buildCSV({ scope, gameId, includeNotes, includePublicTags, includeProcessTags }),
+        "text/csv;charset=utf-8",
+      );
+      state.exportDialog = null;
+      render();
+      showToast("CSV exported");
+      return;
+    }
+
+    if (!document.querySelector("#confirmSensitiveBackup")?.checked) {
+      showToast("Confirm that you understand this is a sensitive private backup.");
+      return;
+    }
+    await recordSensitiveExportAudit("full_backup", "account", currentUserId() || "local-account");
+    downloadFile(
+      `laxhornet-private-backup-${todayISO()}.json`,
+      JSON.stringify(fullBackupPayload(), null, 2),
+      "application/json;charset=utf-8",
+    );
+    state.exportDialog = null;
+    render();
+    showToast("Private backup exported");
+  } catch (error) {
+    showToast(error?.message || "Could not complete the export.");
+  }
+}
+
+function importedGameIsAuthorized(game) {
+  const teamId = gameTeamId(game);
+  const rosterPlayerId = gameRosterPlayerId(game);
+  if (!teamId) return !game.userId || !currentUserId() || game.userId === currentUserId();
+  return Boolean(rosterPlayerId && canTrackRosterPlayer(teamId, rosterPlayerId));
+}
+
+function sanitizeImportedGame(game) {
+  const normalized = normalizeGame(game);
+  return normalizeGame({
+    ...normalized,
+    userId: currentUserId() || "",
+    isShared: false,
+    shareCode: makeShareCode(),
+    events: normalized.events.map((event) => ({
+      ...event,
+      userId: currentUserId() || "",
+    })),
+  });
+}
+
+function prepareImportJSONFile(file) {
   if (!file) return;
   const reader = new FileReader();
   reader.addEventListener("load", () => {
@@ -3550,53 +3659,50 @@ function importJSONFile(file) {
       const payload = JSON.parse(reader.result);
       const importedGames = Array.isArray(payload) ? payload : payload.games;
       if (!Array.isArray(importedGames)) throw new Error("Missing games array");
-
-      const importedPlayers = Array.isArray(payload.players)
-        ? payload.players.map((player) => normalizePlayer(player, { createId: true }))
-        : payload.player
-          ? [normalizePlayer(payload.player, { createId: true })]
-          : [];
-      if (importedPlayers.length) {
-        const mergedPlayers = new Map(state.players.map((player) => [player.id, player]));
-        importedPlayers.forEach((player) => mergedPlayers.set(player.id, player));
-        state.players = [...mergedPlayers.values()];
-        if (payload.activePlayerId && state.players.some((player) => player.id === payload.activePlayerId)) {
-          state.activePlayerId = payload.activePlayerId;
-        }
-        syncActivePlayer();
-      }
-
-      const importedTeams = Array.isArray(payload.teams) ? normalizeTeams(payload.teams) : [];
-      if (importedTeams.length) {
-        state.teams = normalizeTeams([...state.teams, ...importedTeams]);
-        if (payload.activeTeamId && state.teams.some((team) => team.id === payload.activeTeamId)) {
-          state.activeTeamId = payload.activeTeamId;
-        }
-      }
-
-      const importedRosterPlayers = Array.isArray(payload.rosterPlayers)
-        ? normalizeRosterPlayers(payload.rosterPlayers)
-        : [];
-      if (importedRosterPlayers.length) {
-        state.rosterPlayers = normalizeRosterPlayers([...state.rosterPlayers, ...importedRosterPlayers]);
-        mergeRosterPlayersIntoPlayers();
-        syncActivePlayer();
-      }
-
-      const merged = new Map(state.games.map((game) => [game.id, normalizeGame(game)]));
-      importedGames.map(normalizeGame).forEach((game) => merged.set(game.id, game));
-      state.games = [...merged.values()].sort(
-        (a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt),
-      );
-      mergePlayersFromGames(state.games);
-      persistAll();
+      const normalized = importedGames.map(sanitizeImportedGame);
+      const existingIds = new Set(state.games.map((game) => game.id));
+      const deletedIds = new Set(state.deletedGameIds);
+      const authorized = normalized.filter(importedGameIsAuthorized);
+      const mergeable = authorized.filter((game) => !existingIds.has(game.id) && !deletedIds.has(game.id));
+      state.pendingImport = {
+        games: mergeable,
+        sourceVersion: Number(payload?.version || 1),
+        totalCount: normalized.length,
+        unauthorizedCount: normalized.length - authorized.length,
+        duplicateCount: authorized.filter((game) => existingIds.has(game.id)).length,
+        deletedCount: authorized.filter((game) => deletedIds.has(game.id)).length,
+        ignoredAuthorityRecords:
+          (Array.isArray(payload?.teams) ? payload.teams.length : 0) +
+          (Array.isArray(payload?.rosterPlayers) ? payload.rosterPlayers.length : 0) +
+          (Array.isArray(payload?.playerClaims) ? payload.playerClaims.length : 0) +
+          (Array.isArray(payload?.teamAccessRequests) ? payload.teamAccessRequests.length : 0),
+      };
       render();
-      showToast("JSON backup imported");
-    } catch {
+    } catch (error) {
+      state.pendingImport = null;
       showToast("Could not import that JSON file");
     }
   });
   reader.readAsText(file);
+}
+
+function cancelPendingImport() {
+  state.pendingImport = null;
+  render();
+}
+
+function confirmPendingImport() {
+  const pending = state.pendingImport;
+  if (!pending) return;
+  const existingIds = new Set(state.games.map((game) => game.id));
+  const mergeable = pending.games.filter((game) => !existingIds.has(game.id) && !isDeletedGame(game.id));
+  state.games = [...state.games, ...mergeable].sort(
+    (a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt),
+  );
+  state.pendingImport = null;
+  persistAll();
+  render();
+  showToast(`${mergeable.length} game${mergeable.length === 1 ? "" : "s"} imported. Access settings were not changed.`);
 }
 
 function gameToSupabaseRow(game) {
@@ -3727,11 +3833,11 @@ function gameFromSupabaseRow(row, events = []) {
   });
 }
 
-function shareLinkForGame(game) {
+function shareLinkForGame(game, shareCode = "") {
   const url = new URL(window.location.href);
   url.search = "";
   url.hash = "";
-  url.searchParams.set("share", normalizeGame(game).shareCode);
+  url.searchParams.set("share", normalizeTag(shareCode || normalizeGame(game).shareCode).toUpperCase());
   return url.toString();
 }
 
@@ -5229,9 +5335,94 @@ function applySharedGamePayload(payload) {
   render();
 }
 
+function stopSharedGameTransport() {
+  if (sharedGameChannel && supabaseClient) supabaseClient.removeChannel(sharedGameChannel);
+  sharedGameChannel = null;
+  if (sharedGamePollTimer) window.clearTimeout(sharedGamePollTimer);
+  sharedGamePollTimer = null;
+}
+
+function publicLiveShareGameFromPayload(payload = {}) {
+  const game = payload?.game;
+  if (!game?.game_id) return null;
+  const events = Array.isArray(payload.events)
+    ? payload.events.map((event) => normalizeEvent({
+        id: event.event_id,
+        gameId: game.game_id,
+        timestamp: event.occurred_at,
+        quarter: event.period,
+        statType: event.stat_type,
+        statLabel: event.stat_label,
+        category: event.category,
+        pointValue: Number(event.point_value || 0),
+        fieldZone: event.field_zone || "",
+        note: "",
+        tags: [],
+        userId: "",
+      }, game.game_id))
+    : [];
+  return normalizeGame({
+    id: game.game_id,
+    playerId: game.roster_player_id || `shared-${game.game_id}`,
+    rosterPlayerId: game.roster_player_id || "",
+    playerSnapshot: {
+      id: game.roster_player_id || `shared-${game.game_id}`,
+      name: game.player_name || "Player",
+      number: game.jersey_number || "",
+      team: game.team_name || "",
+      position: game.position || "",
+    },
+    opponent: game.opponent || "Opponent",
+    date: game.game_date || todayISO(),
+    periodFormat: game.period_format || "quarters",
+    currentQuarter: events.at(-1)?.quarter || PERIOD_FORMATS[game.period_format]?.start || "Q1",
+    status: game.final_score_for == null && game.final_score_against == null ? "in-progress" : "complete",
+    finalScoreFor: game.final_score_for,
+    finalScoreAgainst: game.final_score_against,
+    isShared: true,
+    events,
+  });
+}
+
+async function fetchPublicLiveShareGame(code, options = {}) {
+  const { data, error } = await supabaseClient.rpc("lh_public_live_share_game", { p_share_code: code });
+  if (error) throw error;
+  const sharedGame = publicLiveShareGameFromPayload(data);
+  if (!sharedGame) {
+    stopSharedGameTransport();
+    state.sharedGame = null;
+    state.syncStatus = "Shared game unavailable";
+    if (!options.quiet) showToast("Shared game is unavailable");
+    render();
+    return null;
+  }
+  state.sharedGame = sharedGame;
+  state.syncStatus = "Watching live";
+  render();
+  return sharedGame;
+}
+
+function schedulePublicLiveSharePoll(code) {
+  if (sharedGamePollTimer) window.clearTimeout(sharedGamePollTimer);
+  sharedGamePollTimer = window.setTimeout(async () => {
+    try {
+      const game = await fetchPublicLiveShareGame(code, { quiet: true });
+      if (game) schedulePublicLiveSharePoll(code);
+    } catch {
+      state.syncStatus = "Live updates paused";
+      render();
+      schedulePublicLiveSharePoll(code);
+    }
+  }, PUBLIC_LIVE_SHARE_POLL_MS);
+}
+
 function subscribeToSharedGame(gameId) {
   if (!supabaseClient || !gameId) return;
-  if (sharedGameChannel) supabaseClient.removeChannel(sharedGameChannel);
+  stopSharedGameTransport();
+  if (TRUSTED_DISCLOSURE_FEATURES.publicLiveShareRpc) {
+    schedulePublicLiveSharePoll(state.sharedCode);
+    return;
+  }
   sharedGameChannel = supabaseClient
     .channel(`laxhornet-game-${gameId}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "games", filter: `id=eq.${gameId}` }, applySharedGamePayload)
@@ -5252,6 +5443,19 @@ async function loadSharedGame(shareCode) {
 
   if (!supabaseClient) {
     showToast("Live Share is not available");
+    return;
+  }
+
+  stopSharedGameTransport();
+  if (TRUSTED_DISCLOSURE_FEATURES.publicLiveShareRpc) {
+    try {
+      const sharedGame = await fetchPublicLiveShareGame(code);
+      if (sharedGame) subscribeToSharedGame(sharedGame.id);
+    } catch {
+      state.syncStatus = "Shared game unavailable";
+      showToast("Shared game is unavailable");
+      render();
+    }
     return;
   }
 
@@ -5296,6 +5500,38 @@ async function copyLiveShareLinkNow(gameId) {
     showToast("Sign in to use Live Share");
     return;
   }
+  if (TRUSTED_DISCLOSURE_FEATURES.liveShareTokenRpc) {
+    const registration = await supabaseClient.rpc("lh_register_game_scope", { p_game_id: game.id });
+    if (registration.error || registration.data?.outcome !== "accepted") {
+      reportSyncError(registration.error || { message: registration.data?.code || "Live Share scope unavailable" });
+      return;
+    }
+    const tokenResult = await supabaseClient.rpc("lh_create_live_share_token", {
+      p_game_id: game.id,
+      p_expires_at: null,
+    });
+    if (tokenResult.error || tokenResult.data?.outcome !== "accepted" || !tokenResult.data?.shareCode) {
+      reportSyncError(tokenResult.error || { message: tokenResult.data?.code || "Live Share token unavailable" });
+      return;
+    }
+    const code = tokenResult.data.shareCode;
+    game.isShared = true;
+    game.shareCode = code;
+    upsertGame(game);
+    persistAll();
+    const link = shareLinkForGame(game, code);
+    try {
+      await navigator.clipboard.writeText(link);
+      state.liveSharePromptGameId = "";
+      render();
+      showToast("Live Share link copied");
+    } catch {
+      window.prompt("Copy this share link", link);
+      state.liveSharePromptGameId = "";
+      render();
+    }
+    return;
+  }
   game.isShared = true;
   game.userId = game.userId || currentUserId() || "";
   if (state.activeGame?.id === game.id) state.activeGame = game;
@@ -5316,12 +5552,19 @@ async function copyLiveShareLinkNow(gameId) {
   }
 }
 
-function turnOffLiveShare(gameId) {
+async function turnOffLiveShare(gameId) {
   const game = (state.activeGame?.id === gameId ? state.activeGame : null) || state.games.find((item) => item.id === gameId);
   if (!game) {
     state.liveSharePromptGameId = "";
     render();
     return;
+  }
+  if (TRUSTED_DISCLOSURE_FEATURES.liveShareTokenRpc && supabaseClient) {
+    const { data, error } = await supabaseClient.rpc("lh_revoke_live_share_tokens", { p_game_id: game.id });
+    if (error || data?.outcome !== "accepted") {
+      reportSyncError(error || { message: data?.code || "Live Share could not be turned off" });
+      return;
+    }
   }
   game.isShared = false;
   if (state.activeGame?.id === game.id) {
@@ -5772,6 +6015,8 @@ function renderShell(content, options = {}) {
     ${renderEndGameModal()}
     ${renderGameSavedModal()}
     ${renderLiveShareModal()}
+    ${renderExportDialog()}
+    ${renderImportDialog()}
     ${renderTeamAccessReviewModal()}
     ${renderDeleteGameModal()}
     ${options.hideNav ? "" : renderBottomNav()}
@@ -7754,6 +7999,75 @@ function renderLiveImpactPill(game, totals) {
       <strong>${Number(totals.eventCount || (game.events || []).length || 0)}</strong>
       <span>Recorded Events</span>
     </div>
+  `;
+}
+
+function renderExportDialog() {
+  if (!state.exportDialog) return "";
+  const fullBackup = state.exportDialog === "full_backup";
+  const games = visibleGames();
+  const selectedGameId = currentReviewGame()?.id || games[0]?.id || "";
+  return `
+    <section class="modal-backdrop" role="presentation">
+      <div class="confirm-modal disclosure-modal" role="dialog" aria-modal="true" aria-labelledby="exportDialogTitle">
+        <h3 id="exportDialogTitle">${fullBackup ? "Create private full backup" : "Export selected event data"}</h3>
+        ${
+          fullBackup
+            ? `<p class="muted small">This sensitive recovery file includes account player settings, team and roster snapshots, saved games, events, notes, tags, and model configuration. It is not a family/public share file.</p>
+               <p class="safety-note">The file may contain youth information. You control its recipient and storage location after download. LaxHornet will not open the native share sheet.</p>
+               <label class="confirm-check"><input id="confirmSensitiveBackup" type="checkbox" /> <span>I understand this is a sensitive private backup.</span></label>`
+            : `<div class="field">
+                 <label for="csvExportScope">Export scope</label>
+                 <select id="csvExportScope">
+                   <option value="selected_player">Selected player - all visible games</option>
+                   <option value="current_game">One selected game</option>
+                 </select>
+               </div>
+               <div class="field">
+                 <label for="csvExportGame">Selected game</label>
+                 <select id="csvExportGame">
+                   ${games.map((game) => `<option value="${escapeHTML(game.id)}" ${game.id === selectedGameId ? "selected" : ""}>${escapeHTML(formatDate(game.date))} vs ${escapeHTML(game.opponent || "Opponent")}</option>`).join("")}
+                 </select>
+               </div>
+               <div class="export-inclusion-list">
+                 <strong>Included by default</strong>
+                 <p class="muted small">Recorded event facts, game context, player snapshot, score context, and calculated values for the chosen scope.</p>
+                 <label class="confirm-check"><input id="csvIncludePublicTags" type="checkbox" /> <span>Include descriptive event tags</span></label>
+                 <label class="confirm-check"><input id="csvIncludeProcessTags" type="checkbox" /> <span>Include private process/decision tags</span></label>
+                 <label class="confirm-check"><input id="csvIncludeNotes" type="checkbox" /> <span>Include private event notes</span></label>
+               </div>
+               <p class="safety-note">This file may contain youth information. You control its recipient and storage location after download.</p>`
+        }
+        <div class="edit-actions">
+          <button class="btn secondary" type="button" data-action="cancel-export">Cancel</button>
+          <button class="btn positive" type="button" data-action="confirm-export">${fullBackup ? "Create Private Backup" : "Export CSV"}</button>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderImportDialog() {
+  const pending = state.pendingImport;
+  if (!pending) return "";
+  return `
+    <section class="modal-backdrop" role="presentation">
+      <div class="confirm-modal disclosure-modal" role="dialog" aria-modal="true" aria-labelledby="importDialogTitle">
+        <h3 id="importDialogTitle">Merge private backup?</h3>
+        <p class="muted small">${pending.games.length} of ${pending.totalCount} saved game${pending.totalCount === 1 ? "" : "s"} can be added without replacing current games.</p>
+        <ul class="import-summary-list">
+          <li>${pending.duplicateCount} existing same-ID game${pending.duplicateCount === 1 ? "" : "s"} will remain unchanged.</li>
+          <li>${pending.deletedCount} previously deleted game${pending.deletedCount === 1 ? "" : "s"} will stay deleted.</li>
+          <li>${pending.unauthorizedCount} game${pending.unauthorizedCount === 1 ? "" : "s"} outside current player access will be skipped.</li>
+          <li>Team access, roster authority, account ownership, and Live Share will not be restored or changed.</li>
+        </ul>
+        <p class="safety-note">Imported games are private and Live Share is off. Existing games are never silently replaced.</p>
+        <div class="edit-actions">
+          <button class="btn secondary" type="button" data-action="cancel-import">Cancel</button>
+          <button class="btn positive" type="button" data-action="confirm-import" ${pending.games.length ? "" : "disabled"}>Merge ${pending.games.length} Game${pending.games.length === 1 ? "" : "s"}</button>
+        </div>
+      </div>
+    </section>
   `;
 }
 
@@ -10239,7 +10553,7 @@ function renderSharedGame() {
   return renderShell(`
     <section class="screen-title">
       <h2>${escapeHTML(game.opponent)}</h2>
-      <p>Shared live game - ${formatDate(game.date)} - ${escapeHTML(displaySyncStatus())}</p>
+      <p>Shared live game - ${formatDate(game.date)} - Read-only live updates</p>
     </section>
 
     <section class="stack">
@@ -10498,13 +10812,14 @@ function renderPastGames() {
         ${
           exportExpanded
             ? `<div class="export-card-body">
-                <p class="muted small">Exports include player info, event tags, notes, categories, and impact values.</p>
+                <p class="muted small">Choose a purpose before downloading. CSV is a scoped data export; Full Backup is a sensitive private recovery file.</p>
                 <div class="export-actions">
-                  <button class="btn neutral" type="button" data-action="export-csv">Export CSV</button>
-                  <button class="btn neutral" type="button" data-action="export-json">Export JSON</button>
-                  <label class="btn secondary import-label" for="jsonImport">Import JSON</label>
+                  <button class="btn neutral" type="button" data-action="open-csv-export">Export Selected CSV</button>
+                  <button class="btn neutral" type="button" data-action="open-full-backup">Create Private Backup</button>
+                  <label class="btn secondary import-label" for="jsonImport">Restore Private Backup</label>
                   <input class="import-input" id="jsonImport" type="file" accept="application/json,.json" data-import-json />
                 </div>
+                <p class="field-help">Live Share, recap sharing, CSV data export, and private backup are separate output modes with different contents.</p>
               </div>`
             : ""
         }
@@ -10721,6 +11036,11 @@ function renderHelp() {
     </section>
 
     <section class="stack">
+      <div class="card pad">
+        <h3>Sharing, Export, and Backup</h3>
+        <p class="muted small"><strong>Live Share</strong> is a read-only game view. <strong>Share Recap</strong> is a short summary you preview before copying. <strong>CSV</strong> exports one selected scope and keeps notes and tags off unless you include them. <strong>Private Full Backup</strong> is a sensitive recovery file and requires confirmation.</p>
+        <p class="muted small">Restoring a backup adds eligible saved games without changing team access, roster authority, account ownership, or Live Share.</p>
+      </div>
       <div class="card pad">
         <h3>Game Impact</h3>
         <p class="muted small">${escapeHTML(GAME_IMPACT_LIMITATION)}</p>
@@ -11735,8 +12055,12 @@ function handleClick(event) {
     if (action.dataset.action === "save-tags") {
       saveEventTags(action.dataset.gameId, action.dataset.eventId);
     }
-    if (action.dataset.action === "export-csv") exportCSV();
-    if (action.dataset.action === "export-json") exportJSON();
+    if (action.dataset.action === "open-csv-export") openExportDialog("csv");
+    if (action.dataset.action === "open-full-backup") openExportDialog("full_backup");
+    if (action.dataset.action === "cancel-export") closeExportDialog();
+    if (action.dataset.action === "confirm-export") confirmExportFromDialog();
+    if (action.dataset.action === "cancel-import") cancelPendingImport();
+    if (action.dataset.action === "confirm-import") confirmPendingImport();
     if (action.dataset.action === "copy-share-link") copyShareLink();
     if (action.dataset.action === "confirm-copy-share-link") copyLiveShareLinkNow(action.dataset.gameId);
     if (action.dataset.action === "turn-off-live-share") turnOffLiveShare(action.dataset.gameId);
@@ -11931,7 +12255,7 @@ function handleDialogKeydown(event) {
 function handleChange(event) {
   const input = event.target.closest("[data-import-json]");
   if (!input) return;
-  importJSONFile(input.files?.[0]);
+  prepareImportJSONFile(input.files?.[0]);
   input.value = "";
 }
 
