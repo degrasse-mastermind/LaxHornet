@@ -1,0 +1,12 @@
+Production project: ulbmjcvnyznvmjgpstno
+Production mutation status: UNTOUCHED
+
+No production SQL was executed.
+No migration repair was executed.
+No db push was executed.
+No production data was changed.
+No production migration-ledger row was changed.
+No deployment or merge was performed.
+
+The only linked Supabase command used for this reconciliation was the read-only
+migration list operation recorded in supabase-migration-list.txt.

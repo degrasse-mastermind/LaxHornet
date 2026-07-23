@@ -106,7 +106,10 @@ if (containment.mode === "standalone" || containment.mode === "additive") {
     check(!changedFiles.some((file) => file.startsWith("supabase/migrations/")), "standalone release-hygiene delta does not alter canonical migrations");
     check(!changedFiles.some((file) => file.startsWith("supabase/rollback/")), "standalone release-hygiene delta does not alter canonical rollbacks");
   }
-} else if (containment.mode === "canonical_plus_additive") {
+} else if (
+  containment.mode === "canonical_plus_additive" ||
+  containment.mode === "canonical_plus_additive_with_provenance"
+) {
   check(
     containment.combinedSupabaseTreeMatchesApprovedRefs,
     "combined Supabase tree matches the approved PR #9 canonical and PR #12 additive identities",
@@ -124,6 +127,12 @@ if (containment.mode === "standalone" || containment.mode === "additive") {
       ]),
     "combined integration contains only the approved PR #12 additive capability package",
   );
+  if (containment.mode === "canonical_plus_additive_with_provenance") {
+    check(
+      containment.historicalProvenance?.markerCommentOnly === true,
+      "combined integration preserves the comment-only historical marker",
+    );
+  }
 } else {
   check(containment.supabaseTreeMatchesAuthorizedRef, "combined Supabase tree matches the authorized PR #9 ref exactly");
   check(containment.postAuthorizationDatabaseFiles.length === 0, "release-hygiene delta does not alter the authorized database candidate");

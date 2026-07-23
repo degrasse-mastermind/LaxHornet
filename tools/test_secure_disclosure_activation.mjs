@@ -67,11 +67,20 @@ check(!sharedLoader.includes('.from("games")'), "anonymous Live Share has no ord
 check(app.includes("requireSecureCapability"), "secure disclosure requires a backend capability handshake");
 
 const sqlDelta = containment.releaseDeltaFiles.filter((file) => file.endsWith(".sql"));
-if (containment.mode === "canonical_plus_additive") {
+if (
+  containment.mode === "canonical_plus_additive" ||
+  containment.mode === "canonical_plus_additive_with_provenance"
+) {
   check(
     containment.combinedSupabaseTreeMatchesApprovedRefs,
     "combined activation matches the approved canonical and additive database identities",
   );
+  if (containment.mode === "canonical_plus_additive_with_provenance") {
+    check(
+      containment.historicalProvenance?.markerCommentOnly === true,
+      "combined activation preserves the comment-only historical marker",
+    );
+  }
 } else {
   check(
     sqlDelta.every((file) => /20260723040000_event_pipeline_capabilities/.test(file)),

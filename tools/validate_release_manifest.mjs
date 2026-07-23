@@ -6,6 +6,9 @@ import process from "node:process";
 import {
   APPROVED_AUTHORIZED_DB_PATHS,
   APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
+  APPROVED_HISTORICAL_PROVENANCE_IDENTITIES,
+  APPROVED_HISTORICAL_PROVENANCE_PATHS,
+  validateHistoricalProvenance,
   validateReleaseContainment,
 } from "./release_containment.mjs";
 
@@ -48,8 +51,12 @@ for (const [name, ref] of [
 }
 
 expect(
-  manifest.databaseTreeMode === "canonical_plus_additive",
-  "databaseTreeMode must identify the canonical-plus-additive release boundary",
+  manifest.finalMainBaseSha === "2b773bce9eb858870c06b95b35051c34fbbad8bc",
+  "finalMainBaseSha must identify the reviewed v283 main base",
+);
+expect(
+  manifest.databaseTreeMode === "canonical_plus_additive_with_provenance",
+  "databaseTreeMode must identify the canonical-plus-additive release boundary with provenance",
 );
 
 const identities = manifest.approvedDatabaseFileIdentities || {};
@@ -65,6 +72,7 @@ expect(
 
 const canonicalIdentityPaths = Object.keys(identities.canonical || {}).sort();
 const additiveIdentityPaths = Object.keys(identities.additive || {}).sort();
+const historicalIdentityPaths = Object.keys(identities.historicalProvenance || {}).sort();
 expect(
   JSON.stringify(canonicalIdentityPaths) === JSON.stringify([...APPROVED_AUTHORIZED_DB_PATHS].sort()),
   "manifest must identify exactly the approved PR #9 canonical files",
@@ -73,6 +81,11 @@ expect(
   JSON.stringify(additiveIdentityPaths)
     === JSON.stringify([...APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS].sort()),
   "manifest must identify exactly the approved PR #12 additive files",
+);
+expect(
+  JSON.stringify(historicalIdentityPaths)
+    === JSON.stringify([...APPROVED_HISTORICAL_PROVENANCE_PATHS].sort()),
+  "manifest must identify exactly the reviewed historical provenance files",
 );
 
 for (const [file, expectedHash] of Object.entries(identities.canonical || {})) {
@@ -93,6 +106,97 @@ for (const [file, expectedHash] of Object.entries(identities.additive || {})) {
     );
   }
 }
+
+const historical = manifest.productionHistoricalMigration || {};
+const expectedHistorical = {
+  version: "20260723010607",
+  name: "remote_schema",
+  projectRef: "ulbmjcvnyznvmjgpstno",
+  archivedSnapshotPath: "supabase/production-history/20260723010607_remote_schema.sql",
+  markerPath: "supabase/migrations/20260723010607_remote_schema.sql",
+  documentationPath: "supabase/production-history/README.md",
+  orderedStatementsMd5: "ea4aeff5aff66a88dae1211b93e3a1fa",
+  statementCount: 350,
+};
+for (const [key, expectedValue] of Object.entries(expectedHistorical)) {
+  expect(
+    historical[key] === expectedValue,
+    `productionHistoricalMigration.${key} must match the reviewed production audit`,
+  );
+}
+for (const flag of [
+  "remoteMarkerExpectedApplied",
+  "blankDatabaseMarkerNoOp",
+  "productionPushRequiresIncludeAll",
+]) {
+  expect(historical[flag] === true, `productionHistoricalMigration.${flag} must be true`);
+}
+for (const file of APPROVED_HISTORICAL_PROVENANCE_PATHS) {
+  const manifestIdentity = identities.historicalProvenance?.[file] || {};
+  const approvedIdentity = APPROVED_HISTORICAL_PROVENANCE_IDENTITIES[file];
+  expect(
+    manifestIdentity.sha256 === approvedIdentity.sha256,
+    `manifest historical SHA-256 differs from the reviewed identity: ${file}`,
+  );
+  expect(
+    manifestIdentity.gitBlob === approvedIdentity.blob,
+    `manifest historical Git blob differs from the reviewed identity: ${file}`,
+  );
+}
+expect(
+  historical.archiveSha256
+    === APPROVED_HISTORICAL_PROVENANCE_IDENTITIES[historical.archivedSnapshotPath]?.sha256,
+  "productionHistoricalMigration archive SHA-256 must match its approved identity",
+);
+expect(
+  historical.archiveGitBlob
+    === APPROVED_HISTORICAL_PROVENANCE_IDENTITIES[historical.archivedSnapshotPath]?.blob,
+  "productionHistoricalMigration archive Git blob must match its approved identity",
+);
+expect(
+  historical.markerSha256
+    === APPROVED_HISTORICAL_PROVENANCE_IDENTITIES[historical.markerPath]?.sha256,
+  "productionHistoricalMigration marker SHA-256 must match its approved identity",
+);
+expect(
+  historical.markerGitBlob
+    === APPROVED_HISTORICAL_PROVENANCE_IDENTITIES[historical.markerPath]?.blob,
+  "productionHistoricalMigration marker Git blob must match its approved identity",
+);
+expect(
+  historical.documentationSha256
+    === APPROVED_HISTORICAL_PROVENANCE_IDENTITIES[historical.documentationPath]?.sha256,
+  "productionHistoricalMigration documentation SHA-256 must match its approved identity",
+);
+expect(
+  historical.documentationGitBlob
+    === APPROVED_HISTORICAL_PROVENANCE_IDENTITIES[historical.documentationPath]?.blob,
+  "productionHistoricalMigration documentation Git blob must match its approved identity",
+);
+
+const expectedMigrationSequence = [
+  ...manifest.canonicalForwardMigrations.slice(0, 2),
+  historical.markerPath,
+  ...manifest.canonicalForwardMigrations.slice(2),
+  ...manifest.additiveForwardMigrations,
+];
+expect(
+  JSON.stringify(manifest.requiredMigrationSequence) === JSON.stringify(expectedMigrationSequence),
+  "requiredMigrationSequence must preserve timestamp order including the historical marker",
+);
+expect(
+  JSON.stringify(manifest.expectedRemoteAppliedMigrations)
+    === JSON.stringify([historical.markerPath]),
+  "expectedRemoteAppliedMigrations must contain only the historical production marker",
+);
+expect(
+  JSON.stringify(manifest.expectedPendingProductionMigrations)
+    === JSON.stringify([
+      ...manifest.canonicalForwardMigrations,
+      ...manifest.additiveForwardMigrations,
+    ]),
+  "expectedPendingProductionMigrations must contain the five reviewed forward migrations",
+);
 
 expect(
   Number.isInteger(manifest.minimumSchemaCapability) && manifest.minimumSchemaCapability > 0,
@@ -146,6 +250,32 @@ if (requireCombined) {
       );
     }
   }
+  for (const file of APPROVED_HISTORICAL_PROVENANCE_PATHS) {
+    const expectedIdentity = APPROVED_HISTORICAL_PROVENANCE_IDENTITIES[file];
+    expect(existsAt(combinedRef, file), `combined ref is missing historical provenance: ${file}`);
+    if (existsAt(combinedRef, file)) {
+      expect(
+        gitFileSha256(combinedRef, file)
+          === (expectedIdentity.repositorySha256 || expectedIdentity.sha256),
+        `combined ref historical SHA-256 differs from the reviewed identity: ${file}`,
+      );
+      expect(
+        git("rev-parse", `${combinedRef}:${file}`) === expectedIdentity.blob,
+        `combined ref historical Git blob differs from the reviewed identity: ${file}`,
+      );
+    }
+  }
+  try {
+    const provenance = validateHistoricalProvenance({ repoRoot: root, headRef: combinedRef });
+    expect(provenance.markerCommentOnly === true, "historical marker must be comment-only");
+    expect(provenance.statementCount === historical.statementCount, "historical statement count mismatch");
+    expect(
+      provenance.orderedStatementsMd5 === historical.orderedStatementsMd5,
+      "historical ordered-statement MD5 mismatch",
+    );
+  } catch (error) {
+    expect(false, `historical provenance validation failed: ${error.code || error.message}`);
+  }
 
   try {
     const releaseBase = git("merge-base", manifest.databaseCandidate, manifest.preCutoverRuntime);
@@ -157,8 +287,8 @@ if (requireCombined) {
       headRef: combinedRef,
     });
     expect(
-      containment.mode === "canonical_plus_additive",
-      "combined ref must validate in canonical_plus_additive mode",
+      containment.mode === "canonical_plus_additive_with_provenance",
+      "combined ref must validate in canonical_plus_additive_with_provenance mode",
     );
     expect(
       containment.combinedSupabaseTreeMatchesApprovedRefs === true,
@@ -179,7 +309,8 @@ const cleanupMigrations = fs.existsSync(migrationDirectory)
   : [];
 const allowedCleanupMigrations = new Set([
   ...manifest.additiveForwardMigrations,
-  ...(requireCombined ? manifest.canonicalForwardMigrations : []),
+  historical.markerPath,
+  ...manifest.canonicalForwardMigrations,
 ]);
 for (const file of cleanupMigrations) {
   expect(allowedCleanupMigrations.has(file), `unknown cleanup migration detected: ${file}`);

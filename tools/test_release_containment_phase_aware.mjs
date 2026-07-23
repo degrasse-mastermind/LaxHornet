@@ -6,11 +6,13 @@ import { execFileSync } from "node:child_process";
 import {
   APPROVED_AUTHORIZED_DB_PATHS,
   APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
+  APPROVED_HISTORICAL_PROVENANCE_PATHS,
   ReleaseContainmentError,
   validateReleaseContainment,
   validateReleaseContainmentFromEnvironment,
 } from "./release_containment.mjs";
 
+const sourceRoot = path.resolve(import.meta.dirname, "..");
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "laxhornet-containment-"));
 const results = [];
 
@@ -270,6 +272,78 @@ try {
     );
   });
 
+  git(["switch", "-c", "canonical-plus-additive-provenance", "canonical-plus-additive"]);
+  fs.copyFileSync(path.join(sourceRoot, ".gitattributes"), path.join(tempRoot, ".gitattributes"));
+  for (const file of APPROVED_HISTORICAL_PROVENANCE_PATHS) {
+    const target = path.join(tempRoot, file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, fs.readFileSync(path.join(sourceRoot, file)));
+  }
+  commit("Add reviewed historical production provenance");
+  git(["tag", "provenance-ref"]);
+
+  test("reviewed historical provenance extends the exact approved final tree", () => {
+    const result = validateReleaseContainment({
+      repoRoot: tempRoot,
+      releaseBaseRef: "release-base",
+      authorizedDbRef: "authorized-db-ref",
+      approvedAdditiveRef: "approved-additive-ref",
+    });
+    assert.equal(result.mode, "canonical_plus_additive_with_provenance");
+    assert.equal(result.combinedSupabaseTreeMatchesApprovedRefs, true);
+    assert.equal(result.historicalProvenance.markerCommentOnly, true);
+    assert.equal(result.historicalProvenance.statementCount, 350);
+    assert.equal(
+      result.historicalProvenance.orderedStatementsMd5,
+      "ea4aeff5aff66a88dae1211b93e3a1fa",
+    );
+  });
+
+  git(["switch", "-c", "provenance-archive-edit", "provenance-ref"]);
+  append(
+    "supabase/production-history/20260723010607_remote_schema.sql",
+    "\n-- unauthorized archive mutation\n",
+  );
+  commit("Tamper historical production archive");
+  test("historical provenance rejects an archive mutation", () => {
+    expectContainmentFailure("HISTORICAL_PROVENANCE_FILE_IDENTITY_MISMATCH", () =>
+      validateReleaseContainment({
+        repoRoot: tempRoot,
+        releaseBaseRef: "release-base",
+        authorizedDbRef: "authorized-db-ref",
+        approvedAdditiveRef: "approved-additive-ref",
+      }),
+    );
+  });
+
+  git(["switch", "-c", "provenance-marker-edit", "provenance-ref"]);
+  append("supabase/migrations/20260723010607_remote_schema.sql", "\nselect 1;\n");
+  commit("Make historical marker executable");
+  test("historical provenance rejects executable marker SQL", () => {
+    expectContainmentFailure("HISTORICAL_PROVENANCE_FILE_IDENTITY_MISMATCH", () =>
+      validateReleaseContainment({
+        repoRoot: tempRoot,
+        releaseBaseRef: "release-base",
+        authorizedDbRef: "authorized-db-ref",
+        approvedAdditiveRef: "approved-additive-ref",
+      }),
+    );
+  });
+
+  git(["switch", "-c", "provenance-unexpected-file", "provenance-ref"]);
+  write("supabase/production-history/UNREVIEWED.md", "not reviewed\n");
+  commit("Add unexpected historical provenance file");
+  test("historical provenance rejects an unexpected archive path", () => {
+    expectContainmentFailure("COMBINED_SUPABASE_PATH_SET_MISMATCH", () =>
+      validateReleaseContainment({
+        repoRoot: tempRoot,
+        releaseBaseRef: "release-base",
+        authorizedDbRef: "authorized-db-ref",
+        approvedAdditiveRef: "approved-additive-ref",
+      }),
+    );
+  });
+
   git(["switch", "-c", "combined-canonical-edit", "canonical-plus-additive"]);
   append(APPROVED_AUTHORIZED_DB_PATHS[1], "tampered canonical migration\n");
   commit("Tamper combined canonical migration");
@@ -428,6 +502,14 @@ try {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
 }
+
+test("historical provenance blank and production-shaped execution pass", () => {
+  execFileSync(process.execPath, ["tools/test_production_ledger_provenance.mjs"], {
+    cwd: sourceRoot,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+});
 
 const failures = results.filter((result) => result.status === "FAIL");
 for (const result of results) {
