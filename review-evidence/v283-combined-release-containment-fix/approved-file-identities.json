@@ -1,0 +1,18 @@
+{
+  "algorithm": "sha256",
+  "canonicalSourceRef": "ad96e428d675fba8fac7752fd108ea06827fa0ad",
+  "additiveSourceRef": "0050f054df826dbe4343515b79079dd6c80793bc",
+  "canonical": {
+    "supabase/PRODUCTION_CANDIDATE.md": "8235094f34bf3cec9428036327d8c5b6c3b34719fc37f16d03aa63d3b160c33c",
+    "supabase/migrations/20260723000000_laxhornet_legacy_baseline.sql": "60033de3bc0d92947d6c5389ec36178f20ece4bbd1f5d40884ff3ae933c9f698",
+    "supabase/migrations/20260723010000_trust_spine_release_1.sql": "b392b91712c7c2491e5ab6b483619b34d84dcd3b9a834aef960a079ee034920d",
+    "supabase/migrations/20260723020000_minimum_necessary_disclosure.sql": "c43a562eccf4c8fd08305675b8d42e4b2d7cea58a71ece3b78df8c99a4e242a6",
+    "supabase/migrations/20260723030000_fix_disclosure_audit_and_evidence_validation.sql": "968f8eeccbbd0252e41d3ec62ffded2b1e04cca5eead85ab3e6f4c171441ac4b",
+    "supabase/rollback/20260723010000_trust_spine_release_1_rollback.sql": "4b947cf6be78159454f66ef4b6f98c99266cf82255c6abd522dee9c91381e02f",
+    "supabase/rollback/20260723020000_minimum_necessary_disclosure_rollback.sql": "40bc028fb536c1b1bf00ff1ac75a4c24fc7ae29a7f66ba155f6537a6313b4cde"
+  },
+  "additive": {
+    "supabase/migrations/20260723040000_event_pipeline_capabilities.sql": "7d220e88a1e742c8e79f1dfcf54e4b370a85f1363c657e6f9d02aa0527ed8c69",
+    "supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql": "4a4f3d4db7e2cf05883af016551eaeef110a23ee91445941989f5cb5542306e6"
+  }
+}

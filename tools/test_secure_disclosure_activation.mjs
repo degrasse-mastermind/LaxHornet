@@ -18,17 +18,22 @@ function check(condition, message) {
   checks.push(message);
 }
 
-const containment = validateReleaseContainmentFromEnvironment(root, {
-  releaseBaseRef:
-    process.env.LAXHORNET_ACTIVATION_BASE_REF?.trim() ||
-    "origin/review/release-hygiene-v281",
-  authorizedDbRef: "",
-  allowedAdditiveDbPaths: [
-    "supabase/migrations/20260723040000_event_pipeline_capabilities.sql",
-    "supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql",
-  ],
-  headRef: process.env.LAXHORNET_ACTIVATION_HEAD_REF?.trim() || "HEAD",
-});
+const combinedMode =
+  Boolean(process.env.LAXHORNET_AUTHORIZED_DB_REF?.trim()) &&
+  Boolean(process.env.LAXHORNET_APPROVED_ADDITIVE_REF?.trim());
+const containment = combinedMode
+  ? validateReleaseContainmentFromEnvironment(root)
+  : validateReleaseContainmentFromEnvironment(root, {
+      releaseBaseRef:
+        process.env.LAXHORNET_ACTIVATION_BASE_REF?.trim() ||
+        "origin/review/release-hygiene-v281",
+      authorizedDbRef: "",
+      allowedAdditiveDbPaths: [
+        "supabase/migrations/20260723040000_event_pipeline_capabilities.sql",
+        "supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql",
+      ],
+      headRef: process.env.LAXHORNET_ACTIVATION_HEAD_REF?.trim() || "HEAD",
+    });
 
 const versionNumber = Number(version.replace(/^v/, ""));
 check(versionNumber >= 282, "version manifest identifies a secure-disclosure release");
@@ -62,10 +67,17 @@ check(!sharedLoader.includes('.from("games")'), "anonymous Live Share has no ord
 check(app.includes("requireSecureCapability"), "secure disclosure requires a backend capability handshake");
 
 const sqlDelta = containment.releaseDeltaFiles.filter((file) => file.endsWith(".sql"));
-check(
-  sqlDelta.every((file) => /20260723040000_event_pipeline_capabilities/.test(file)),
-  "activation cleanup changes only the additive capability migration and rollback",
-);
+if (containment.mode === "canonical_plus_additive") {
+  check(
+    containment.combinedSupabaseTreeMatchesApprovedRefs,
+    "combined activation matches the approved canonical and additive database identities",
+  );
+} else {
+  check(
+    sqlDelta.every((file) => /20260723040000_event_pipeline_capabilities/.test(file)),
+    "activation cleanup changes only the additive capability migration and rollback",
+  );
+}
 
 console.log(`Secure-disclosure activation checks passed (${checks.length}/${checks.length}).`);
 checks.forEach((message) => console.log(`PASS: ${message}`));
