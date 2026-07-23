@@ -3380,6 +3380,43 @@ form.account-card .account-actions .btn.auth-demo-light {
   gap: 14px;
 }
 
+.operational-health-card {
+  grid-column: 1 / -1;
+}
+
+.operational-health-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.operational-health-grid > div {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #d8dde3;
+  border-radius: 6px;
+  background: #f5f6f7;
+}
+
+.operational-health-grid span,
+.operational-health-grid strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.operational-health-grid span {
+  margin-bottom: 3px;
+  color: #5d6672;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.operational-health-grid strong {
+  color: #15181c;
+  font-size: 0.88rem;
+}
+
 .admin-portal-grid > .card,
 .admin-portal-card {
   border-color: rgba(232, 16, 16, 0.24);
