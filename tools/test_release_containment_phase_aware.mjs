@@ -7,6 +7,7 @@ import {
   APPROVED_AUTHORIZED_DB_PATHS,
   ReleaseContainmentError,
   validateReleaseContainment,
+  validateReleaseContainmentFromEnvironment,
 } from "./release_containment.mjs";
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "laxhornet-containment-"));
@@ -65,6 +66,42 @@ try {
   git(["switch", "-c", "release"]);
   write("app.js", "export const version = 'release';\n");
   commit("Synthetic release hygiene");
+
+  git(["update-ref", "refs/remotes/origin/main", "release-base"]);
+
+  test("explicit environment release base wins", () => {
+    const previous = process.env.LAXHORNET_RELEASE_BASE_REF;
+    process.env.LAXHORNET_RELEASE_BASE_REF = "release-base";
+    try {
+      const result = validateReleaseContainmentFromEnvironment(tempRoot);
+      assert.equal(result.releaseBaseRef, "release-base");
+      assert.equal(result.releaseBaseSource, "explicit");
+    } finally {
+      if (previous === undefined) delete process.env.LAXHORNET_RELEASE_BASE_REF;
+      else process.env.LAXHORNET_RELEASE_BASE_REF = previous;
+    }
+  });
+
+  test("origin/main is selected when available", () => {
+    const result = validateReleaseContainmentFromEnvironment(tempRoot);
+    assert.equal(result.releaseBaseRef, "origin/main");
+    assert.equal(result.releaseBaseSource, "origin/main");
+  });
+
+  test("local main is selected when origin/main is absent", () => {
+    git(["update-ref", "-d", "refs/remotes/origin/main"]);
+    const result = validateReleaseContainmentFromEnvironment(tempRoot);
+    assert.equal(result.releaseBaseRef, "main");
+    assert.equal(result.releaseBaseSource, "main");
+  });
+
+  test("invalid explicit release base fails closed", () => {
+    expectContainmentFailure("RELEASE_BASE_REF_UNAVAILABLE", () =>
+      validateReleaseContainmentFromEnvironment(tempRoot, {
+        releaseBaseRef: "missing-release-base",
+      }),
+    );
+  });
 
   test("PR #10 standalone mode passes against the release base", () => {
     const result = validateReleaseContainment({
@@ -206,6 +243,13 @@ try {
     });
     assert.equal(result.mode, "integration");
     assert.equal(result.supabaseTreeMatchesAuthorizedRef, true);
+  });
+
+  git(["branch", "-D", "main"]);
+  test("validation fails when origin/main and main are unavailable", () => {
+    expectContainmentFailure("RELEASE_BASE_REF_UNAVAILABLE", () =>
+      validateReleaseContainmentFromEnvironment(tempRoot),
+    );
   });
 } finally {
   if (tempRoot.startsWith(path.resolve(os.tmpdir()))) {

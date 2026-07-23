@@ -37,6 +37,36 @@ function resolveCommit(repoRoot, ref, code) {
   }
 }
 
+function tryResolveCommit(repoRoot, ref) {
+  try {
+    return runGit(repoRoot, ["rev-parse", "--verify", `${ref}^{commit}`]);
+  } catch {
+    return "";
+  }
+}
+
+export function resolveReleaseBaseRef(repoRoot, explicitRef = "") {
+  const normalizedRoot = path.resolve(repoRoot);
+  const normalizedExplicitRef = String(explicitRef || "").trim();
+  if (normalizedExplicitRef) {
+    resolveCommit(normalizedRoot, normalizedExplicitRef, "RELEASE_BASE_REF_UNAVAILABLE");
+    return { releaseBaseRef: normalizedExplicitRef, releaseBaseSource: "explicit" };
+  }
+
+  if (tryResolveCommit(normalizedRoot, "origin/main")) {
+    return { releaseBaseRef: "origin/main", releaseBaseSource: "origin/main" };
+  }
+  if (tryResolveCommit(normalizedRoot, "main")) {
+    return { releaseBaseRef: "main", releaseBaseSource: "main" };
+  }
+
+  throw new ReleaseContainmentError(
+    "RELEASE_BASE_REF_UNAVAILABLE",
+    "No authorized release base is available. Set LAXHORNET_RELEASE_BASE_REF or provide origin/main or main.",
+    { attemptedRefs: ["origin/main", "main"] },
+  );
+}
+
 function changedFiles(repoRoot, fromCommit, toCommit) {
   const output = runGit(repoRoot, [
     "diff",
@@ -223,16 +253,20 @@ export function validateReleaseContainment({
 }
 
 export function validateReleaseContainmentFromEnvironment(repoRoot, options = {}) {
-  return validateReleaseContainment({
+  const explicitReleaseBaseRef =
+    options.releaseBaseRef || process.env.LAXHORNET_RELEASE_BASE_REF?.trim() || "";
+  const { releaseBaseRef, releaseBaseSource } = resolveReleaseBaseRef(
     repoRoot,
-    releaseBaseRef:
-      options.releaseBaseRef ||
-      process.env.LAXHORNET_RELEASE_BASE_REF?.trim() ||
-      "origin/main",
+    explicitReleaseBaseRef,
+  );
+  const result = validateReleaseContainment({
+    repoRoot,
+    releaseBaseRef,
     authorizedDbRef:
       options.authorizedDbRef ??
       process.env.LAXHORNET_AUTHORIZED_DB_REF?.trim() ??
       "",
     headRef: options.headRef || "HEAD",
   });
+  return { ...result, releaseBaseSource };
 }
