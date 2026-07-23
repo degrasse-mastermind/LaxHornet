@@ -1,18 +1,18 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import process from "node:process";
 import { execFileSync } from "node:child_process";
+import { validateReleaseContainmentFromEnvironment } from "./release_containment.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const app = read("app.js");
-const baseApp = execFileSync("git", ["show", "origin/main:app.js"], { cwd: root, encoding: "utf8" });
-const releaseBase = execFileSync("git", ["merge-base", "HEAD", "origin/main"], { cwd: root, encoding: "utf8" }).trim();
-const changedFiles = execFileSync("git", ["diff", "--name-only", releaseBase], { cwd: root, encoding: "utf8" })
-  .trim()
-  .split(/\r?\n/)
-  .filter(Boolean);
+const containment = validateReleaseContainmentFromEnvironment(root);
+const baseApp = execFileSync("git", ["show", `${containment.releaseBaseCommit}:app.js`], {
+  cwd: root,
+  encoding: "utf8",
+});
+const changedFiles = containment.releaseDeltaFiles;
 
 const checks = [];
 function check(condition, message) {
@@ -71,9 +71,18 @@ check(stagingReferenceViolations.length === 0, "active runtime, public, and supp
 check(publishableKeyViolations.length === 0, "no publishable key appears outside the existing production app configuration");
 check(app.includes(`https://${productionProjectRef}.supabase.co`), "app default remains scoped to the established production project");
 
-check(!changedFiles.some((file) => file.endsWith(".sql")), "release branch changes no SQL");
-check(!changedFiles.some((file) => file.startsWith("supabase/migrations/")), "canonical forward migrations are unchanged");
-check(!changedFiles.some((file) => file.startsWith("supabase/rollback/")), "canonical rollback files are unchanged");
+if (containment.mode === "standalone") {
+  check(!changedFiles.some((file) => file.endsWith(".sql")), "standalone release-hygiene delta changes no SQL");
+  check(!changedFiles.some((file) => file.startsWith("supabase/migrations/")), "standalone release-hygiene delta does not alter canonical migrations");
+  check(!changedFiles.some((file) => file.startsWith("supabase/rollback/")), "standalone release-hygiene delta does not alter canonical rollbacks");
+} else {
+  check(containment.supabaseTreeMatchesAuthorizedRef, "combined Supabase tree matches the authorized PR #9 ref exactly");
+  check(containment.postAuthorizationDatabaseFiles.length === 0, "release-hygiene delta does not alter the authorized database candidate");
+  check(
+    containment.authorizedSupabaseDeltaFiles.length === 7,
+    "combined integration contains only the seven approved PR #9 Supabase files",
+  );
+}
 
 for (const functionName of [
   "impactValueForEvent",

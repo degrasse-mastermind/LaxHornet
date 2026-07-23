@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { validateReleaseContainmentFromEnvironment } from "./release_containment.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
@@ -29,11 +29,8 @@ const importEnd = app.indexOf("function cancelPendingImport", importStart);
 const importSource = app.slice(importStart, importEnd);
 const backupStart = app.indexOf("function fullBackupPayload");
 const backupEnd = app.indexOf("function openExportDialog", backupStart);
-const releaseBase = execFileSync("git", ["merge-base", "HEAD", "origin/main"], { cwd: root, encoding: "utf8" }).trim();
-const changedFiles = execFileSync("git", ["diff", "--name-only", releaseBase], { cwd: root, encoding: "utf8" })
-  .trim()
-  .split(/\r?\n/)
-  .filter(Boolean);
+const containment = validateReleaseContainmentFromEnvironment(root);
+const changedFiles = containment.releaseDeltaFiles;
 
 expect(app.includes("publicLiveShareRpc: RUNTIME_CONFIG.publicLiveShareRpc === true"), "trusted Live Share is off by default");
 expect(app.includes("liveShareTokenRpc: RUNTIME_CONFIG.liveShareTokenRpc === true"), "trusted token lifecycle is off by default");
@@ -71,7 +68,21 @@ expect(styles.includes(".disclosure-modal") && styles.includes(".confirm-check")
 expect(remote.includes("allowedGameKeys") && remote.includes("allowedEventKeys") && remote.includes("Anonymous ordinary-table read exposed"), "remote suite asserts exact allowlists and ordinary-table denial");
 expect(changedFiles.includes("service-worker.js") && changedFiles.includes("version.json"), "release hygiene coordinates the service worker and version manifest");
 expect(!changedFiles.some((file) => file.endsWith("supabase-schema.sql")), "production Supabase schema remains unchanged");
-expect(!changedFiles.some((file) => file.endsWith(".sql") || file.startsWith("supabase/migrations/")), "release hygiene changes no SQL or canonical migration history");
+if (containment.mode === "standalone") {
+  expect(
+    !changedFiles.some((file) => file.endsWith(".sql") || file.startsWith("supabase/migrations/")),
+    "standalone release-hygiene delta changes no SQL or canonical migration history",
+  );
+} else {
+  expect(
+    containment.supabaseTreeMatchesAuthorizedRef,
+    "combined Supabase tree matches the authorized PR #9 ref exactly",
+  );
+  expect(
+    containment.postAuthorizationDatabaseFiles.length === 0,
+    "release-hygiene delta does not alter canonical database files",
+  );
+}
 expect(
   [privacy, terms, trust, readme].every((text) => /staging/i.test(text) && /not (?:yet )?active in production|production activation|production defaults remain off/i.test(text)),
   "public copy distinguishes staged proof from production activation",

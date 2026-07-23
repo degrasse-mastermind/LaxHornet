@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
-import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { validateReleaseContainmentFromEnvironment } from "./release_containment.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "..");
@@ -439,22 +439,23 @@ test("Next-game focus keys isolate account, team, and roster player", () => {
   assert.match(aTeamAPlayer1, /user\.account-a\.team\.team-a\.player\.player-1$/);
 });
 
-test("Release hygiene preserves Trust Spine SQL and keeps trusted disclosure disabled", () => {
-  const releaseBase = execFileSync("git", ["merge-base", "HEAD", "origin/main"], {
-    cwd: repoRoot,
-    encoding: "utf8",
-  }).trim();
-  const changedFiles = execFileSync("git", ["diff", "--name-only", releaseBase], {
-    cwd: repoRoot,
-    encoding: "utf8",
-  })
-    .trim()
-    .split(/\r?\n/)
-    .filter(Boolean);
-
-  assert.equal(changedFiles.some((file) => file.endsWith(".sql")), false);
-  assert.equal(changedFiles.some((file) => file.startsWith("supabase/migrations/")), false);
-  assert.equal(changedFiles.some((file) => file.startsWith("supabase/rollback/")), false);
+test("Phase-aware release containment preserves the authorized Trust Spine SQL", () => {
+  const containment = validateReleaseContainmentFromEnvironment(repoRoot);
+  if (containment.mode === "standalone") {
+    assert.equal(containment.releaseDeltaFiles.some((file) => file.endsWith(".sql")), false);
+    assert.equal(
+      containment.releaseDeltaFiles.some((file) => file.startsWith("supabase/migrations/")),
+      false,
+    );
+    assert.equal(
+      containment.releaseDeltaFiles.some((file) => file.startsWith("supabase/rollback/")),
+      false,
+    );
+  } else {
+    assert.equal(containment.supabaseTreeMatchesAuthorizedRef, true);
+    assert.deepEqual(containment.postAuthorizationDatabaseFiles, []);
+    assert.equal(containment.authorizedSupabaseDeltaFiles.length, 7);
+  }
   assert.match(appSource, /publicLiveShareRpc:\s*RUNTIME_CONFIG\.publicLiveShareRpc === true/);
   assert.match(appSource, /liveShareTokenRpc:\s*RUNTIME_CONFIG\.liveShareTokenRpc === true/);
   assert.match(appSource, /exportAuditRpc:\s*RUNTIME_CONFIG\.exportAuditRpc === true/);
