@@ -14,11 +14,30 @@ Merging this pull request is not production-cutover authorization.
 
 ## Canonical forward migrations
 
-1. `migrations/20260723010000_trust_spine_release_1.sql`
-2. `migrations/20260723020000_minimum_necessary_disclosure.sql`
+1. `migrations/20260723000000_laxhornet_legacy_baseline.sql`
+2. `migrations/20260723010000_trust_spine_release_1.sql`
+3. `migrations/20260723020000_minimum_necessary_disclosure.sql`
 
-The files are copied without substantive SQL changes from the staging-tested
-evidence package.
+The legacy baseline reconstructs the checked-in LaxHornet schema required by
+Trust Spine on a blank Supabase preview. It contains schema definitions, RLS
+policies, grants, functions, the auth trigger, indexes, constraints, and
+Realtime publication membership. It contains no production data or synthetic
+rows.
+
+The Trust Spine and minimum-disclosure files are copied without substantive SQL
+changes from the staging-tested evidence package.
+
+## Prior preview failure
+
+Preview project `yqclnivnizasaavpjyuy` created successfully, but migration
+deployment failed on July 23, 2026 with:
+
+`ERROR: relation "public.team_members" does not exist (SQLSTATE 42P01)`
+
+The failure exposed missing canonical legacy migration history: manually
+prepared staging already had the legacy LaxHornet schema, while a fresh
+Supabase preview did not. The canonical legacy baseline closes that
+reproducibility gap without copying production rows.
 
 ## Rollback references
 
