@@ -1,0 +1,189 @@
+{
+  "suite": "LaxHornet minimum-necessary disclosure remote staging checks",
+  "projectHost": "jafhrhgseiwrohqrhcof.supabase.co",
+  "synthetic": true,
+  "testsPassed": 16,
+  "results": [
+    {
+      "name": "synthetic authenticated sign-in",
+      "status": "pass",
+      "evidence": {
+        "status": 200,
+        "userId": "a3ca59f0-e725-493f-b4e3-aa0e9f3458f8"
+      }
+    },
+    {
+      "name": "anonymous games table denial",
+      "status": "pass",
+      "evidence": {
+        "status": 401,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": "Grant the required privileges to the current role with: GRANT SELECT ON public.games TO anon;",
+          "message": "permission denied for table games"
+        }
+      }
+    },
+    {
+      "name": "anonymous events table denial",
+      "status": "pass",
+      "evidence": {
+        "status": 401,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": "Grant the required privileges to the current role with: GRANT SELECT ON public.events TO anon;",
+          "message": "permission denied for table events"
+        }
+      }
+    },
+    {
+      "name": "anonymous lh_live_share_tokens table denial",
+      "status": "pass",
+      "evidence": {
+        "status": 401,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": "Grant the required privileges to the current role with: GRANT SELECT ON public.lh_live_share_tokens TO anon;",
+          "message": "permission denied for table lh_live_share_tokens"
+        }
+      }
+    },
+    {
+      "name": "anonymous lh_security_audit_events table denial",
+      "status": "pass",
+      "evidence": {
+        "status": 401,
+        "body": {
+          "code": "42501",
+          "details": null,
+          "hint": "Grant the required privileges to the current role with: GRANT SELECT ON public.lh_security_audit_events TO anon;",
+          "message": "permission denied for table lh_security_audit_events"
+        }
+      }
+    },
+    {
+      "name": "game-scoped token creation",
+      "status": "pass",
+      "evidence": {
+        "status": 200,
+        "codeLength": 32,
+        "expiresAt": null
+      }
+    },
+    {
+      "name": "anonymous Live Share exact allowlist",
+      "status": "pass",
+      "evidence": {
+        "game": {
+          "game_id": "disclosure-game",
+          "opponent": "Madison Demo",
+          "position": "Midfield",
+          "game_date": "2026-07-22",
+          "team_name": "Branford Demo Hornets",
+          "player_name": "Demo Player",
+          "jersey_number": "12",
+          "period_format": "quarters",
+          "final_score_for": 6,
+          "final_score_against": 4
+        },
+        "events": [
+          {
+            "period": "Q2",
+            "category": "Possession",
+            "event_id": "disclosure-event-1",
+            "stat_type": "groundBall",
+            "field_zone": "Midfield",
+            "stat_label": "Ground Ball",
+            "occurred_at": "2026-07-22T18:10:00Z",
+            "point_value": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "authenticated public-safe response",
+      "status": "pass",
+      "evidence": {
+        "status": 200
+      }
+    },
+    {
+      "name": "public-safe polling",
+      "status": "pass",
+      "evidence": {
+        "status": 200,
+        "eventCount": 1
+      }
+    },
+    {
+      "name": "unknown token neutral failure",
+      "status": "pass",
+      "evidence": {
+        "status": 200,
+        "body": null
+      }
+    },
+    {
+      "name": "expired token neutral failure",
+      "status": "pass",
+      "evidence": {
+        "status": 200,
+        "body": null
+      }
+    },
+    {
+      "name": "revoked token neutral failure",
+      "status": "pass",
+      "evidence": {
+        "status": 200,
+        "body": null
+      }
+    },
+    {
+      "name": "game CSV audit metadata",
+      "status": "pass",
+      "evidence": {
+        "code": "export_audit_recorded",
+        "auditId": "3d67c0e8-7e3f-4f04-b5b4-fd08d94c5514",
+        "outcome": "accepted",
+        "recordedAt": "2026-07-23T01:44:54.768525+00:00"
+      }
+    },
+    {
+      "name": "wrong-account backup audit denied",
+      "status": "pass",
+      "evidence": {
+        "code": "unauthorized_scope",
+        "outcome": "rejected"
+      }
+    },
+    {
+      "name": "private full-backup audit metadata",
+      "status": "pass",
+      "evidence": {
+        "code": "export_audit_recorded",
+        "auditId": "a7335201-dcf5-47eb-9f47-250ac6215f9d",
+        "outcome": "accepted",
+        "recordedAt": "2026-07-23T01:44:54.900284+00:00"
+      }
+    },
+    {
+      "name": "created-token revocation",
+      "status": "pass",
+      "evidence": {
+        "revoke": {
+          "code": "live_share_tokens_revoked",
+          "outcome": "accepted",
+          "revokedTokenCount": 1
+        },
+        "readAfterRevoke": {
+          "status": 200,
+          "body": null
+        }
+      }
+    }
+  ]
+}

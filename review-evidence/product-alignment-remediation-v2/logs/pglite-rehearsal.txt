@@ -1,0 +1,183 @@
+﻿PASS: base and disclosure migrations apply {"synthetic":true}
+PASS: anonymous ordinary and private table privileges are denied {"anon_games":false,"anon_events":false,"anon_tokens":false,"anon_audit":false,"anon_public_rpc":true,"anon_create_token":false,"auth_create_token":true}
+PASS: RPC grants are purpose-bounded {"anon_games":false,"anon_events":false,"anon_tokens":false,"anon_audit":false,"anon_public_rpc":true,"anon_create_token":false,"auth_create_token":true}
+PASS: authenticated actor creates a game-scoped random token {"outcome":"accepted","codeLength":32}
+PASS: anonymous game response uses the exact allowlist {"gameKeys":["final_score_against","final_score_for","game_date","game_id","jersey_number","opponent","period_format","player_name","position","team_name"]}
+PASS: anonymous event response uses the exact allowlist {"eventKeys":["category","event_id","field_zone","occurred_at","period","point_value","stat_label","stat_type"]}
+PASS: public response excludes private and authority fields {}
+PASS: unknown token fails neutrally {}
+PASS: expired token fails neutrally {}
+PASS: revoked token fails neutrally {}
+PASS: authorized export writes audit metadata {"code":"export_audit_recorded","auditId":"7162bb1d-f100-4b22-9e52-f49ae0181de8","outcome":"accepted","recordedAt":"2026-07-23T01:56:52.031+00:00"}
+PASS: export audit stores purpose metadata without payload {"outcome":"accepted","scopeId":"disclosure-game","scopeType":"game","exportType":"player_csv"}
+PASS: account backup audit cannot name another account {"code":"unauthorized_scope","outcome":"rejected"}
+PASS: account backup audit accepts only the signed-in account scope {"code":"export_audit_recorded","auditId":"dab8635b-033f-4826-86ba-8cbd52bc05bc","outcome":"accepted","recordedAt":"2026-07-23T01:56:52.045+00:00"}
+PASS: authorized actor revokes active game tokens {"code":"live_share_tokens_revoked","outcome":"accepted","revokedTokenCount":1}
+PASS: revoked generated token can no longer disclose the game {}
+PASS: rollback removes staging objects and preserves legacy sentinels {"trust_tables":0,"legacy_games":1,"legacy_events":1,"anon_games_restored":true,"anon_events_restored":true}
+{
+  "suite": "LaxHornet minimum-necessary disclosure PGlite rehearsal",
+  "repoRoot": "C:\\Users\\user\\Documents\\LaxHornet",
+  "synthetic": true,
+  "testsPassed": 17,
+  "results": [
+    {
+      "name": "base and disclosure migrations apply",
+      "status": "pass",
+      "evidence": {
+        "synthetic": true
+      }
+    },
+    {
+      "name": "anonymous ordinary and private table privileges are denied",
+      "status": "pass",
+      "evidence": {
+        "anon_games": false,
+        "anon_events": false,
+        "anon_tokens": false,
+        "anon_audit": false,
+        "anon_public_rpc": true,
+        "anon_create_token": false,
+        "auth_create_token": true
+      }
+    },
+    {
+      "name": "RPC grants are purpose-bounded",
+      "status": "pass",
+      "evidence": {
+        "anon_games": false,
+        "anon_events": false,
+        "anon_tokens": false,
+        "anon_audit": false,
+        "anon_public_rpc": true,
+        "anon_create_token": false,
+        "auth_create_token": true
+      }
+    },
+    {
+      "name": "authenticated actor creates a game-scoped random token",
+      "status": "pass",
+      "evidence": {
+        "outcome": "accepted",
+        "codeLength": 32
+      }
+    },
+    {
+      "name": "anonymous game response uses the exact allowlist",
+      "status": "pass",
+      "evidence": {
+        "gameKeys": [
+          "final_score_against",
+          "final_score_for",
+          "game_date",
+          "game_id",
+          "jersey_number",
+          "opponent",
+          "period_format",
+          "player_name",
+          "position",
+          "team_name"
+        ]
+      }
+    },
+    {
+      "name": "anonymous event response uses the exact allowlist",
+      "status": "pass",
+      "evidence": {
+        "eventKeys": [
+          "category",
+          "event_id",
+          "field_zone",
+          "occurred_at",
+          "period",
+          "point_value",
+          "stat_label",
+          "stat_type"
+        ]
+      }
+    },
+    {
+      "name": "public response excludes private and authority fields",
+      "status": "pass",
+      "evidence": {}
+    },
+    {
+      "name": "unknown token fails neutrally",
+      "status": "pass",
+      "evidence": {}
+    },
+    {
+      "name": "expired token fails neutrally",
+      "status": "pass",
+      "evidence": {}
+    },
+    {
+      "name": "revoked token fails neutrally",
+      "status": "pass",
+      "evidence": {}
+    },
+    {
+      "name": "authorized export writes audit metadata",
+      "status": "pass",
+      "evidence": {
+        "code": "export_audit_recorded",
+        "auditId": "7162bb1d-f100-4b22-9e52-f49ae0181de8",
+        "outcome": "accepted",
+        "recordedAt": "2026-07-23T01:56:52.031+00:00"
+      }
+    },
+    {
+      "name": "export audit stores purpose metadata without payload",
+      "status": "pass",
+      "evidence": {
+        "outcome": "accepted",
+        "scopeId": "disclosure-game",
+        "scopeType": "game",
+        "exportType": "player_csv"
+      }
+    },
+    {
+      "name": "account backup audit cannot name another account",
+      "status": "pass",
+      "evidence": {
+        "code": "unauthorized_scope",
+        "outcome": "rejected"
+      }
+    },
+    {
+      "name": "account backup audit accepts only the signed-in account scope",
+      "status": "pass",
+      "evidence": {
+        "code": "export_audit_recorded",
+        "auditId": "dab8635b-033f-4826-86ba-8cbd52bc05bc",
+        "outcome": "accepted",
+        "recordedAt": "2026-07-23T01:56:52.045+00:00"
+      }
+    },
+    {
+      "name": "authorized actor revokes active game tokens",
+      "status": "pass",
+      "evidence": {
+        "code": "live_share_tokens_revoked",
+        "outcome": "accepted",
+        "revokedTokenCount": 1
+      }
+    },
+    {
+      "name": "revoked generated token can no longer disclose the game",
+      "status": "pass",
+      "evidence": {}
+    },
+    {
+      "name": "rollback removes staging objects and preserves legacy sentinels",
+      "status": "pass",
+      "evidence": {
+        "trust_tables": 0,
+        "legacy_games": 1,
+        "legacy_events": 1,
+        "anon_games_restored": true,
+        "anon_events_restored": true
+      }
+    }
+  ]
+}

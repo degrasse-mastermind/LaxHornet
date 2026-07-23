@@ -1,0 +1,48 @@
+﻿node.exe : warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+At line:6 char:1
++ & 'C:\Users\user\.cache\codex-runtimes\codex-primary-runtime\dependen ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: in the... Git touches it:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+warning: in the working copy of 'access-and-trust.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'app.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'privacy.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'styles.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'terms.html', LF will be replaced by CRLF the next time Git touches it
+Minimum-disclosure checks passed (35/35).
+PASS: trusted Live Share is off by default
+PASS: shared viewers receive public-view status copy
+PASS: secure Live Share returns before the legacy wildcard path
+PASS: secure Live Share calls the public-safe RPC
+PASS: secure Live Share uses allowlisted polling
+PASS: secure cutover removes ordinary table subscriptions
+PASS: public payload mapping cannot render notes or tags
+PASS: staging denies anonymous ordinary game/event reads
+PASS: only the public-safe Live Share RPC is granted anonymously
+PASS: staging has explicit token create/revoke RPCs
+PASS: server stores only the token hash
+PASS: public token resolution enforces expiration
+PASS: remote tests cover unknown, expired, and revoked tokens
+PASS: CSV defaults to the selected player scope
+PASS: CSV annotations require explicit inclusion
+PASS: full backup requires explicit confirmation
+PASS: full backup never invokes native/public sharing
+PASS: trusted export auditing is integrated behind its flag
+PASS: export audit stores metadata and outcome
+PASS: export audit does not store exported payloads
+PASS: account backup audit is scoped to the signed-in account
+PASS: security-definer function ownership is explicit
+PASS: import cannot grant player or team access
+PASS: import cannot replace team, roster, or player authority state
+PASS: imported games cannot reactivate Live Share tokens
+PASS: import explains that existing games are not replaced
+PASS: import cannot resurrect locally deleted games
+PASS: recap excludes private event notes and private process intelligence
+PASS: privacy, terms, access, and README distinguish output purposes
+PASS: mobile export/import confirmations have dedicated accessible layout
+PASS: remote suite asserts exact allowlists and ordinary-table denial
+PASS: service worker and version files remain unchanged
+PASS: production Supabase schema remains unchanged
+PASS: live tracking controls remain intact
+PASS: Game Review, Season Review, and offline persistence remain present

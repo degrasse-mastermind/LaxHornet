@@ -1,0 +1,184 @@
+﻿===== Product Alignment v1 =====
+Product alignment checks passed (33/33).
+PASS: letter-grade generator is removed
+PASS: letter-grade renderer is removed
+PASS: archetype generator is removed from active code
+PASS: archetype share-card generator is removed
+PASS: active app code contains no archetype reads, generation, or presentation
+PASS: archetype presentation CSS is removed
+PASS: public, legal, README, and launch copy contain no archetype claims
+PASS: hidden DOM and CSS contain no retired impact-grade class
+PASS: app contains the required proprietary Game Impact limitation
+PASS: public/legal documentation contains the required Game Impact limitation
+PASS: app states the missing-event limitation
+PASS: low-data review uses the required insufficient-evidence state
+PASS: Game Review visibly labels recorded evidence
+PASS: Game Review visibly labels interpretation
+PASS: Game Review visibly labels the optional focus
+PASS: recap begins with recorded contributions
+PASS: recap separates cautious interpretation
+PASS: recap includes a conversation starter
+PASS: recap includes focus only when explicitly added
+PASS: no letter grade appears in app or public copy
+PASS: CSV reframes the numeric export field as proprietary
+PASS: JSON export documents Impact provenance and evidence limits
+PASS: share recap excludes private process context from prompt selection
+PASS: Live Share suppresses private notes
+PASS: Live Share filters private process tags
+PASS: user-recorded process tags do not generate automatic game patterns
+PASS: user-recorded process tags do not generate season conclusions
+PASS: no external AI model integration was added
+PASS: live tracking retains Undo, Save, End Game, and Cancel Game controls
+PASS: recap copy and share actions remain wired
+PASS: legacy saved games remain normalization-compatible without deleting unknown fields
+PASS: offline/local persistence paths remain present
+PASS: no player comparison or ranking presentation was introduced
+===== Cancel Game =====
+PASS: new game with no events is removed
+PASS: cancel clears active game and tracking session
+PASS: cancel writes a durable game tombstone
+PASS: cancel returns to home
+PASS: online cancel requests one cloud deletion
+PASS: game with several events is fully removed
+PASS: unrelated games remain unchanged
+PASS: Keep Tracking leaves game and events unchanged
+PASS: offline cancel queues no immediate cloud call
+PASS: offline tombstone prevents cloud resurrection after reload
+PASS: canceled game is excluded from export source
+PASS: resumed saved game is preserved
+PASS: resumed saved game does not call cloud delete
+PASS: unauthorized cancel cannot change the game
+PASS: cancel is idempotent after active game is cleared
+PASS: Cancel Game is a secondary live control
+PASS: confirmation uses required warning copy
+PASS: confirmation has Keep Tracking and Cancel Game actions
+PASS: new tracking sessions are marked at game creation
+PASS: legacy sessions default to preservation-safe existing origin
+PASS: cancel clears active and review pointers
+PASS: cancel uses durable game tombstone
+PASS: cancel never completes or reviews the game
+PASS: cancel uses RPC-only cloud deletion
+PASS: game deletion has no direct table delete fallback
+PASS: saved-session exit does not call cloud deletion
+PASS: modal is accessible
+PASS: Escape and Tab handling are implemented
+PASS: Keep Tracking restores focus to cancel control
+PASS: Save, End Game, and Undo controls remain
+PASS: normal navigation does not invoke cancellation
+PASS: cloud merge filters deleted games
+PASS: cloud reload flushes tombstones before merge
+
+33 cancel-game checks passed.
+===== Delete RPC Permissions =====
+PASS: delete installer revokes PUBLIC and anon from public.laxhornet_delete_game(text)
+PASS: delete installer grants authenticated access to public.laxhornet_delete_game(text)
+PASS: security hardening restores authenticated access to public.laxhornet_delete_game(text)
+PASS: main schema grants authenticated access to public.laxhornet_delete_game(text)
+PASS: permission patch revokes PUBLIC and anon from public.laxhornet_delete_game(text)
+PASS: permission patch grants authenticated access to public.laxhornet_delete_game(text)
+PASS: delete installer revokes PUBLIC and anon from public.laxhornet_delete_event(text)
+PASS: delete installer grants authenticated access to public.laxhornet_delete_event(text)
+PASS: security hardening restores authenticated access to public.laxhornet_delete_event(text)
+PASS: main schema grants authenticated access to public.laxhornet_delete_event(text)
+PASS: permission patch revokes PUBLIC and anon from public.laxhornet_delete_event(text)
+PASS: permission patch grants authenticated access to public.laxhornet_delete_event(text)
+PASS: permission patch is transactional
+PASS: permission patch verifies effective privileges
+PASS: main schema removes default PUBLIC function execution
+PASS: delete game RPC rejects missing authentication
+PASS: delete event RPC rejects missing authentication
+
+17 delete RPC permission checks passed.
+===== Player Removal Cleanup =====
+PASS: canonical schema permits player_removed status
+PASS: standalone migration permits player_removed status
+PASS: canonical removal RPC exists
+PASS: canonical removal RPC requires sign-in
+PASS: canonical removal RPC requires team admin or reviewer
+PASS: canonical removal RPC locks exact roster player
+PASS: canonical removal RPC marks player inactive
+PASS: canonical removal RPC removes only exact player claims
+PASS: canonical removal RPC preserves team membership
+PASS: canonical removal RPC resolves only matching pending or approved requests
+PASS: canonical removal RPC records player_removed
+PASS: canonical removal RPC leaves failures to roll back the transaction
+PASS: migration removal RPC exists
+PASS: migration removal RPC requires sign-in
+PASS: migration removal RPC requires team admin or reviewer
+PASS: migration removal RPC locks exact roster player
+PASS: migration removal RPC marks player inactive
+PASS: migration removal RPC removes only exact player claims
+PASS: migration removal RPC preserves team membership
+PASS: migration removal RPC resolves only matching pending or approved requests
+PASS: migration removal RPC records player_removed
+PASS: migration removal RPC leaves failures to roll back the transaction
+PASS: roster repair removal RPC exists
+PASS: roster repair removal RPC requires sign-in
+PASS: roster repair removal RPC requires team admin or reviewer
+PASS: roster repair removal RPC locks exact roster player
+PASS: roster repair removal RPC marks player inactive
+PASS: roster repair removal RPC removes only exact player claims
+PASS: roster repair removal RPC preserves team membership
+PASS: roster repair removal RPC resolves only matching pending or approved requests
+PASS: roster repair removal RPC records player_removed
+PASS: roster repair removal RPC leaves failures to roll back the transaction
+PASS: canonical pending-request RPC requires an active roster match
+PASS: canonical pending-request RPC excludes terminal player_removed requests
+PASS: canonical pending-request RPC checks the claim for the requested jersey
+PASS: migration pending-request RPC requires an active roster match
+PASS: migration pending-request RPC excludes terminal player_removed requests
+PASS: migration pending-request RPC checks the claim for the requested jersey
+PASS: reminder repair pending-request RPC requires an active roster match
+PASS: reminder repair pending-request RPC excludes terminal player_removed requests
+PASS: reminder repair pending-request RPC checks the claim for the requested jersey
+PASS: canonical approval RPC locks the request
+PASS: canonical approval RPC rejects terminal requests
+PASS: canonical approval RPC locks the active roster match
+PASS: canonical approval RPC updates only a still-pending request
+PASS: migration approval RPC locks the request
+PASS: migration approval RPC rejects terminal requests
+PASS: migration approval RPC locks the active roster match
+PASS: migration approval RPC updates only a still-pending request
+PASS: admin UI refreshes Parent Requests after player removal
+PASS: an explicit request can reopen a player_removed request
+PASS: removing a player hides its Parent Request
+PASS: removing a player removes the exact claim
+PASS: requests for other players remain unchanged
+PASS: claims for other players remain unchanged
+PASS: a parent with another player claim keeps that access
+PASS: parent team membership is preserved
+PASS: approved request becomes player_removed
+PASS: re-adding the jersey does not reactivate the old request
+PASS: an explicit new request can be submitted for the re-added player
+PASS: unauthorized cleanup leaves all data unchanged
+PASS: cleanup failure rolls the modeled transaction back
+PASS: migration is explicitly transactional
+PASS: migration revokes public and anon execution
+
+64 passed; 0 failed
+===== Release =====
+Update release checks passed for v280.
+===== Trust Spine Release 1 (expected stale scope assertion) =====
+PASS Migration is additive and does not alter legacy runtime tables
+PASS Trust Spine foreign keys preserve evidence and never target legacy tables
+PASS Release 1 scope excludes deferred roles and systems
+PASS All 20 Trust Spine tables are in the deny-all RLS list
+PASS No direct Trust Spine table grants are given to browser roles
+PASS Staging rollback removes exactly the additive Trust Spine tables
+PASS Only the nine approved public RPCs are created and granted
+PASS Public RPC wrappers are fixed-path definers and private helpers are unreachable
+PASS Grant lifecycle and constrained provenance are represented
+PASS Create, correction, and permanent tombstone operation records are separate
+PASS Operations preserve all outcomes while revisions preserve accepted evidence only
+PASS Scope registration is canonical, idempotent, and does not issue grants
+PASS Accepted revision sequencing uses the locked effective-row counter
+PASS Evidence, annotations, Live Share, and export field allowlists are explicit
+PASS The SQL suite covers every required staging scenario
+PASS LaxHornet account storage keys isolate users
+PASS Next-game focus keys isolate account, team, and roster player
+FAIL No production runtime or cache file is modified by this implementation: app.js was modified
+
+true !== false
+
+
+17/18 local contract tests passed.

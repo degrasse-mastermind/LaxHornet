@@ -17,6 +17,20 @@ LaxHornet is a mobile-first offline PWA for tracking youth lacrosse stats during
 - Optional user profiles with approved team access for parents
 - Optional shared team rosters with parent access requests
 - Optional Live Share with a share code/link for read-only real-time viewing
+- Purpose-specific output modes: public-safe Live Share, user-previewed recap, selected-scope CSV, and sensitive private backup
+- Explicit annotation choices for CSV plus confirmation-gated private backup and import merge
+
+## Minimum-Necessary Disclosure
+
+The hardened disclosure path is staged behind `window.LAXHORNET_RUNTIME_CONFIG` feature flags. Production defaults remain off until the Trust Spine RPCs and token lifecycle have passed disposable-staging verification.
+
+- **Live Share:** backend-allowlisted game and event facts only; no notes, tags, process context, account data, corrections, focus records, or generated recommendations. The trusted viewer polls the public-safe RPC instead of subscribing to ordinary game/event tables.
+- **Share Recap:** a short, user-previewed summary with cautious interpretation, a conversation prompt, and an optional focus only when the user adds it.
+- **CSV Data Export:** selected player or one selected game. Recorded facts are included by default; descriptive tags, private process tags, and notes each require an explicit checkbox.
+- **Private Full Backup:** broader recovery data with a sensitive-data warning and explicit confirmation. It downloads directly and does not invoke native/public sharing.
+- **Import:** previews and merges only new, authorized games. It does not restore claims, team membership, roster authority, account ownership, deleted games, or Live Share state, and it never replaces an existing same-ID game.
+
+The staging migration and evidence suite are under `review-evidence/product-alignment-remediation-v2/`. They must not be applied to production as part of this sprint.
 
 ## Local Setup
 
