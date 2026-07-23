@@ -197,7 +197,7 @@ PASS: secure viewer makes no ordinary games/events request
 PASS: v283 activation removes the stale v281 cache
 PASS: unknown and expired tokens remain neutral
 PASS: synthetic roster-connected game renders the real live tracker
-PASS: first live tracker button records immediately (observed 1; Ground Ball added · Q1 8:19 AM)
+PASS: first live tracker button records immediately (observed 1; Ground Ball added · Q1 8:33 AM)
 PASS: two events are recorded through the live tracking UI
 PASS: live tracker events persist locally before secure sharing
 PASS: signed-in token creation uses the approved RPC
@@ -493,7 +493,6 @@ EXIT: 0
 
 ===== git diff check =====
 
-warning: in the working copy of 'release/laxhornet-release-manifest.json', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'review-evidence/event-pipeline-release-control-cleanup/export-audit-evidence.json', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'review-evidence/event-pipeline-release-control-cleanup/failure-mode-evidence.json', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'review-evidence/event-pipeline-release-control-cleanup/local-browser-results.txt', LF will be replaced by CRLF the next time Git touches it
@@ -502,14 +501,6 @@ warning: in the working copy of 'review-evidence/event-pipeline-release-control-
 warning: in the working copy of 'review-evidence/event-pipeline-release-control-cleanup/script-order-proof.json', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'review-evidence/event-pipeline-release-control-cleanup/service-worker-cache-proof.txt', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'review-evidence/event-pipeline-release-control-cleanup/token-lifecycle-evidence.json', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'tools/release_containment.mjs', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'tools/run_v283_local_regression.mjs', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'tools/test_minimum_disclosure.mjs', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'tools/test_release_containment_phase_aware.mjs', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'tools/test_release_hygiene.mjs', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'tools/test_secure_disclosure_activation.mjs', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'tools/test_trust_spine_release1.mjs', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'tools/validate_release_manifest.mjs', LF will be replaced by CRLF the next time Git touches it
 EXIT: 0
 
 MODE: stacked_additive
