@@ -65,6 +65,14 @@ function withoutExplicitReleaseBase(callback) {
   }
 }
 
+function validateSyntheticEnvironment(options = {}) {
+  return validateReleaseContainmentFromEnvironment(tempRoot, {
+    authorizedDbRef: "",
+    approvedAdditiveRef: "",
+    ...options,
+  });
+}
+
 try {
   git(["init"]);
   git(["config", "user.name", "LaxHornet Containment Test"]);
@@ -84,7 +92,7 @@ try {
     const previous = process.env.LAXHORNET_RELEASE_BASE_REF;
     process.env.LAXHORNET_RELEASE_BASE_REF = "release-base";
     try {
-      const result = validateReleaseContainmentFromEnvironment(tempRoot);
+      const result = validateSyntheticEnvironment();
       assert.equal(result.releaseBaseRef, "release-base");
       assert.equal(result.releaseBaseSource, "explicit");
     } finally {
@@ -94,14 +102,14 @@ try {
   });
 
   test("origin/main is selected when available", () => {
-    const result = withoutExplicitReleaseBase(() => validateReleaseContainmentFromEnvironment(tempRoot));
+    const result = withoutExplicitReleaseBase(() => validateSyntheticEnvironment());
     assert.equal(result.releaseBaseRef, "origin/main");
     assert.equal(result.releaseBaseSource, "origin/main");
   });
 
   test("local main is selected when origin/main is absent", () => {
     git(["update-ref", "-d", "refs/remotes/origin/main"]);
-    const result = withoutExplicitReleaseBase(() => validateReleaseContainmentFromEnvironment(tempRoot));
+    const result = withoutExplicitReleaseBase(() => validateSyntheticEnvironment());
     assert.equal(result.releaseBaseRef, "main");
     assert.equal(result.releaseBaseSource, "main");
   });
