@@ -1,5 +1,6 @@
 import path from "node:path";
 import process from "node:process";
+import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 
 export const APPROVED_AUTHORIZED_DB_PATHS = Object.freeze([
@@ -16,6 +17,32 @@ export const APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS = Object.freeze([
   "supabase/migrations/20260723040000_event_pipeline_capabilities.sql",
   "supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql",
 ]);
+
+export const APPROVED_HISTORICAL_PROVENANCE_PATHS = Object.freeze([
+  "supabase/migrations/20260723010607_remote_schema.sql",
+  "supabase/production-history/20260723010607_remote_schema.sql",
+  "supabase/production-history/README.md",
+]);
+
+export const APPROVED_HISTORICAL_PROVENANCE_IDENTITIES = Object.freeze({
+  "supabase/migrations/20260723010607_remote_schema.sql": Object.freeze({
+    sha256: "eee50c8cddc00dcec0171f1cadc3937d6ca8473a023c68c6858609f6813520f9",
+    blob: "d4aed15847e45abbe755aaba3d10f3978755acc9",
+    classification: "comment-only historical migration marker",
+  }),
+  "supabase/production-history/20260723010607_remote_schema.sql": Object.freeze({
+    sha256: "c8bd4bc55cc13b6506ccb859cf658f6962beec65f91d713f0867c91b4b046c82",
+    blob: "0c7fd494be0a461a3fb2b3efa60496b8541229a3",
+    statementCount: 350,
+    orderedStatementsMd5: "ea4aeff5aff66a88dae1211b93e3a1fa",
+    classification: "historical production db-pull snapshot",
+  }),
+  "supabase/production-history/README.md": Object.freeze({
+    sha256: "b77ad6b99fb551d0099c689d76803ffa78ef6da8c56a7d660a2b346e0cb01019",
+    blob: "73aff47d9b4c33876617a9b956b2693befa9457c",
+    classification: "historical production provenance documentation",
+  }),
+});
 
 export class ReleaseContainmentError extends Error {
   constructor(code, message, details = {}) {
@@ -102,6 +129,150 @@ function blobIdAt(repoRoot, ref, file) {
   } catch {
     return "";
   }
+}
+
+function fileBufferAt(repoRoot, ref, file) {
+  try {
+    return execFileSync("git", ["show", `${ref}:${file}`], {
+      cwd: repoRoot,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch {
+    return null;
+  }
+}
+
+function digest(algorithm, value) {
+  return createHash(algorithm).update(value).digest("hex");
+}
+
+function parseHistoricalStatements(archiveText) {
+  const marker =
+    /^-- statement (\d+) \| md5 ([a-f0-9]{32}) \| chars (\d+)\r?$/gm;
+  const matches = [...archiveText.matchAll(marker)];
+  const statements = [];
+
+  for (const [index, match] of matches.entries()) {
+    const statementNumber = Number(match[1]);
+    const expectedMd5 = match[2];
+    const characterCount = Number(match[3]);
+    const contentStart = match.index + match[0].length +
+      (archiveText.slice(match.index + match[0].length).startsWith("\r\n") ? 2 : 1);
+    const statement = archiveText.slice(contentStart, contentStart + characterCount);
+
+    if (statementNumber !== index + 1 || statement.length !== characterCount) {
+      throw new ReleaseContainmentError(
+        "HISTORICAL_STATEMENT_STRUCTURE_MISMATCH",
+        "The archived production snapshot statement ordering or length changed.",
+        { statementNumber, expectedStatementNumber: index + 1, characterCount },
+      );
+    }
+    if (digest("md5", statement) !== expectedMd5) {
+      throw new ReleaseContainmentError(
+        "HISTORICAL_STATEMENT_IDENTITY_MISMATCH",
+        "An archived production statement no longer matches its audited identity.",
+        { statementNumber },
+      );
+    }
+    statements.push(statement);
+  }
+
+  return statements;
+}
+
+function assertCommentOnlyMarker(markerText) {
+  const withoutBlockComments = markerText.replace(/\/\*[\s\S]*?\*\//g, "");
+  const executable = withoutBlockComments
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("--"));
+  if (executable.length) {
+    throw new ReleaseContainmentError(
+      "HISTORICAL_MARKER_EXECUTABLE_SQL",
+      "The historical production migration marker must remain comment-only.",
+      { executable },
+    );
+  }
+}
+
+export function validateHistoricalProvenance({
+  repoRoot,
+  headRef = "HEAD",
+} = {}) {
+  if (!repoRoot) {
+    throw new ReleaseContainmentError("REPOSITORY_REQUIRED", "repoRoot is required.");
+  }
+  const normalizedRoot = path.resolve(repoRoot);
+  const headCommit = resolveCommit(normalizedRoot, headRef, "HEAD_REF_UNAVAILABLE");
+  const mismatched = [];
+
+  for (const file of APPROVED_HISTORICAL_PROVENANCE_PATHS) {
+    const identity = APPROVED_HISTORICAL_PROVENANCE_IDENTITIES[file];
+    const content = fileBufferAt(normalizedRoot, headCommit, file);
+    const actualBlob = blobIdAt(normalizedRoot, headCommit, file);
+    const actualSha256 = content ? digest("sha256", content) : "";
+    const expectedRepositorySha256 = identity.repositorySha256 || identity.sha256;
+    if (
+      !content ||
+      actualBlob !== identity.blob ||
+      actualSha256 !== expectedRepositorySha256
+    ) {
+      mismatched.push({
+        file,
+        expectedBlob: identity.blob,
+        actualBlob: actualBlob || null,
+        expectedSha256: expectedRepositorySha256,
+        actualSha256: actualSha256 || null,
+      });
+    }
+  }
+  if (mismatched.length) {
+    throw new ReleaseContainmentError(
+      "HISTORICAL_PROVENANCE_FILE_IDENTITY_MISMATCH",
+      "Historical production provenance files changed from their reviewed identities.",
+      { mismatched },
+    );
+  }
+
+  const markerPath = "supabase/migrations/20260723010607_remote_schema.sql";
+  const archivePath =
+    "supabase/production-history/20260723010607_remote_schema.sql";
+  const markerText = fileBufferAt(normalizedRoot, headCommit, markerPath).toString("utf8");
+  const archiveText = fileBufferAt(normalizedRoot, headCommit, archivePath).toString("utf8");
+  assertCommentOnlyMarker(markerText);
+  const statements = parseHistoricalStatements(archiveText);
+  const archiveIdentity = APPROVED_HISTORICAL_PROVENANCE_IDENTITIES[archivePath];
+  const orderedStatementsMd5 = digest(
+    "md5",
+    statements.join("\n-- statement boundary --\n"),
+  );
+  if (
+    statements.length !== archiveIdentity.statementCount ||
+    orderedStatementsMd5 !== archiveIdentity.orderedStatementsMd5
+  ) {
+    throw new ReleaseContainmentError(
+      "HISTORICAL_ARCHIVE_AUDIT_MISMATCH",
+      "The archived production snapshot no longer matches the audited statement set.",
+      {
+        expectedStatementCount: archiveIdentity.statementCount,
+        actualStatementCount: statements.length,
+        expectedOrderedStatementsMd5: archiveIdentity.orderedStatementsMd5,
+        actualOrderedStatementsMd5: orderedStatementsMd5,
+      },
+    );
+  }
+
+  return {
+    projectRef: "ulbmjcvnyznvmjgpstno",
+    migrationVersion: "20260723010607",
+    migrationName: "remote_schema",
+    markerPath,
+    archivePath,
+    statementCount: statements.length,
+    orderedStatementsMd5,
+    markerCommentOnly: true,
+    identitiesMatch: true,
+  };
 }
 
 function isAncestor(repoRoot, ancestorCommit, descendantCommit) {
@@ -213,8 +384,17 @@ function validateCanonicalPlusAdditiveTree({
   }
 
   const headSupabaseFiles = listFilesAt(repoRoot, headCommit, "supabase");
+  const historicalProvenancePresent = headSupabaseFiles.some(
+    (file) =>
+      APPROVED_HISTORICAL_PROVENANCE_PATHS.includes(file) ||
+      file.startsWith("supabase/production-history/"),
+  );
+  const expectedFiles = [
+    ...expectedSupabaseSources.keys(),
+    ...(historicalProvenancePresent ? APPROVED_HISTORICAL_PROVENANCE_PATHS : []),
+  ];
   assertMatchingFileSet(
-    [...expectedSupabaseSources.keys()],
+    expectedFiles,
     headSupabaseFiles,
     "COMBINED_SUPABASE_PATH_SET_MISMATCH",
     "The combined Supabase tree contains missing or unexpected paths.",
@@ -226,6 +406,9 @@ function validateCanonicalPlusAdditiveTree({
     "COMBINED_SUPABASE_FILE_IDENTITY_MISMATCH",
     "The combined Supabase tree does not match the approved canonical and additive file identities.",
   );
+  return historicalProvenancePresent
+    ? validateHistoricalProvenance({ repoRoot, headRef: headCommit })
+    : null;
 }
 
 export function validateReleaseContainment({
@@ -315,7 +498,7 @@ export function validateReleaseContainment({
       );
     }
 
-    validateCanonicalPlusAdditiveTree({
+    const historicalProvenance = validateCanonicalPlusAdditiveTree({
       repoRoot: normalizedRoot,
       authorizedDbCommit,
       approvedAdditiveCommit,
@@ -323,7 +506,9 @@ export function validateReleaseContainment({
     });
 
     return {
-      mode: "canonical_plus_additive",
+      mode: historicalProvenance
+        ? "canonical_plus_additive_with_provenance"
+        : "canonical_plus_additive",
       repoRoot: normalizedRoot,
       releaseBaseRef,
       releaseBaseCommit,
@@ -342,6 +527,7 @@ export function validateReleaseContainment({
       supabaseTreeMatchesAuthorizedRef: null,
       canonicalSupabaseFilesMatchAuthorizedRef: true,
       combinedSupabaseTreeMatchesApprovedRefs: true,
+      historicalProvenance,
     };
   }
 

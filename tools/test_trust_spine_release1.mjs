@@ -461,7 +461,10 @@ test("Phase-aware release containment preserves the authorized Trust Spine SQL",
     );
     assert.deepEqual(containment.postAuthorizationDatabaseFiles, []);
     assert.equal(containment.supabaseTreeMatchesAuthorizedRef, null);
-  } else if (containment.mode === "canonical_plus_additive") {
+  } else if (
+    containment.mode === "canonical_plus_additive" ||
+    containment.mode === "canonical_plus_additive_with_provenance"
+  ) {
     assert.equal(containment.supabaseTreeMatchesAuthorizedRef, null);
     assert.equal(containment.canonicalSupabaseFilesMatchAuthorizedRef, true);
     assert.equal(containment.combinedSupabaseTreeMatchesApprovedRefs, true);
@@ -471,6 +474,14 @@ test("Phase-aware release containment preserves the authorized Trust Spine SQL",
       [...containment.allowedAdditiveDatabaseFiles].sort(),
       [...APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS].sort(),
     );
+    if (containment.mode === "canonical_plus_additive_with_provenance") {
+      assert.equal(containment.historicalProvenance.markerCommentOnly, true);
+      assert.equal(containment.historicalProvenance.statementCount, 350);
+      assert.equal(
+        containment.historicalProvenance.orderedStatementsMd5,
+        "ea4aeff5aff66a88dae1211b93e3a1fa",
+      );
+    }
   } else {
     assert.equal(containment.supabaseTreeMatchesAuthorizedRef, true);
     assert.deepEqual(containment.postAuthorizationDatabaseFiles, []);

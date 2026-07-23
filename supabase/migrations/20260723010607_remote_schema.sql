@@ -1,0 +1,17 @@
+-- LaxHornet production migration provenance marker.
+-- Remote migration: 20260723010607_remote_schema
+-- Production project: ulbmjcvnyznvmjgpstno
+-- Classification: historical production db-pull snapshot
+-- Archived snapshot: supabase/production-history/20260723010607_remote_schema.sql
+-- Ordered statement count: 350
+-- Ordered-statements MD5: ea4aeff5aff66a88dae1211b93e3a1fa
+-- Archive SHA-256: c8bd4bc55cc13b6506ccb859cf658f6962beec65f91d713f0867c91b4b046c82
+-- Archive Git blob: 0c7fd494be0a461a3fb2b3efa60496b8541229a3
+--
+-- This migration is already applied in production and is intentionally a
+-- comment-only no-op for blank-database builds. All five canonical v283
+-- migrations still execute through their existing files and timestamps.
+--
+-- Never convert this marker into executable SQL. Never delete or repair the
+-- legitimate remote ledger row. Never copy the archived 350 statements into
+-- the active migration path.

@@ -1,11 +1,33 @@
 {
   "release": "v283",
+  "finalMainBaseSha": "2b773bce9eb858870c06b95b35051c34fbbad8bc",
   "databaseCandidate": "ad96e428d675fba8fac7752fd108ea06827fa0ad",
   "preCutoverRuntime": "f4ead54b44fcb5710fe4ed3eed39ab5f1694def4",
   "activationCandidate": "7cf58df9a43ce235fc6068bd4c50549e05906de4",
   "cleanupCandidate": "0050f054df826dbe4343515b79079dd6c80793bc",
   "minimumSchemaCapability": 1,
-  "databaseTreeMode": "canonical_plus_additive",
+  "databaseTreeMode": "canonical_plus_additive_with_provenance",
+  "productionHistoricalMigration": {
+    "version": "20260723010607",
+    "name": "remote_schema",
+    "projectRef": "ulbmjcvnyznvmjgpstno",
+    "classification": "legitimate historical production provenance",
+    "sourceClassification": "historical production db-pull snapshot",
+    "archivedSnapshotPath": "supabase/production-history/20260723010607_remote_schema.sql",
+    "markerPath": "supabase/migrations/20260723010607_remote_schema.sql",
+    "documentationPath": "supabase/production-history/README.md",
+    "orderedStatementsMd5": "ea4aeff5aff66a88dae1211b93e3a1fa",
+    "archiveSha256": "c8bd4bc55cc13b6506ccb859cf658f6962beec65f91d713f0867c91b4b046c82",
+    "archiveGitBlob": "0c7fd494be0a461a3fb2b3efa60496b8541229a3",
+    "markerSha256": "eee50c8cddc00dcec0171f1cadc3937d6ca8473a023c68c6858609f6813520f9",
+    "markerGitBlob": "d4aed15847e45abbe755aaba3d10f3978755acc9",
+    "documentationSha256": "b77ad6b99fb551d0099c689d76803ffa78ef6da8c56a7d660a2b346e0cb01019",
+    "documentationGitBlob": "73aff47d9b4c33876617a9b956b2693befa9457c",
+    "statementCount": 350,
+    "remoteMarkerExpectedApplied": true,
+    "blankDatabaseMarkerNoOp": true,
+    "productionPushRequiresIncludeAll": true
+  },
   "canonicalForwardMigrations": [
     "supabase/migrations/20260723000000_laxhornet_legacy_baseline.sql",
     "supabase/migrations/20260723010000_trust_spine_release_1.sql",
@@ -13,6 +35,24 @@
     "supabase/migrations/20260723030000_fix_disclosure_audit_and_evidence_validation.sql"
   ],
   "additiveForwardMigrations": [
+    "supabase/migrations/20260723040000_event_pipeline_capabilities.sql"
+  ],
+  "requiredMigrationSequence": [
+    "supabase/migrations/20260723000000_laxhornet_legacy_baseline.sql",
+    "supabase/migrations/20260723010000_trust_spine_release_1.sql",
+    "supabase/migrations/20260723010607_remote_schema.sql",
+    "supabase/migrations/20260723020000_minimum_necessary_disclosure.sql",
+    "supabase/migrations/20260723030000_fix_disclosure_audit_and_evidence_validation.sql",
+    "supabase/migrations/20260723040000_event_pipeline_capabilities.sql"
+  ],
+  "expectedRemoteAppliedMigrations": [
+    "supabase/migrations/20260723010607_remote_schema.sql"
+  ],
+  "expectedPendingProductionMigrations": [
+    "supabase/migrations/20260723000000_laxhornet_legacy_baseline.sql",
+    "supabase/migrations/20260723010000_trust_spine_release_1.sql",
+    "supabase/migrations/20260723020000_minimum_necessary_disclosure.sql",
+    "supabase/migrations/20260723030000_fix_disclosure_audit_and_evidence_validation.sql",
     "supabase/migrations/20260723040000_event_pipeline_capabilities.sql"
   ],
   "rollbackReferences": [
@@ -36,6 +76,20 @@
     "additive": {
       "supabase/migrations/20260723040000_event_pipeline_capabilities.sql": "7d220e88a1e742c8e79f1dfcf54e4b370a85f1363c657e6f9d02aa0527ed8c69",
       "supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql": "4a4f3d4db7e2cf05883af016551eaeef110a23ee91445941989f5cb5542306e6"
+    },
+    "historicalProvenance": {
+      "supabase/migrations/20260723010607_remote_schema.sql": {
+        "sha256": "eee50c8cddc00dcec0171f1cadc3937d6ca8473a023c68c6858609f6813520f9",
+        "gitBlob": "d4aed15847e45abbe755aaba3d10f3978755acc9"
+      },
+      "supabase/production-history/20260723010607_remote_schema.sql": {
+        "sha256": "c8bd4bc55cc13b6506ccb859cf658f6962beec65f91d713f0867c91b4b046c82",
+        "gitBlob": "0c7fd494be0a461a3fb2b3efa60496b8541229a3"
+      },
+      "supabase/production-history/README.md": {
+        "sha256": "b77ad6b99fb551d0099c689d76803ffa78ef6da8c56a7d660a2b346e0cb01019",
+        "gitBlob": "73aff47d9b4c33876617a9b956b2693befa9457c"
+      }
     }
   },
   "requiredRuntimeFlags": [

@@ -86,7 +86,10 @@ if (containment.mode === "standalone") {
     containment.postAuthorizationDatabaseFiles.length === 0,
     "additive cleanup has no post-authorization database changes",
   );
-} else if (containment.mode === "canonical_plus_additive") {
+} else if (
+  containment.mode === "canonical_plus_additive" ||
+  containment.mode === "canonical_plus_additive_with_provenance"
+) {
   expect(
     containment.combinedSupabaseTreeMatchesApprovedRefs,
     "combined Supabase tree matches the approved canonical and additive file identities",
@@ -95,6 +98,12 @@ if (containment.mode === "standalone") {
     containment.postAuthorizationDatabaseFiles.length === 0,
     "combined release contains no unapproved database files",
   );
+  if (containment.mode === "canonical_plus_additive_with_provenance") {
+    expect(
+      containment.historicalProvenance?.markerCommentOnly === true,
+      "combined release preserves the comment-only historical marker",
+    );
+  }
 } else {
   expect(
     containment.supabaseTreeMatchesAuthorizedRef,

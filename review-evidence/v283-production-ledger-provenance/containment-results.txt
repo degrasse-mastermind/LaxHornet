@@ -1,0 +1,15 @@
+Historical provenance containment:
+- exact marker, archive, and documentation path set: PASS
+- exact SHA-256 and Git blob identities: PASS
+- archive statement count 350: PASS
+- aggregate ordered-statements MD5: PASS
+- comment-only marker: PASS
+- canonical_plus_additive compatibility preserved: PASS
+- canonical_plus_additive_with_provenance final mode: PASS
+- changed archive rejected: PASS
+- executable marker rejected: PASS
+- unexpected production-history file rejected: PASS
+- canonical migration mutations rejected by existing controls: PASS
+- unexpected migration, rollback, and function paths rejected: PASS
+
+Focused phase-aware result: 30/30 passed.
