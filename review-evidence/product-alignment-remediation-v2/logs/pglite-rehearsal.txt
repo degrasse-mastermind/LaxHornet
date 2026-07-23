@@ -1,4 +1,4 @@
-﻿PASS: base and disclosure migrations apply {"synthetic":true}
+PASS: base and disclosure migrations apply {"synthetic":true}
 PASS: anonymous ordinary and private table privileges are denied {"anon_games":false,"anon_events":false,"anon_tokens":false,"anon_audit":false,"anon_public_rpc":true,"anon_create_token":false,"auth_create_token":true}
 PASS: RPC grants are purpose-bounded {"anon_games":false,"anon_events":false,"anon_tokens":false,"anon_audit":false,"anon_public_rpc":true,"anon_create_token":false,"auth_create_token":true}
 PASS: authenticated actor creates a game-scoped random token {"outcome":"accepted","codeLength":32}
@@ -8,10 +8,10 @@ PASS: public response excludes private and authority fields {}
 PASS: unknown token fails neutrally {}
 PASS: expired token fails neutrally {}
 PASS: revoked token fails neutrally {}
-PASS: authorized export writes audit metadata {"code":"export_audit_recorded","auditId":"7162bb1d-f100-4b22-9e52-f49ae0181de8","outcome":"accepted","recordedAt":"2026-07-23T01:56:52.031+00:00"}
+PASS: authorized export writes audit metadata {"code":"export_audit_recorded","auditId":"85883413-d631-40d8-b7e4-99d97b545736","outcome":"accepted","recordedAt":"2026-07-23T02:52:55.988+00:00"}
 PASS: export audit stores purpose metadata without payload {"outcome":"accepted","scopeId":"disclosure-game","scopeType":"game","exportType":"player_csv"}
 PASS: account backup audit cannot name another account {"code":"unauthorized_scope","outcome":"rejected"}
-PASS: account backup audit accepts only the signed-in account scope {"code":"export_audit_recorded","auditId":"dab8635b-033f-4826-86ba-8cbd52bc05bc","outcome":"accepted","recordedAt":"2026-07-23T01:56:52.045+00:00"}
+PASS: account backup audit accepts only the signed-in account scope {"code":"export_audit_recorded","auditId":"ce006aff-b792-44e0-879e-4c22faeb0831","outcome":"accepted","recordedAt":"2026-07-23T02:52:55.993+00:00"}
 PASS: authorized actor revokes active game tokens {"code":"live_share_tokens_revoked","outcome":"accepted","revokedTokenCount":1}
 PASS: revoked generated token can no longer disclose the game {}
 PASS: rollback removes staging objects and preserves legacy sentinels {"trust_tables":0,"legacy_games":1,"legacy_events":1,"anon_games_restored":true,"anon_events_restored":true}
@@ -121,9 +121,9 @@ PASS: rollback removes staging objects and preserves legacy sentinels {"trust_ta
       "status": "pass",
       "evidence": {
         "code": "export_audit_recorded",
-        "auditId": "7162bb1d-f100-4b22-9e52-f49ae0181de8",
+        "auditId": "85883413-d631-40d8-b7e4-99d97b545736",
         "outcome": "accepted",
-        "recordedAt": "2026-07-23T01:56:52.031+00:00"
+        "recordedAt": "2026-07-23T02:52:55.988+00:00"
       }
     },
     {
@@ -149,9 +149,9 @@ PASS: rollback removes staging objects and preserves legacy sentinels {"trust_ta
       "status": "pass",
       "evidence": {
         "code": "export_audit_recorded",
-        "auditId": "dab8635b-033f-4826-86ba-8cbd52bc05bc",
+        "auditId": "ce006aff-b792-44e0-879e-4c22faeb0831",
         "outcome": "accepted",
-        "recordedAt": "2026-07-23T01:56:52.045+00:00"
+        "recordedAt": "2026-07-23T02:52:55.993+00:00"
       }
     },
     {

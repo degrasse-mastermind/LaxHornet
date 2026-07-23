@@ -1,5 +1,3 @@
-\set ON_ERROR_STOP on
-
 -- LaxHornet Trust Spine Release 1
 -- STAGING-ONLY destructive rollback for the additive lh_* objects.
 --

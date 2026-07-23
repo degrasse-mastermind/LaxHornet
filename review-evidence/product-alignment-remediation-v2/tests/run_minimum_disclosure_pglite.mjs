@@ -17,7 +17,7 @@ const baseMigration = read("sql/00_TRUST_SPINE_BASE_STAGING_MIGRATION.sql").repl
 );
 const disclosureMigration = read("sql/01_MINIMUM_DISCLOSURE_STAGING_MIGRATION.sql");
 const disclosureRollback = read("sql/98_MINIMUM_DISCLOSURE_STAGING_ROLLBACK.sql");
-const baseRollback = read("sql/99_TRUST_SPINE_BASE_STAGING_ROLLBACK.sql").replace(/^\\set\s+ON_ERROR_STOP\s+on\s*$/im, "");
+const baseRollback = read("sql/99_TRUST_SPINE_BASE_STAGING_ROLLBACK.sql");
 const testUserId = "11111111-1111-4111-8111-111111111111";
 const fixture = read("tests/STAGING_DISCLOSURE_FIXTURE_TEMPLATE.sql").replaceAll("__TEST_USER_ID__", testUserId);
 
