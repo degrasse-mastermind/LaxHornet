@@ -1,0 +1,34 @@
+﻿LaxHornet v283 combined release containment rehearsal
+Generated: 2026-07-23T08:30:25.6390844-04:00
+origin/main: d1c5ada83a1247973b44ebfd1c33be78f4bc2dc7
+PR9: ad96e428d675fba8fac7752fd108ea06827fa0ad
+PR10: f4ead54b44fcb5710fe4ed3eed39ab5f1694def4
+PR11: 7cf58df9a43ce235fc6068bd4c50549e05906de4
+PR12: 0050f054df826dbe4343515b79079dd6c80793bc
+fix: f7b3ebce4f0e6ec009bc1a7aa97d87a086e60e95
+combined HEAD: 12ed2cc648bb1316b50003c9627bda55c1c83e9f
+
+Recent integration history:
+12ed2cc (HEAD -> review/integration-v283-containment-fix) Merge containment test isolation for local rehearsal
+f7b3ebc (review/v283-combined-release-containment-fix) Isolate containment fixtures from release environment
+18bae71 Merge PR12 cleanup and containment fix for local rehearsal
+ddc0299 Merge PR11 activation candidate for local rehearsal
+92a4c71 Merge PR10 runtime candidate for local rehearsal
+8266e52 Merge PR9 database candidate for local rehearsal
+bb34b98 Support canonical plus additive release containment
+0050f05 (origin/review/event-pipeline-release-control-cleanup, review/event-pipeline-release-control-cleanup) Add operational health and end-to-end proof
+
+Governed Supabase files:
+supabase/PRODUCTION_CANDIDATE.md
+supabase/config.toml
+supabase/functions/_shared/email-templates.js
+supabase/functions/resend-webhook/index.ts
+supabase/functions/send-laxhornet-email-queue/index.ts
+supabase/migrations/20260723000000_laxhornet_legacy_baseline.sql
+supabase/migrations/20260723010000_trust_spine_release_1.sql
+supabase/migrations/20260723020000_minimum_necessary_disclosure.sql
+supabase/migrations/20260723030000_fix_disclosure_audit_and_evidence_validation.sql
+supabase/migrations/20260723040000_event_pipeline_capabilities.sql
+supabase/rollback/20260723010000_trust_spine_release_1_rollback.sql
+supabase/rollback/20260723020000_minimum_necessary_disclosure_rollback.sql
+supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql
