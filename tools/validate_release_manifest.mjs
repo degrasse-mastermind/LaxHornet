@@ -84,7 +84,10 @@ const migrationDirectory = path.join(root, "supabase", "migrations");
 const cleanupMigrations = fs.existsSync(migrationDirectory)
   ? fs.readdirSync(migrationDirectory).map((name) => `supabase/migrations/${name}`)
   : [];
-const allowedCleanupMigrations = new Set(manifest.additiveForwardMigrations);
+const allowedCleanupMigrations = new Set([
+  ...manifest.additiveForwardMigrations,
+  ...(requireCombined ? manifest.canonicalForwardMigrations : []),
+]);
 for (const file of cleanupMigrations) {
   expect(allowedCleanupMigrations.has(file), `unknown cleanup migration detected: ${file}`);
 }

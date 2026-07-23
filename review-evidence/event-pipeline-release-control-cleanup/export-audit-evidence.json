@@ -1,0 +1,8 @@
+{
+  "syntheticOnly": true,
+  "authorizedPlayerExportAccepted": true,
+  "teamAdminExportAccepted": true,
+  "teamCoachExportAccepted": true,
+  "crossPlayerExportRejected": true,
+  "crossTeamExportRejected": true
+}

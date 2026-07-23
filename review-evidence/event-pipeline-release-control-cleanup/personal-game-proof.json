@@ -1,0 +1,11 @@
+{
+  "scopeType": "personal",
+  "privateTrackingAvailable": true,
+  "privateSaveReviewExportAvailable": true,
+  "secureLiveShareAvailable": false,
+  "eligibilityReason": "personal_game",
+  "teamScopeRpcCalled": false,
+  "tokenRpcCalled": false,
+  "anonymousLegacyFallback": false,
+  "result": "pass"
+}

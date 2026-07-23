@@ -1,0 +1,16 @@
+{
+  "appVersion": "v283",
+  "cacheVersion": "laxhornet-v283",
+  "schemaVersion": 1,
+  "runtimeReady": true,
+  "pending": 0,
+  "failed": 0,
+  "conflicted": 0,
+  "lastAcceptedSync": "present",
+  "liveShareReady": true,
+  "exportAuditReady": true,
+  "anonymousTables": "Denied by release contract",
+  "legacyCompatibility": "Present",
+  "manifestRelease": "v283",
+  "containsYouthOrFamilyData": false
+}

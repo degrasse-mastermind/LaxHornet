@@ -1,0 +1,6 @@
+Initialising login role...
+Connecting to remote database...
+Linting schema: extensions
+Linting schema: lh_trust_private
+Linting schema: public
+{"results":[{"function":"public.laxhornet_request_team_player_access","issues":[{"level":"error","message":"column reference \"id\" is ambiguous","statement":{"lineNumber":"68","text":"SQL statement"},"query":{"position":"790","text":"insert into public.notification_queue (id, event_type, recipient_email, subject, body, payload)\n  values (\n    'notify-request-user-' || request_id,\n    'team_access_requested_user',\n    requester_email,\n    'LaxHornet request submitted',\n    'Your LaxHornet request was submitted for ' || matched_team.name || ', jersey #' || jersey_number || '. Admin is reviewing your request.',\n    jsonb_build_object(\n      'team_id', matched_team.id,\n      'team_name', matched_team.name,\n      'request_id', request_id,\n      'email', requester_email,\n      'first_name', coalesce(requester_profile.first_name, ''),\n      'last_name', coalesce(requester_profile.last_name, ''),\n      'phone', coalesce(requester_profile.phone, ''),\n      'child_jersey_number', jersey_number\n    )\n  )\n  on conflict (id) do nothing"},"detail":"It could refer to either a PL/pgSQL variable or a table column.","sqlState":"42702"}]}],"message":"db lint"}
