@@ -191,6 +191,7 @@ try {
 
   git(["switch", "-c", "advanced-release-base", "release-base"]);
   write("approved-base-marker.txt", "current approved base\n");
+  write("review-evidence/historical.sql", "approved release-base evidence\n");
   commit("Advance the approved release base");
   git(["tag", "advanced-release-base-ref"]);
   git(["switch", "-c", "combined-divergent-history"]);

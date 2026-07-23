@@ -95,10 +95,6 @@ function isCanonicalDatabasePath(file) {
   );
 }
 
-function isPostAuthorizationDatabasePath(file) {
-  return isSqlPath(file) || file === "supabase" || file.startsWith("supabase/");
-}
-
 function assertExactAuthorizedSupabaseDelta(files) {
   const approved = new Set(APPROVED_AUTHORIZED_DB_PATHS);
   const actual = new Set(files.filter((file) => file === "supabase" || file.startsWith("supabase/")));
@@ -178,14 +174,24 @@ export function validateReleaseContainment({
   );
   assertExactAuthorizedSupabaseDelta(authorizedDeltaFiles);
 
-  const postAuthorizationFiles = changedFiles(normalizedRoot, authorizedDbCommit, headCommit);
-  const postAuthorizationDatabaseFiles = postAuthorizationFiles.filter(
-    isPostAuthorizationDatabasePath,
+  const supabaseChangesAfterAuthorization = changedFiles(
+    normalizedRoot,
+    authorizedDbCommit,
+    headCommit,
+  ).filter((file) => file === "supabase" || file.startsWith("supabase/"));
+  const nonSupabaseSqlChangesFromReleaseBase = releaseDeltaFiles.filter(
+    (file) => isSqlPath(file) && file !== "supabase" && !file.startsWith("supabase/"),
   );
+  const postAuthorizationDatabaseFiles = [
+    ...new Set([
+      ...supabaseChangesAfterAuthorization,
+      ...nonSupabaseSqlChangesFromReleaseBase,
+    ]),
+  ].sort();
   if (postAuthorizationDatabaseFiles.length) {
     throw new ReleaseContainmentError(
       "POST_AUTHORIZATION_DATABASE_CHANGE",
-      "Combined integration changes SQL or Supabase files after the authorized database ref.",
+      "Combined integration changes the authorized Supabase tree or adds SQL outside the release base.",
       { forbidden: postAuthorizationDatabaseFiles },
     );
   }
