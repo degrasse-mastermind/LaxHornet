@@ -1,129 +1,332 @@
 {
   "previewHost": "authorized-preview.supabase.co",
   "forbiddenHostedRequestCount": 0,
-  "hostedRequestCount": 3,
+  "hostedRequestCount": 31,
   "requests": [
     {
+      "actor": "authenticated-tracker",
       "method": "GET",
       "host": "127.0.0.1:5262",
       "path": "/app.html",
       "resourceType": "document"
     },
     {
+      "actor": "authenticated-tracker",
       "method": "GET",
       "host": "127.0.0.1:5262",
       "path": "/styles.css",
       "resourceType": "stylesheet"
     },
     {
+      "actor": "authenticated-tracker",
       "method": "GET",
       "host": "127.0.0.1:5262",
       "path": "/runtime-config.js",
       "resourceType": "script"
     },
     {
+      "actor": "authenticated-tracker",
       "method": "GET",
       "host": "127.0.0.1:5262",
       "path": "/assets/supabase.min.js",
       "resourceType": "script"
     },
     {
+      "actor": "authenticated-tracker",
       "method": "GET",
       "host": "127.0.0.1:5262",
       "path": "/app.js",
       "resourceType": "script"
     },
     {
+      "actor": "authenticated-tracker",
       "method": "GET",
       "host": "127.0.0.1:5262",
       "path": "/assets/LHbanner.png",
       "resourceType": "image"
     },
     {
-      "method": "POST",
-      "host": "authorized-preview.supabase.co",
-      "path": "/rest/v1/rpc/lh_public_live_share_game",
-      "resourceType": "fetch"
-    },
-    {
+      "actor": "authenticated-tracker",
       "method": "GET",
       "host": "127.0.0.1:5262",
       "path": "/assets/honeycombblack.png",
       "resourceType": "image"
     },
     {
+      "actor": "authenticated-tracker",
+      "method": "GET",
+      "host": "authorized-preview.supabase.co",
+      "path": "/auth/v1/user",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
       "method": "GET",
       "host": "127.0.0.1:5262",
       "path": "/assets/LHicon.png",
       "resourceType": "other"
     },
     {
-      "method": "GET",
-      "host": "127.0.0.1:5262",
-      "path": "/version.json",
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/laxhornet_my_profile",
       "resourceType": "fetch"
     },
     {
+      "actor": "authenticated-tracker",
+      "method": "GET",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/user_profiles",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/laxhornet_my_teams",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/laxhornet_my_team_access_requests",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/laxhornet_visible_roster_players",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/laxhornet_my_player_claims",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/laxhornet_my_roster_players",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "GET",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/games",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "GET",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/games",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/games",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/events",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/games",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/lh_register_game_scope",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/lh_register_game_scope",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/events",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/lh_create_event",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/lh_create_event",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/lh_create_event",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/games",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/events",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/lh_create_live_share_token",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "anonymous-viewer",
       "method": "GET",
       "host": "127.0.0.1:5262",
       "path": "/app.html",
       "resourceType": "document"
     },
     {
+      "actor": "anonymous-viewer",
       "method": "GET",
       "host": "127.0.0.1:5262",
       "path": "/styles.css",
       "resourceType": "stylesheet"
     },
     {
+      "actor": "anonymous-viewer",
       "method": "GET",
       "host": "127.0.0.1:5262",
       "path": "/runtime-config.js",
       "resourceType": "script"
     },
     {
+      "actor": "anonymous-viewer",
       "method": "GET",
       "host": "127.0.0.1:5262",
       "path": "/assets/supabase.min.js",
       "resourceType": "script"
     },
     {
+      "actor": "anonymous-viewer",
       "method": "GET",
       "host": "127.0.0.1:5262",
       "path": "/app.js",
       "resourceType": "script"
     },
     {
+      "actor": "anonymous-viewer",
       "method": "GET",
       "host": "127.0.0.1:5262",
       "path": "/assets/honeycombblack.png",
       "resourceType": "image"
     },
     {
+      "actor": "anonymous-viewer",
       "method": "GET",
       "host": "127.0.0.1:5262",
       "path": "/assets/LHbanner.png",
       "resourceType": "image"
     },
     {
+      "actor": "anonymous-viewer",
       "method": "POST",
       "host": "authorized-preview.supabase.co",
       "path": "/rest/v1/rpc/lh_public_live_share_game",
       "resourceType": "fetch"
     },
     {
+      "actor": "anonymous-viewer",
       "method": "GET",
       "host": "127.0.0.1:5262",
       "path": "/assets/LHicon.png",
       "resourceType": "other"
     },
     {
-      "method": "GET",
-      "host": "127.0.0.1:5262",
-      "path": "/version.json",
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/games",
       "resourceType": "fetch"
     },
     {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/lh_create_event",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/events",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "anonymous-viewer",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/lh_public_live_share_game",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/lh_correct_event",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "anonymous-viewer",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/lh_public_live_share_game",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "authenticated-tracker",
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/lh_tombstone_event",
+      "resourceType": "fetch"
+    },
+    {
+      "actor": "anonymous-viewer",
       "method": "POST",
       "host": "authorized-preview.supabase.co",
       "path": "/rest/v1/rpc/lh_public_live_share_game",

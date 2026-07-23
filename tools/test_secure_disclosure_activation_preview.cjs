@@ -191,7 +191,11 @@ async function signIn(email) {
     status: response.status,
     signedIn: Boolean(response.body?.access_token),
   });
-  return { token: response.body.access_token, userId: response.body.user.id };
+  return {
+    token: response.body.access_token,
+    refreshToken: response.body.refresh_token,
+    userId: response.body.user.id,
+  };
 }
 
 async function seedFixture(users) {
@@ -199,6 +203,41 @@ async function seedFixture(users) {
   const issuedAt = new Date(now - 60 * 60 * 1000).toISOString();
   const acceptedAt = new Date(now - 59 * 60 * 1000).toISOString();
 
+  await tableInsert("teams", {
+    id: fixture.teamA,
+    name: "Branford Demo Hornets",
+    invite_code: `${runId}-INVITE`,
+    tracker_code: `${runId}-TRACK`,
+    created_by: users.admin,
+  });
+  await tableInsert("team_members", [
+    {
+      id: `${runId}-admin-member`,
+      team_id: fixture.teamA,
+      user_id: users.admin,
+      role: "admin",
+    },
+    {
+      id: `${runId}-parent-member`,
+      team_id: fixture.teamA,
+      user_id: users.parent,
+      role: "tracker",
+    },
+  ]);
+  await tableInsert("roster_players", {
+    id: fixture.playerA,
+    team_id: fixture.teamA,
+    name: "Demo Player",
+    number: "12",
+    position: "Midfield",
+    active: true,
+  });
+  await tableInsert("player_claims", {
+    id: `${runId}-parent-claim`,
+    team_id: fixture.teamA,
+    roster_player_id: fixture.playerA,
+    user_id: users.parent,
+  });
   await tableInsert("lh_team_scopes", [
     { team_id: fixture.teamA, team_name_snapshot: "Branford Demo Hornets" },
     { team_id: fixture.teamB, team_name_snapshot: "Madison Demo Hornets" },
@@ -335,42 +374,11 @@ async function seedFixture(users) {
   ]);
 }
 
-async function createSyntheticEvent(parentSession) {
-  const response = await rpc("lh_create_event", {
-    p_operation: {
-      client_operation_id: `${runId}-create-event`,
-      event_id: fixture.eventA,
-      game_id: fixture.gameA,
-      client_created_at: "2026-07-23T18:10:00.000Z",
-      evidence: {
-        occurred_at: "2026-07-23T18:10:00.000Z",
-        period: "Q2",
-        stat_type: "groundBall",
-        stat_label: "Ground Ball",
-        category: "Possession",
-        point_value: 2,
-        field_zone: "midfield",
-      },
-      annotations: {
-        note: "SYNTHETIC_PRIVATE_NOTE_MUST_NOT_BE_PUBLIC",
-        tags: ["SYNTHETIC_PRIVATE_TAG_MUST_NOT_BE_PUBLIC"],
-      },
-    },
-  }, parentSession.token);
-  check(
-    response.status === 200
-      && response.body?.outcome === "accepted"
-      && response.body?.code === "created",
-    "created synthetic event through the approved authenticated RPC",
-    response,
-  );
-}
-
 function exactKeys(value) {
   return Object.keys(value || {}).sort();
 }
 
-async function runRpcChecks(sessions) {
+async function runRpcChecks(sessions, shareCode, bridgeEvidence) {
   for (const table of ["games", "events"]) {
     const direct = await request(`${previewOrigin}/rest/v1/${table}?select=*&limit=1`, {
       headers: dataHeaders(publishableKey),
@@ -382,13 +390,7 @@ async function runRpcChecks(sessions) {
     );
   }
 
-  const create = await rpc("lh_create_live_share_token", {
-    p_game_id: fixture.gameA,
-    p_expires_at: null,
-  }, sessions.admin.token);
-  check(create.status === 200 && create.body?.outcome === "accepted", "team admin created a game-scoped token", create);
-  const shareCode = create.body.shareCode;
-  check(/^[A-F0-9]{32}$/.test(shareCode), "created token has the expected random shape");
+  check(/^[A-F0-9]{32}$/.test(shareCode), "browser-created token has the expected random shape");
 
   const publicRead = await rpc("lh_public_live_share_game", { p_share_code: shareCode });
   check(publicRead.status === 200 && publicRead.body?.game, "anonymous public-safe read succeeded", publicRead);
@@ -401,7 +403,12 @@ async function runRpcChecks(sessions) {
     "stat_label", "stat_type",
   ].sort();
   check(JSON.stringify(exactKeys(publicRead.body.game)) === JSON.stringify(allowedGameKeys), "public game payload matches the exact allowlist");
-  check(JSON.stringify(exactKeys(publicRead.body.events?.[0])) === JSON.stringify(allowedEventKeys), "public event payload matches the exact allowlist");
+  check(
+    Array.isArray(publicRead.body.events)
+      && publicRead.body.events.length === bridgeEvidence.expectedPublicEventCount
+      && publicRead.body.events.every((event) => JSON.stringify(exactKeys(event)) === JSON.stringify(allowedEventKeys)),
+    "public event payload matches the exact allowlist",
+  );
   const serialized = JSON.stringify(publicRead.body).toLowerCase();
   check(!serialized.includes("synthetic_private_note"), "public payload excludes private notes");
   check(!serialized.includes("synthetic_private_tag"), "public payload excludes private tags");
@@ -449,10 +456,11 @@ async function runRpcChecks(sessions) {
     shareCode,
     publicPayload: publicRead.body,
     tokenEvidence: {
-      created: create.body?.outcome,
+      created: "accepted",
       codeLength: shareCode.length,
       polled: poll.status === 200,
       unknownExpiredRevokedNeutral: true,
+      createdThroughTrackerUi: true,
     },
     exportEvidence: {
       teamAdmin: adminAudit.body?.outcome,
@@ -463,6 +471,7 @@ async function runRpcChecks(sessions) {
       ownBackup: backup.body?.outcome,
       otherAccountBackup: wrongBackup.body?.code,
     },
+    bridgeEvidence,
   };
 }
 
@@ -492,7 +501,26 @@ function startServer() {
   });
 }
 
-async function runBrowserCheck(shareCode) {
+function recordBrowserNetwork(page, actor) {
+  page.on("console", (message) => {
+    if (["error", "warning"].includes(message.type())) {
+      browserDiagnostics.push(`${actor}:console:${message.type()}: ${message.text()}`);
+    }
+  });
+  page.on("pageerror", (error) => browserDiagnostics.push(`${actor}:pageerror: ${error.message}`));
+  page.on("request", (browserRequest) => {
+    const url = new URL(browserRequest.url());
+    networkInventory.push({
+      actor,
+      method: browserRequest.method(),
+      host: url.host,
+      path: url.pathname,
+      resourceType: browserRequest.resourceType(),
+    });
+  });
+}
+
+async function runBrowserBridge(parentSession) {
   server = await startServer();
   const executablePath = [
     process.env.CHROME_PATH,
@@ -500,37 +528,188 @@ async function runBrowserCheck(shareCode) {
     "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
   ].find((candidate) => candidate && fs.existsSync(candidate));
   browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await context.addInitScript(({ url, key }) => {
+  const trackerContext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+  await trackerContext.grantPermissions(["clipboard-read", "clipboard-write"], { origin: localOrigin });
+  await trackerContext.addInitScript(({ url, key }) => {
     window.LAXHORNET_RUNTIME_CONFIG = {
       supabaseUrl: url,
       supabasePublishableKey: key,
     };
   }, { url: previewOrigin, key: publishableKey });
-  const page = await context.newPage();
-  page.on("console", (message) => {
-    if (["error", "warning"].includes(message.type())) {
-      browserDiagnostics.push(`console:${message.type()}: ${message.text()}`);
-    }
-  });
-  page.on("pageerror", (error) => browserDiagnostics.push(`pageerror: ${error.message}`));
-  page.on("request", (browserRequest) => {
-    const url = new URL(browserRequest.url());
-    networkInventory.push({
-      method: browserRequest.method(),
-      host: url.host,
-      path: url.pathname,
-      resourceType: browserRequest.resourceType(),
-    });
-  });
-  await page.goto(`${localOrigin}/app.html?share=${encodeURIComponent(shareCode)}&fresh=v282-managed-preview`, {
+  const trackerPage = await trackerContext.newPage();
+  recordBrowserNetwork(trackerPage, "authenticated-tracker");
+  await trackerPage.goto(`${localOrigin}/app.html?fresh=v282-managed-preview-tracker`, {
     waitUntil: "domcontentloaded",
   });
-  await page.getByText("Ground Ball", { exact: false }).first().waitFor({ timeout: 30000 });
-  await page.waitForTimeout(4500);
-  const body = await page.locator("body").innerText();
-  const status = await page.evaluate(() => window.LAXHORNET_DISCLOSURE_STATUS);
-  const scriptOrder = await page.evaluate(() => window.LAXHORNET_SCRIPT_ORDER);
+  const authResult = await trackerPage.evaluate(async (session) => {
+    const { data, error } = await supabaseClient.auth.setSession({
+      access_token: session.token,
+      refresh_token: session.refreshToken,
+    });
+    if (error || !data?.user) return { ok: false, message: error?.message || "Session unavailable" };
+    setAuthUser(data.user);
+    return { ok: true, userId: data.user.id };
+  }, parentSession);
+  check(authResult.ok && authResult.userId === parentSession.userId, "managed browser signed in the synthetic parent");
+
+  await trackerPage.evaluate(({ fixtureIds, email }) => {
+    state.userProfile = normalizeUserProfile({
+      userId: currentUserId(),
+      email,
+      firstName: "Synthetic",
+      lastName: "Parent",
+      approvedRole: "tracker",
+      onboardingCompleted: true,
+    });
+    const team = normalizeTeam({
+      id: fixtureIds.teamA,
+      name: "Branford Demo Hornets",
+      role: "tracker",
+      cloudBacked: true,
+    });
+    const roster = normalizeRosterPlayer({
+      id: fixtureIds.playerA,
+      teamId: fixtureIds.teamA,
+      name: "Demo Player",
+      number: "12",
+      position: "Midfield",
+      active: true,
+    });
+    const player = rosterPlayerToPlayer(roster);
+    const existingEvent = normalizeEvent({
+      id: fixtureIds.eventA,
+      gameId: fixtureIds.gameA,
+      timestamp: "2026-07-23T18:10:00.000Z",
+      quarter: "Q1",
+      statType: "groundBall",
+      statLabel: "Ground Ball",
+      category: "Possession / IQ",
+      pointValue: 2,
+      fieldZone: "Midfield",
+      note: "SYNTHETIC_PRIVATE_NOTE_MUST_NOT_BE_PUBLIC",
+      tags: ["SYNTHETIC_PRIVATE_TAG_MUST_NOT_BE_PUBLIC"],
+    }, fixtureIds.gameA);
+    const game = normalizeGame({
+      id: fixtureIds.gameA,
+      userId: currentUserId(),
+      teamId: fixtureIds.teamA,
+      rosterPlayerId: fixtureIds.playerA,
+      opponent: "Madison Demo",
+      date: "2026-07-23",
+      periodFormat: "quarters",
+      currentQuarter: "Q1",
+      playerSnapshot: player,
+      events: [existingEvent],
+    });
+    state.teams = [team];
+    state.rosterPlayers = [roster];
+    state.playerClaims = [{
+      id: `${fixtureIds.playerA}-claim`,
+      teamId: fixtureIds.teamA,
+      rosterPlayerId: fixtureIds.playerA,
+      userId: currentUserId(),
+    }];
+    state.players = [player];
+    state.player = player;
+    state.activePlayerId = player.id;
+    state.activeTeamId = fixtureIds.teamA;
+    state.activeGame = game;
+    state.games = [game];
+    state.screen = "live";
+    persistAll();
+    render();
+  }, { fixtureIds: fixture, email: userEmails.parent });
+
+  await trackerPage.locator('[data-stat="assist"]').click();
+  await trackerPage.locator('[data-stat="successfulClear"]').click();
+  const initialSync = await trackerPage.evaluate(async () => {
+    const synchronized = await reconcileTrustSpineGame(state.activeGame);
+    return {
+      synchronized,
+      eventIds: state.activeGame.events.map((event) => event.id),
+      pending: Object.values(state.trustSpineSync.events).reduce(
+        (sum, record) => sum + (record.pendingOperations?.length || 0),
+        0,
+      ),
+    };
+  });
+  check(initialSync.synchronized && initialSync.pending === 0, "ordinary tracker events synchronized into Trust Spine");
+  check(initialSync.eventIds.length === 3, "existing local event and two tracker events reconciled before sharing");
+
+  await trackerPage.getByRole("button", { name: "Live Share", exact: true }).click();
+  await trackerPage.getByRole("button", { name: "Copy Live Share Link", exact: true }).click();
+  await trackerPage.waitForFunction(() => /^[A-F0-9]{32}$/.test(state.activeGame?.shareCode || ""), null, { timeout: 30000 });
+  const shareCode = await trackerPage.evaluate(() => state.activeGame.shareCode);
+  check(/^[A-F0-9]{32}$/.test(shareCode), "ordinary tracker UI created a secure Live Share token");
+
+  const viewerContext = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+  await viewerContext.addInitScript(({ url, key }) => {
+    window.LAXHORNET_RUNTIME_CONFIG = {
+      supabaseUrl: url,
+      supabasePublishableKey: key,
+    };
+  }, { url: previewOrigin, key: publishableKey });
+  const viewerPage = await viewerContext.newPage();
+  recordBrowserNetwork(viewerPage, "anonymous-viewer");
+  await viewerPage.goto(`${localOrigin}/app.html?share=${encodeURIComponent(shareCode)}&fresh=v282-managed-preview-viewer`, {
+    waitUntil: "domcontentloaded",
+  });
+  await viewerPage.getByText("Ground Ball", { exact: false }).first().waitFor({ timeout: 30000 });
+  const initialPublicIds = await viewerPage.evaluate(() => state.sharedGame?.events?.map((event) => event.id) || []);
+  check(initialPublicIds.length === 3, "secure viewer received the complete pre-share timeline");
+
+  await trackerPage.locator('[data-stat="goal"]').click();
+  const addedEvent = await trackerPage.evaluate(async (knownIds) => {
+    await reconcileTrustSpineGame(state.activeGame);
+    const event = state.activeGame.events.find((item) => !knownIds.includes(item.id));
+    return { id: event?.id || "", label: event?.statLabel || "" };
+  }, initialSync.eventIds);
+  check(Boolean(addedEvent.id), "tracker added another event while the viewer was polling");
+  await viewerPage.waitForFunction(
+    (eventId) => state.sharedGame?.events?.some((event) => event.id === eventId),
+    addedEvent.id,
+    { timeout: 10000 },
+  );
+  check(true, "new tracker event appeared within the public polling interval");
+
+  const correctedEventId = initialSync.eventIds.find((id) => id !== fixture.eventA);
+  const correctionResult = await trackerPage.evaluate(async (eventId) => {
+    const event = state.activeGame.events.find((item) => item.id === eventId);
+    event.fieldZone = "Offensive";
+    event.note = "SYNTHETIC_PRIVATE_CORRECTION_NOTE";
+    event.tags = ["SYNTHETIC_PRIVATE_CORRECTION_TAG"];
+    event.correctedAt = new Date().toISOString();
+    queueTrustSpineGameReconciliation(state.activeGame);
+    const synchronized = await reconcileTrustSpineGame(state.activeGame);
+    return { synchronized, eventId };
+  }, correctedEventId);
+  check(correctionResult.synchronized, "tracker correction synchronized through the approved correction RPC");
+  const correctedZone = await viewerPage.evaluate(async (eventId) => {
+    await loadSharedGame(state.sharedCode);
+    return state.sharedGame?.events?.find((event) => event.id === eventId)?.fieldZone || "";
+  }, correctedEventId);
+  check(correctedZone === "Offensive", "secure viewer received the corrected event evidence");
+
+  const tombstonedEventId = initialSync.eventIds.find((id) => id !== fixture.eventA && id !== correctedEventId);
+  const tombstoneResult = await trackerPage.evaluate(async (eventId) => {
+    const event = state.activeGame.events.find((item) => item.id === eventId);
+    queueTrustSpineTombstone(state.activeGame, event, "Synthetic managed-preview deletion");
+    state.activeGame.events = state.activeGame.events.filter((item) => item.id !== eventId);
+    state.games = [state.activeGame];
+    rememberDeletedEvent(eventId);
+    await flushTrustSpineSync({ gameId: state.activeGame.id });
+    return state.trustSpineSync.events[eventId]?.lifecycleState || "";
+  }, tombstonedEventId);
+  check(tombstoneResult === "tombstoned", "tracker deletion synchronized as a Trust Spine tombstone");
+  const tombstonedStillPublic = await viewerPage.evaluate(async (eventId) => {
+    await loadSharedGame(state.sharedCode);
+    return state.sharedGame?.events?.some((event) => event.id === eventId) || false;
+  }, tombstonedEventId);
+  check(!tombstonedStillPublic, "secure viewer removed the tombstoned event");
+
+  const body = await viewerPage.locator("body").innerText();
+  const status = await viewerPage.evaluate(() => window.LAXHORNET_DISCLOSURE_STATUS);
+  const scriptOrder = await viewerPage.evaluate(() => window.LAXHORNET_SCRIPT_ORDER);
   check(status?.ready === true, "managed browser reports secure disclosure ready");
   check(Object.values(status?.features || {}).every(Boolean), "managed browser reports all three secure flags true");
   check(JSON.stringify(scriptOrder) === JSON.stringify(["runtime-config", "app"]), "managed browser executes runtime-config before app.js");
@@ -538,19 +717,33 @@ async function runBrowserCheck(shareCode) {
   check(!body.includes("SYNTHETIC_PRIVATE_NOTE"), "managed browser excludes the private note");
   check(!body.includes("SYNTHETIC_PRIVATE_TAG"), "managed browser excludes the private tag");
   const previewRpcRequests = networkInventory.filter((item) =>
+    item.actor === "anonymous-viewer"
+      &&
     item.host === `${previewRef}.supabase.co`
       && item.path.endsWith("/rest/v1/rpc/lh_public_live_share_game"));
   check(previewRpcRequests.length >= 2, "managed browser polls the public-safe RPC");
   check(!networkInventory.some((item) =>
+    item.actor === "anonymous-viewer"
+      &&
     item.host === `${previewRef}.supabase.co`
       && /^\/rest\/v1\/(?:games|events)(?:\/|$)/.test(item.path)), "managed browser makes no ordinary games/events request");
   check(!networkInventory.some((item) =>
     item.host.endsWith(".supabase.co")
       && item.host !== `${previewRef}.supabase.co`), "managed browser makes no foreign hosted-project request");
-  await page.screenshot({
+  await viewerPage.screenshot({
     path: path.join(browserDir, "04-managed-preview-live-share.png"),
     fullPage: true,
   });
+  await trackerContext.close();
+  await viewerContext.close();
+  return {
+    shareCode,
+    expectedPublicEventCount: 3,
+    initialEventCount: initialSync.eventIds.length,
+    polledEventId: addedEvent.id,
+    correctedEventId,
+    tombstonedEventId,
+  };
 }
 
 async function verifyCleanup() {
@@ -653,9 +846,8 @@ function writeEvidence(rpcEvidence) {
       coach: await signIn(userEmails.coach),
       parent: await signIn(userEmails.parent),
     };
-    await createSyntheticEvent(sessions.parent);
-    rpcEvidence = await runRpcChecks(sessions);
-    await runBrowserCheck(rpcEvidence.shareCode);
+    const bridgeEvidence = await runBrowserBridge(sessions.parent);
+    rpcEvidence = await runRpcChecks(sessions, bridgeEvidence.shareCode, bridgeEvidence);
     const revoke = await rpc("lh_revoke_live_share_tokens", {
       p_game_id: fixture.gameA,
     }, sessions.admin.token);

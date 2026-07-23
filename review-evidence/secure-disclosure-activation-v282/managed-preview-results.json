@@ -2,7 +2,7 @@
   "suite": "LaxHornet v282 managed-preview activation",
   "environment": "authorized managed preview",
   "synthetic": true,
-  "testsPassed": 57,
+  "testsPassed": 70,
   "testsFailed": 0,
   "results": [
     {
@@ -20,6 +20,22 @@
     {
       "status": "pass",
       "message": "created synthetic parent Auth user"
+    },
+    {
+      "status": "pass",
+      "message": "seeded teams"
+    },
+    {
+      "status": "pass",
+      "message": "seeded team_members"
+    },
+    {
+      "status": "pass",
+      "message": "seeded roster_players"
+    },
+    {
+      "status": "pass",
+      "message": "seeded player_claims"
     },
     {
       "status": "pass",
@@ -83,19 +99,95 @@
     },
     {
       "status": "pass",
-      "message": "signed in v282-mrx78s2q-ee6e35-admin"
+      "message": "signed in v282-mrx9w5jd-ad28a3-admin"
     },
     {
       "status": "pass",
-      "message": "signed in v282-mrx78s2q-ee6e35-coach"
+      "message": "signed in v282-mrx9w5jd-ad28a3-coach"
     },
     {
       "status": "pass",
-      "message": "signed in v282-mrx78s2q-ee6e35-parent"
+      "message": "signed in v282-mrx9w5jd-ad28a3-parent"
     },
     {
       "status": "pass",
-      "message": "created synthetic event through the approved authenticated RPC"
+      "message": "managed browser signed in the synthetic parent"
+    },
+    {
+      "status": "pass",
+      "message": "ordinary tracker events synchronized into Trust Spine"
+    },
+    {
+      "status": "pass",
+      "message": "existing local event and two tracker events reconciled before sharing"
+    },
+    {
+      "status": "pass",
+      "message": "ordinary tracker UI created a secure Live Share token"
+    },
+    {
+      "status": "pass",
+      "message": "secure viewer received the complete pre-share timeline"
+    },
+    {
+      "status": "pass",
+      "message": "tracker added another event while the viewer was polling"
+    },
+    {
+      "status": "pass",
+      "message": "new tracker event appeared within the public polling interval"
+    },
+    {
+      "status": "pass",
+      "message": "tracker correction synchronized through the approved correction RPC"
+    },
+    {
+      "status": "pass",
+      "message": "secure viewer received the corrected event evidence"
+    },
+    {
+      "status": "pass",
+      "message": "tracker deletion synchronized as a Trust Spine tombstone"
+    },
+    {
+      "status": "pass",
+      "message": "secure viewer removed the tombstoned event"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser reports secure disclosure ready"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser reports all three secure flags true"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser executes runtime-config before app.js"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser renders an allowlisted event"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser excludes the private note"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser excludes the private tag"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser polls the public-safe RPC"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser makes no ordinary games/events request"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser makes no foreign hosted-project request"
     },
     {
       "status": "pass",
@@ -107,11 +199,7 @@
     },
     {
       "status": "pass",
-      "message": "team admin created a game-scoped token"
-    },
-    {
-      "status": "pass",
-      "message": "created token has the expected random shape"
+      "message": "browser-created token has the expected random shape"
     },
     {
       "status": "pass",
@@ -179,42 +267,6 @@
     },
     {
       "status": "pass",
-      "message": "managed browser reports secure disclosure ready"
-    },
-    {
-      "status": "pass",
-      "message": "managed browser reports all three secure flags true"
-    },
-    {
-      "status": "pass",
-      "message": "managed browser executes runtime-config before app.js"
-    },
-    {
-      "status": "pass",
-      "message": "managed browser renders an allowlisted event"
-    },
-    {
-      "status": "pass",
-      "message": "managed browser excludes the private note"
-    },
-    {
-      "status": "pass",
-      "message": "managed browser excludes the private tag"
-    },
-    {
-      "status": "pass",
-      "message": "managed browser polls the public-safe RPC"
-    },
-    {
-      "status": "pass",
-      "message": "managed browser makes no ordinary games/events request"
-    },
-    {
-      "status": "pass",
-      "message": "managed browser makes no foreign hosted-project request"
-    },
-    {
-      "status": "pass",
       "message": "token revocation succeeded"
     },
     {
@@ -234,5 +286,8 @@
       "message": "post-test reset removed synthetic Auth users"
     }
   ],
-  "browserDiagnostics": []
+  "browserDiagnostics": [
+    "authenticated-tracker:console:warning: Service Worker registration blocked by Playwright",
+    "anonymous-viewer:console:warning: Service Worker registration blocked by Playwright"
+  ]
 }

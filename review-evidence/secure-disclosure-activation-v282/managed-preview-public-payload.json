@@ -1,6 +1,6 @@
 {
   "game": {
-    "game_id": "v282-mrx78s2q-ee6e35-game-a",
+    "game_id": "v282-mrx9w5jd-ad28a3-game-a",
     "opponent": "Madison Demo",
     "position": "Midfield",
     "game_date": "2026-07-23",
@@ -13,11 +13,31 @@
   },
   "events": [
     {
-      "period": "Q2",
-      "category": "Possession",
-      "event_id": "v282-mrx78s2q-ee6e35-event-a",
+      "period": "Q1",
+      "category": "Offense",
+      "event_id": "event-mrx9wfe6-1niihm",
+      "stat_type": "assist",
+      "field_zone": "Offensive",
+      "stat_label": "Assist",
+      "occurred_at": "2026-07-23T08:52:26.478Z",
+      "point_value": 3
+    },
+    {
+      "period": "Q1",
+      "category": "Offense",
+      "event_id": "event-mrx9wgd5-epxdt2",
+      "stat_type": "goal",
+      "field_zone": "",
+      "stat_label": "Goal",
+      "occurred_at": "2026-07-23T08:52:27.737Z",
+      "point_value": 5
+    },
+    {
+      "period": "Q1",
+      "category": "Possession / IQ",
+      "event_id": "v282-mrx9w5jd-ad28a3-event-a",
       "stat_type": "groundBall",
-      "field_zone": "midfield",
+      "field_zone": "Midfield",
       "stat_label": "Ground Ball",
       "occurred_at": "2026-07-23T18:10:00.000Z",
       "point_value": 2
