@@ -1,6 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import { validateReleaseContainmentFromEnvironment } from "./release_containment.mjs";
+import {
+  APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
+  validateReleaseContainmentFromEnvironment,
+} from "./release_containment.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
@@ -72,6 +75,16 @@ if (containment.mode === "standalone") {
   expect(
     !changedFiles.some((file) => file.endsWith(".sql") || file.startsWith("supabase/migrations/")),
     "standalone release-hygiene delta changes no SQL or canonical migration history",
+  );
+} else if (containment.mode === "additive") {
+  expect(
+    JSON.stringify([...containment.allowedAdditiveDatabaseFiles].sort())
+      === JSON.stringify([...APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS].sort()),
+    "additive cleanup changes only the approved capability migration and rollback",
+  );
+  expect(
+    containment.postAuthorizationDatabaseFiles.length === 0,
+    "additive cleanup has no post-authorization database changes",
   );
 } else {
   expect(
