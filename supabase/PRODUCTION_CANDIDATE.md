@@ -17,6 +17,7 @@ Merging this pull request is not production-cutover authorization.
 1. `migrations/20260723000000_laxhornet_legacy_baseline.sql`
 2. `migrations/20260723010000_trust_spine_release_1.sql`
 3. `migrations/20260723020000_minimum_necessary_disclosure.sql`
+4. `migrations/20260723030000_fix_disclosure_audit_and_evidence_validation.sql`
 
 The legacy baseline reconstructs the checked-in LaxHornet schema required by
 Trust Spine on a blank Supabase preview. It contains schema definitions, RLS
@@ -25,7 +26,18 @@ Realtime publication membership. It contains no production data or synthetic
 rows.
 
 The Trust Spine and minimum-disclosure files are copied without substantive SQL
-changes from the staging-tested evidence package.
+changes from the staging-tested evidence package. The fourth migration is an
+additive correction for two PR review findings:
+
+* Selected-player CSV audits now resolve the canonical player scope before
+  choosing an active covering grant. Exact player-scoped parent and coach
+  grants, same-team team-scoped coach grants, and same-team team-admin grants
+  are accepted. Cross-player, cross-team, expired, revoked, unassigned, and
+  anonymous access remains rejected.
+* Evidence validation now returns `false`, never SQL `NULL`, for SQL-null,
+  JSON-null, array, scalar, and other non-object inputs. Malformed event creates
+  and corrections return audited `invalid_input` rejections without inserting
+  evidence or aborting through a not-null constraint.
 
 ## Prior preview failure
 
@@ -53,8 +65,10 @@ They must never be executed automatically by the Supabase migration runner.
 * RLS was enabled on all 20 tables.
 * Anonymous reads of `games` and `events` were denied.
 * Remote authenticated and anonymous test suite passed 16/16.
-* Local minimum-disclosure guards passed 36/36.
+* Local minimum-disclosure guards passed 35/35.
 * PGlite migration, RPC, and rollback suite passed 17/17.
+* Blank-database application passed with all four canonical migrations.
+* PR #9 P2 disclosure/evidence regression suite passed 28/28.
 * Append-only history blocked an in-place identity rewrite and rolled back the transaction.
 
 ## Advisor status

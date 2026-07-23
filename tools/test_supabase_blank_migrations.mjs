@@ -27,6 +27,13 @@ const minimumDisclosure = fs.readFileSync(
   path.join(migrationsDir, "20260723020000_minimum_necessary_disclosure.sql"),
   "utf8",
 );
+const p2CorrectiveMigration = fs.readFileSync(
+  path.join(
+    migrationsDir,
+    "20260723030000_fix_disclosure_audit_and_evidence_validation.sql",
+  ),
+  "utf8",
+);
 
 const requiredLegacyTables = [
   "events",
@@ -121,7 +128,8 @@ async function proveBlankDatabaseBuilds() {
     await db.exec(legacyBaseline);
     await db.exec(trustSpine);
     await db.exec(minimumDisclosure);
-    console.log("PASS: all three migrations apply from a blank database");
+    await db.exec(p2CorrectiveMigration);
+    console.log("PASS: all four migrations apply from a blank database");
 
     const legacyTables = await db.query(`
       select tablename
@@ -289,6 +297,7 @@ async function proveBlankDatabaseBuilds() {
         "20260723000000_laxhornet_legacy_baseline.sql",
         "20260723010000_trust_spine_release_1.sql",
         "20260723020000_minimum_necessary_disclosure.sql",
+        "20260723030000_fix_disclosure_audit_and_evidence_validation.sql",
       ],
       requiredLegacyTables,
       trustSpineTableCount: trustTables.rows.length,
