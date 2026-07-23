@@ -2,10 +2,11 @@
 
 ## Recommendation
 
-**Ready for the next remediation sprint.** The secure disclosure path passed
-disposable-staging tests, but production should not be cut over until the staging
-runtime flags, browser flow, and rollback procedure receive a deliberate release
-approval.
+**Revise before pilot.** The secure disclosure path passed its disposable-staging
+rollback/reapply and all 16 remote API tests. Production should not be cut over
+until the informational Trust Spine index findings are reviewed, the legacy
+security-definer warnings are separately triaged, and the signed-in browser flow
+receives deliberate release approval.
 
 ## Implemented
 
@@ -56,9 +57,15 @@ Evidence package:
 ## Test Results
 
 - JavaScript syntax: pass.
-- Minimum disclosure source/UI checks: pass, 35/35 after the public-view copy assertion.
+- Minimum disclosure source/UI checks: pass, 36/36, including the dashboard-executable rollback assertion.
 - PGlite migration/RPC/rollback rehearsal: pass, 17/17.
 - Disposable staging PostgREST/RPC tests: pass, 16/16.
+- Disposable staging rollback/reapply: pass; 0 Trust Spine tables after rollback,
+  then 20 tables with RLS enabled after reapply.
+- Supabase Security Advisor rerun: 0 errors, 82 legacy-function warnings, and no
+  inspected `lh_*` warning.
+- Supabase Performance Advisor rerun: 0 errors, 0 warnings, 67 informational
+  suggestions, including unindexed foreign keys on several `lh_*` tables.
 - Product Alignment v1 regression: pass, 33/33.
 - Cancel Game regression: pass, 33/33.
 - Delete permission regression: pass, 17/17.
@@ -81,9 +88,15 @@ Evidence package:
   after backend deployment.
 - Synthetic staging records remain available for review until the staging
   rollback is executed.
+- Several Trust Spine foreign keys do not yet have covering indexes. This is an
+  advisor-level performance finding, not a functional or disclosure-test failure.
+- The disposable staging database also contains pre-existing `laxhornet_*`
+  SECURITY DEFINER warnings that are outside this narrow disclosure slice and
+  must not be mistaken for newly introduced Trust Spine warnings.
 
 ## Production Confirmation
 
 No production SQL, RLS policy, Supabase configuration, service worker, cache
-version, or runtime feature flag was changed. No repository secret was added.
+version, or runtime feature flag was changed. The configured `supabase/`
+production migration directory was not touched. No repository secret was added.
 This sprint does not publish or deploy the static app.

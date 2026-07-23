@@ -1,16 +1,4 @@
-﻿node.exe : warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
-At line:6 char:1
-+ & 'C:\Users\user\.cache\codex-runtimes\codex-primary-runtime\dependen ...
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (warning: in the... Git touches it:String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 
-warning: in the working copy of 'access-and-trust.html', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'app.js', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'privacy.html', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'styles.css', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'terms.html', LF will be replaced by CRLF the next time Git touches it
-Minimum-disclosure checks passed (35/35).
+Minimum-disclosure checks passed (36/36).
 PASS: trusted Live Share is off by default
 PASS: shared viewers receive public-view status copy
 PASS: secure Live Share returns before the legacy wildcard path
@@ -19,6 +7,7 @@ PASS: secure Live Share uses allowlisted polling
 PASS: secure cutover removes ordinary table subscriptions
 PASS: public payload mapping cannot render notes or tags
 PASS: staging denies anonymous ordinary game/event reads
+PASS: base rollback is executable in the Supabase SQL editor without psql meta-commands
 PASS: only the public-safe Live Share RPC is granted anonymously
 PASS: staging has explicit token create/revoke RPCs
 PASS: server stores only the token hash

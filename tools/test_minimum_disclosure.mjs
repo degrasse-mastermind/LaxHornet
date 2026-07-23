@@ -11,6 +11,7 @@ const terms = read("terms.html");
 const trust = read("access-and-trust.html");
 const readme = read("README.md");
 const migration = read("review-evidence/product-alignment-remediation-v2/sql/01_MINIMUM_DISCLOSURE_STAGING_MIGRATION.sql");
+const baseRollback = read("review-evidence/product-alignment-remediation-v2/sql/99_TRUST_SPINE_BASE_STAGING_ROLLBACK.sql");
 const remote = read("review-evidence/product-alignment-remediation-v2/tests/test_minimum_disclosure_remote.mjs");
 
 const checks = [];
@@ -41,6 +42,7 @@ expect(app.includes("schedulePublicLiveSharePoll") && app.includes("PUBLIC_LIVE_
 expect(app.includes("stopSharedGameTransport") && app.includes("removeChannel"), "secure cutover removes ordinary table subscriptions");
 expect(app.includes('note: ""') && app.includes("tags: []"), "public payload mapping cannot render notes or tags");
 expect(migration.includes("revoke select on table public.games from anon") && migration.includes("revoke select on table public.events from anon"), "staging denies anonymous ordinary game/event reads");
+expect(!/^\\set\b/im.test(baseRollback), "base rollback is executable in the Supabase SQL editor without psql meta-commands");
 expect(migration.includes("lh_public_live_share_game(text) to anon, authenticated"), "only the public-safe Live Share RPC is granted anonymously");
 expect(migration.includes("lh_create_live_share_token") && migration.includes("lh_revoke_live_share_tokens"), "staging has explicit token create/revoke RPCs");
 expect(migration.includes("token_hash") && !migration.includes("'rawToken'"), "server stores only the token hash");
