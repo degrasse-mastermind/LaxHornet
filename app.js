@@ -1,3 +1,5 @@
+window.LAXHORNET_SCRIPT_ORDER = [...(window.LAXHORNET_SCRIPT_ORDER || []), "app"];
+
 const STORAGE_KEYS = {
   player: "laxhornet.playerSettings",
   players: "laxhornet.players",
@@ -30,10 +32,16 @@ const TRUSTED_DISCLOSURE_FEATURES = Object.freeze({
   liveShareTokenRpc: RUNTIME_CONFIG.liveShareTokenRpc === true,
   exportAuditRpc: RUNTIME_CONFIG.exportAuditRpc === true,
 });
+const SECURE_DISCLOSURE_RUNTIME_READY = Object.values(TRUSTED_DISCLOSURE_FEATURES).every(Boolean);
 const PUBLIC_LIVE_SHARE_POLL_MS = 4000;
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v281";
+const APP_VERSION = "v282";
+window.LAXHORNET_DISCLOSURE_STATUS = Object.freeze({
+  appVersion: APP_VERSION,
+  ready: SECURE_DISCLOSURE_RUNTIME_READY,
+  features: TRUSTED_DISCLOSURE_FEATURES,
+});
 
 const PERIOD_FORMATS = {
   quarters: {
@@ -3575,7 +3583,9 @@ function closeExportDialog() {
 }
 
 async function recordSensitiveExportAudit(exportType, scopeType, scopeId) {
-  if (!TRUSTED_DISCLOSURE_FEATURES.exportAuditRpc) return { skipped: true };
+  if (!SECURE_DISCLOSURE_RUNTIME_READY) {
+    throw new Error("Secure export is temporarily unavailable. Tracking and reviews are still available.");
+  }
   if (!supabaseClient || !currentUserId()) throw new Error("Sign in before exporting sensitive data.");
   const { data, error } = await supabaseClient.rpc("lh_record_disclosure_export", {
     p_export_type: exportType,
@@ -3583,7 +3593,9 @@ async function recordSensitiveExportAudit(exportType, scopeType, scopeId) {
     p_scope_id: scopeId || null,
     p_outcome: "accepted",
   });
-  if (error || data?.outcome !== "accepted") throw error || new Error(data?.code || "Export audit failed");
+  if (error || data?.outcome !== "accepted") {
+    throw new Error("Secure export is temporarily unavailable. Try again after reconnecting.");
+  }
   return data;
 }
 
@@ -3853,6 +3865,12 @@ function reportSyncError(error) {
     lastSyncErrorAt = now;
     showToast("Live Share is not ready yet");
   }
+}
+
+function reportSecureDisclosureUnavailable(feature = "Secure sharing") {
+  state.syncStatus = `${feature} temporarily unavailable`;
+  showToast(`${feature} is temporarily unavailable. Tracking is still available.`);
+  render();
 }
 
 function reportCloudDeleteNeedsUpdate(recordLabel = "item") {
@@ -5419,6 +5437,10 @@ function schedulePublicLiveSharePoll(code) {
 function subscribeToSharedGame(gameId) {
   if (!supabaseClient || !gameId) return;
   stopSharedGameTransport();
+  if (!SECURE_DISCLOSURE_RUNTIME_READY) {
+    reportSecureDisclosureUnavailable("Live Share");
+    return;
+  }
   if (TRUSTED_DISCLOSURE_FEATURES.publicLiveShareRpc) {
     schedulePublicLiveSharePoll(state.sharedCode);
     return;
@@ -5447,6 +5469,10 @@ async function loadSharedGame(shareCode) {
   }
 
   stopSharedGameTransport();
+  if (!SECURE_DISCLOSURE_RUNTIME_READY) {
+    reportSecureDisclosureUnavailable("Live Share");
+    return;
+  }
   if (TRUSTED_DISCLOSURE_FEATURES.publicLiveShareRpc) {
     try {
       const sharedGame = await fetchPublicLiveShareGame(code);
@@ -5493,6 +5519,10 @@ async function copyLiveShareLinkNow(gameId) {
   if (!game) return;
   if (!supabaseClient) {
     showToast("Live Share is not available");
+    return;
+  }
+  if (!SECURE_DISCLOSURE_RUNTIME_READY) {
+    reportSecureDisclosureUnavailable("Live Share");
     return;
   }
   if (!currentUserId()) {
@@ -5557,6 +5587,10 @@ async function turnOffLiveShare(gameId) {
   if (!game) {
     state.liveSharePromptGameId = "";
     render();
+    return;
+  }
+  if (!SECURE_DISCLOSURE_RUNTIME_READY) {
+    reportSecureDisclosureUnavailable("Live Share");
     return;
   }
   if (TRUSTED_DISCLOSURE_FEATURES.liveShareTokenRpc && supabaseClient) {
@@ -10531,17 +10565,24 @@ function renderReview() {
 function renderSharedGame() {
   const code = escapeHTML(state.sharedCode || "");
   if (!state.sharedGame) {
+    const disclosureUnavailable = !SECURE_DISCLOSURE_RUNTIME_READY;
+    const liveShareUnavailable = /unavailable|paused/i.test(state.syncStatus || "");
+    const helper = disclosureUnavailable || liveShareUnavailable
+      ? "Secure Live Share is temporarily unavailable. Game tracking and saved reviews are not affected."
+      : code
+        ? `Loading read-only share code ${code}...`
+        : "Enter a share code from the Parent Tracker phone to open a read-only game.";
     return renderShell(`
       <section class="screen-title">
         <h2>Shared Game</h2>
-        <p>${code ? `Loading read-only share code ${code}...` : "Enter a share code from the Parent Tracker phone to open a read-only game."}</p>
+        <p>${helper}</p>
       </section>
       <form class="card pad form-grid" data-form="watch-share">
         <div class="field">
           <label for="sharedScreenCode">Share code</label>
           <input id="sharedScreenCode" name="shareCode" value="${code}" placeholder="ABC123" autocapitalize="characters" />
         </div>
-        <button class="btn neutral" type="submit">Watch Live</button>
+        <button class="btn neutral" type="submit" ${disclosureUnavailable ? "disabled" : ""}>Watch Live</button>
       </form>
     `);
   }

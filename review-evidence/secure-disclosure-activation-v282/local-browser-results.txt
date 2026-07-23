@@ -1,0 +1,22 @@
+PASS: all three secure disclosure flags are active
+PASS: runtime status reports every disclosure feature true
+PASS: runtime-config executes before app.js
+PASS: public-safe payload renders an allowlisted event
+PASS: public UI contains no private note
+PASS: public UI contains no private tag
+PASS: public-safe polling repeats the RPC request
+PASS: secure viewer makes no ordinary games/events request
+PASS: v282 activation removes the stale v281 cache
+PASS: signed-in token creation uses the approved RPC
+PASS: token revocation disables Live Share
+PASS: authorized export audit succeeds
+PASS: rejected export audit is bounded
+PASS: missing runtime-config is detected
+PASS: missing configuration shows truthful bounded copy
+PASS: missing configuration never falls through to legacy tables
+PASS: local tracking remains available when secure disclosure configuration is missing
+PASS: failed activation RPC produces a bounded unavailable state
+PASS: delayed service-worker activation exposes a clear update action
+PASS: updated offline client continues local tracking
+PASS: updated client recovers secure Live Share after reconnection
+PASS: activation browser suite contacts no hosted Supabase project

@@ -1,0 +1,65 @@
+rendered-body: LaxHornet
+APP VERSION: V282
+?
+i
+Madison Demo
+
+Shared live game - Jul 23, 2026 - Read-only live updates
+
+2
+RECORDED EVENTS
+0
+POINTS
+0
+GOALS
+0
+ASSISTS
+STAT	TOTAL
+OFFENSE
+Goals	0
+Assists	0
+Points	0
+Shots	0
+Shots on goal	0
+Shooting %	0%
+Shot on goal %	0%
+POSSESSION & EFFORT
+Possession value	+3
+Ground balls	1 (+1 EP)
+Backed up shots	0
+Successful clears	0
+Failed clears	0
+Turnovers	0
+Hustle plays	0
+Smart plays	0
+Effort score	1
+DEFENSE
+Caused turnovers	1 (+1 EP)
+Defensive stops	0
+Penalties	0
+SPECIALTY
+Faceoff wins	0
+Faceoff losses	0
+Faceoff attempts	0
+Faceoff win %	0%
+Saves	0
+Goals allowed	0
+Save %	0%
+Live Timeline
+Q2
+Caused Turnover
+
+8:05 AM - Defense - Defensive
+
++3
+Q1
+Ground Ball
+
+8:00 AM - Effort / IQ - Midfield
+
++2
+Home
+Track
+Review
+Season
+More

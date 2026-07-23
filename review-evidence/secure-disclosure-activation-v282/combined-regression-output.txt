@@ -1,0 +1,839 @@
+Combined v282 rehearsal - 2026-07-23T03:11:15.0460568-04:00
+
+===== syntax app.js =====
+
+EXIT: 0
+
+===== syntax runtime-config.js =====
+
+EXIT: 0
+
+===== syntax service-worker.js =====
+
+EXIT: 0
+
+===== syntax tools/test_secure_disclosure_activation.mjs =====
+
+EXIT: 0
+
+===== syntax tools/test_secure_disclosure_activation_browser.cjs =====
+
+EXIT: 0
+
+===== blank-database migrations =====
+PASS: Trust Spine cannot apply when the required legacy baseline is absent {"error":"error: relation \"public.team_members\" does not exist"}
+PASS: all four migrations apply from a blank database
+PASS: all required legacy tables exist {"tables":["events","games","notification_queue","player_claims","roster_players","team_access_requests","team_members","teams","user_profiles"]}
+PASS: exactly 20 Trust Spine tables exist {"count":20}
+PASS: RLS is enabled on every Trust Spine table {"disabled":[]}
+PASS: legacy RLS configuration is preserved {"disabled":[]}
+PASS: minimum disclosure preserves authenticated reads and denies anonymous ordinary-table reads {"anon_games":false,"anon_events":false,"auth_games":true,"auth_events":true,"anon_live_share":true}
+PASS: legacy game and event policies are narrowed to authenticated after disclosure {"policies":[{"tablename":"events","policyname":"laxhornet read own or shared events","roles":["authenticated"]},{"tablename":"games","policyname":"laxhornet read own or shared games","roles":["authenticated"]}]}
+PASS: the canonical baseline embeds no legacy data rows {"events":0,"games":0,"notification_queue":0,"player_claims":0,"roster_players":0,"team_access_requests":0,"team_members":0,"teams":0,"user_profiles":0}
+PASS: all canonical legacy LaxHornet functions exist {"count":34}
+PASS: all canonical named legacy indexes exist {"count":23}
+{
+  "suite": "LaxHornet blank Supabase migration regression",
+  "migrations": [
+    "20260723000000_laxhornet_legacy_baseline.sql",
+    "20260723010000_trust_spine_release_1.sql",
+    "20260723020000_minimum_necessary_disclosure.sql",
+    "20260723030000_fix_disclosure_audit_and_evidence_validation.sql"
+  ],
+  "requiredLegacyTables": [
+    "events",
+    "games",
+    "notification_queue",
+    "player_claims",
+    "roster_players",
+    "team_access_requests",
+    "team_members",
+    "teams",
+    "user_profiles"
+  ],
+  "trustSpineTableCount": 20,
+  "legacyDataRows": {
+    "events": 0,
+    "games": 0,
+    "notification_queue": 0,
+    "player_claims": 0,
+    "roster_players": 0,
+    "team_access_requests": 0,
+    "team_members": 0,
+    "teams": 0,
+    "user_profiles": 0
+  }
+}
+EXIT: 0
+
+===== P2 disclosure and evidence =====
+PASS: player-scoped parent for selected player: accepted {"code":"export_audit_recorded","auditId":"d1014928-a059-4604-9c9f-b5e2af49b75c","outcome":"accepted","recordedAt":"2026-07-23T07:11:20.85+00:00"}
+PASS: player-scoped parent for selected player: canonical player scope and deterministic covering grant recorded {"actor_grant_id":"parent-player-a","team_id":"team-a","roster_player_id":"player-a"}
+PASS: player-scoped coach for selected player: accepted {"code":"export_audit_recorded","auditId":"9a1170a0-551e-45fb-95cb-3e4d47e129f1","outcome":"accepted","recordedAt":"2026-07-23T07:11:20.875+00:00"}
+PASS: player-scoped coach for selected player: canonical player scope and deterministic covering grant recorded {"actor_grant_id":"coach-player-a","team_id":"team-a","roster_player_id":"player-a"}
+PASS: team-scoped coach covering selected player's team: accepted {"code":"export_audit_recorded","auditId":"b155cad3-894f-4196-9be9-aaab86ae2555","outcome":"accepted","recordedAt":"2026-07-23T07:11:20.885+00:00"}
+PASS: team-scoped coach covering selected player's team: canonical player scope and deterministic covering grant recorded {"actor_grant_id":"coach-team-a","team_id":"team-a","roster_player_id":"player-a"}
+PASS: team admin covering selected player's team: accepted {"code":"export_audit_recorded","auditId":"5dc3a345-827c-400e-b730-87f3d77d163a","outcome":"accepted","recordedAt":"2026-07-23T07:11:20.89+00:00"}
+PASS: team admin covering selected player's team: canonical player scope and deterministic covering grant recorded {"actor_grant_id":"admin-a","team_id":"team-a","roster_player_id":"player-a"}
+PASS: parent assigned to another player: rejected {"code":"unauthorized_scope","outcome":"rejected"}
+PASS: player-scoped coach assigned to another player: rejected {"code":"unauthorized_scope","outcome":"rejected"}
+PASS: team-scoped coach from another team: rejected {"code":"unauthorized_scope","outcome":"rejected"}
+PASS: expired grant: rejected {"code":"unauthorized_scope","outcome":"rejected"}
+PASS: revoked grant: rejected {"code":"unauthorized_scope","outcome":"rejected"}
+PASS: unassigned authenticated user: rejected {"code":"unauthorized_scope","outcome":"rejected"}
+PASS: unknown canonical player scope: rejected {"code":"unauthorized_scope","outcome":"rejected"}
+PASS: anonymous user: rejected at RPC privilege boundary {"error":"error: permission denied for function lh_record_disclosure_export"}
+PASS: create event with SQL-null evidence: controlled rejection {"code":"invalid_input","gameId":"game-a","eventId":"bad-create-missing","outcome":"rejected","operationId":"a884dc35-827d-464b-a857-e04a5413075e","operationType":"create_event","clientOperationId":"bad-create-missing","serverEventVersion":null}
+PASS: create event with JSON null evidence: controlled rejection {"code":"invalid_input","gameId":"game-a","eventId":"bad-create-json-null","outcome":"rejected","operationId":"7512c318-08d0-49b1-8413-ea80ccb6c0d9","operationType":"create_event","clientOperationId":"bad-create-json-null","serverEventVersion":null}
+PASS: create event with array evidence: controlled rejection {"code":"invalid_input","gameId":"game-a","eventId":"bad-create-array","outcome":"rejected","operationId":"2fa0d33e-5718-4ace-8ff9-99e7f47b1d4e","operationType":"create_event","clientOperationId":"bad-create-array","serverEventVersion":null}
+PASS: create event with scalar evidence: controlled rejection {"code":"invalid_input","gameId":"game-a","eventId":"bad-create-scalar","outcome":"rejected","operationId":"72b48429-881c-48dd-a659-66d28f78fa26","operationType":"create_event","clientOperationId":"bad-create-scalar","serverEventVersion":null}
+PASS: valid create behavior remains accepted {"code":"created","gameId":"game-a","eventId":"valid-event","outcome":"accepted","operationId":"97162805-2a76-42fa-973d-eb94f6b4a349","operationType":"create_event","clientOperationId":"valid-create","serverEventVersion":1}
+PASS: correction with SQL-null changes: controlled rejection {"code":"invalid_input","gameId":"game-a","eventId":"valid-event","outcome":"rejected","operationId":"95bc7c4a-d3b8-4cb8-83a7-579c824e02a7","operationType":"correct_event","clientOperationId":"bad-correct-missing","serverEventVersion":null}
+PASS: correction with JSON null changes: controlled rejection {"code":"invalid_input","gameId":"game-a","eventId":"valid-event","outcome":"rejected","operationId":"a1534437-0e0c-4ff0-995a-495a9c8b9c8d","operationType":"correct_event","clientOperationId":"bad-correct-json-null","serverEventVersion":null}
+PASS: correction with array changes: controlled rejection {"code":"invalid_input","gameId":"game-a","eventId":"valid-event","outcome":"rejected","operationId":"d43f14df-97fb-44c3-b2c1-2d70b50b714b","operationType":"correct_event","clientOperationId":"bad-correct-array","serverEventVersion":null}
+PASS: malformed requests create no event or revision and record rejected operations {"malformed_events":0,"malformed_revisions":0,"rejected_operations":7,"effective_version":1,"effective_evidence":{"period":"Q1","category":"Possession","stat_type":"groundBall","field_zone":"Midfield","stat_label":"Ground Ball","occurred_at":"2026-07-23T18:00:00Z","point_value":2}}
+PASS: malformed correction leaves the effective event unchanged {"effectiveVersion":1,"effectiveEvidence":{"period":"Q1","category":"Possession","stat_type":"groundBall","field_zone":"Midfield","stat_label":"Ground Ball","occurred_at":"2026-07-23T18:00:00Z","point_value":2}}
+PASS: valid correction behavior remains accepted {"code":"corrected","gameId":"game-a","eventId":"valid-event","outcome":"accepted","operationId":"6beaf012-ac49-4d25-b29f-7f43b85c45b4","operationType":"correct_event","clientOperationId":"valid-correction","serverEventVersion":2}
+PASS: valid correction updates the effective event and records one revision {"server_event_version":2,"period":"Q2","revisions":1}
+{
+  "suite": "LaxHornet PR #9 P2 disclosure audit and evidence validation",
+  "synthetic": true,
+  "migrations": [
+    "20260723000000_laxhornet_legacy_baseline.sql",
+    "20260723010000_trust_spine_release_1.sql",
+    "20260723020000_minimum_necessary_disclosure.sql",
+    "20260723030000_fix_disclosure_audit_and_evidence_validation.sql"
+  ],
+  "testsPassed": 28,
+  "results": [
+    {
+      "name": "player-scoped parent for selected player: accepted",
+      "status": "pass",
+      "evidence": {
+        "code": "export_audit_recorded",
+        "auditId": "d1014928-a059-4604-9c9f-b5e2af49b75c",
+        "outcome": "accepted",
+        "recordedAt": "2026-07-23T07:11:20.85+00:00"
+      }
+    },
+    {
+      "name": "player-scoped parent for selected player: canonical player scope and deterministic covering grant recorded",
+      "status": "pass",
+      "evidence": {
+        "actor_grant_id": "parent-player-a",
+        "team_id": "team-a",
+        "roster_player_id": "player-a"
+      }
+    },
+    {
+      "name": "player-scoped coach for selected player: accepted",
+      "status": "pass",
+      "evidence": {
+        "code": "export_audit_recorded",
+        "auditId": "9a1170a0-551e-45fb-95cb-3e4d47e129f1",
+        "outcome": "accepted",
+        "recordedAt": "2026-07-23T07:11:20.875+00:00"
+      }
+    },
+    {
+      "name": "player-scoped coach for selected player: canonical player scope and deterministic covering grant recorded",
+      "status": "pass",
+      "evidence": {
+        "actor_grant_id": "coach-player-a",
+        "team_id": "team-a",
+        "roster_player_id": "player-a"
+      }
+    },
+    {
+      "name": "team-scoped coach covering selected player's team: accepted",
+      "status": "pass",
+      "evidence": {
+        "code": "export_audit_recorded",
+        "auditId": "b155cad3-894f-4196-9be9-aaab86ae2555",
+        "outcome": "accepted",
+        "recordedAt": "2026-07-23T07:11:20.885+00:00"
+      }
+    },
+    {
+      "name": "team-scoped coach covering selected player's team: canonical player scope and deterministic covering grant recorded",
+      "status": "pass",
+      "evidence": {
+        "actor_grant_id": "coach-team-a",
+        "team_id": "team-a",
+        "roster_player_id": "player-a"
+      }
+    },
+    {
+      "name": "team admin covering selected player's team: accepted",
+      "status": "pass",
+      "evidence": {
+        "code": "export_audit_recorded",
+        "auditId": "5dc3a345-827c-400e-b730-87f3d77d163a",
+        "outcome": "accepted",
+        "recordedAt": "2026-07-23T07:11:20.89+00:00"
+      }
+    },
+    {
+      "name": "team admin covering selected player's team: canonical player scope and deterministic covering grant recorded",
+      "status": "pass",
+      "evidence": {
+        "actor_grant_id": "admin-a",
+        "team_id": "team-a",
+        "roster_player_id": "player-a"
+      }
+    },
+    {
+      "name": "parent assigned to another player: rejected",
+      "status": "pass",
+      "evidence": {
+        "code": "unauthorized_scope",
+        "outcome": "rejected"
+      }
+    },
+    {
+      "name": "player-scoped coach assigned to another player: rejected",
+      "status": "pass",
+      "evidence": {
+        "code": "unauthorized_scope",
+        "outcome": "rejected"
+      }
+    },
+    {
+      "name": "team-scoped coach from another team: rejected",
+      "status": "pass",
+      "evidence": {
+        "code": "unauthorized_scope",
+        "outcome": "rejected"
+      }
+    },
+    {
+      "name": "expired grant: rejected",
+      "status": "pass",
+      "evidence": {
+        "code": "unauthorized_scope",
+        "outcome": "rejected"
+      }
+    },
+    {
+      "name": "revoked grant: rejected",
+      "status": "pass",
+      "evidence": {
+        "code": "unauthorized_scope",
+        "outcome": "rejected"
+      }
+    },
+    {
+      "name": "unassigned authenticated user: rejected",
+      "status": "pass",
+      "evidence": {
+        "code": "unauthorized_scope",
+        "outcome": "rejected"
+      }
+    },
+    {
+      "name": "unknown canonical player scope: rejected",
+      "status": "pass",
+      "evidence": {
+        "code": "unauthorized_scope",
+        "outcome": "rejected"
+      }
+    },
+    {
+      "name": "anonymous user: rejected at RPC privilege boundary",
+      "status": "pass",
+      "evidence": {
+        "error": "error: permission denied for function lh_record_disclosure_export"
+      }
+    },
+    {
+      "name": "create event with SQL-null evidence: controlled rejection",
+      "status": "pass",
+      "evidence": {
+        "code": "invalid_input",
+        "gameId": "game-a",
+        "eventId": "bad-create-missing",
+        "outcome": "rejected",
+        "operationId": "a884dc35-827d-464b-a857-e04a5413075e",
+        "operationType": "create_event",
+        "clientOperationId": "bad-create-missing",
+        "serverEventVersion": null
+      }
+    },
+    {
+      "name": "create event with JSON null evidence: controlled rejection",
+      "status": "pass",
+      "evidence": {
+        "code": "invalid_input",
+        "gameId": "game-a",
+        "eventId": "bad-create-json-null",
+        "outcome": "rejected",
+        "operationId": "7512c318-08d0-49b1-8413-ea80ccb6c0d9",
+        "operationType": "create_event",
+        "clientOperationId": "bad-create-json-null",
+        "serverEventVersion": null
+      }
+    },
+    {
+      "name": "create event with array evidence: controlled rejection",
+      "status": "pass",
+      "evidence": {
+        "code": "invalid_input",
+        "gameId": "game-a",
+        "eventId": "bad-create-array",
+        "outcome": "rejected",
+        "operationId": "2fa0d33e-5718-4ace-8ff9-99e7f47b1d4e",
+        "operationType": "create_event",
+        "clientOperationId": "bad-create-array",
+        "serverEventVersion": null
+      }
+    },
+    {
+      "name": "create event with scalar evidence: controlled rejection",
+      "status": "pass",
+      "evidence": {
+        "code": "invalid_input",
+        "gameId": "game-a",
+        "eventId": "bad-create-scalar",
+        "outcome": "rejected",
+        "operationId": "72b48429-881c-48dd-a659-66d28f78fa26",
+        "operationType": "create_event",
+        "clientOperationId": "bad-create-scalar",
+        "serverEventVersion": null
+      }
+    },
+    {
+      "name": "valid create behavior remains accepted",
+      "status": "pass",
+      "evidence": {
+        "code": "created",
+        "gameId": "game-a",
+        "eventId": "valid-event",
+        "outcome": "accepted",
+        "operationId": "97162805-2a76-42fa-973d-eb94f6b4a349",
+        "operationType": "create_event",
+        "clientOperationId": "valid-create",
+        "serverEventVersion": 1
+      }
+    },
+    {
+      "name": "correction with SQL-null changes: controlled rejection",
+      "status": "pass",
+      "evidence": {
+        "code": "invalid_input",
+        "gameId": "game-a",
+        "eventId": "valid-event",
+        "outcome": "rejected",
+        "operationId": "95bc7c4a-d3b8-4cb8-83a7-579c824e02a7",
+        "operationType": "correct_event",
+        "clientOperationId": "bad-correct-missing",
+        "serverEventVersion": null
+      }
+    },
+    {
+      "name": "correction with JSON null changes: controlled rejection",
+      "status": "pass",
+      "evidence": {
+        "code": "invalid_input",
+        "gameId": "game-a",
+        "eventId": "valid-event",
+        "outcome": "rejected",
+        "operationId": "a1534437-0e0c-4ff0-995a-495a9c8b9c8d",
+        "operationType": "correct_event",
+        "clientOperationId": "bad-correct-json-null",
+        "serverEventVersion": null
+      }
+    },
+    {
+      "name": "correction with array changes: controlled rejection",
+      "status": "pass",
+      "evidence": {
+        "code": "invalid_input",
+        "gameId": "game-a",
+        "eventId": "valid-event",
+        "outcome": "rejected",
+        "operationId": "d43f14df-97fb-44c3-b2c1-2d70b50b714b",
+        "operationType": "correct_event",
+        "clientOperationId": "bad-correct-array",
+        "serverEventVersion": null
+      }
+    },
+    {
+      "name": "malformed requests create no event or revision and record rejected operations",
+      "status": "pass",
+      "evidence": {
+        "malformed_events": 0,
+        "malformed_revisions": 0,
+        "rejected_operations": 7,
+        "effective_version": 1,
+        "effective_evidence": {
+          "period": "Q1",
+          "category": "Possession",
+          "stat_type": "groundBall",
+          "field_zone": "Midfield",
+          "stat_label": "Ground Ball",
+          "occurred_at": "2026-07-23T18:00:00Z",
+          "point_value": 2
+        }
+      }
+    },
+    {
+      "name": "malformed correction leaves the effective event unchanged",
+      "status": "pass",
+      "evidence": {
+        "effectiveVersion": 1,
+        "effectiveEvidence": {
+          "period": "Q1",
+          "category": "Possession",
+          "stat_type": "groundBall",
+          "field_zone": "Midfield",
+          "stat_label": "Ground Ball",
+          "occurred_at": "2026-07-23T18:00:00Z",
+          "point_value": 2
+        }
+      }
+    },
+    {
+      "name": "valid correction behavior remains accepted",
+      "status": "pass",
+      "evidence": {
+        "code": "corrected",
+        "gameId": "game-a",
+        "eventId": "valid-event",
+        "outcome": "accepted",
+        "operationId": "6beaf012-ac49-4d25-b29f-7f43b85c45b4",
+        "operationType": "correct_event",
+        "clientOperationId": "valid-correction",
+        "serverEventVersion": 2
+      }
+    },
+    {
+      "name": "valid correction updates the effective event and records one revision",
+      "status": "pass",
+      "evidence": {
+        "server_event_version": 2,
+        "period": "Q2",
+        "revisions": 1
+      }
+    }
+  ]
+}
+EXIT: 0
+
+===== minimum disclosure =====
+Minimum-disclosure checks passed (41/41).
+PASS: trusted Live Share is off by default
+PASS: trusted token lifecycle is off by default
+PASS: trusted export audit is off by default
+PASS: shared viewers receive public-view status copy
+PASS: secure Live Share returns before the legacy wildcard path
+PASS: secure Live Share calls the public-safe RPC
+PASS: secure Live Share uses allowlisted polling
+PASS: secure cutover removes ordinary table subscriptions
+PASS: public payload mapping cannot render notes or tags
+PASS: staging denies anonymous ordinary game/event reads
+PASS: base rollback is executable in the Supabase SQL editor without psql meta-commands
+PASS: only the public-safe Live Share RPC is granted anonymously
+PASS: staging has explicit token create/revoke RPCs
+PASS: server stores only the token hash
+PASS: public token resolution enforces expiration
+PASS: remote tests cover unknown, expired, and revoked tokens
+PASS: CSV defaults to the selected player scope
+PASS: CSV annotations require explicit inclusion
+PASS: full backup requires explicit confirmation
+PASS: full backup never invokes native/public sharing
+PASS: trusted export auditing is integrated behind its flag
+PASS: export audit stores metadata and outcome
+PASS: export audit does not store exported payloads
+PASS: account backup audit is scoped to the signed-in account
+PASS: security-definer function ownership is explicit
+PASS: import cannot grant player or team access
+PASS: import cannot replace team, roster, or player authority state
+PASS: imported games cannot reactivate Live Share tokens
+PASS: import explains that existing games are not replaced
+PASS: import cannot resurrect locally deleted games
+PASS: recap excludes private event notes and private process intelligence
+PASS: privacy, terms, access, and README distinguish output purposes
+PASS: mobile export/import confirmations have dedicated accessible layout
+PASS: remote suite asserts exact allowlists and ordinary-table denial
+PASS: release hygiene coordinates the service worker and version manifest
+PASS: production Supabase schema remains unchanged
+PASS: combined Supabase tree matches the authorized PR #9 ref exactly
+PASS: release-hygiene delta does not alter canonical database files
+PASS: public copy distinguishes staged proof from production activation
+PASS: live tracking controls remain intact
+PASS: Game Review, Season Review, and offline persistence remain present
+EXIT: 0
+
+===== phase-aware containment =====
+PASS PR #10 standalone mode passes against the release base
+PASS standalone mode rejects any SQL change
+PASS combined mode passes with the exact authorized database candidate
+PASS integration mode rejects a fifth migration
+PASS integration mode rejects edits to a canonical migration
+PASS integration mode rejects edits to a rollback file
+PASS integration mode rejects an unknown Supabase file
+PASS integration mode rejects an unavailable authorized database ref
+PASS integration mode rejects a database ref absent from combined HEAD
+PASS combined mode accepts an authorized database ref from earlier review history
+
+10/10 phase-aware containment tests passed.
+EXIT: 0
+
+===== Trust Spine SQL acceptance and rollback =====
+MIGRATION: PASS
+TRUST_SPINE_TABLES: 20
+SQL_ACCEPTANCE: {"suite":"LaxHornet Trust Spine Release 1","fixtures":"synthetic","transaction":"rolled_back","sqlTestsPassed":33}
+ROLLBACK: PASS
+TRUST_SPINE_TABLES_AFTER_ROLLBACK: 0
+LEGACY_SENTINELS_AFTER_ROLLBACK: {"games":1,"events":1,"teams":1,"roster_players":1}
+EXIT: 0
+
+===== v282 release coordination =====
+Update release checks passed for v282.
+EXIT: 0
+
+===== release hygiene =====
+Release hygiene checks passed (42/42).
+PASS: version manifest identifies v282
+PASS: browser runtime identifies v282
+PASS: service-worker cache identifies v282
+PASS: publicLiveShareRpc requires deliberate true runtime configuration
+PASS: liveShareTokenRpc requires deliberate true runtime configuration
+PASS: exportAuditRpc requires deliberate true runtime configuration
+PASS: app runtime does not self-enable trusted disclosure flags
+PASS: legacy Live Share fallback remains pending explicit cutover
+PASS: publicLiveShareRpc is explicitly enabled by the v282 runtime artifact
+PASS: liveShareTokenRpc is explicitly enabled by the v282 runtime artifact
+PASS: exportAuditRpc is explicitly enabled by the v282 runtime artifact
+PASS: v282 runtime configuration loads before app.js
+PASS: v282 has bounded secure-disclosure configuration failure handling
+PASS: active runtime, public, and support files contain no staging project reference
+PASS: no publishable key appears outside the existing production app configuration
+PASS: app default remains scoped to the established production project
+PASS: combined Supabase tree matches the authorized PR #9 ref exactly
+PASS: release-hygiene delta does not alter the authorized database candidate
+PASS: combined integration contains only the seven approved PR #9 Supabase files
+PASS: impactValueForEvent is unchanged from origin/main
+PASS: possessionRuleForEvent is unchanged from origin/main
+PASS: calculatePossessionImpact is unchanged from origin/main
+PASS: calculateGameImpact is unchanged from origin/main
+PASS: calculateTotals is unchanged from origin/main
+PASS: calculateSeasonTotalsFromGames is unchanged from origin/main
+PASS: publicLiveShareGameFromPayload is unchanged from origin/main
+PASS: README.md identifies isolated staging proof
+PASS: README.md identifies managed preview proof
+PASS: README.md says production activation is pending
+PASS: README.md retains sensitive-data caution
+PASS: access-and-trust.html identifies isolated staging proof
+PASS: access-and-trust.html identifies managed preview proof
+PASS: access-and-trust.html says production activation is pending
+PASS: access-and-trust.html retains sensitive-data caution
+PASS: privacy.html identifies isolated staging proof
+PASS: privacy.html identifies managed preview proof
+PASS: privacy.html says production activation is pending
+PASS: privacy.html retains sensitive-data caution
+PASS: terms.html identifies isolated staging proof
+PASS: terms.html identifies managed preview proof
+PASS: terms.html says production activation is pending
+PASS: terms.html retains sensitive-data caution
+EXIT: 0
+
+===== secure disclosure activation =====
+Secure-disclosure activation checks passed (21/21).
+PASS: version manifest identifies v282
+PASS: app runtime identifies v282
+PASS: service worker uses the v282 cache
+PASS: app shell loads the v282 runtime configuration
+PASS: deferred runtime configuration appears before deferred app.js
+PASS: runtime configuration preserves existing non-secret values
+PASS: publicLiveShareRpc is explicitly enabled
+PASS: liveShareTokenRpc is explicitly enabled
+PASS: exportAuditRpc is explicitly enabled
+PASS: runtime configuration contains no host or credential
+PASS: service worker has a dedicated runtime-config route
+PASS: runtime configuration prefers a no-store network fetch
+PASS: runtime configuration has a v282 offline cache fallback
+PASS: activation removes stale LaxHornet caches
+PASS: app detects complete activation configuration
+PASS: missing activation configuration blocks Live Share truthfully
+PASS: missing activation configuration blocks audited exports truthfully
+PASS: legacy fallback source remains for a later cleanup release
+PASS: v282 blocks before the legacy anonymous table read
+PASS: v282 activation delta changes no SQL
+PASS: v282 activation delta changes no Supabase files
+EXIT: 0
+
+===== Product Alignment source =====
+Product alignment checks passed (33/33).
+PASS: letter-grade generator is removed
+PASS: letter-grade renderer is removed
+PASS: archetype generator is removed from active code
+PASS: archetype share-card generator is removed
+PASS: active app code contains no archetype reads, generation, or presentation
+PASS: archetype presentation CSS is removed
+PASS: public, legal, README, and launch copy contain no archetype claims
+PASS: hidden DOM and CSS contain no retired impact-grade class
+PASS: app contains the required proprietary Game Impact limitation
+PASS: public/legal documentation contains the required Game Impact limitation
+PASS: app states the missing-event limitation
+PASS: low-data review uses the required insufficient-evidence state
+PASS: Game Review visibly labels recorded evidence
+PASS: Game Review visibly labels interpretation
+PASS: Game Review visibly labels the optional focus
+PASS: recap begins with recorded contributions
+PASS: recap separates cautious interpretation
+PASS: recap includes a conversation starter
+PASS: recap includes focus only when explicitly added
+PASS: no letter grade appears in app or public copy
+PASS: CSV reframes the numeric export field as proprietary
+PASS: JSON export documents Impact provenance and evidence limits
+PASS: share recap excludes private process context from prompt selection
+PASS: Live Share suppresses private notes
+PASS: Live Share filters private process tags
+PASS: user-recorded process tags do not generate automatic game patterns
+PASS: user-recorded process tags do not generate season conclusions
+PASS: no external AI model integration was added
+PASS: live tracking retains Undo, Save, End Game, and Cancel Game controls
+PASS: recap copy and share actions remain wired
+PASS: legacy saved games remain normalization-compatible without deleting unknown fields
+PASS: offline/local persistence paths remain present
+PASS: no player comparison or ranking presentation was introduced
+EXIT: 0
+
+===== Product Alignment browser =====
+SAMPLE FAMILY RECAP
+Demo vs Madison Demo
+Recorded contributions
+1 goal, 1 assist, 1 ground ball, 1 successful clear
+
+What this may suggest
+Based on the recorded events, scoring may have been an important part of this game.
+
+Conversation starter
+After winning the ball, what could help make the next pass or carry cleaner?
+PASS: public homepage contains no player archetype/profile claim
+PASS: public homepage contains no Game Impact letter grade
+PASS: demo tracker renders
+PASS: demo review renders
+PASS: rendered numeric Impact includes its proprietary limitation
+PASS: rendered review separates evidence, interpretation, and focus
+PASS: rendered demo contains no grade or archetype output
+PASS: rendered DOM contains no retired impact-grade element
+PASS: rendered DOM contains no archetype card
+PASS: 390px demo has no horizontal page overflow
+PASS: runtime Family Recap separates evidence, interpretation, and conversation prompt
+PASS: runtime Family Recap excludes grades, archetypes, private notes, and private process tags
+PASS: runtime low-data review suppresses developmental takeaway and shows the required limitation
+PASS: runtime public event rendering excludes private notes and process tags
+PASS: browser Product Alignment checks make no hosted Supabase request
+Browser product alignment checks passed (15/15).
+EXIT: 0
+
+===== release hygiene browser =====
+PASS: anonymous shared-game screen renders
+PASS: anonymous shared-game flow remains read-only and code-scoped before or after secure activation
+PASS: anonymous shared-game screen has no 390px horizontal overflow
+PASS: CSV export dialog requires a selected scope
+PASS: CSV export keeps private process tags optional
+PASS: CSV export keeps private notes optional
+PASS: private backup confirmation identifies sensitive recovery data
+PASS: private backup is distinguished from public sharing
+PASS: private backup requires explicit confirmation
+PASS: import review states authority boundaries
+PASS: import review states merge behavior
+PASS: Help identifies staged and preview proof
+PASS: Help says hardened production activation is pending
+PASS: Help warns against sensitive notes and tags
+PASS: update-available banner exposes the update action
+PASS: browser verification made no hosted Supabase request
+Browser evidence: C:\Users\user\Documents\LaxHornet\review-evidence\release-hygiene-v281\browser
+Release-hygiene browser checks passed (16/16).
+EXIT: 0
+
+===== activation browser =====
+PASS: all three secure disclosure flags are active
+PASS: runtime status reports every disclosure feature true
+PASS: runtime-config executes before app.js
+PASS: public-safe payload renders an allowlisted event
+PASS: public UI contains no private note
+PASS: public UI contains no private tag
+PASS: public-safe polling repeats the RPC request
+PASS: secure viewer makes no ordinary games/events request
+PASS: v282 activation removes the stale v281 cache
+PASS: signed-in token creation uses the approved RPC
+PASS: token revocation disables Live Share
+PASS: authorized export audit succeeds
+PASS: rejected export audit is bounded
+PASS: missing runtime-config is detected
+PASS: missing configuration shows truthful bounded copy
+PASS: missing configuration never falls through to legacy tables
+PASS: local tracking remains available when secure disclosure configuration is missing
+PASS: failed activation RPC produces a bounded unavailable state
+PASS: delayed service-worker activation exposes a clear update action
+PASS: updated offline client continues local tracking
+PASS: updated client recovers secure Live Share after reconnection
+PASS: activation browser suite contacts no hosted Supabase project
+Activation browser checks passed (22/22).
+EXIT: 0
+
+===== Trust Spine contracts =====
+PASS Migration is additive and does not alter legacy runtime tables
+PASS Trust Spine foreign keys preserve evidence and never target legacy tables
+PASS Release 1 scope excludes deferred roles and systems
+PASS All 20 Trust Spine tables are in the deny-all RLS list
+PASS No direct Trust Spine table grants are given to browser roles
+PASS Staging rollback removes exactly the additive Trust Spine tables
+PASS Only the nine approved public RPCs are created and granted
+PASS Public RPC wrappers are fixed-path definers and private helpers are unreachable
+PASS Grant lifecycle and constrained provenance are represented
+PASS Create, correction, and permanent tombstone operation records are separate
+PASS Operations preserve all outcomes while revisions preserve accepted evidence only
+PASS Scope registration is canonical, idempotent, and does not issue grants
+PASS Accepted revision sequencing uses the locked effective-row counter
+PASS Evidence, annotations, Live Share, and export field allowlists are explicit
+PASS The SQL suite covers every required staging scenario
+PASS LaxHornet account storage keys isolate users
+PASS Next-game focus keys isolate account, team, and roster player
+PASS Phase-aware release containment preserves the authorized Trust Spine SQL
+
+18/18 local contract tests passed.
+EXIT: 0
+
+===== Cancel Game =====
+PASS: new game with no events is removed
+PASS: cancel clears active game and tracking session
+PASS: cancel writes a durable game tombstone
+PASS: cancel returns to home
+PASS: online cancel requests one cloud deletion
+PASS: game with several events is fully removed
+PASS: unrelated games remain unchanged
+PASS: Keep Tracking leaves game and events unchanged
+PASS: offline cancel queues no immediate cloud call
+PASS: offline tombstone prevents cloud resurrection after reload
+PASS: canceled game is excluded from export source
+PASS: resumed saved game is preserved
+PASS: resumed saved game does not call cloud delete
+PASS: unauthorized cancel cannot change the game
+PASS: cancel is idempotent after active game is cleared
+PASS: Cancel Game is a secondary live control
+PASS: confirmation uses required warning copy
+PASS: confirmation has Keep Tracking and Cancel Game actions
+PASS: new tracking sessions are marked at game creation
+PASS: legacy sessions default to preservation-safe existing origin
+PASS: cancel clears active and review pointers
+PASS: cancel uses durable game tombstone
+PASS: cancel never completes or reviews the game
+PASS: cancel uses RPC-only cloud deletion
+PASS: game deletion has no direct table delete fallback
+PASS: saved-session exit does not call cloud deletion
+PASS: modal is accessible
+PASS: Escape and Tab handling are implemented
+PASS: Keep Tracking restores focus to cancel control
+PASS: Save, End Game, and Undo controls remain
+PASS: normal navigation does not invoke cancellation
+PASS: cloud merge filters deleted games
+PASS: cloud reload flushes tombstones before merge
+
+33 cancel-game checks passed.
+EXIT: 0
+
+===== delete permissions =====
+PASS: delete installer revokes PUBLIC and anon from public.laxhornet_delete_game(text)
+PASS: delete installer grants authenticated access to public.laxhornet_delete_game(text)
+PASS: security hardening restores authenticated access to public.laxhornet_delete_game(text)
+PASS: main schema grants authenticated access to public.laxhornet_delete_game(text)
+PASS: permission patch revokes PUBLIC and anon from public.laxhornet_delete_game(text)
+PASS: permission patch grants authenticated access to public.laxhornet_delete_game(text)
+PASS: delete installer revokes PUBLIC and anon from public.laxhornet_delete_event(text)
+PASS: delete installer grants authenticated access to public.laxhornet_delete_event(text)
+PASS: security hardening restores authenticated access to public.laxhornet_delete_event(text)
+PASS: main schema grants authenticated access to public.laxhornet_delete_event(text)
+PASS: permission patch revokes PUBLIC and anon from public.laxhornet_delete_event(text)
+PASS: permission patch grants authenticated access to public.laxhornet_delete_event(text)
+PASS: permission patch is transactional
+PASS: permission patch verifies effective privileges
+PASS: main schema removes default PUBLIC function execution
+PASS: delete game RPC rejects missing authentication
+PASS: delete event RPC rejects missing authentication
+
+17 delete RPC permission checks passed.
+EXIT: 0
+
+===== player-removal cleanup =====
+PASS: canonical schema permits player_removed status
+PASS: standalone migration permits player_removed status
+PASS: canonical removal RPC exists
+PASS: canonical removal RPC requires sign-in
+PASS: canonical removal RPC requires team admin or reviewer
+PASS: canonical removal RPC locks exact roster player
+PASS: canonical removal RPC marks player inactive
+PASS: canonical removal RPC removes only exact player claims
+PASS: canonical removal RPC preserves team membership
+PASS: canonical removal RPC resolves only matching pending or approved requests
+PASS: canonical removal RPC records player_removed
+PASS: canonical removal RPC leaves failures to roll back the transaction
+PASS: migration removal RPC exists
+PASS: migration removal RPC requires sign-in
+PASS: migration removal RPC requires team admin or reviewer
+PASS: migration removal RPC locks exact roster player
+PASS: migration removal RPC marks player inactive
+PASS: migration removal RPC removes only exact player claims
+PASS: migration removal RPC preserves team membership
+PASS: migration removal RPC resolves only matching pending or approved requests
+PASS: migration removal RPC records player_removed
+PASS: migration removal RPC leaves failures to roll back the transaction
+PASS: roster repair removal RPC exists
+PASS: roster repair removal RPC requires sign-in
+PASS: roster repair removal RPC requires team admin or reviewer
+PASS: roster repair removal RPC locks exact roster player
+PASS: roster repair removal RPC marks player inactive
+PASS: roster repair removal RPC removes only exact player claims
+PASS: roster repair removal RPC preserves team membership
+PASS: roster repair removal RPC resolves only matching pending or approved requests
+PASS: roster repair removal RPC records player_removed
+PASS: roster repair removal RPC leaves failures to roll back the transaction
+PASS: canonical pending-request RPC requires an active roster match
+PASS: canonical pending-request RPC excludes terminal player_removed requests
+PASS: canonical pending-request RPC checks the claim for the requested jersey
+PASS: migration pending-request RPC requires an active roster match
+PASS: migration pending-request RPC excludes terminal player_removed requests
+PASS: migration pending-request RPC checks the claim for the requested jersey
+PASS: reminder repair pending-request RPC requires an active roster match
+PASS: reminder repair pending-request RPC excludes terminal player_removed requests
+PASS: reminder repair pending-request RPC checks the claim for the requested jersey
+PASS: canonical approval RPC locks the request
+PASS: canonical approval RPC rejects terminal requests
+PASS: canonical approval RPC locks the active roster match
+PASS: canonical approval RPC updates only a still-pending request
+PASS: migration approval RPC locks the request
+PASS: migration approval RPC rejects terminal requests
+PASS: migration approval RPC locks the active roster match
+PASS: migration approval RPC updates only a still-pending request
+PASS: admin UI refreshes Parent Requests after player removal
+PASS: an explicit request can reopen a player_removed request
+PASS: removing a player hides its Parent Request
+PASS: removing a player removes the exact claim
+PASS: requests for other players remain unchanged
+PASS: claims for other players remain unchanged
+PASS: a parent with another player claim keeps that access
+PASS: parent team membership is preserved
+PASS: approved request becomes player_removed
+PASS: re-adding the jersey does not reactivate the old request
+PASS: an explicit new request can be submitted for the re-added player
+PASS: unauthorized cleanup leaves all data unchanged
+PASS: cleanup failure rolls the modeled transaction back
+PASS: migration is explicitly transactional
+PASS: migration revokes public and anon execution
+
+64 passed; 0 failed
+EXIT: 0
+
+===== secret and staging-reference scan =====
+No preview reference, publishable-key value, service-role token, or JWT-like value found in the activation delta.
+EXIT: 0
+
+===== git diff --check =====
+
+EXIT: 0
+
+TOTAL GROUPS: 23 passed, 0 failed

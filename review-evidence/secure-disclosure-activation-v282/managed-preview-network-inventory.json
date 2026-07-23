@@ -1,0 +1,133 @@
+{
+  "previewHost": "authorized-preview.supabase.co",
+  "forbiddenHostedRequestCount": 0,
+  "hostedRequestCount": 3,
+  "requests": [
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/app.html",
+      "resourceType": "document"
+    },
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/styles.css",
+      "resourceType": "stylesheet"
+    },
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/runtime-config.js",
+      "resourceType": "script"
+    },
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/assets/supabase.min.js",
+      "resourceType": "script"
+    },
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/app.js",
+      "resourceType": "script"
+    },
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/assets/LHbanner.png",
+      "resourceType": "image"
+    },
+    {
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/lh_public_live_share_game",
+      "resourceType": "fetch"
+    },
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/assets/honeycombblack.png",
+      "resourceType": "image"
+    },
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/assets/LHicon.png",
+      "resourceType": "other"
+    },
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/version.json",
+      "resourceType": "fetch"
+    },
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/app.html",
+      "resourceType": "document"
+    },
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/styles.css",
+      "resourceType": "stylesheet"
+    },
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/runtime-config.js",
+      "resourceType": "script"
+    },
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/assets/supabase.min.js",
+      "resourceType": "script"
+    },
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/app.js",
+      "resourceType": "script"
+    },
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/assets/honeycombblack.png",
+      "resourceType": "image"
+    },
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/assets/LHbanner.png",
+      "resourceType": "image"
+    },
+    {
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/lh_public_live_share_game",
+      "resourceType": "fetch"
+    },
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/assets/LHicon.png",
+      "resourceType": "other"
+    },
+    {
+      "method": "GET",
+      "host": "127.0.0.1:5262",
+      "path": "/version.json",
+      "resourceType": "fetch"
+    },
+    {
+      "method": "POST",
+      "host": "authorized-preview.supabase.co",
+      "path": "/rest/v1/rpc/lh_public_live_share_game",
+      "resourceType": "fetch"
+    }
+  ]
+}

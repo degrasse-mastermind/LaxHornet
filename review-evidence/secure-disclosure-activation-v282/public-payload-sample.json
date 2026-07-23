@@ -1,0 +1,36 @@
+{
+  "game": {
+    "game_id": "synthetic-secure-game",
+    "team_name": "Branford Demo Hornets",
+    "player_name": "Demo Player",
+    "jersey_number": "12",
+    "position": "Midfield",
+    "opponent": "Madison Demo",
+    "game_date": "2026-07-23",
+    "period_format": "quarters",
+    "final_score_for": null,
+    "final_score_against": null
+  },
+  "events": [
+    {
+      "event_id": "synthetic-event-1",
+      "stat_type": "groundBall",
+      "stat_label": "Ground Ball",
+      "category": "Effort / IQ",
+      "point_value": 2,
+      "period": "Q1",
+      "occurred_at": "2026-07-23T12:00:00.000Z",
+      "field_zone": "Midfield"
+    },
+    {
+      "event_id": "synthetic-event-2",
+      "stat_type": "causedTurnover",
+      "stat_label": "Caused Turnover",
+      "category": "Defense",
+      "point_value": 3,
+      "period": "Q2",
+      "occurred_at": "2026-07-23T12:05:00.000Z",
+      "field_zone": "Defensive"
+    }
+  ]
+}

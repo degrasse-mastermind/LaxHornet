@@ -12,6 +12,7 @@ function expect(condition, message) {
 
 const version = JSON.parse(read("version.json")).version;
 const versionNumber = version.replace(/^v/, "");
+const priorVersion = `v${Number(versionNumber) - 1}`;
 const appJs = read("app.js");
 const serviceWorker = read("service-worker.js");
 const appHtml = read("app.html");
@@ -58,6 +59,9 @@ for (const [file, content] of [
   ["index.html", indexHtml],
 ]) {
   expect(!content.includes("v280"), `${file} must not retain the prior v280 release identity`);
+  if (Number.isFinite(Number(versionNumber)) && Number(versionNumber) > 281) {
+    expect(!content.includes(priorVersion), `${file} must not retain the prior ${priorVersion} release identity`);
+  }
 }
 
 expect(

@@ -1,0 +1,316 @@
+===== syntax: app.js =====
+EXIT: 0
+===== syntax: runtime-config.js =====
+EXIT: 0
+===== syntax: service-worker.js =====
+EXIT: 0
+===== v282 update release =====
+Update release checks passed for v282.
+EXIT: 0
+===== release hygiene =====
+Release hygiene checks passed (42/42).
+PASS: version manifest identifies v282
+PASS: browser runtime identifies v282
+PASS: service-worker cache identifies v282
+PASS: publicLiveShareRpc requires deliberate true runtime configuration
+PASS: liveShareTokenRpc requires deliberate true runtime configuration
+PASS: exportAuditRpc requires deliberate true runtime configuration
+PASS: app runtime does not self-enable trusted disclosure flags
+PASS: legacy Live Share fallback remains pending explicit cutover
+PASS: publicLiveShareRpc is explicitly enabled by the v282 runtime artifact
+PASS: liveShareTokenRpc is explicitly enabled by the v282 runtime artifact
+PASS: exportAuditRpc is explicitly enabled by the v282 runtime artifact
+PASS: v282 runtime configuration loads before app.js
+PASS: v282 has bounded secure-disclosure configuration failure handling
+PASS: active runtime, public, and support files contain no staging project reference
+PASS: no publishable key appears outside the existing production app configuration
+PASS: app default remains scoped to the established production project
+PASS: standalone release-hygiene delta changes no SQL
+PASS: standalone release-hygiene delta does not alter canonical migrations
+PASS: standalone release-hygiene delta does not alter canonical rollbacks
+PASS: impactValueForEvent is unchanged from origin/main
+PASS: possessionRuleForEvent is unchanged from origin/main
+PASS: calculatePossessionImpact is unchanged from origin/main
+PASS: calculateGameImpact is unchanged from origin/main
+PASS: calculateTotals is unchanged from origin/main
+PASS: calculateSeasonTotalsFromGames is unchanged from origin/main
+PASS: publicLiveShareGameFromPayload is unchanged from origin/main
+PASS: README.md identifies isolated staging proof
+PASS: README.md identifies managed preview proof
+PASS: README.md says production activation is pending
+PASS: README.md retains sensitive-data caution
+PASS: access-and-trust.html identifies isolated staging proof
+PASS: access-and-trust.html identifies managed preview proof
+PASS: access-and-trust.html says production activation is pending
+PASS: access-and-trust.html retains sensitive-data caution
+PASS: privacy.html identifies isolated staging proof
+PASS: privacy.html identifies managed preview proof
+PASS: privacy.html says production activation is pending
+PASS: privacy.html retains sensitive-data caution
+PASS: terms.html identifies isolated staging proof
+PASS: terms.html identifies managed preview proof
+PASS: terms.html says production activation is pending
+PASS: terms.html retains sensitive-data caution
+EXIT: 0
+===== secure disclosure activation =====
+Secure-disclosure activation checks passed (21/21).
+PASS: version manifest identifies v282
+PASS: app runtime identifies v282
+PASS: service worker uses the v282 cache
+PASS: app shell loads the v282 runtime configuration
+PASS: deferred runtime configuration appears before deferred app.js
+PASS: runtime configuration preserves existing non-secret values
+PASS: publicLiveShareRpc is explicitly enabled
+PASS: liveShareTokenRpc is explicitly enabled
+PASS: exportAuditRpc is explicitly enabled
+PASS: runtime configuration contains no host or credential
+PASS: service worker has a dedicated runtime-config route
+PASS: runtime configuration prefers a no-store network fetch
+PASS: runtime configuration has a v282 offline cache fallback
+PASS: activation removes stale LaxHornet caches
+PASS: app detects complete activation configuration
+PASS: missing activation configuration blocks Live Share truthfully
+PASS: missing activation configuration blocks audited exports truthfully
+PASS: legacy fallback source remains for a later cleanup release
+PASS: v282 blocks before the legacy anonymous table read
+PASS: v282 activation delta changes no SQL
+PASS: v282 activation delta changes no Supabase files
+EXIT: 0
+===== secure disclosure browser =====
+PASS: all three secure disclosure flags are active
+PASS: runtime status reports every disclosure feature true
+PASS: runtime-config executes before app.js
+PASS: public-safe payload renders an allowlisted event
+PASS: public UI contains no private note
+PASS: public UI contains no private tag
+PASS: public-safe polling repeats the RPC request
+PASS: secure viewer makes no ordinary games/events request
+PASS: v282 activation removes the stale v281 cache
+PASS: signed-in token creation uses the approved RPC
+PASS: token revocation disables Live Share
+PASS: authorized export audit succeeds
+PASS: rejected export audit is bounded
+PASS: missing runtime-config is detected
+PASS: missing configuration shows truthful bounded copy
+PASS: missing configuration never falls through to legacy tables
+PASS: local tracking remains available when secure disclosure configuration is missing
+PASS: failed activation RPC produces a bounded unavailable state
+PASS: delayed service-worker activation exposes a clear update action
+PASS: updated offline client continues local tracking
+PASS: updated client recovers secure Live Share after reconnection
+PASS: activation browser suite contacts no hosted Supabase project
+Activation browser checks passed (22/22).
+EXIT: 0
+===== Product Alignment source =====
+Product alignment checks passed (33/33).
+PASS: letter-grade generator is removed
+PASS: letter-grade renderer is removed
+PASS: archetype generator is removed from active code
+PASS: archetype share-card generator is removed
+PASS: active app code contains no archetype reads, generation, or presentation
+PASS: archetype presentation CSS is removed
+PASS: public, legal, README, and launch copy contain no archetype claims
+PASS: hidden DOM and CSS contain no retired impact-grade class
+PASS: app contains the required proprietary Game Impact limitation
+PASS: public/legal documentation contains the required Game Impact limitation
+PASS: app states the missing-event limitation
+PASS: low-data review uses the required insufficient-evidence state
+PASS: Game Review visibly labels recorded evidence
+PASS: Game Review visibly labels interpretation
+PASS: Game Review visibly labels the optional focus
+PASS: recap begins with recorded contributions
+PASS: recap separates cautious interpretation
+PASS: recap includes a conversation starter
+PASS: recap includes focus only when explicitly added
+PASS: no letter grade appears in app or public copy
+PASS: CSV reframes the numeric export field as proprietary
+PASS: JSON export documents Impact provenance and evidence limits
+PASS: share recap excludes private process context from prompt selection
+PASS: Live Share suppresses private notes
+PASS: Live Share filters private process tags
+PASS: user-recorded process tags do not generate automatic game patterns
+PASS: user-recorded process tags do not generate season conclusions
+PASS: no external AI model integration was added
+PASS: live tracking retains Undo, Save, End Game, and Cancel Game controls
+PASS: recap copy and share actions remain wired
+PASS: legacy saved games remain normalization-compatible without deleting unknown fields
+PASS: offline/local persistence paths remain present
+PASS: no player comparison or ranking presentation was introduced
+EXIT: 0
+===== Product Alignment browser =====
+SAMPLE FAMILY RECAP
+Demo vs Madison Demo
+Recorded contributions
+1 goal, 1 assist, 1 ground ball, 1 successful clear
+
+What this may suggest
+Based on the recorded events, scoring may have been an important part of this game.
+
+Conversation starter
+After winning the ball, what could help make the next pass or carry cleaner?
+PASS: public homepage contains no player archetype/profile claim
+PASS: public homepage contains no Game Impact letter grade
+PASS: demo tracker renders
+PASS: demo review renders
+PASS: rendered numeric Impact includes its proprietary limitation
+PASS: rendered review separates evidence, interpretation, and focus
+PASS: rendered demo contains no grade or archetype output
+PASS: rendered DOM contains no retired impact-grade element
+PASS: rendered DOM contains no archetype card
+PASS: 390px demo has no horizontal page overflow
+PASS: runtime Family Recap separates evidence, interpretation, and conversation prompt
+PASS: runtime Family Recap excludes grades, archetypes, private notes, and private process tags
+PASS: runtime low-data review suppresses developmental takeaway and shows the required limitation
+PASS: runtime public event rendering excludes private notes and process tags
+PASS: browser Product Alignment checks make no hosted Supabase request
+Browser product alignment checks passed (15/15).
+EXIT: 0
+===== Trust Spine contracts =====
+PASS Migration is additive and does not alter legacy runtime tables
+PASS Trust Spine foreign keys preserve evidence and never target legacy tables
+PASS Release 1 scope excludes deferred roles and systems
+PASS All 20 Trust Spine tables are in the deny-all RLS list
+PASS No direct Trust Spine table grants are given to browser roles
+PASS Staging rollback removes exactly the additive Trust Spine tables
+PASS Only the nine approved public RPCs are created and granted
+PASS Public RPC wrappers are fixed-path definers and private helpers are unreachable
+PASS Grant lifecycle and constrained provenance are represented
+PASS Create, correction, and permanent tombstone operation records are separate
+PASS Operations preserve all outcomes while revisions preserve accepted evidence only
+PASS Scope registration is canonical, idempotent, and does not issue grants
+PASS Accepted revision sequencing uses the locked effective-row counter
+PASS Evidence, annotations, Live Share, and export field allowlists are explicit
+PASS The SQL suite covers every required staging scenario
+PASS LaxHornet account storage keys isolate users
+PASS Next-game focus keys isolate account, team, and roster player
+PASS Phase-aware release containment preserves the authorized Trust Spine SQL
+
+18/18 local contract tests passed.
+EXIT: 0
+===== Cancel Game =====
+PASS: new game with no events is removed
+PASS: cancel clears active game and tracking session
+PASS: cancel writes a durable game tombstone
+PASS: cancel returns to home
+PASS: online cancel requests one cloud deletion
+PASS: game with several events is fully removed
+PASS: unrelated games remain unchanged
+PASS: Keep Tracking leaves game and events unchanged
+PASS: offline cancel queues no immediate cloud call
+PASS: offline tombstone prevents cloud resurrection after reload
+PASS: canceled game is excluded from export source
+PASS: resumed saved game is preserved
+PASS: resumed saved game does not call cloud delete
+PASS: unauthorized cancel cannot change the game
+PASS: cancel is idempotent after active game is cleared
+PASS: Cancel Game is a secondary live control
+PASS: confirmation uses required warning copy
+PASS: confirmation has Keep Tracking and Cancel Game actions
+PASS: new tracking sessions are marked at game creation
+PASS: legacy sessions default to preservation-safe existing origin
+PASS: cancel clears active and review pointers
+PASS: cancel uses durable game tombstone
+PASS: cancel never completes or reviews the game
+PASS: cancel uses RPC-only cloud deletion
+PASS: game deletion has no direct table delete fallback
+PASS: saved-session exit does not call cloud deletion
+PASS: modal is accessible
+PASS: Escape and Tab handling are implemented
+PASS: Keep Tracking restores focus to cancel control
+PASS: Save, End Game, and Undo controls remain
+PASS: normal navigation does not invoke cancellation
+PASS: cloud merge filters deleted games
+PASS: cloud reload flushes tombstones before merge
+
+33 cancel-game checks passed.
+EXIT: 0
+===== delete permissions =====
+PASS: delete installer revokes PUBLIC and anon from public.laxhornet_delete_game(text)
+PASS: delete installer grants authenticated access to public.laxhornet_delete_game(text)
+PASS: security hardening restores authenticated access to public.laxhornet_delete_game(text)
+PASS: main schema grants authenticated access to public.laxhornet_delete_game(text)
+PASS: permission patch revokes PUBLIC and anon from public.laxhornet_delete_game(text)
+PASS: permission patch grants authenticated access to public.laxhornet_delete_game(text)
+PASS: delete installer revokes PUBLIC and anon from public.laxhornet_delete_event(text)
+PASS: delete installer grants authenticated access to public.laxhornet_delete_event(text)
+PASS: security hardening restores authenticated access to public.laxhornet_delete_event(text)
+PASS: main schema grants authenticated access to public.laxhornet_delete_event(text)
+PASS: permission patch revokes PUBLIC and anon from public.laxhornet_delete_event(text)
+PASS: permission patch grants authenticated access to public.laxhornet_delete_event(text)
+PASS: permission patch is transactional
+PASS: permission patch verifies effective privileges
+PASS: main schema removes default PUBLIC function execution
+PASS: delete game RPC rejects missing authentication
+PASS: delete event RPC rejects missing authentication
+
+17 delete RPC permission checks passed.
+EXIT: 0
+===== player-removal cleanup =====
+PASS: canonical schema permits player_removed status
+PASS: standalone migration permits player_removed status
+PASS: canonical removal RPC exists
+PASS: canonical removal RPC requires sign-in
+PASS: canonical removal RPC requires team admin or reviewer
+PASS: canonical removal RPC locks exact roster player
+PASS: canonical removal RPC marks player inactive
+PASS: canonical removal RPC removes only exact player claims
+PASS: canonical removal RPC preserves team membership
+PASS: canonical removal RPC resolves only matching pending or approved requests
+PASS: canonical removal RPC records player_removed
+PASS: canonical removal RPC leaves failures to roll back the transaction
+PASS: migration removal RPC exists
+PASS: migration removal RPC requires sign-in
+PASS: migration removal RPC requires team admin or reviewer
+PASS: migration removal RPC locks exact roster player
+PASS: migration removal RPC marks player inactive
+PASS: migration removal RPC removes only exact player claims
+PASS: migration removal RPC preserves team membership
+PASS: migration removal RPC resolves only matching pending or approved requests
+PASS: migration removal RPC records player_removed
+PASS: migration removal RPC leaves failures to roll back the transaction
+PASS: roster repair removal RPC exists
+PASS: roster repair removal RPC requires sign-in
+PASS: roster repair removal RPC requires team admin or reviewer
+PASS: roster repair removal RPC locks exact roster player
+PASS: roster repair removal RPC marks player inactive
+PASS: roster repair removal RPC removes only exact player claims
+PASS: roster repair removal RPC preserves team membership
+PASS: roster repair removal RPC resolves only matching pending or approved requests
+PASS: roster repair removal RPC records player_removed
+PASS: roster repair removal RPC leaves failures to roll back the transaction
+PASS: canonical pending-request RPC requires an active roster match
+PASS: canonical pending-request RPC excludes terminal player_removed requests
+PASS: canonical pending-request RPC checks the claim for the requested jersey
+PASS: migration pending-request RPC requires an active roster match
+PASS: migration pending-request RPC excludes terminal player_removed requests
+PASS: migration pending-request RPC checks the claim for the requested jersey
+PASS: reminder repair pending-request RPC requires an active roster match
+PASS: reminder repair pending-request RPC excludes terminal player_removed requests
+PASS: reminder repair pending-request RPC checks the claim for the requested jersey
+PASS: canonical approval RPC locks the request
+PASS: canonical approval RPC rejects terminal requests
+PASS: canonical approval RPC locks the active roster match
+PASS: canonical approval RPC updates only a still-pending request
+PASS: migration approval RPC locks the request
+PASS: migration approval RPC rejects terminal requests
+PASS: migration approval RPC locks the active roster match
+PASS: migration approval RPC updates only a still-pending request
+PASS: admin UI refreshes Parent Requests after player removal
+PASS: an explicit request can reopen a player_removed request
+PASS: removing a player hides its Parent Request
+PASS: removing a player removes the exact claim
+PASS: requests for other players remain unchanged
+PASS: claims for other players remain unchanged
+PASS: a parent with another player claim keeps that access
+PASS: parent team membership is preserved
+PASS: approved request becomes player_removed
+PASS: re-adding the jersey does not reactivate the old request
+PASS: an explicit new request can be submitted for the re-added player
+PASS: unauthorized cleanup leaves all data unchanged
+PASS: cleanup failure rolls the modeled transaction back
+PASS: migration is explicitly transactional
+PASS: migration revokes public and anon execution
+
+64 passed; 0 failed
+EXIT: 0
+TOTAL: 13 passed, 0 failed
