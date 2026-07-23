@@ -1,13 +1,20 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import process from "node:process";
 import { execFileSync } from "node:child_process";
 import { validateReleaseContainmentFromEnvironment } from "./release_containment.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const app = read("app.js");
-const containment = validateReleaseContainmentFromEnvironment(root);
+const version = JSON.parse(read("version.json")).version;
+const activationRelease = version === "v282";
+const containment = validateReleaseContainmentFromEnvironment(root, {
+  releaseBaseRef:
+    process.env.LAXHORNET_RELEASE_BASE_REF?.trim() ||
+    (activationRelease ? "origin/review/release-hygiene-v281" : undefined),
+});
 const baseApp = execFileSync("git", ["show", `${containment.releaseBaseCommit}:app.js`], {
   cwd: root,
   encoding: "utf8",
@@ -42,9 +49,9 @@ function activeTextFiles(dir) {
   return results;
 }
 
-check(read("version.json").includes('"version": "v281"'), "version manifest identifies v281");
-check(app.includes('const APP_VERSION = "v281";'), "browser runtime identifies v281");
-check(read("service-worker.js").includes('const CACHE_NAME = "laxhornet-v281";'), "service-worker cache identifies v281");
+check(read("version.json").includes(`"version": "${version}"`), `version manifest identifies ${version}`);
+check(app.includes(`const APP_VERSION = "${version}";`), `browser runtime identifies ${version}`);
+check(read("service-worker.js").includes(`const CACHE_NAME = "laxhornet-${version}";`), `service-worker cache identifies ${version}`);
 
 for (const flag of ["publicLiveShareRpc", "liveShareTokenRpc", "exportAuditRpc"]) {
   check(
@@ -52,8 +59,24 @@ for (const flag of ["publicLiveShareRpc", "liveShareTokenRpc", "exportAuditRpc"]
     `${flag} requires deliberate true runtime configuration`,
   );
 }
-check(!/window\.LAXHORNET_RUNTIME_CONFIG\s*=/.test(app), "browser runtime does not enable trusted disclosure flags");
+check(!/window\.LAXHORNET_RUNTIME_CONFIG\s*=/.test(app), "app runtime does not self-enable trusted disclosure flags");
 check(app.includes('.select("*, events(*)")'), "legacy Live Share fallback remains pending explicit cutover");
+if (activationRelease) {
+  const runtimeConfig = read("runtime-config.js");
+  const appHtml = read("app.html");
+  for (const flag of ["publicLiveShareRpc", "liveShareTokenRpc", "exportAuditRpc"]) {
+    check(runtimeConfig.includes(`${flag}: true`), `${flag} is explicitly enabled by the v282 runtime artifact`);
+  }
+  check(
+    appHtml.indexOf("runtime-config.js?v=282") < appHtml.indexOf("app.js?v=282"),
+    "v282 runtime configuration loads before app.js",
+  );
+  check(
+    app.includes("SECURE_DISCLOSURE_RUNTIME_READY") &&
+      app.includes("reportSecureDisclosureUnavailable"),
+    "v282 has bounded secure-disclosure configuration failure handling",
+  );
+}
 
 const activeFiles = activeTextFiles(root);
 const productionProjectRef = "ulbmjcvnyznvmjgpstno";

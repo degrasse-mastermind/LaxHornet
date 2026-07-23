@@ -1,0 +1,55 @@
+PASS: all three secure disclosure flags are active
+PASS: runtime status reports every disclosure feature true
+PASS: runtime-config executes before app.js
+PASS: public-safe payload renders an allowlisted event
+PASS: public UI contains no private note
+PASS: public UI contains no private tag
+PASS: public-safe polling repeats the RPC request
+PASS: secure viewer makes no ordinary games/events request
+PASS: v282 activation removes the stale v281 cache
+PASS: unknown and expired tokens remain neutral
+PASS: signed-in token creation uses the approved RPC
+PASS: team-scoped secure Live Share remains available after synchronization
+PASS: authorized export audit succeeds
+PASS: team-admin player export audit succeeds
+PASS: team-coach player export audit succeeds
+PASS: cross-player and cross-team export audits remain rejected
+PASS: existing legacy events are reconciled before token creation
+PASS: private notes and tags never enter Trust Spine evidence
+PASS: secure events preserve chronological ordering
+PASS: newly reconciled events appear in the secure public timeline
+PASS: retry of the same create operation is idempotent
+PASS: event correction synchronizes through the approved correction RPC
+PASS: correction updates the secure public event evidence
+PASS: correction keeps private notes and tags outside public evidence
+PASS: corrected evidence is visible through the public-safe RPC
+PASS: stale correction produces a controlled conflict
+PASS: stale correction is surfaced instead of silently overwriting a newer version
+PASS: event deletion records a Trust Spine tombstone
+PASS: tombstone removes the event from the secure public timeline
+PASS: duplicate tombstone retry is idempotent
+PASS: public-safe timeline omits tombstoned events
+PASS: token revocation disables the public view
+PASS: personal game tracking works
+PASS: personal game save and review work
+PASS: personal game export and private backup remain available
+PASS: personal game Live Share is visibly unavailable
+PASS: personal game does not open or retain a Live Share token prompt
+PASS: personal game never calls the scope RPC
+PASS: personal game never calls the token RPC
+PASS: personal game never uses legacy anonymous-table sharing
+PASS: Trust Spine failure never erases the locally recorded event
+PASS: token is not issued when required reconciliation fails
+PASS: reconciliation failure explains that secure sharing is waiting
+PASS: offline tracking records locally and queues a retry-safe create
+PASS: reconnection submits the pending create
+PASS: reconnected event is available to the secure public timeline
+PASS: missing runtime-config is detected
+PASS: missing configuration shows truthful bounded copy
+PASS: missing configuration never falls through to legacy tables
+PASS: local tracking remains available when secure disclosure configuration is missing
+PASS: failed activation RPC produces a bounded unavailable state
+PASS: delayed service-worker activation exposes a clear update action
+PASS: updated offline client continues local tracking
+PASS: updated client recovers secure Live Share after reconnection
+PASS: activation browser suite contacts no hosted Supabase project

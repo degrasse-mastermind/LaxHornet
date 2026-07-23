@@ -1,0 +1,9 @@
+{
+  "teamAdmin": "accepted",
+  "teamCoach": "accepted",
+  "parentOwnPlayer": "accepted",
+  "crossPlayer": "unauthorized_scope",
+  "crossTeam": "unauthorized_scope",
+  "ownBackup": "accepted",
+  "otherAccountBackup": "unauthorized_scope"
+}

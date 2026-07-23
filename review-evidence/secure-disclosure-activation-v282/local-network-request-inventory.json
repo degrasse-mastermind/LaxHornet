@@ -1,0 +1,219 @@
+{
+  "generatedAt": "2026-07-23T08:40:25.148Z",
+  "hostedSupabaseRequestCount": 0,
+  "productionHostRequestCount": 0,
+  "localApiRequests": [
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_public_live_share_game"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_public_live_share_game"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_public_live_share_game"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_public_live_share_game"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_public_live_share_game"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/games"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/events"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_register_game_scope"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_create_event"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_create_event"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_create_live_share_token"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_record_disclosure_export"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_record_disclosure_export"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_record_disclosure_export"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_record_disclosure_export"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_record_disclosure_export"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_public_live_share_game"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_create_event"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_correct_event"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_public_live_share_game"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_correct_event"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_tombstone_event"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_tombstone_event"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_public_live_share_game"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_revoke_live_share_tokens"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/games"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_public_live_share_game"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/events"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/games"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/games"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/events"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/events"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/games"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/events"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_register_game_scope"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_create_event"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_create_event"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_create_event"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_create_event"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/laxhornet_my_teams"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/laxhornet_my_team_access_requests"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/laxhornet_my_player_claims"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/laxhornet_my_roster_players"
+    },
+    {
+      "method": "GET",
+      "pathname": "/rest/v1/games"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_register_game_scope"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_create_event"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_public_live_share_game"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_public_live_share_game"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/laxhornet_my_teams"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/lh_public_live_share_game"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/laxhornet_my_team_access_requests"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/laxhornet_my_player_claims"
+    },
+    {
+      "method": "POST",
+      "pathname": "/rest/v1/rpc/laxhornet_my_roster_players"
+    }
+  ]
+}

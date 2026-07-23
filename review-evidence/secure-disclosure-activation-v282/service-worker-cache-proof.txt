@@ -1,0 +1,4 @@
+PASS: v282 activation removed the synthetic laxhornet-v281 cache.
+PASS: runtime-config.js uses a dedicated network no-store route.
+PASS: the v282 cached runtime-config fallback keeps all secure disclosure flags enabled.
+PASS: the update-available path rendered an Update Now action.

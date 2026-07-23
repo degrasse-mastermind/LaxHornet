@@ -47,7 +47,17 @@ async function capture(page, fileName) {
   await page.waitForTimeout(250);
   const sharedText = await page.locator("body").innerText();
   expectCheck(sharedText.includes("Shared Game"), "anonymous shared-game screen renders");
-  expectCheck(/share code/i.test(sharedText) && /read-only/i.test(sharedText) && sharedText.includes("Watch Live"), "anonymous shared-game entry remains read-only and code-scoped");
+  const secureActivatedView = /shared live game/i.test(sharedText) && /read-only/i.test(sharedText);
+  const sharedCodeField = page.locator("#sharedScreenCode");
+  const secureEntryView =
+    (await sharedCodeField.count()) === 1 &&
+    (await sharedCodeField.inputValue()) === "SYNTHETIC" &&
+    sharedText.includes("Watch Live") &&
+    !sharedText.includes("Track New Game");
+  expectCheck(
+    secureEntryView || secureActivatedView,
+    "anonymous shared-game flow remains read-only and code-scoped before or after secure activation",
+  );
   expectCheck(documentWidthFits(await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
     clientWidth: document.documentElement.clientWidth,

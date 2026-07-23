@@ -1,0 +1,293 @@
+{
+  "suite": "LaxHornet v282 managed-preview activation",
+  "environment": "authorized managed preview",
+  "synthetic": true,
+  "testsPassed": 70,
+  "testsFailed": 0,
+  "results": [
+    {
+      "status": "pass",
+      "message": "pre-test preview reset accepted"
+    },
+    {
+      "status": "pass",
+      "message": "created synthetic admin Auth user"
+    },
+    {
+      "status": "pass",
+      "message": "created synthetic coach Auth user"
+    },
+    {
+      "status": "pass",
+      "message": "created synthetic parent Auth user"
+    },
+    {
+      "status": "pass",
+      "message": "seeded teams"
+    },
+    {
+      "status": "pass",
+      "message": "seeded team_members"
+    },
+    {
+      "status": "pass",
+      "message": "seeded roster_players"
+    },
+    {
+      "status": "pass",
+      "message": "seeded player_claims"
+    },
+    {
+      "status": "pass",
+      "message": "seeded lh_team_scopes"
+    },
+    {
+      "status": "pass",
+      "message": "seeded lh_player_scopes"
+    },
+    {
+      "status": "pass",
+      "message": "seeded lh_game_scopes"
+    },
+    {
+      "status": "pass",
+      "message": "seeded lh_access_grants"
+    },
+    {
+      "status": "pass",
+      "message": "seeded lh_grant_lifecycle_events"
+    },
+    {
+      "status": "pass",
+      "message": "seeded lh_grant_lifecycle_events"
+    },
+    {
+      "status": "pass",
+      "message": "seeded lh_access_invitations"
+    },
+    {
+      "status": "pass",
+      "message": "seeded lh_access_grants"
+    },
+    {
+      "status": "pass",
+      "message": "seeded lh_grant_lifecycle_events"
+    },
+    {
+      "status": "pass",
+      "message": "seeded lh_grant_lifecycle_events"
+    },
+    {
+      "status": "pass",
+      "message": "seeded lh_access_invitations"
+    },
+    {
+      "status": "pass",
+      "message": "seeded lh_access_grants"
+    },
+    {
+      "status": "pass",
+      "message": "seeded lh_grant_lifecycle_events"
+    },
+    {
+      "status": "pass",
+      "message": "seeded lh_grant_lifecycle_events"
+    },
+    {
+      "status": "pass",
+      "message": "seeded lh_live_share_tokens"
+    },
+    {
+      "status": "pass",
+      "message": "signed in v282-mrx9w5jd-ad28a3-admin"
+    },
+    {
+      "status": "pass",
+      "message": "signed in v282-mrx9w5jd-ad28a3-coach"
+    },
+    {
+      "status": "pass",
+      "message": "signed in v282-mrx9w5jd-ad28a3-parent"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser signed in the synthetic parent"
+    },
+    {
+      "status": "pass",
+      "message": "ordinary tracker events synchronized into Trust Spine"
+    },
+    {
+      "status": "pass",
+      "message": "existing local event and two tracker events reconciled before sharing"
+    },
+    {
+      "status": "pass",
+      "message": "ordinary tracker UI created a secure Live Share token"
+    },
+    {
+      "status": "pass",
+      "message": "secure viewer received the complete pre-share timeline"
+    },
+    {
+      "status": "pass",
+      "message": "tracker added another event while the viewer was polling"
+    },
+    {
+      "status": "pass",
+      "message": "new tracker event appeared within the public polling interval"
+    },
+    {
+      "status": "pass",
+      "message": "tracker correction synchronized through the approved correction RPC"
+    },
+    {
+      "status": "pass",
+      "message": "secure viewer received the corrected event evidence"
+    },
+    {
+      "status": "pass",
+      "message": "tracker deletion synchronized as a Trust Spine tombstone"
+    },
+    {
+      "status": "pass",
+      "message": "secure viewer removed the tombstoned event"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser reports secure disclosure ready"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser reports all three secure flags true"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser executes runtime-config before app.js"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser renders an allowlisted event"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser excludes the private note"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser excludes the private tag"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser polls the public-safe RPC"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser makes no ordinary games/events request"
+    },
+    {
+      "status": "pass",
+      "message": "managed browser makes no foreign hosted-project request"
+    },
+    {
+      "status": "pass",
+      "message": "anonymous games read exposes no rows"
+    },
+    {
+      "status": "pass",
+      "message": "anonymous events read exposes no rows"
+    },
+    {
+      "status": "pass",
+      "message": "browser-created token has the expected random shape"
+    },
+    {
+      "status": "pass",
+      "message": "anonymous public-safe read succeeded"
+    },
+    {
+      "status": "pass",
+      "message": "public game payload matches the exact allowlist"
+    },
+    {
+      "status": "pass",
+      "message": "public event payload matches the exact allowlist"
+    },
+    {
+      "status": "pass",
+      "message": "public payload excludes private notes"
+    },
+    {
+      "status": "pass",
+      "message": "public payload excludes private tags"
+    },
+    {
+      "status": "pass",
+      "message": "public-safe polling preserves the allowlisted shape"
+    },
+    {
+      "status": "pass",
+      "message": "unknown, expired, or revoked token fails neutrally"
+    },
+    {
+      "status": "pass",
+      "message": "unknown, expired, or revoked token fails neutrally"
+    },
+    {
+      "status": "pass",
+      "message": "unknown, expired, or revoked token fails neutrally"
+    },
+    {
+      "status": "pass",
+      "message": "team administrator player-export audit succeeded"
+    },
+    {
+      "status": "pass",
+      "message": "team-scoped coach player-export audit succeeded"
+    },
+    {
+      "status": "pass",
+      "message": "player-scoped parent audit succeeded for the granted player"
+    },
+    {
+      "status": "pass",
+      "message": "cross-player export audit was rejected"
+    },
+    {
+      "status": "pass",
+      "message": "cross-team export audit was rejected"
+    },
+    {
+      "status": "pass",
+      "message": "private backup audit succeeded for the signed-in account"
+    },
+    {
+      "status": "pass",
+      "message": "private backup audit rejected another account"
+    },
+    {
+      "status": "pass",
+      "message": "token revocation succeeded"
+    },
+    {
+      "status": "pass",
+      "message": "revocation immediately disabled the public view"
+    },
+    {
+      "status": "pass",
+      "message": "post-test preview reset accepted"
+    },
+    {
+      "status": "pass",
+      "message": "post-test reset removed synthetic Trust Spine rows"
+    },
+    {
+      "status": "pass",
+      "message": "post-test reset removed synthetic Auth users"
+    }
+  ],
+  "browserDiagnostics": [
+    "authenticated-tracker:console:warning: Service Worker registration blocked by Playwright",
+    "anonymous-viewer:console:warning: Service Worker registration blocked by Playwright"
+  ]
+}
