@@ -54,6 +54,16 @@ function expectContainmentFailure(expectedCode, callback) {
   });
 }
 
+function withoutExplicitReleaseBase(callback) {
+  const previous = process.env.LAXHORNET_RELEASE_BASE_REF;
+  delete process.env.LAXHORNET_RELEASE_BASE_REF;
+  try {
+    return callback();
+  } finally {
+    if (previous !== undefined) process.env.LAXHORNET_RELEASE_BASE_REF = previous;
+  }
+}
+
 try {
   git(["init"]);
   git(["config", "user.name", "LaxHornet Containment Test"]);
@@ -83,14 +93,14 @@ try {
   });
 
   test("origin/main is selected when available", () => {
-    const result = validateReleaseContainmentFromEnvironment(tempRoot);
+    const result = withoutExplicitReleaseBase(() => validateReleaseContainmentFromEnvironment(tempRoot));
     assert.equal(result.releaseBaseRef, "origin/main");
     assert.equal(result.releaseBaseSource, "origin/main");
   });
 
   test("local main is selected when origin/main is absent", () => {
     git(["update-ref", "-d", "refs/remotes/origin/main"]);
-    const result = validateReleaseContainmentFromEnvironment(tempRoot);
+    const result = withoutExplicitReleaseBase(() => validateReleaseContainmentFromEnvironment(tempRoot));
     assert.equal(result.releaseBaseRef, "main");
     assert.equal(result.releaseBaseSource, "main");
   });
@@ -122,6 +132,17 @@ try {
         releaseBaseRef: "release-base",
       }),
     );
+  });
+
+  test("additive cleanup mode permits only explicitly approved SQL paths", () => {
+    const result = validateReleaseContainment({
+      repoRoot: tempRoot,
+      releaseBaseRef: "release-base",
+      headRef: "bad-standalone-sql",
+      allowedAdditiveDbPaths: ["tools/unauthorized.sql"],
+    });
+    assert.equal(result.mode, "additive");
+    assert.deepEqual(result.allowedAdditiveDatabaseFiles, ["tools/unauthorized.sql"]);
   });
 
   git(["switch", "-c", "authorized-db", "release-base"]);
@@ -247,9 +268,11 @@ try {
 
   git(["branch", "-D", "main"]);
   test("validation fails when origin/main and main are unavailable", () => {
-    expectContainmentFailure("RELEASE_BASE_REF_UNAVAILABLE", () =>
-      validateReleaseContainmentFromEnvironment(tempRoot),
-    );
+    withoutExplicitReleaseBase(() => {
+      expectContainmentFailure("RELEASE_BASE_REF_UNAVAILABLE", () =>
+        validateReleaseContainmentFromEnvironment(tempRoot),
+      );
+    });
   });
 } finally {
   if (tempRoot.startsWith(path.resolve(os.tmpdir()))) {

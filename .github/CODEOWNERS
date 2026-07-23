@@ -1,0 +1,13 @@
+# Security-sensitive LaxHornet surfaces require repository-owner review.
+/app.js @degrasse-mastermind
+/event-operation-service.js @degrasse-mastermind
+/runtime-config.js @degrasse-mastermind
+/service-worker.js @degrasse-mastermind
+/supabase/migrations/ @degrasse-mastermind
+/supabase/rollback/ @degrasse-mastermind
+/supabase/functions/ @degrasse-mastermind
+/release/ @degrasse-mastermind
+/tools/validate_release_manifest.mjs @degrasse-mastermind
+/tools/test_*disclosure* @degrasse-mastermind
+/tools/test_*trust_spine* @degrasse-mastermind
+/tools/test_event_operation_service.mjs @degrasse-mastermind

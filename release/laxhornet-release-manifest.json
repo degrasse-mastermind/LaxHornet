@@ -1,0 +1,40 @@
+{
+  "release": "v283",
+  "databaseCandidate": "ad96e428d675fba8fac7752fd108ea06827fa0ad",
+  "preCutoverRuntime": "f4ead54b44fcb5710fe4ed3eed39ab5f1694def4",
+  "activationCandidate": "7cf58df9a43ce235fc6068bd4c50549e05906de4",
+  "minimumSchemaCapability": 1,
+  "databaseTreeMode": "stacked-review",
+  "canonicalForwardMigrations": [
+    "supabase/migrations/20260723000000_laxhornet_legacy_baseline.sql",
+    "supabase/migrations/20260723010000_trust_spine_release_1.sql",
+    "supabase/migrations/20260723020000_minimum_necessary_disclosure.sql",
+    "supabase/migrations/20260723030000_fix_disclosure_audit_and_evidence_validation.sql"
+  ],
+  "additiveForwardMigrations": [
+    "supabase/migrations/20260723040000_event_pipeline_capabilities.sql"
+  ],
+  "rollbackReferences": [
+    "supabase/rollback/20260723010000_trust_spine_release_1_rollback.sql",
+    "supabase/rollback/20260723020000_minimum_necessary_disclosure_rollback.sql",
+    "supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql"
+  ],
+  "requiredRuntimeFlags": [
+    "publicLiveShareRpc",
+    "liveShareTokenRpc",
+    "exportAuditRpc"
+  ],
+  "requiredBackendCapabilities": [
+    "trustSpineEvents",
+    "secureLiveShare",
+    "exportAudit"
+  ],
+  "requiredEndToEndContracts": [
+    "track-to-share",
+    "correction-to-share",
+    "tombstone-to-share",
+    "offline-reconnect",
+    "personal-game-boundary"
+  ],
+  "evidenceDirectory": "review-evidence/event-pipeline-release-control-cleanup"
+}

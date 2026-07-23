@@ -12,6 +12,11 @@ export const APPROVED_AUTHORIZED_DB_PATHS = Object.freeze([
   "supabase/rollback/20260723020000_minimum_necessary_disclosure_rollback.sql",
 ]);
 
+export const APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS = Object.freeze([
+  "supabase/migrations/20260723040000_event_pipeline_capabilities.sql",
+  "supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql",
+]);
+
 export class ReleaseContainmentError extends Error {
   constructor(code, message, details = {}) {
     super(message);
@@ -143,6 +148,7 @@ export function validateReleaseContainment({
   repoRoot,
   releaseBaseRef = "origin/main",
   authorizedDbRef = "",
+  allowedAdditiveDbPaths = [],
   headRef = "HEAD",
 } = {}) {
   if (!repoRoot) {
@@ -160,7 +166,11 @@ export function validateReleaseContainment({
   const normalizedAuthorizedRef = String(authorizedDbRef || "").trim();
 
   if (!normalizedAuthorizedRef) {
-    const forbidden = releaseDeltaFiles.filter(isCanonicalDatabasePath);
+    const allowedAdditive = new Set(
+      (allowedAdditiveDbPaths || []).map((file) => String(file).trim().replaceAll("\\", "/")).filter(Boolean),
+    );
+    const databaseDelta = releaseDeltaFiles.filter(isCanonicalDatabasePath);
+    const forbidden = databaseDelta.filter((file) => !allowedAdditive.has(file));
     if (forbidden.length) {
       throw new ReleaseContainmentError(
         "STANDALONE_DATABASE_CHANGE",
@@ -169,7 +179,7 @@ export function validateReleaseContainment({
       );
     }
     return {
-      mode: "standalone",
+      mode: databaseDelta.length ? "additive" : "standalone",
       repoRoot: normalizedRoot,
       releaseBaseRef,
       releaseBaseCommit,
@@ -181,6 +191,7 @@ export function validateReleaseContainment({
       authorizedSupabaseDeltaFiles: [],
       postAuthorizationDatabaseFiles: [],
       supabaseTreeMatchesAuthorizedRef: null,
+      allowedAdditiveDatabaseFiles: databaseDelta,
     };
   }
 
@@ -266,6 +277,10 @@ export function validateReleaseContainmentFromEnvironment(repoRoot, options = {}
       options.authorizedDbRef ??
       process.env.LAXHORNET_AUTHORIZED_DB_REF?.trim() ??
       "",
+    allowedAdditiveDbPaths:
+      options.allowedAdditiveDbPaths
+      ?? process.env.LAXHORNET_ALLOWED_ADDITIVE_DB_PATHS?.split(",")
+      ?? [],
     headRef: options.headRef || "HEAD",
   });
   return { ...result, releaseBaseSource };

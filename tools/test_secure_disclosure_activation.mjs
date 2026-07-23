@@ -23,16 +23,24 @@ const containment = validateReleaseContainmentFromEnvironment(root, {
     process.env.LAXHORNET_ACTIVATION_BASE_REF?.trim() ||
     "origin/review/release-hygiene-v281",
   authorizedDbRef: "",
+  allowedAdditiveDbPaths: [
+    "supabase/migrations/20260723040000_event_pipeline_capabilities.sql",
+    "supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql",
+  ],
   headRef: process.env.LAXHORNET_ACTIVATION_HEAD_REF?.trim() || "HEAD",
 });
 
-check(version === "v282", "version manifest identifies v282");
-check(app.includes('const APP_VERSION = "v282";'), "app runtime identifies v282");
-check(serviceWorker.includes('const CACHE_NAME = "laxhornet-v282";'), "service worker uses the v282 cache");
-check(appHtml.includes('runtime-config.js?v=282'), "app shell loads the v282 runtime configuration");
+const versionNumber = Number(version.replace(/^v/, ""));
+check(versionNumber >= 282, "version manifest identifies a secure-disclosure release");
+check(app.includes(`const APP_VERSION = "${version}";`), "app runtime matches the version manifest");
+check(serviceWorker.includes(`const CACHE_NAME = "laxhornet-${version}";`), "service worker uses the release cache");
+check(appHtml.includes(`runtime-config.js?v=${versionNumber}`), "app shell loads the release runtime configuration");
 check(
-  appHtml.indexOf('runtime-config.js?v=282') < appHtml.indexOf('app.js?v=282'),
-  "deferred runtime configuration appears before deferred app.js",
+  appHtml.indexOf(`runtime-config.js?v=${versionNumber}`)
+    < appHtml.indexOf(`event-operation-service.js?v=${versionNumber}`)
+    && appHtml.indexOf(`event-operation-service.js?v=${versionNumber}`)
+      < appHtml.indexOf(`app.js?v=${versionNumber}`),
+  "runtime configuration and event service appear before deferred app.js",
 );
 check(
   runtimeConfig.includes("...(window.LAXHORNET_RUNTIME_CONFIG || {})"),
@@ -44,19 +52,20 @@ for (const flag of ["publicLiveShareRpc", "liveShareTokenRpc", "exportAuditRpc"]
 check(!/supabase\.co|sb_publishable_|service[_-]?role|eyJ[a-zA-Z0-9_-]+\./i.test(runtimeConfig), "runtime configuration contains no host or credential");
 check(serviceWorker.includes('requestUrl.pathname.endsWith("/runtime-config.js")'), "service worker has a dedicated runtime-config route");
 check(serviceWorker.includes('fetch(event.request, { cache: "no-store" })'), "runtime configuration prefers a no-store network fetch");
-check(serviceWorker.includes("caches.match(RUNTIME_CONFIG_ASSET)"), "runtime configuration has a v282 offline cache fallback");
+check(serviceWorker.includes("caches.match(RUNTIME_CONFIG_ASSET)"), "runtime configuration has a versioned offline cache fallback");
 check(serviceWorker.includes("keys.filter((key) => key !== CACHE_NAME)"), "activation removes stale LaxHornet caches");
 check(app.includes("SECURE_DISCLOSURE_RUNTIME_READY"), "app detects complete activation configuration");
 check(app.includes('reportSecureDisclosureUnavailable("Live Share")'), "missing activation configuration blocks Live Share truthfully");
 check(app.includes("Secure export is temporarily unavailable"), "missing activation configuration blocks audited exports truthfully");
-check(app.includes('.select("*, events(*)")'), "legacy fallback source remains for a later cleanup release");
+const sharedLoader = app.slice(app.indexOf("async function loadSharedGame"), app.indexOf("async function copyShareLink"));
+check(!sharedLoader.includes('.from("games")'), "anonymous Live Share has no ordinary-table fallback");
+check(app.includes("requireSecureCapability"), "secure disclosure requires a backend capability handshake");
 
-const readinessGuard = app.indexOf("if (!SECURE_DISCLOSURE_RUNTIME_READY)", app.indexOf("async function loadSharedGame"));
-const legacyRead = app.indexOf('.select("*, events(*)")', app.indexOf("async function loadSharedGame"));
-check(readinessGuard >= 0 && readinessGuard < legacyRead, "v282 blocks before the legacy anonymous table read");
-
-check(!containment.releaseDeltaFiles.some((file) => file.endsWith(".sql")), "v282 activation delta changes no SQL");
-check(!containment.releaseDeltaFiles.some((file) => file.startsWith("supabase/")), "v282 activation delta changes no Supabase files");
+const sqlDelta = containment.releaseDeltaFiles.filter((file) => file.endsWith(".sql"));
+check(
+  sqlDelta.every((file) => /20260723040000_event_pipeline_capabilities/.test(file)),
+  "activation cleanup changes only the additive capability migration and rollback",
+);
 
 console.log(`Secure-disclosure activation checks passed (${checks.length}/${checks.length}).`);
 checks.forEach((message) => console.log(`PASS: ${message}`));

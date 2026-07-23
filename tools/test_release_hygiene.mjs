@@ -9,7 +9,8 @@ const root = path.resolve(import.meta.dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const app = read("app.js");
 const version = JSON.parse(read("version.json")).version;
-const activationRelease = version === "v282";
+const versionNumber = Number(version.replace(/^v/, ""));
+const activationRelease = versionNumber >= 282;
 const containment = validateReleaseContainmentFromEnvironment(root, {
   releaseBaseRef:
     process.env.LAXHORNET_RELEASE_BASE_REF?.trim() ||
@@ -68,13 +69,13 @@ if (activationRelease) {
     check(runtimeConfig.includes(`${flag}: true`), `${flag} is explicitly enabled by the v282 runtime artifact`);
   }
   check(
-    appHtml.indexOf("runtime-config.js?v=282") < appHtml.indexOf("app.js?v=282"),
-    "v282 runtime configuration loads before app.js",
+    appHtml.indexOf(`runtime-config.js?v=${versionNumber}`) < appHtml.indexOf(`app.js?v=${versionNumber}`),
+    `${version} runtime configuration loads before app.js`,
   );
   check(
     app.includes("SECURE_DISCLOSURE_RUNTIME_READY") &&
       app.includes("reportSecureDisclosureUnavailable"),
-    "v282 has bounded secure-disclosure configuration failure handling",
+    `${version} has bounded secure-disclosure configuration failure handling`,
   );
 }
 
@@ -94,10 +95,17 @@ check(stagingReferenceViolations.length === 0, "active runtime, public, and supp
 check(publishableKeyViolations.length === 0, "no publishable key appears outside the existing production app configuration");
 check(app.includes(`https://${productionProjectRef}.supabase.co`), "app default remains scoped to the established production project");
 
-if (containment.mode === "standalone") {
-  check(!changedFiles.some((file) => file.endsWith(".sql")), "standalone release-hygiene delta changes no SQL");
-  check(!changedFiles.some((file) => file.startsWith("supabase/migrations/")), "standalone release-hygiene delta does not alter canonical migrations");
-  check(!changedFiles.some((file) => file.startsWith("supabase/rollback/")), "standalone release-hygiene delta does not alter canonical rollbacks");
+if (containment.mode === "standalone" || containment.mode === "additive") {
+  if (containment.mode === "additive") {
+    check(
+      containment.allowedAdditiveDatabaseFiles.every((file) => /20260723040000_event_pipeline_capabilities/.test(file)),
+      "additive cleanup contains only the approved capability migration and rollback",
+    );
+  } else {
+    check(!changedFiles.some((file) => file.endsWith(".sql")), "standalone release-hygiene delta changes no SQL");
+    check(!changedFiles.some((file) => file.startsWith("supabase/migrations/")), "standalone release-hygiene delta does not alter canonical migrations");
+    check(!changedFiles.some((file) => file.startsWith("supabase/rollback/")), "standalone release-hygiene delta does not alter canonical rollbacks");
+  }
 } else {
   check(containment.supabaseTreeMatchesAuthorizedRef, "combined Supabase tree matches the authorized PR #9 ref exactly");
   check(containment.postAuthorizationDatabaseFiles.length === 0, "release-hygiene delta does not alter the authorized database candidate");
