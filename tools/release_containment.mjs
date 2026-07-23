@@ -163,13 +163,6 @@ export function validateReleaseContainment({
     normalizedAuthorizedRef,
     "AUTHORIZED_DB_REF_UNAVAILABLE",
   );
-  if (!isAncestor(normalizedRoot, releaseBaseCommit, authorizedDbCommit)) {
-    throw new ReleaseContainmentError(
-      "AUTHORIZED_DB_BASE_MISMATCH",
-      "Authorized database ref does not descend from the configured release base.",
-      { releaseBaseRef, normalizedAuthorizedRef },
-    );
-  }
   if (!isAncestor(normalizedRoot, authorizedDbCommit, headCommit)) {
     throw new ReleaseContainmentError(
       "AUTHORIZED_DB_REF_NOT_IN_HEAD",

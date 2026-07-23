@@ -188,6 +188,24 @@ try {
       }),
     );
   });
+
+  git(["switch", "-c", "advanced-release-base", "release-base"]);
+  write("approved-base-marker.txt", "current approved base\n");
+  commit("Advance the approved release base");
+  git(["tag", "advanced-release-base-ref"]);
+  git(["switch", "-c", "combined-divergent-history"]);
+  git(["merge", "--no-ff", "--no-edit", "authorized-db-ref"]);
+  write("app.js", "export const version = 'release';\n");
+  commit("Integrate release hygiene after database review began");
+  test("combined mode accepts an authorized database ref from earlier review history", () => {
+    const result = validateReleaseContainment({
+      repoRoot: tempRoot,
+      releaseBaseRef: "advanced-release-base-ref",
+      authorizedDbRef: "authorized-db-ref",
+    });
+    assert.equal(result.mode, "integration");
+    assert.equal(result.supabaseTreeMatchesAuthorizedRef, true);
+  });
 } finally {
   if (tempRoot.startsWith(path.resolve(os.tmpdir()))) {
     fs.rmSync(tempRoot, { recursive: true, force: true });
