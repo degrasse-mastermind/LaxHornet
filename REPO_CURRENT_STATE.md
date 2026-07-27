@@ -40,6 +40,7 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
 - Runtime includes local delete markers and event-operation capabilities.
 - `main` contains the reviewed Tracked Playing Time foundation from merged PR #24 and the opt-in Phase 1 UI from merged PR #25.
 - The v284 release branch changes only coordinated version/cache surfaces, release controls, tests, and documentation before the separately gated production migration and frontend deployment.
+- Production migration `20260727000000_tracked_playing_time_operations` is present exactly once and its 88 normalized statements match the reviewed migration. The v284 team authorization gate passed with an active player-scoped parent grant plus its matching claim. Team-admin-only authority remains intentionally read/list-only for tracked time.
 - Any synchronization change must preserve offline operation, reconnection behavior, deduplication, authorization boundaries, and existing saved data.
 
 ## Supabase backend
@@ -64,7 +65,7 @@ The release manifest records:
 - A historical production schema snapshot and provenance marker.
 - Canonical forward migrations for the legacy baseline, Trust Spine Release 1, minimum-necessary disclosure, and disclosure/evidence fixes.
 - An additive event-pipeline capability migration.
-- A separately contained Tracked Playing Time package with one forward migration, one rollback reference, and one pgTAP contract file. Its reviewed Windows/CRLF identities are recorded in the v284 manifest; it remains marked unapplied until the production cutover is verified.
+- A separately contained Tracked Playing Time package with one forward migration, one rollback reference, and one pgTAP contract file. Its reviewed Windows/CRLF identities remain recorded in the v284 manifest. Live production history now independently verifies the migration is present exactly once and matches all 88 reviewed statements after line-ending normalization.
 - Required ordering, rollback references, approved file identities, and pending-production expectations.
 
 Do not rewrite, reorder, squash, rename, or silently regenerate these migration files. Any new migration must be additive, timestamped, reviewed, tested locally, and reflected in release-control documentation.
@@ -157,7 +158,7 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Live Share and export disclosure boundaries.
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
-- Tracked Playing Time still requires the coordinated v284 release PR, production migration verification, signed-in production smoke validation, and final evidence closure.
+- Tracked Playing Time still requires public-disclosure verification, exact-main frontend deployment, signed-in browser smoke validation, and final production evidence closure. Migration and team authorization gates have passed.
 - Coordinated version and service-worker release hygiene.
 - Maintenance of GitHub Action majors and portability of the CI-selected regression checks.
 

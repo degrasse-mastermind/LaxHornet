@@ -206,6 +206,7 @@ Add the private, local-first data foundation for authoritative game-clock state 
 - `node tools/test_tracked_playing_time_foundation.mjs`: static migration/privacy/containment contracts added.
 - `node tools/run_v283_local_regression.mjs`: 26/26 groups passed locally.
 - GitHub Actions run `30258266639` passed every named regression step on draft PR #24.
+- Production follow-up: migration `20260727000000` was already present exactly once and all 88 normalized production statements matched the reviewed migration. The stopped team-admin rollout fixture was classified as a fixture mismatch because mutation authority is limited to scoped parents and coaches. A corrected synthetic player-scoped parent fixture passed the production authorization gate; team-admin read/list authority remained allowed while initialize/update/create/correct/tombstone remained denied.
 
 #### Risks and rollback
 
@@ -219,7 +220,7 @@ Add the private, local-first data foundation for authoritative game-clock state 
 Commit/PR: implementation commits `e2477d0` and `025aaf3`; pull request #24 merged as `2deb8c8df92a612d233f9dad58765e0a22bee618`.
 Evidence: `review-evidence/tracked-playing-time-foundation/`
 `REPO_CURRENT_STATE.md` updated: `YES`
-Remaining work: coordinated production migration and release verification under the separately authorized release procedure.
+Remaining work: public-disclosure verification, exact-main frontend deployment, production browser smoke testing, and final release-evidence closure under the separately authorized release procedure.
 
 ### LH-22 — Tracked Playing Time Phase 1 user experience
 
@@ -270,7 +271,7 @@ Provide a complete, private, local-first Phase 1 experience for tracking one sel
 
 #### Risks and rollback
 
-- The foundation is merged but still unapplied in production, so hosted tracked-time synchronization remains unavailable pending the coordinated migration; local tracking remains usable.
+- The foundation migration is present in production and the corrected synthetic team authorization gate passed. The v284 frontend is not yet deployed, and public-disclosure plus browser-smoke gates remain pending; local tracking remains usable.
 - A review browser that reaches a backend without the tracked-time RPCs fails soft to device-only tracking for that session; the local event gate remains authoritative and is unaffected by hosted capability availability.
 - Running-clock recovery gaps longer than 30 seconds freeze and require review rather than inventing time.
 - Feature rollback is the removal of the additive UI/service wiring before release. Accepted database history remains governed by the foundation's fail-closed rollback.
@@ -281,7 +282,7 @@ Commit/PR: implementation commits through `76274fe`; pull request #25 merged as 
 Files changed: `app.html`, `app.js`, `styles.css`, `service-worker.js`, `tracked-playing-time-service.js`, `.github/workflows/laxhornet-regression.yml`, focused tests, review evidence, `TICKETS.md`, and `REPO_CURRENT_STATE.md`.
 Evidence: `review-evidence/tracked-playing-time-ui/`
 `REPO_CURRENT_STATE.md` updated: `YES`
-Remaining work: complete the coordinated v284 release PR, database-first production cutover, hosted authorization/disclosure verification, frontend deployment, smoke tests, and release-evidence closure.
+Remaining work: complete public-disclosure verification, deploy the exact approved `main` frontend, run production browser smoke tests, and close final release evidence.
 
 ## Ticket template
 

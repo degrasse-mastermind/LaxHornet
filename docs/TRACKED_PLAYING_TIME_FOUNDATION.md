@@ -41,6 +41,32 @@ Direct browser access to all three tables and the effective view is revoked. RLS
 - Team-roster games: initialization must match the canonical Trust Spine game scope; mutations reuse active Trust Spine mutation grants; reads reuse the existing read/export scope rules.
 - Cross-account, cross-team, cross-game, and cross-player attempts return bounded rejection results.
 
+### Team-roster role boundary
+
+Team admin alone is not a tracked-time mutation role. The reviewed Trust Spine
+helpers distinguish mutation authority from read/export authority:
+
+| Operation | Personal owner | Active parent/player grant | Active coach grant | Team admin only |
+| --- | --- | --- | --- | --- |
+| Initialize clock | Allowed | Allowed for the claimed player | Allowed within the coach scope | Denied |
+| Read clock | Allowed | Allowed for the granted player | Allowed within the coach scope | Allowed for the team |
+| Update clock | Allowed | Allowed for the granted player | Allowed within the coach scope | Denied |
+| Create/correct/tombstone participation | Allowed | Allowed for the granted player | Allowed within the coach scope | Denied |
+| List effective participation | Allowed | Allowed for the granted player | Allowed within the coach scope | Allowed for the team |
+
+An active grant means its latest lifecycle event is `accepted` and its
+`expires_at` is absent or in the future. Pending, revoked, renewed-away, and
+expired grants are denied. Parent and player-scoped coach initialization also
+requires the matching legacy player claim used to register the canonical game
+scope. A team-scoped coach needs the reviewed same-team legacy registration
+relationship. After a clock exists, mutation RPCs rely on the active mutation
+grant and exact game/player scope.
+
+There is no standalone `tracker` Trust Spine role or capability. A legacy
+profile or membership label of `tracker` does not authorize these RPCs. Service
+credentials are diagnostic infrastructure, not an end-user tracked-time role;
+the public RPCs still require an authenticated user subject.
+
 ## Disclosure and backup
 
 Clock and participation history are private child-associated operational data.
