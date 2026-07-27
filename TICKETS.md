@@ -103,7 +103,7 @@ Candidate acceptance criteria:
 
 ### LH-DEV-004 — Add GitHub Actions regression checks
 
-Status: `READY`
+Status: `DONE`
 Branch: `chore/lh-dev-004-ci-regression`
 
 #### Goal
@@ -128,66 +128,48 @@ Add a pull-request and manual-dispatch GitHub Actions workflow that runs the rep
 
 #### Current behavior
 
-- Pull requests rely on manually reported local verification.
-- Existing repository scripts already cover JavaScript syntax, event-operation contracts, game-scope capabilities, release-manifest validation, containment and hygiene, minimum disclosure, secure disclosure, Product Alignment, Trust Spine contracts, selected embedded database checks, Python permission/cleanup checks, secret scanning, and `git diff --check`.
-- `tools/run_v283_local_regression.mjs` is the current broad local entry point, but Codex must inspect it and determine which checks are portable to GitHub-hosted runners before selecting the CI command set.
+- Pull requests now run the read-only `LaxHornet Regression` workflow automatically.
+- The same workflow can be launched manually through `workflow_dispatch` on `main`.
+- Existing repository scripts cover JavaScript syntax, event-operation contracts, game-scope capabilities, release-manifest validation, containment and hygiene, minimum disclosure, secure disclosure, Product Alignment, Trust Spine contracts, selected embedded database checks, Python permission/cleanup checks, secret scanning, and `git diff --check`.
 
 #### Requirements
 
 - Workflow events: `pull_request` and `workflow_dispatch` only.
-- Permissions must default to read-only repository contents unless a documented check requires something narrower and still non-mutating.
-- The workflow must not use repository or environment secrets.
-- The workflow must not deploy, push, publish, merge, create Supabase branches, or call remote production services.
-- Pin official GitHub Actions to stable major versions and document runtime versions.
-- Use dependency caching only when the repository actually has a lockfile or deterministic dependency source.
-- Commands must fail the job on test failure and make the failing test identifiable.
-- A documentation-only PR should still run the lightweight checks unless path filtering is explicitly justified and tested.
+- Permissions default to read-only repository contents.
+- The workflow does not use repository or environment secrets.
+- The workflow does not deploy, push, publish, merge, create Supabase branches, or call remote production services.
+- Official GitHub Actions use Node-24-compatible stable major versions.
+- Dependency caching is disabled because the repository has no lockfile; the pinned PGlite dependency is installed temporarily without modifying the repository.
+- Commands fail the job on test failure and each test group has a distinct step name.
 
 #### Acceptance criteria
 
-- A workflow file exists under `.github/workflows/` and is valid YAML.
+- `.github/workflows/laxhornet-regression.yml` exists and is valid YAML.
 - The workflow runs on pull requests and manual dispatch.
-- The workflow uses existing LaxHornet test scripts rather than creating a parallel test framework.
+- The workflow uses existing LaxHornet test scripts rather than a parallel test framework.
 - No production deployment or remote Supabase mutation is possible from the workflow.
 - No secrets are required.
-- The job output clearly identifies each failed command or test group.
-- The workflow passes on its own pull request, or any runner incompatibility is documented and resolved without weakening existing safety controls.
-- `TICKETS.md` and `REPO_CURRENT_STATE.md` are updated with durable completion facts before merge.
-
-#### Expected files
-
-- `.github/workflows/laxhornet-regression.yml` or a similarly clear workflow name.
-- `TICKETS.md`.
-- `REPO_CURRENT_STATE.md` only if CI becomes a durable repository capability.
-- Existing test scripts only when a narrowly scoped portability fix is necessary and behavior remains unchanged.
-
-#### Verification plan
-
-```powershell
-# Local review
-Get-Content .github\workflows\laxhornet-regression.yml
-git diff --check
-
-# Existing focused or broad checks selected after repository inspection
-node tools/run_v283_local_regression.mjs
-```
-
-Also verify the GitHub Actions run on the pull request and a manual `workflow_dispatch` run before marking the ticket `DONE`.
+- Job output identifies each failed command or test group.
+- Pull-request and manual-dispatch runs completed successfully.
+- `REPO_CURRENT_STATE.md` records CI as a durable repository capability.
 
 #### Risks and rollback
 
-- Risk: CI may rely on tools or services available locally but absent on GitHub-hosted runners.
-- Risk: the broad regression runner may contain release-state assumptions that require a portable subset or explicit environment setup.
-- Risk: overly broad workflow permissions or secret usage would create unnecessary supply-chain exposure.
-- Rollback: remove or disable the single workflow file; no runtime, database, or production rollback should be required.
+- Risk: GitHub-hosted runner or official action versions may change over time and require maintenance.
+- Risk: release-control checks depend on manifest-derived repository ancestry and must continue to fail closed.
+- Rollback: remove or disable the single workflow file; no runtime, database, or production rollback is required.
 
 #### Completion record
 
-Commit/PR:  
-Files changed:  
-Tests and results:  
-`REPO_CURRENT_STATE.md` updated: `YES/NO`  
-Remaining work:
+- Implementation pull request: #20
+- Implementation merge commit: `3b3a1fc9c0f52a1e9497bfcc518d12f82afacbfd`
+- Node 24 action cleanup pull request: #21
+- Node 24 cleanup merge commit: `86a5d8348a8e3b747d3f486296c2db81f9422550`
+- Pull-request verification: the portable regression workflow passed all selected JavaScript, Node, Python, release-control, disclosure, security, embedded-database, and diff-hygiene checks.
+- Manual verification: `workflow_dispatch` completed successfully on `main`; the initial Node.js 20 action-runtime annotation was then removed by upgrading to `actions/checkout@v5`, `actions/setup-node@v6`, and `actions/setup-python@v6`.
+- Permissions and safety: `contents: read` only, no repository secrets, no deployments, no Supabase CLI or remote service mutations.
+- Files changed: `.github/workflows/laxhornet-regression.yml`, `TICKETS.md`, and `REPO_CURRENT_STATE.md`.
+- Remaining work: maintain action majors and portable test coverage as the repository evolves; browser/device QA and the local Supabase Docker workflow remain separate verification layers.
 
 ## Ticket template
 
