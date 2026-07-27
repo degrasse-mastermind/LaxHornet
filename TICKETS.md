@@ -260,6 +260,7 @@ Provide a complete, private, local-first Phase 1 experience for tracking one sel
 - `supabase test db supabase/tests/tracked_playing_time_foundation.sql`: 37/37 passed.
 - `node tools/run_v283_local_regression.mjs`: 29/29 groups passed.
 - Secret/host scan and `git diff --check`: passed within the full regression.
+- GitHub Actions run `30261706471`: passed, including the new UI contracts and manual scenarios as named steps.
 
 #### Risks and rollback
 
@@ -270,10 +271,10 @@ Provide a complete, private, local-first Phase 1 experience for tracking one sel
 #### Completion record
 
 Commit/PR: implementation commit `8c1c9d3`; draft pull request #25 stacked on foundation draft PR #24.
-Files changed: `app.html`, `app.js`, `styles.css`, `service-worker.js`, `tracked-playing-time-service.js`, focused tests, review evidence, `TICKETS.md`, and `REPO_CURRENT_STATE.md`.
+Files changed: `app.html`, `app.js`, `styles.css`, `service-worker.js`, `tracked-playing-time-service.js`, `.github/workflows/laxhornet-regression.yml`, focused tests, review evidence, `TICKETS.md`, and `REPO_CURRENT_STATE.md`.
 Evidence: `review-evidence/tracked-playing-time-ui/`
 `REPO_CURRENT_STATE.md` updated: `YES`
-Remaining work: product review, GitHub Actions confirmation, signed-in device validation against an approved non-production backend, foundation approval, and separately authorized release/version coordination. Do not merge or deploy from this ticket.
+Remaining work: product review, signed-in device validation against an approved non-production backend, foundation approval, and separately authorized release/version coordination. Do not merge or deploy from this ticket.
 
 ## Ticket template
 

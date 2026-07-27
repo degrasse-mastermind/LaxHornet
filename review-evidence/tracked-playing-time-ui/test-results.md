@@ -17,6 +17,7 @@ Date: 2026-07-27
 | Secret and production-host scan | PASS |
 | `git diff --check` | PASS |
 | Full v283 local regression | 29/29 groups PASS |
+| GitHub Actions portable regression | PASS (`30261706471`), including UI and manual scenario steps |
 
 The full runner needed `@electric-sql/pglite@0.5.4` as a test-only dependency. It was supplied from a disposable temp directory, matching CI behavior; no package metadata or application dependency was added to the repository.
 
