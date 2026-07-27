@@ -36,8 +36,12 @@ jobs:
       - name: Report runtime versions
         run: |
           node --version
+          npm --version
           python --version
           git --version
+
+      - name: Install embedded database test dependency
+        run: npm install --no-save --no-package-lock --ignore-scripts @electric-sql/pglite@0.5.4
 
       - name: Check root JavaScript syntax
         shell: bash
