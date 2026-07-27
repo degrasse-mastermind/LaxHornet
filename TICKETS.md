@@ -16,7 +16,7 @@ This file is the active, reviewable work queue for Codex. Work on one approved t
 
 ### LH-DEV-001 — Codex repository guardrails
 
-Status: `REVIEW`  
+Status: `DONE`
 Branch: `chore/codex-project-configuration`
 
 Goal:
@@ -40,6 +40,13 @@ Verification:
 - Confirm `/model` shows a model supported by the signed-in ChatGPT account without a startup error.
 - Confirm Codex recognizes `codex_apps` connectors as host-managed capabilities rather than repository-scoped tools.
 - Confirm Codex does not invoke Supabase, Vercel, Resend, or other write-capable app actions during ordinary repository work without explicit ticket authorization.
+
+Completion record:
+
+- Pull request: #16
+- Merge commit: `d4431a9adeba6eeb5c3b4beb30ff3bea0721140f`
+- Verification: Codex successfully loaded `AGENTS.md`, `README.md`, `REPO_CURRENT_STATE.md`, `TICKETS.md`, and `.codex/config.toml` and correctly summarized the repository constraints.
+- Scope confirmation: No runtime code, database migration, deployment configuration, release marker, connector permission, or production data was changed.
 
 ### LH-DEV-002 — Establish local Supabase CLI workflow
 
