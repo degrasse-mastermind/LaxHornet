@@ -65,6 +65,8 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
   const requestUrl = new URL(event.request.url);
+  if (requestUrl.protocol !== "http:" && requestUrl.protocol !== "https:") return;
+
   if (requestUrl.pathname.endsWith("/runtime-config.js")) {
     event.respondWith(
       fetch(event.request, { cache: "no-store" })

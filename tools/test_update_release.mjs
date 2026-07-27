@@ -74,6 +74,11 @@ expect(
   "installed-app update checks must bypass the service-worker cache for version.json",
 );
 expect(
+  serviceWorker.includes('requestUrl.protocol !== "http:"')
+    && serviceWorker.includes('requestUrl.protocol !== "https:"'),
+  "service worker must ignore unsupported request schemes before cache handling",
+);
+expect(
   appJs.includes("let registrationUpdateFailed = false;")
     && appJs.includes("registrationUpdateFailed = true;")
     && appJs.includes("if (registrationUpdateFailed && !serverVersion)"),
