@@ -81,6 +81,9 @@ jobs:
       - name: Tracked playing time foundation contracts
         run: node tools/test_tracked_playing_time_foundation.mjs
 
+      - name: V284 team authorization policy
+        run: node tools/test_v284_team_authorization_policy.mjs
+
       - name: Tracked playing time UI contracts
         run: node tools/test_tracked_playing_time_ui.mjs
 

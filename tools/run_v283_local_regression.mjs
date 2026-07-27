@@ -46,6 +46,7 @@ const tests = [
   { name: "event-operation service contracts", command: process.execPath, args: ["tools/test_event_operation_service.mjs"] },
   { name: "tracked playing time service contracts", command: process.execPath, args: ["tools/test_tracked_playing_time_service.mjs"] },
   { name: "tracked playing time foundation contracts", command: process.execPath, args: ["tools/test_tracked_playing_time_foundation.mjs"] },
+  { name: "v284 team authorization policy", command: process.execPath, args: ["tools/test_v284_team_authorization_policy.mjs"] },
   { name: "tracked playing time UI contracts", command: process.execPath, args: ["tools/test_tracked_playing_time_ui.mjs"] },
   { name: "tracked playing time manual scenarios", command: process.execPath, args: ["tools/test_tracked_playing_time_manual_scenarios.mjs"] },
   { name: "tracked playing time browser", command: process.execPath, args: ["tools/test_tracked_playing_time_ui_browser.cjs"] },

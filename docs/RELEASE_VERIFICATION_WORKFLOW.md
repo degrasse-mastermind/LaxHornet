@@ -81,3 +81,17 @@ Preflight results use `PASS`, `FAIL`, `NOT REQUIRED`, or `RESTORED EPHEMERALLY`.
 - Production rollout always requires a separate explicit authorization task.
 - Production rollout prompts must use `--phase production` and an exact
   `--approved-rollout-sha` when an authorized post-merge correction exists.
+
+## Tracked-time authorization fixture
+
+For a team-scoped Tracked Playing Time production gate, use an accepted,
+unexpired player-scoped `parent` grant with the matching player claim, or an
+accepted `coach` grant with the matching team/player scope and reviewed legacy
+scope-registration relationship. Do not use a team-admin-only fixture as the
+authorized tracked-time actor. Team admins have reviewed read/list authority,
+but `lh_mutation_grant_for_game` deliberately limits initialize, update,
+create, correct, and tombstone authority to scoped parents and coaches.
+
+There is no standalone Trust Spine `tracker` capability. Record the exact
+grant role, scope, latest lifecycle event, expiry, claim or team relationship,
+game scope, and player scope before calling the authorization gate.
