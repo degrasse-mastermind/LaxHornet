@@ -1,6 +1,6 @@
 # Companion Client Service Contract
 
-`tracked-playing-time-service.js` is a framework-free ES module that can be injected with local storage, time, and RPC functions.
+`tracked-playing-time-service.js` is a framework-free companion browser script that exposes one frozen namespace and can be injected with persistence, time, and RPC functions.
 
 It provides:
 
