@@ -6,6 +6,10 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const evidenceRoot = path.join(root, "review-evidence", "event-pipeline-release-control-cleanup");
 const browserDir = path.join(evidenceRoot, "browser");
+const releaseVersion = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8")).version;
+const releaseVersionMatch = /^v(\d+)$/.exec(releaseVersion);
+if (!releaseVersionMatch) throw new Error(`Unsupported release version: ${releaseVersion}`);
+const simulatedNextVersion = `v${Number(releaseVersionMatch[1]) + 1}`;
 const port = Number(process.env.LAXHORNET_ACTIVATION_PORT || 5258);
 const baseUrl = `http://127.0.0.1:${port}`;
 const results = [];
@@ -13,6 +17,11 @@ const failures = [];
 const hostedRequests = [];
 const localApiRequests = [];
 const browserDiagnostics = [];
+const browserErrors = [];
+const diagnosticPages = new WeakSet();
+const diagnosticStartedAt = Date.now();
+let lastCompletedTestStep = "module initialized";
+let diagnosticContextSequence = 0;
 const trustApi = {
   scopes: new Set(),
   events: new Map(),
@@ -26,6 +35,37 @@ fs.mkdirSync(browserDir, { recursive: true });
 function check(condition, message) {
   results.push({ passed: Boolean(condition), message });
   if (!condition) failures.push(message);
+}
+
+function recordStep(message, options = {}) {
+  if (options.testStep !== false) lastCompletedTestStep = message;
+  console.log(`[secure-disclosure-browser +${Date.now() - diagnosticStartedAt}ms] ${message}`);
+}
+
+function attachPageDiagnostics(page, label, options = {}) {
+  if (diagnosticPages.has(page)) return;
+  diagnosticPages.add(page);
+  page.on("console", (message) => {
+    const expectedConsoleError = (options.expectedConsoleErrorPatterns || []).some((pattern) =>
+      pattern.test(message.text()),
+    );
+    if (message.type() === "error" || message.type() === "warning") {
+      browserDiagnostics.push(`${label}:console:${message.type()}: ${message.text()}`);
+    }
+    if (message.type() === "error" && !expectedConsoleError) {
+      browserErrors.push(`${label}:console:error: ${message.text()}`);
+    }
+  });
+  page.on("pageerror", (error) => {
+    const detail = `${label}:pageerror: ${error.message}`;
+    browserDiagnostics.push(detail);
+    browserErrors.push(detail);
+  });
+  page.on("requestfailed", (request) => {
+    browserDiagnostics.push(
+      `${label}:requestfailed: ${request.method()} ${request.url()} ${request.failure()?.errorText || "unknown error"}`,
+    );
+  });
 }
 
 function contentType(file) {
@@ -67,7 +107,7 @@ function startServer() {
       }
       let body = fs.readFileSync(resolved.target);
       if (resolved.missingConfig && resolved.target.endsWith("app.html")) {
-        body = Buffer.from(body.toString("utf8").replace(/\s*<script src="runtime-config\.js\?v=283" defer><\/script>/, ""));
+        body = Buffer.from(body.toString("utf8").replace(/\s*<script src="runtime-config\.js\?v=284" defer><\/script>/, ""));
       }
       response.writeHead(200, {
         "Cache-Control": "no-store",
@@ -310,10 +350,19 @@ async function installApiRoutes(page, options = {}) {
 }
 
 async function newContext(browser, options = {}) {
+  const diagnosticContextId = ++diagnosticContextSequence;
+  const {
+    diagnosticLabel = `context-${diagnosticContextId}`,
+    expectedConsoleErrorPatterns = [],
+    ...contextOptions
+  } = options;
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
-    ...options,
+    ...contextOptions,
   });
+  context.on("page", (page) =>
+    attachPageDiagnostics(page, diagnosticLabel, { expectedConsoleErrorPatterns }),
+  );
   await context.addInitScript(() => {
     window.LAXHORNET_RUNTIME_CONFIG = {
       supabaseUrl: "http://127.0.0.1:9",
@@ -328,25 +377,24 @@ async function newContext(browser, options = {}) {
 }
 
 (async () => {
+  recordStep("local server startup");
   const server = await startServer();
+  recordStep(`local server ready at ${baseUrl}`);
   const executablePath = [
     process.env.CHROME_PATH,
     "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
   ].find((candidate) => candidate && fs.existsSync(candidate));
   const browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) });
+  recordStep(`browser launched${executablePath ? ` with ${executablePath}` : ""}`);
   try {
     const secureContext = await newContext(browser);
     const securePage = await secureContext.newPage();
-    securePage.on("console", (message) => {
-      if (message.type() === "error" || message.type() === "warning") {
-        browserDiagnostics.push(`console:${message.type()}: ${message.text()}`);
-      }
-    });
-    securePage.on("pageerror", (error) => browserDiagnostics.push(`pageerror: ${error.message}`));
+    attachPageDiagnostics(securePage, "secure-viewer");
     securePage.on("request", (request) => {
       if (/https:\/\/[a-z]{20}\.supabase\.co/i.test(request.url())) hostedRequests.push(request.url());
     });
+    recordStep("secure viewer setup complete");
     await installApiRoutes(securePage);
     await securePage.goto(`${baseUrl}/blank.html`, { waitUntil: "domcontentloaded" });
     await securePage.evaluate(async () => {
@@ -356,7 +404,7 @@ async function newContext(browser, options = {}) {
         new Response("window.LAXHORNET_RUNTIME_CONFIG={publicLiveShareRpc:false,liveShareTokenRpc:false,exportAuditRpc:false};"),
       );
     });
-    await securePage.goto(`${baseUrl}/app.html?share=SYNTHETICSECURECODE&fresh=v283-browser`, { waitUntil: "domcontentloaded" });
+    await securePage.goto(`${baseUrl}/app.html?share=SYNTHETICSECURECODE&fresh=v284-browser`, { waitUntil: "domcontentloaded" });
     try {
       await securePage.getByText("Ground Ball", { exact: false }).first().waitFor();
     } catch (error) {
@@ -378,7 +426,7 @@ async function newContext(browser, options = {}) {
     const publicRpcCalls = localApiRequests.filter((item) => item.pathname.endsWith("/lh_public_live_share_game")).length;
     check(publicRpcCalls >= 2, "public-safe polling repeats the RPC request");
     check(!localApiRequests.some((item) => /\/rest\/v1\/(?:games|events)$/.test(item.pathname)), "secure viewer makes no ordinary games/events request");
-    check((await securePage.evaluate(() => caches.keys())).every((key) => key !== "laxhornet-v281"), "v283 activation removes the stale v281 cache");
+    check((await securePage.evaluate(() => caches.keys())).every((key) => key !== "laxhornet-v281"), "v284 activation removes the stale v281 cache");
     await securePage.screenshot({ path: path.join(browserDir, "01-secure-live-share.png"), fullPage: true });
     const neutralTokens = await securePage.evaluate(async () => {
       await loadSharedGame("UNKNOWNSECURECODE");
@@ -388,8 +436,9 @@ async function newContext(browser, options = {}) {
       return { unknown, expired };
     });
     check(neutralTokens.unknown === null && neutralTokens.expired === null, "unknown and expired tokens remain neutral");
+    recordStep("secure disclosure assertions complete");
 
-    await securePage.goto(`${baseUrl}/app.html?fresh=v283-token`, { waitUntil: "domcontentloaded" });
+    await securePage.goto(`${baseUrl}/app.html?fresh=v284-token`, { waitUntil: "domcontentloaded" });
     await securePage.getByRole("button", { name: "Log In" }).waitFor();
     const seededTrackerState = await securePage.evaluate(() => {
       setAuthUser({ id: "synthetic-admin-user", email: "synthetic-admin@example.invalid" });
@@ -626,7 +675,7 @@ async function newContext(browser, options = {}) {
     const personalContext = await newContext(browser, { serviceWorkers: "block" });
     const personalPage = await personalContext.newPage();
     await installApiRoutes(personalPage);
-    await personalPage.goto(`${baseUrl}/app.html?fresh=v283-personal-boundary`, { waitUntil: "domcontentloaded" });
+    await personalPage.goto(`${baseUrl}/app.html?fresh=v284-personal-boundary`, { waitUntil: "domcontentloaded" });
     await personalPage.getByRole("button", { name: "Log In" }).waitFor();
     const personalResult = await personalPage.evaluate(async () => {
       setAuthUser({ id: "synthetic-parent-user", email: "synthetic-parent@example.invalid" });
@@ -706,10 +755,16 @@ async function newContext(browser, options = {}) {
     await personalContext.close();
 
     const failedTokenCallsBefore = localApiRequests.filter((item) => item.pathname.endsWith("/lh_create_live_share_token")).length;
-    const reconciliationFailureContext = await newContext(browser, { serviceWorkers: "block" });
+    const reconciliationFailureContext = await newContext(browser, {
+      serviceWorkers: "block",
+      diagnosticLabel: "reconciliation-failure",
+      expectedConsoleErrorPatterns: [
+        /Failed to load resource: the server responded with a status of 503/,
+      ],
+    });
     const reconciliationFailurePage = await reconciliationFailureContext.newPage();
     await installApiRoutes(reconciliationFailurePage, { failCreate: true });
-    await reconciliationFailurePage.goto(`${baseUrl}/app.html?fresh=v283-reconcile-failure`, { waitUntil: "domcontentloaded" });
+    await reconciliationFailurePage.goto(`${baseUrl}/app.html?fresh=v284-reconcile-failure`, { waitUntil: "domcontentloaded" });
     await reconciliationFailurePage.getByRole("button", { name: "Log In" }).waitFor();
     const reconciliationFailure = await reconciliationFailurePage.evaluate(async () => {
       setAuthUser({ id: "synthetic-failure-user", email: "synthetic-failure@example.invalid" });
@@ -773,7 +828,7 @@ async function newContext(browser, options = {}) {
     const offlineBridgeContext = await newContext(browser, { serviceWorkers: "block" });
     const offlineBridgePage = await offlineBridgeContext.newPage();
     await installApiRoutes(offlineBridgePage);
-    await offlineBridgePage.goto(`${baseUrl}/app.html?fresh=v283-offline-bridge`, { waitUntil: "domcontentloaded" });
+    await offlineBridgePage.goto(`${baseUrl}/app.html?fresh=v284-offline-bridge`, { waitUntil: "domcontentloaded" });
     await offlineBridgePage.getByRole("button", { name: "Log In" }).waitFor();
     await offlineBridgePage.evaluate(() => {
       setAuthUser({ id: "synthetic-offline-user", email: "synthetic-offline@example.invalid" });
@@ -842,7 +897,7 @@ async function newContext(browser, options = {}) {
       if (/https:\/\/[a-z]{20}\.supabase\.co/i.test(request.url())) hostedRequests.push(request.url());
     });
     await installApiRoutes(missingPage);
-    await missingPage.goto(`${baseUrl}/missing-config/app.html?fresh=v283-missing`, { waitUntil: "domcontentloaded" });
+    await missingPage.goto(`${baseUrl}/missing-config/app.html?fresh=v284-missing`, { waitUntil: "domcontentloaded" });
     const missingStatus = await missingPage.evaluate(() => window.LAXHORNET_DISCLOSURE_STATUS);
     check(missingStatus?.ready === false, "missing runtime-config is detected");
     await missingPage.evaluate(() => loadSharedGame("SYNTHETICSECURECODE"));
@@ -871,7 +926,7 @@ async function newContext(browser, options = {}) {
     const capabilityContext = await newContext(browser, { serviceWorkers: "block" });
     const capabilityPage = await capabilityContext.newPage();
     await installApiRoutes(capabilityPage, { disableCapability: true });
-    await capabilityPage.goto(`${baseUrl}/app.html?fresh=v283-capability-mismatch`, { waitUntil: "domcontentloaded" });
+    await capabilityPage.goto(`${baseUrl}/app.html?fresh=v284-capability-mismatch`, { waitUntil: "domcontentloaded" });
     await capabilityPage.evaluate(() => loadSharedGame("SYNTHETICSECURECODE"));
     await capabilityPage.waitForTimeout(200);
     const capabilityText = await capabilityPage.locator("body").innerText();
@@ -894,10 +949,16 @@ async function newContext(browser, options = {}) {
     check(capabilityLocalCount === 1, "backend capability mismatch does not block local tracking");
     await capabilityContext.close();
 
-    const failureContext = await newContext(browser, { serviceWorkers: "block" });
+    const failureContext = await newContext(browser, {
+      serviceWorkers: "block",
+      diagnosticLabel: "public-rpc-failure",
+      expectedConsoleErrorPatterns: [
+        /Failed to load resource: the server responded with a status of 503/,
+      ],
+    });
     const failurePage = await failureContext.newPage();
     await installApiRoutes(failurePage, { failPublicRpc: true });
-    await failurePage.goto(`${baseUrl}/app.html?share=SYNTHETICSECURECODE&fresh=v283-rpc-failure`, { waitUntil: "domcontentloaded" });
+    await failurePage.goto(`${baseUrl}/app.html?share=SYNTHETICSECURECODE&fresh=v284-rpc-failure`, { waitUntil: "domcontentloaded" });
     await failurePage
       .waitForFunction(() => document.body.innerText.includes("Secure Live Share is temporarily unavailable"), null, { timeout: 2000 })
       .catch(() => {});
@@ -912,13 +973,18 @@ async function newContext(browser, options = {}) {
       };
     });
     const updatePage = await updateContext.newPage();
+    attachPageDiagnostics(updatePage, "update-path");
     await installApiRoutes(updatePage);
     await updatePage.route("**/version.json*", (route) =>
-      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ version: "v284" }) }),
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ version: simulatedNextVersion }) }),
     );
-    await updatePage.goto(`${baseUrl}/app.html?fresh=v283-update`, { waitUntil: "domcontentloaded" });
-    await updatePage.evaluate(() => showUpdateAvailable(null, "v284"));
-    await updatePage.getByText("Update available", { exact: true }).waitFor();
+    recordStep("update-path navigation started");
+    await updatePage.goto(`${baseUrl}/app.html?fresh=v284-update`, { waitUntil: "domcontentloaded" });
+    recordStep("update-path navigation complete");
+    await updatePage.evaluate((version) => showUpdateAvailable(null, version), simulatedNextVersion);
+    recordStep(`update-path signal invoked for ${simulatedNextVersion}`);
+    await updatePage.getByText("Update available", { exact: true }).waitFor({ state: "visible", timeout: 5000 });
+    recordStep("update-path banner visible");
     check((await updatePage.locator("body").innerText()).includes("Update Now"), "delayed service-worker activation exposes a clear update action");
     await updatePage.screenshot({ path: path.join(browserDir, "03-update-path.png"), fullPage: true });
     await updateContext.close();
@@ -943,6 +1009,7 @@ async function newContext(browser, options = {}) {
     check(true, "updated client recovers secure Live Share after reconnection");
 
     check(hostedRequests.length === 0, "activation browser suite contacts no hosted Supabase project");
+    check(browserErrors.length === 0, "browser console and pages report no errors");
 
     const inventory = {
       generatedAt: new Date().toISOString(),
@@ -1006,9 +1073,9 @@ async function newContext(browser, options = {}) {
     fs.writeFileSync(
       path.join(evidenceRoot, "service-worker-cache-proof.txt"),
       [
-        "PASS: v282 activation removed the synthetic laxhornet-v281 cache.",
+        "PASS: v284 activation removed the synthetic laxhornet-v281 cache.",
         "PASS: runtime-config.js uses a dedicated network no-store route.",
-        "PASS: the v282 cached runtime-config fallback keeps all secure disclosure flags enabled.",
+        "PASS: the v284 cached runtime-config fallback keeps all secure disclosure flags enabled.",
         "PASS: the update-available path rendered an Update Now action.",
         "",
       ].join("\n"),
@@ -1026,13 +1093,19 @@ async function newContext(browser, options = {}) {
       console.log(`Activation browser checks passed (${results.length}/${results.length}).`);
     }
   } finally {
+    recordStep("teardown started", { testStep: false });
     if (browserDiagnostics.length) {
       fs.writeFileSync(path.join(evidenceRoot, "browser-diagnostics.txt"), `${browserDiagnostics.join("\n")}\n`);
     }
     await browser.close();
     await new Promise((resolve) => server.close(resolve));
+    recordStep("teardown complete", { testStep: false });
   }
 })().catch((error) => {
+  console.error(`Last completed test step: ${lastCompletedTestStep}`);
+  if (browserDiagnostics.length) {
+    console.error(browserDiagnostics.join("\n"));
+  }
   console.error(error);
   process.exit(1);
 });

@@ -1,5 +1,5 @@
-const CACHE_NAME = "laxhornet-v283";
-const RUNTIME_CONFIG_ASSET = "./runtime-config.js?v=283";
+const CACHE_NAME = "laxhornet-v284";
+const RUNTIME_CONFIG_ASSET = "./runtime-config.js?v=284";
 const APP_ASSETS = [
   "./",
   "./index.html",
@@ -20,15 +20,15 @@ const APP_ASSETS = [
   "./launch-kit/parent-email.html",
   "./launch-kit/admin-launch-checklist.html",
   "./launch-kit/laxhornet-qr.png",
-  "./landing.css?v=283",
-  "./styles.css?v=283",
+  "./landing.css?v=284",
+  "./styles.css?v=284",
   "./assets/supabase.min.js?v=253",
   RUNTIME_CONFIG_ASSET,
-  "./event-operation-service.js?v=283",
-  "./next-focus-recommendation.js?v=283",
-  "./tracked-playing-time-service.js?v=283",
-  "./app.js?v=283",
-  "./manifest.json?v=283",
+  "./event-operation-service.js?v=284",
+  "./next-focus-recommendation.js?v=284",
+  "./tracked-playing-time-service.js?v=284",
+  "./app.js?v=284",
+  "./manifest.json?v=284",
   "./assets/icon.svg?v=11",
   "./assets/LHicon.png?v=1",
   "./assets/LHbanner.png?v=3",

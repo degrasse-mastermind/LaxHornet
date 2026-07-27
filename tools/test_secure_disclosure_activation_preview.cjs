@@ -37,7 +37,7 @@ if (createHash("sha256").update(previewRef).digest("hex") !== expectedPreviewRef
 
 fs.mkdirSync(browserDir, { recursive: true });
 
-const runId = `v283-${Date.now().toString(36)}-${randomBytes(3).toString("hex")}`;
+const runId = `v284-${Date.now().toString(36)}-${randomBytes(3).toString("hex")}`;
 const fixture = {
   teamA: `${runId}-team-a`,
   teamB: `${runId}-team-b`,
@@ -538,7 +538,7 @@ async function runBrowserBridge(parentSession) {
   }, { url: previewOrigin, key: publishableKey });
   const trackerPage = await trackerContext.newPage();
   recordBrowserNetwork(trackerPage, "authenticated-tracker");
-  await trackerPage.goto(`${localOrigin}/app.html?fresh=v283-managed-preview-tracker`, {
+  await trackerPage.goto(`${localOrigin}/app.html?fresh=v284-managed-preview-tracker`, {
     waitUntil: "domcontentloaded",
   });
   const authResult = await trackerPage.evaluate(async (session) => {
@@ -657,7 +657,7 @@ async function runBrowserBridge(parentSession) {
   }, { url: previewOrigin, key: publishableKey });
   const viewerPage = await viewerContext.newPage();
   recordBrowserNetwork(viewerPage, "anonymous-viewer");
-  await viewerPage.goto(`${localOrigin}/app.html?share=${encodeURIComponent(shareCode)}&fresh=v283-managed-preview-viewer`, {
+  await viewerPage.goto(`${localOrigin}/app.html?share=${encodeURIComponent(shareCode)}&fresh=v284-managed-preview-viewer`, {
     waitUntil: "domcontentloaded",
   });
   await viewerPage.getByText("Ground Ball", { exact: false }).first().waitFor({ timeout: 30000 });
@@ -813,7 +813,7 @@ async function runBrowserBridge(parentSession) {
       && capabilities?.secureLiveShare === true
       && capabilities?.exportAudit === true
       && capabilities?.personalGameSharing === false,
-    "managed browser confirms the v283 backend capability contract",
+    "managed browser confirms the v284 backend capability contract",
     capabilities,
   );
   check(
@@ -825,7 +825,7 @@ async function runBrowserBridge(parentSession) {
     capabilityMismatch,
   );
   check(
-    health?.appVersion === "v283"
+    health?.appVersion === "v284"
       && health?.schemaVersion >= 1
       && !JSON.stringify(health).includes("Demo Player")
       && !JSON.stringify(health).includes(userEmails.parent),
@@ -917,7 +917,7 @@ function writeEvidence(rpcEvidence) {
   fs.writeFileSync(
     path.join(evidenceRoot, "managed-preview-results.json"),
     `${JSON.stringify({
-      suite: "LaxHornet v283 event pipeline and release control",
+      suite: "LaxHornet v284 tracked playing time release",
       environment: "authorized managed preview",
       synthetic: true,
       testsPassed: results.length,

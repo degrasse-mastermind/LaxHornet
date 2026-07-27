@@ -371,15 +371,15 @@ test("existing Game Review keeps its prior sections", () => {
   assert.match(app, /renderTrackedPlayingTimeReview/);
 });
 
-test("service worker caches the tracked-time script without a version bump", () => {
-  assert.match(worker, /\.\/tracked-playing-time-service\.js\?v=283/);
-  assert.match(worker, /const CACHE_NAME = "laxhornet-v283"/);
+test("service worker caches the tracked-time script with the v284 release cache", () => {
+  assert.match(worker, /\.\/tracked-playing-time-service\.js\?v=284/);
+  assert.match(worker, /const CACHE_NAME = "laxhornet-v284"/);
 });
 
 test("tracked-time service loads before app.js", () => {
   assert.ok(
-    appHtml.indexOf("tracked-playing-time-service.js?v=283")
-      < appHtml.indexOf("app.js?v=283"),
+    appHtml.indexOf("tracked-playing-time-service.js?v=284")
+      < appHtml.indexOf("app.js?v=284"),
   );
 });
 

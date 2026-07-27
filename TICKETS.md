@@ -223,9 +223,9 @@ Remaining work: coordinated production migration and release verification under 
 
 ### LH-22 — Tracked Playing Time Phase 1 user experience
 
-Status: `READY FOR PRODUCT REVIEW`
-Branch: `feature/tracked-playing-time-ui`
-Base: `main` at foundation merge `2deb8c8df92a612d233f9dad58765e0a22bee618`
+Status: `REVIEW`
+Branch: `release/v284-tracked-playing-time`
+Base: `main` at UI merge `fc9c079d69757cfc2667dea7e1dfcc56524dce56`
 Related design document: `docs/TRACKED_PLAYING_TIME_FOUNDATION.md`
 
 #### Goal
@@ -263,6 +263,10 @@ Provide a complete, private, local-first Phase 1 experience for tracking one sel
 - `node tools/run_v283_local_regression.mjs`: 29/29 groups passed.
 - Secret/host scan and `git diff --check`: passed within the full regression.
 - GitHub Actions portable regression is required on the final PR head; the post-push result is recorded on PR #25.
+- v284 release repair: the secure-disclosure browser update-path fixture now derives a simulated next version instead of signaling the current release; timestamped diagnostics preserve the last completed test step and capture unexpected console/page/network failures.
+- Focused v284 verification: secure-disclosure browser passed three consecutive runs at 62/62, static minimum disclosure passed 42/42, secure activation passed 21/21, and `git diff --check` passed.
+- Reusable release controls: `tools/run_release_preflight.mjs`, `tools/run_release_verification.mjs`, and `docs/RELEASE_VERIFICATION_WORKFLOW.md` centralize release refs, exact disposable dependencies, local-stack health, fail-fast gates, cleanup, and external logs without contacting production.
+- Canonical v284 local release verification: all 15 gates passed; production-ledger provenance passed; both database reset/upgrade paths and rollback cases passed; pgTAP passed 37/37 on each path; lint contained only the documented legacy finding; the complete regression passed 29/29; cleanup removed all disposable dependencies and local Supabase containers.
 
 #### Risks and rollback
 
@@ -273,11 +277,11 @@ Provide a complete, private, local-first Phase 1 experience for tracking one sel
 
 #### Completion record
 
-Commit/PR: implementation commits through `0ca2a00`; draft pull request #25 retargeted to `main` after foundation PR #24 merged.
+Commit/PR: implementation commits through `76274fe`; pull request #25 merged as `fc9c079d69757cfc2667dea7e1dfcc56524dce56`.
 Files changed: `app.html`, `app.js`, `styles.css`, `service-worker.js`, `tracked-playing-time-service.js`, `.github/workflows/laxhornet-regression.yml`, focused tests, review evidence, `TICKETS.md`, and `REPO_CURRENT_STATE.md`.
 Evidence: `review-evidence/tracked-playing-time-ui/`
 `REPO_CURRENT_STATE.md` updated: `YES`
-Remaining work: final integration review and the separately authorized coordinated v284 migration, deployment, and production verification.
+Remaining work: complete the coordinated v284 release PR, database-first production cutover, hosted authorization/disclosure verification, frontend deployment, smoke tests, and release-evidence closure.
 
 ## Ticket template
 

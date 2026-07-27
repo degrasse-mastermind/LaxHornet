@@ -57,6 +57,17 @@ function reviewedWindowsSha256(bytes) {
   return sha256(Buffer.from(canonicalCrLf, "utf8"));
 }
 
+function assertReviewedFileHashes(expectedByPath, sourceByPath) {
+  for (const file of [migrationPath, rollbackPath, testSqlPath]) {
+    assert.equal(typeof expectedByPath?.[file], "string", `missing reviewed hash: ${file}`);
+    assert.equal(
+      reviewedWindowsSha256(sourceByPath[file]).toLowerCase(),
+      expectedByPath[file],
+      `stale reviewed hash: ${file}`,
+    );
+  }
+}
+
 function assertFoundationMigrationPhase(state) {
   assert.equal(state.rollbackExists, true, rollbackPath);
   assert.equal(state.currentMigrationSha256, expectedMigrationSha256);
@@ -266,6 +277,27 @@ test("release manifest identifies a review-only, unapplied package", () => {
   assert.deepEqual(
     [review.forwardMigration, review.rollbackReference, review.testSql],
     [migrationPath, rollbackPath, testSqlPath],
+  );
+  const reviewedSources = Object.fromEntries(
+    [migrationPath, rollbackPath, testSqlPath].map((file) => [
+      file,
+      fs.readFileSync(path.join(root, file)),
+    ]),
+  );
+  assertReviewedFileHashes(review.sha256, reviewedSources);
+
+  const missingHash = { ...review.sha256 };
+  delete missingHash[testSqlPath];
+  assert.throws(() => assertReviewedFileHashes(missingHash, reviewedSources));
+
+  assert.throws(() =>
+    assertReviewedFileHashes(review.sha256, {
+      ...reviewedSources,
+      [rollbackPath]: Buffer.concat([
+        reviewedSources[rollbackPath],
+        Buffer.from("\n-- synthetic tamper\n", "utf8"),
+      ]),
+    }),
   );
 });
 
