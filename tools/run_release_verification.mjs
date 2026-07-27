@@ -238,6 +238,7 @@ try {
   preflight = runReleasePreflight({
     prepare: true,
     release,
+    phase: "preparation",
     startSupabase: true,
   });
   appendResults("PREFLIGHT", preflight.results);

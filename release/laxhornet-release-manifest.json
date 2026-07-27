@@ -1,6 +1,10 @@
 {
   "release": "v284",
   "finalMainBaseSha": "fc9c079d69757cfc2667dea7e1dfcc56524dce56",
+  "preReleaseBaseSha": "fc9c079d69757cfc2667dea7e1dfcc56524dce56",
+  "releaseHeadSha": "1cf5d9d33a7295da8248353165a696b7b81690db",
+  "releaseHeadTreeSha": "20341b66dad600d1ae19f4eed20b55bb61752fbc",
+  "approvedMergeSha": "e2cd28a568e91232d375a8607e6376800d3a2a20",
   "databaseCandidate": "ad96e428d675fba8fac7752fd108ea06827fa0ad",
   "preCutoverRuntime": "f4ead54b44fcb5710fe4ed3eed39ab5f1694def4",
   "activationCandidate": "7cf58df9a43ce235fc6068bd4c50549e05906de4",

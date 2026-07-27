@@ -59,6 +59,7 @@ const tests = [
       ...(combinedMode ? ["--require-combined", "--combined-ref=HEAD"] : []),
     ],
   },
+  { name: "release preflight phase-aware", command: process.execPath, args: ["tools/test_release_preflight_phase_aware.mjs"] },
   { name: "release containment phase-aware", command: process.execPath, args: ["tools/test_release_containment_phase_aware.mjs"] },
   { name: "release hygiene", command: process.execPath, args: ["tools/test_release_hygiene.mjs"] },
   { name: "minimum disclosure", command: process.execPath, args: ["tools/test_minimum_disclosure.mjs"] },
