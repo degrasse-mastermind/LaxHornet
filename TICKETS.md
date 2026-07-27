@@ -27,7 +27,7 @@ Acceptance criteria:
 
 - Root `AGENTS.md` accurately describes the vanilla HTML/CSS/JavaScript offline PWA.
 - `REPO_CURRENT_STATE.md` records the current architecture, release controls, Supabase boundaries, and verification entry points.
-- `.codex/config.toml` selects a current capable model, uses safe local approvals, and scopes Supabase MCP to the LaxHornet project in read-only mode.
+- `.codex/config.toml` lets ChatGPT-authenticated Codex choose the newest model supported for the signed-in account, applies high reasoning where supported, uses safe local approvals, and scopes Supabase MCP to the LaxHornet project in read-only mode.
 - Supabase MCP migration writes are disabled.
 - This ticket file contains a reusable implementation template.
 - No production code, release marker, migration, deployment, or database state is changed.
@@ -36,6 +36,7 @@ Verification:
 
 - Review all four configuration files against the repository.
 - Confirm Codex trusts the project and reports the loaded instruction/config sources.
+- Confirm `/model` shows a model supported by the signed-in ChatGPT account without a startup error.
 - Confirm `/mcp` shows the project-scoped Supabase server after OAuth authentication.
 - Confirm the Supabase MCP cannot apply migrations.
 
