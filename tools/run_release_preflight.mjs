@@ -124,14 +124,118 @@ function releaseEnvironment(manifest) {
   };
 }
 
-function reviewedTextSha256(file) {
+export function reviewedTextSha256(file) {
   const canonicalCrLf = readFileSync(file, "utf8")
     .replace(/\r\n/g, "\n")
     .replace(/\n/g, "\r\n");
   return createHash("sha256").update(Buffer.from(canonicalCrLf, "utf8")).digest("hex");
 }
 
-function checkRepository(results, release) {
+export function validateManifestReleaseIdentity(manifest, release = "") {
+  const failures = [];
+  if (release && manifest.release !== release) {
+    failures.push(`manifest release ${manifest.release || "(missing)"} does not match ${release}`);
+  }
+  if (!manifest.preReleaseBaseSha) failures.push("preReleaseBaseSha is missing");
+  if (!manifest.releaseHeadSha) failures.push("releaseHeadSha is missing");
+  if (!manifest.approvedMergeSha) failures.push("approvedMergeSha is missing");
+  if (manifest.preReleaseBaseSha !== manifest.finalMainBaseSha) {
+    failures.push("preReleaseBaseSha does not preserve finalMainBaseSha provenance");
+  }
+  return failures;
+}
+
+export function evaluateReleaseIdentity({
+  phase,
+  release,
+  branch,
+  headSha,
+  mainSha,
+  manifest,
+  approvedRolloutSha = "",
+  isAncestor,
+  isSameTree,
+}) {
+  const rows = [];
+  const add = (label, ok, detail) => rows.push({
+    label,
+    status: ok ? "PASS" : "FAIL",
+    detail,
+  });
+  const ancestor = (older, newer) =>
+    Boolean(older && newer && typeof isAncestor === "function" && isAncestor(older, newer));
+
+  if (!release) {
+    add("Current branch", true, branch || "(detached)");
+    return rows;
+  }
+
+  if (phase === "preparation") {
+    add("Current branch", branch.startsWith(`release/${release}-`), branch || "(detached)");
+    add(
+      "Pre-release main base",
+      mainSha === manifest.preReleaseBaseSha,
+      mainSha || "main unavailable",
+    );
+    add(
+      "Release changes from approved base",
+      headSha !== manifest.preReleaseBaseSha && ancestor(manifest.preReleaseBaseSha, headSha),
+      `${manifest.preReleaseBaseSha || "(missing)"} -> ${headSha || "(missing)"}`,
+    );
+    return rows;
+  }
+
+  if (phase === "production") {
+    const approvedHead = approvedRolloutSha || manifest.approvedMergeSha;
+    add("Current branch", branch === "main", branch || "(detached)");
+    add("Approved production HEAD", headSha === approvedHead, headSha || "HEAD unavailable");
+    add(
+      "Release head incorporated by approved merge",
+      ancestor(manifest.releaseHeadSha, manifest.approvedMergeSha) ||
+        Boolean(isSameTree?.(manifest.releaseHeadSha, manifest.approvedMergeSha)),
+      `${manifest.releaseHeadSha || "(missing)"} -> ${manifest.approvedMergeSha || "(missing)"}`,
+    );
+    add(
+      "Pre-release base ancestry",
+      ancestor(manifest.preReleaseBaseSha, manifest.approvedMergeSha),
+      `${manifest.preReleaseBaseSha || "(missing)"} -> ${manifest.approvedMergeSha || "(missing)"}`,
+    );
+    add(
+      "Approved merge ancestry",
+      ancestor(manifest.approvedMergeSha, approvedHead),
+      `${manifest.approvedMergeSha || "(missing)"} -> ${approvedHead || "(missing)"}`,
+    );
+    return rows;
+  }
+
+  add("Preflight phase", false, phase || "(missing)");
+  return rows;
+}
+
+export function findReleaseSurfaceFailures(rootPath, release) {
+  const failures = [];
+  const version = JSON.parse(readFileSync(path.join(rootPath, "version.json"), "utf8")).version;
+  const serviceWorker = readFileSync(path.join(rootPath, "service-worker.js"), "utf8");
+  const appHtml = readFileSync(path.join(rootPath, "app.html"), "utf8");
+  if (version !== release) failures.push(`version.json is ${version}`);
+  if (!serviceWorker.includes(`const CACHE_NAME = "laxhornet-${release}";`)) {
+    failures.push(`service-worker cache is not laxhornet-${release}`);
+  }
+  for (const asset of [
+    "runtime-config.js",
+    "event-operation-service.js",
+    "next-focus-recommendation.js",
+    "tracked-playing-time-service.js",
+    "app.js",
+  ]) {
+    if (!appHtml.includes(`${asset}?v=${release.slice(1)}`)) {
+      failures.push(`${asset} query marker is not ${release}`);
+    }
+  }
+  return failures;
+}
+
+function checkRepository(results, release, phase, approvedRolloutSha) {
   const topLevel = trimmed(git("rev-parse", "--show-toplevel"));
   addResult(
     results,
@@ -140,13 +244,32 @@ function checkRepository(results, release) {
     topLevel,
   );
 
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const branch = trimmed(git("branch", "--show-current"));
-  addResult(
-    results,
-    "Current branch",
-    !release || branch.startsWith(`release/${release}-`) ? "PASS" : "FAIL",
-    branch || "(detached)",
-  );
+  const headSha = trimmed(git("rev-parse", "HEAD"));
+  const mainShaResult = git("rev-parse", "main");
+  const mainSha = mainShaResult.status === 0 ? trimmed(mainShaResult) : "";
+  const identityRows = evaluateReleaseIdentity({
+    phase,
+    release,
+    branch,
+    headSha,
+    mainSha,
+    manifest,
+    approvedRolloutSha,
+    isAncestor: (older, newer) =>
+      git("merge-base", "--is-ancestor", older, newer).status === 0,
+    isSameTree: (left, right) => {
+      const leftTree = git("rev-parse", `${left}^{tree}`);
+      const rightTree = git("rev-parse", `${right}^{tree}`);
+      return leftTree.status === 0 &&
+        rightTree.status === 0 &&
+        trimmed(leftTree) === trimmed(rightTree);
+    },
+  });
+  for (const row of identityRows) {
+    addResult(results, row.label, row.status, row.detail);
+  }
 
   const status = trimmed(git("status", "--short"));
   const changedPaths = status
@@ -162,21 +285,29 @@ function checkRepository(results, release) {
   addResult(
     results,
     "Tracked worktree state",
-    unsafeChanges.length ? "FAIL" : "PASS",
-    status ? `${changedPaths.length} identified release-path changes; no SQL/package metadata drift` : "clean",
+    phase === "production"
+      ? status
+        ? "FAIL"
+        : "PASS"
+      : unsafeChanges.length
+        ? "FAIL"
+        : "PASS",
+    status
+      ? phase === "production"
+        ? `${changedPaths.length} changed paths; production rollout requires a clean tree`
+        : `${changedPaths.length} identified release-path changes; no SQL/package metadata drift`
+      : "clean",
   );
   if (unsafeChanges.length) {
     addResult(results, "Unexpected protected changes", "FAIL", unsafeChanges.join(", "));
   }
 
-  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-  const mainShaResult = git("rev-parse", "main");
-  const mainSha = mainShaResult.status === 0 ? trimmed(mainShaResult) : "";
+  const manifestIdentityFailures = validateManifestReleaseIdentity(manifest, release);
   addResult(
     results,
-    "Current main SHA",
-    mainSha === manifest.finalMainBaseSha ? "PASS" : "FAIL",
-    mainSha || "main unavailable",
+    "Manifest release identity",
+    manifestIdentityFailures.length ? "FAIL" : "PASS",
+    manifestIdentityFailures.length ? manifestIdentityFailures.join("; ") : "base, release head, and merge SHA recorded",
   );
 
   const migrationPath = "supabase/migrations/20260727000000_tracked_playing_time_operations.sql";
@@ -203,6 +334,29 @@ function checkRepository(results, release) {
     "Release manifest",
     manifestResult.status === 0 ? "PASS" : "FAIL",
     manifestResult.status === 0 ? trimmed(manifestResult).split(/\r?\n/).at(-1) : trimmed(manifestResult),
+  );
+
+  const releaseSurfaceFailures = release ? findReleaseSurfaceFailures(root, release) : [];
+  addResult(
+    results,
+    "Release marker, cache, and asset queries",
+    releaseSurfaceFailures.length ? "FAIL" : "PASS",
+    releaseSurfaceFailures.length ? releaseSurfaceFailures.join("; ") : `${release || manifest.release} surfaces present`,
+  );
+
+  const publicLiveShareSql = "supabase/migrations/20260723020000_minimum_necessary_disclosure.sql";
+  const publicLiveShareDiff = git(
+    "diff",
+    "--quiet",
+    manifest.databaseCandidate,
+    "--",
+    publicLiveShareSql,
+  );
+  addResult(
+    results,
+    "Public Live Share SQL identity",
+    publicLiveShareDiff.status === 0 ? "PASS" : "FAIL",
+    publicLiveShareDiff.status === 0 ? "matches approved canonical source" : `${publicLiveShareSql} drifted`,
   );
 
   const protectedDiff = git(
@@ -450,11 +604,29 @@ export function cleanupReleasePreflight({ stopSupabase = true } = {}) {
 export function runReleasePreflight({
   prepare = false,
   release = "",
+  phase = "",
+  approvedRolloutSha = "",
   startSupabase = false,
 } = {}) {
   const results = [];
   const normalizedRelease = release && !release.startsWith("v") ? `v${release}` : release;
-  const repository = checkRepository(results, normalizedRelease);
+  const normalizedPhase = phase || (normalizedRelease ? "preparation" : "general");
+  const repository = checkRepository(
+    results,
+    normalizedRelease,
+    normalizedPhase,
+    approvedRolloutSha,
+  );
+  const validPhase =
+    normalizedPhase === "general" ||
+    normalizedPhase === "preparation" ||
+    normalizedPhase === "production";
+  addResult(
+    results,
+    "Preflight phase",
+    validPhase && (normalizedPhase === "general" || Boolean(normalizedRelease)) ? "PASS" : "FAIL",
+    normalizedPhase,
+  );
   const versionMatches = !normalizedRelease || repository.manifest.release === normalizedRelease;
   addResult(
     results,
@@ -480,6 +652,7 @@ export function runReleasePreflight({
     results,
     root,
     release: normalizedRelease,
+    phase: normalizedPhase,
     environment: {
       ...repository.releaseEnv,
       ...(runtime.python ? { LAXHORNET_PYTHON: runtime.python.command } : {}),
@@ -495,9 +668,15 @@ function parseArguments(args) {
     cleanup: args.includes("--cleanup"),
     startSupabase: args.includes("--start-supabase"),
     release: "",
+    phase: "",
+    approvedRolloutSha: "",
   };
   const releaseIndex = args.indexOf("--release");
   if (releaseIndex >= 0) options.release = args[releaseIndex + 1] || "";
+  const phaseIndex = args.indexOf("--phase");
+  if (phaseIndex >= 0) options.phase = args[phaseIndex + 1] || "";
+  const rolloutIndex = args.indexOf("--approved-rollout-sha");
+  if (rolloutIndex >= 0) options.approvedRolloutSha = args[rolloutIndex + 1] || "";
   return options;
 }
 

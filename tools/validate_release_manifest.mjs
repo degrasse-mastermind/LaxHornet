@@ -63,6 +63,51 @@ expect(
   "finalMainBaseSha must identify the reviewed v284 main base",
 );
 expect(
+  manifest.preReleaseBaseSha === manifest.finalMainBaseSha,
+  "preReleaseBaseSha must preserve the reviewed v284 main base",
+);
+expect(
+  manifest.releaseHeadSha === "1cf5d9d33a7295da8248353165a696b7b81690db",
+  "releaseHeadSha must identify the reviewed v284 release head",
+);
+expect(
+  manifest.approvedMergeSha === "e2cd28a568e91232d375a8607e6376800d3a2a20",
+  "approvedMergeSha must identify the approved PR #26 merge",
+);
+for (const [ancestor, descendant, message] of [[
+  manifest.preReleaseBaseSha,
+  manifest.releaseHeadSha,
+  "preReleaseBaseSha must be an ancestor of releaseHeadSha",
+]]) {
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", ancestor, descendant], {
+      cwd: root,
+      stdio: "ignore",
+    });
+    expect(true, message);
+  } catch {
+    expect(false, message);
+  }
+}
+try {
+  execFileSync(
+    "git",
+    ["merge-base", "--is-ancestor", manifest.releaseHeadSha, manifest.approvedMergeSha],
+    { cwd: root, stdio: "ignore" },
+  );
+  expect(true, "releaseHeadSha must be incorporated by approvedMergeSha");
+} catch {
+  try {
+    expect(
+      git("rev-parse", `${manifest.releaseHeadSha}^{tree}`)
+        === git("rev-parse", `${manifest.approvedMergeSha}^{tree}`),
+      "squash-merged releaseHeadSha must have the exact approvedMergeSha tree",
+    );
+  } catch {
+    expect(false, "releaseHeadSha must be incorporated by approvedMergeSha");
+  }
+}
+expect(
   manifest.databaseTreeMode === "canonical_plus_additive_with_provenance",
   "databaseTreeMode must identify the canonical-plus-additive release boundary with provenance",
 );
