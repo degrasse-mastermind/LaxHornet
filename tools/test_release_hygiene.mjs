@@ -3,7 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { execFileSync } from "node:child_process";
-import { validateReleaseContainmentFromEnvironment } from "./release_containment.mjs";
+import {
+  APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
+  TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
+  validateReleaseContainmentFromEnvironment,
+} from "./release_containment.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
@@ -108,7 +112,8 @@ if (containment.mode === "standalone" || containment.mode === "additive") {
   }
 } else if (
   containment.mode === "canonical_plus_additive" ||
-  containment.mode === "canonical_plus_additive_with_provenance"
+  containment.mode === "canonical_plus_additive_with_provenance" ||
+  containment.mode === "canonical_plus_additive_with_provenance_and_review_package"
 ) {
   check(
     containment.combinedSupabaseTreeMatchesApprovedRefs,
@@ -122,12 +127,12 @@ if (containment.mode === "standalone" || containment.mode === "additive") {
   check(
     JSON.stringify([...containment.allowedAdditiveDatabaseFiles].sort())
       === JSON.stringify([
-        "supabase/migrations/20260723040000_event_pipeline_capabilities.sql",
-        "supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql",
-      ]),
-    "combined integration contains only the approved PR #12 additive capability package",
+        ...APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
+        ...TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
+      ].sort()),
+    "combined integration contains only the approved additive and explicit review packages",
   );
-  if (containment.mode === "canonical_plus_additive_with_provenance") {
+  if (containment.mode.includes("with_provenance")) {
     check(
       containment.historicalProvenance?.markerCommentOnly === true,
       "combined integration preserves the comment-only historical marker",

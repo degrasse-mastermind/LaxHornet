@@ -1,7 +1,7 @@
 # Tracked Playing Time Foundation Review Evidence
 
-Review date: 2026-07-27  
-Branch: `feature/tracked-playing-time-foundation`  
+Review date: 2026-07-27
+Branch: `feature/tracked-playing-time-foundation`
 Baseline: `origin/main` at `2a0435817d7302b1041542d0ef0f54c9697e8bc0`
 
 This package supports review of the private data foundation only. It does not claim production application, deployment, UI activation, or signed-in browser verification.

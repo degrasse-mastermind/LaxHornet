@@ -204,7 +204,8 @@ Add the private, local-first data foundation for authoritative game-clock state 
 - Reapplying the migration to the existing local schema passed, followed by 37/37 pgTAP assertions.
 - `node tools/test_tracked_playing_time_service.mjs`: 16/16 passed.
 - `node tools/test_tracked_playing_time_foundation.mjs`: static migration/privacy/containment contracts added.
-- Broad portable regression and GitHub Actions are required before merge.
+- `node tools/run_v283_local_regression.mjs`: 26/26 groups passed locally.
+- GitHub Actions is required to be green before merge.
 
 #### Risks and rollback
 

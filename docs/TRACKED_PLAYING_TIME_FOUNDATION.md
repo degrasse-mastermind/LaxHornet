@@ -1,7 +1,7 @@
 # Tracked Playing Time Foundation
 
-Status: review-only foundation  
-Branch: `feature/tracked-playing-time-foundation`  
+Status: review-only foundation
+Branch: `feature/tracked-playing-time-foundation`
 Production state: not applied, deployed, activated, or exposed in the UI
 
 ## Boundary

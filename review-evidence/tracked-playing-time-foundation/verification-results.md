@@ -11,9 +11,11 @@ All database checks used the local Supabase stack only. No project link, product
 | Local pgTAP: `supabase test db --local supabase/tests/tracked_playing_time_foundation.sql` | PASS; 37/37 |
 | Rollback on empty foundation history | PASS; foundation functions/view/tables removed |
 | Rollback preservation check | PASS; `lh_event_operations` and `lh_public_live_share_game(text)` remained present |
+| Rollback refusal with one synthetic accepted operation | PASS; failed closed with the documented export/disposal requirement |
 | Production-shaped local reapply over the existing six-migration schema | PASS |
 | pgTAP after reapply | PASS; 37/37 |
 | New unindexed foreign-key advisor findings | PASS; none after adding covering indexes |
+| Broad portable regression: `node tools/run_v283_local_regression.mjs` | PASS; 26/26 groups |
 
 ## Lint and advisors
 
@@ -23,4 +25,4 @@ Security advisors report informational `rls_enabled_no_policy` entries for the n
 
 ## Portable checks
 
-The branch adds the focused service and static foundation tests to both `tools/run_v283_local_regression.mjs` and the pull-request workflow. Final broad regression and CI results are recorded in the pull request rather than inferred here.
+The branch adds the focused service and static foundation tests to both `tools/run_v283_local_regression.mjs` and the pull-request workflow. The complete local runner passed 26/26 groups; `regression-output.txt` contains the command-level output. GitHub Actions remains a separate remote result and must be green before merge.
