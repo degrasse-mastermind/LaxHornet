@@ -7,6 +7,7 @@ import {
   APPROVED_AUTHORIZED_DB_PATHS,
   APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
   APPROVED_HISTORICAL_PROVENANCE_PATHS,
+  TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
   ReleaseContainmentError,
   validateReleaseContainment,
   validateReleaseContainmentFromEnvironment,
@@ -296,6 +297,46 @@ try {
     assert.equal(
       result.historicalProvenance.orderedStatementsMd5,
       "ea4aeff5aff66a88dae1211b93e3a1fa",
+    );
+  });
+
+  git(["switch", "-c", "provenance-with-review-package", "provenance-ref"]);
+  for (const [index, file] of TRACKED_PLAYING_TIME_REVIEW_DB_PATHS.entries()) {
+    write(file, `tracked playing time review file ${index + 1}\n`);
+  }
+  commit("Add synthetic tracked playing time review package");
+  git(["tag", "review-package-ref"]);
+
+  test("combined containment accepts the explicit tracked playing time review package", () => {
+    const result = validateReleaseContainment({
+      repoRoot: tempRoot,
+      releaseBaseRef: "release-base",
+      authorizedDbRef: "authorized-db-ref",
+      approvedAdditiveRef: "approved-additive-ref",
+      allowedAdditiveDbPaths: TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
+    });
+    assert.equal(
+      result.mode,
+      "canonical_plus_additive_with_provenance_and_review_package",
+    );
+    assert.deepEqual(
+      result.reviewAdditiveDatabaseFiles,
+      [...TRACKED_PLAYING_TIME_REVIEW_DB_PATHS].sort(),
+    );
+  });
+
+  git(["switch", "-c", "review-package-with-extra", "review-package-ref"]);
+  write("supabase/migrations/20260727010000_unapproved.sql", "select 1;\n");
+  commit("Add unapproved review migration");
+  test("combined containment still rejects files outside the explicit review package", () => {
+    expectContainmentFailure("COMBINED_SUPABASE_PATH_SET_MISMATCH", () =>
+      validateReleaseContainment({
+        repoRoot: tempRoot,
+        releaseBaseRef: "release-base",
+        authorizedDbRef: "authorized-db-ref",
+        approvedAdditiveRef: "approved-additive-ref",
+        allowedAdditiveDbPaths: TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
+      }),
     );
   });
 

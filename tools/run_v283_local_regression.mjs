@@ -30,6 +30,9 @@ const baseRef = process.env.LAXHORNET_RELEASE_BASE_REF || defaultBaseRef;
 const additivePaths = [
   "supabase/migrations/20260723040000_event_pipeline_capabilities.sql",
   "supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql",
+  "supabase/migrations/20260727000000_tracked_playing_time_operations.sql",
+  "supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql",
+  "supabase/tests/tracked_playing_time_foundation.sql",
 ].join(",");
 
 const rootJavaScript = readdirSync(root)
@@ -40,6 +43,8 @@ const rootJavaScript = readdirSync(root)
 const tests = [
   ...rootJavaScript,
   { name: "event-operation service contracts", command: process.execPath, args: ["tools/test_event_operation_service.mjs"] },
+  { name: "tracked playing time service contracts", command: process.execPath, args: ["tools/test_tracked_playing_time_service.mjs"] },
+  { name: "tracked playing time foundation contracts", command: process.execPath, args: ["tools/test_tracked_playing_time_foundation.mjs"] },
   { name: "game scope and capability contracts", command: process.execPath, args: ["tools/test_game_scope_capabilities.mjs"] },
   { name: "v283 update release", command: process.execPath, args: ["tools/test_update_release.mjs"] },
   {

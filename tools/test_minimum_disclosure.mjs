@@ -88,7 +88,8 @@ if (containment.mode === "standalone") {
   );
 } else if (
   containment.mode === "canonical_plus_additive" ||
-  containment.mode === "canonical_plus_additive_with_provenance"
+  containment.mode === "canonical_plus_additive_with_provenance" ||
+  containment.mode === "canonical_plus_additive_with_provenance_and_review_package"
 ) {
   expect(
     containment.combinedSupabaseTreeMatchesApprovedRefs,
@@ -98,7 +99,7 @@ if (containment.mode === "standalone") {
     containment.postAuthorizationDatabaseFiles.length === 0,
     "combined release contains no unapproved database files",
   );
-  if (containment.mode === "canonical_plus_additive_with_provenance") {
+  if (containment.mode.includes("with_provenance")) {
     expect(
       containment.historicalProvenance?.markerCommentOnly === true,
       "combined release preserves the comment-only historical marker",

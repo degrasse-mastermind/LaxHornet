@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
-const excludedDirectories = new Set([".git", "assets", "node_modules", "research"]);
+const excludedDirectories = new Set([".codex", ".git", "assets", "node_modules", "research"]);
 const currentEvidence = path.join("review-evidence", "event-pipeline-release-control-cleanup");
 const allowedProductionHostFiles = new Set([
   "README.md",

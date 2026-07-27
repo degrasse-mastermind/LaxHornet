@@ -5,6 +5,7 @@ import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import {
   APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
+  TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
   validateReleaseContainmentFromEnvironment,
 } from "./release_containment.mjs";
 
@@ -463,7 +464,8 @@ test("Phase-aware release containment preserves the authorized Trust Spine SQL",
     assert.equal(containment.supabaseTreeMatchesAuthorizedRef, null);
   } else if (
     containment.mode === "canonical_plus_additive" ||
-    containment.mode === "canonical_plus_additive_with_provenance"
+    containment.mode === "canonical_plus_additive_with_provenance" ||
+    containment.mode === "canonical_plus_additive_with_provenance_and_review_package"
   ) {
     assert.equal(containment.supabaseTreeMatchesAuthorizedRef, null);
     assert.equal(containment.canonicalSupabaseFilesMatchAuthorizedRef, true);
@@ -472,9 +474,12 @@ test("Phase-aware release containment preserves the authorized Trust Spine SQL",
     assert.equal(containment.authorizedSupabaseDeltaFiles.length, 7);
     assert.deepEqual(
       [...containment.allowedAdditiveDatabaseFiles].sort(),
-      [...APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS].sort(),
+      [
+        ...APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
+        ...TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
+      ].sort(),
     );
-    if (containment.mode === "canonical_plus_additive_with_provenance") {
+    if (containment.mode.includes("with_provenance")) {
       assert.equal(containment.historicalProvenance.markerCommentOnly, true);
       assert.equal(containment.historicalProvenance.statementCount, 350);
       assert.equal(

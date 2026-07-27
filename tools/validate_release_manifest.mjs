@@ -8,6 +8,7 @@ import {
   APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
   APPROVED_HISTORICAL_PROVENANCE_IDENTITIES,
   APPROVED_HISTORICAL_PROVENANCE_PATHS,
+  TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
   validateHistoricalProvenance,
   validateReleaseContainment,
 } from "./release_containment.mjs";
@@ -58,6 +59,47 @@ expect(
   manifest.databaseTreeMode === "canonical_plus_additive_with_provenance",
   "databaseTreeMode must identify the canonical-plus-additive release boundary with provenance",
 );
+expect(
+  manifest.reviewDatabaseTreeMode
+    === "canonical_plus_additive_with_provenance_and_review_package",
+  "reviewDatabaseTreeMode must identify the isolated review-only database package",
+);
+
+const reviewPackages = manifest.reviewDatabasePackages || [];
+const trackedTimeReview = reviewPackages.find(
+  (entry) => entry.name === "tracked_playing_time_foundation",
+);
+expect(reviewPackages.length === 1, "manifest must contain exactly one review-only database package");
+expect(Boolean(trackedTimeReview), "tracked playing time review package must be present");
+const trackedTimeReviewPaths = trackedTimeReview
+  ? [
+      trackedTimeReview.forwardMigration,
+      trackedTimeReview.rollbackReference,
+      trackedTimeReview.testSql,
+    ]
+  : [];
+expect(
+  JSON.stringify([...trackedTimeReviewPaths].sort())
+    === JSON.stringify([...TRACKED_PLAYING_TIME_REVIEW_DB_PATHS].sort()),
+  "tracked playing time review package paths must match the explicit containment allowlist",
+);
+expect(trackedTimeReview?.status === "draft_review", "tracked playing time package must remain draft_review");
+expect(trackedTimeReview?.productionApplied === false, "review package must not claim production application");
+expect(
+  trackedTimeReview?.productionAuthorizationRequired === true,
+  "review package must require separate production authorization",
+);
+for (const file of TRACKED_PLAYING_TIME_REVIEW_DB_PATHS) {
+  const absolute = path.join(root, file);
+  expect(fs.existsSync(absolute), `tracked playing time review file is missing: ${file}`);
+  if (fs.existsSync(absolute)) {
+    const localHash = createHash("sha256").update(fs.readFileSync(absolute)).digest("hex");
+    expect(
+      trackedTimeReview?.sha256?.[file] === localHash,
+      `tracked playing time review SHA-256 is stale: ${file}`,
+    );
+  }
+}
 
 const identities = manifest.approvedDatabaseFileIdentities || {};
 expect(identities.algorithm === "sha256", "approved database identities must use sha256");
@@ -185,6 +227,11 @@ expect(
   "requiredMigrationSequence must preserve timestamp order including the historical marker",
 );
 expect(
+  JSON.stringify(manifest.reviewMigrationSequence)
+    === JSON.stringify([...expectedMigrationSequence, trackedTimeReview?.forwardMigration]),
+  "reviewMigrationSequence must append the tracked playing time migration without changing production state",
+);
+expect(
   JSON.stringify(manifest.expectedRemoteAppliedMigrations)
     === JSON.stringify([historical.markerPath]),
   "expectedRemoteAppliedMigrations must contain only the historical production marker",
@@ -284,11 +331,12 @@ if (requireCombined) {
       releaseBaseRef: releaseBase,
       authorizedDbRef: manifest.databaseCandidate,
       approvedAdditiveRef: manifest.cleanupCandidate,
+      allowedAdditiveDbPaths: TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
       headRef: combinedRef,
     });
     expect(
-      containment.mode === "canonical_plus_additive_with_provenance",
-      "combined ref must validate in canonical_plus_additive_with_provenance mode",
+      containment.mode === manifest.reviewDatabaseTreeMode,
+      "combined ref must validate in the review-only database tree mode",
     );
     expect(
       containment.combinedSupabaseTreeMatchesApprovedRefs === true,
@@ -311,6 +359,7 @@ const allowedCleanupMigrations = new Set([
   ...manifest.additiveForwardMigrations,
   historical.markerPath,
   ...manifest.canonicalForwardMigrations,
+  trackedTimeReview?.forwardMigration,
 ]);
 for (const file of cleanupMigrations) {
   expect(allowedCleanupMigrations.has(file), `unknown cleanup migration detected: ${file}`);

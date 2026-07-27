@@ -69,13 +69,14 @@ check(app.includes("requireSecureCapability"), "secure disclosure requires a bac
 const sqlDelta = containment.releaseDeltaFiles.filter((file) => file.endsWith(".sql"));
 if (
   containment.mode === "canonical_plus_additive" ||
-  containment.mode === "canonical_plus_additive_with_provenance"
+  containment.mode === "canonical_plus_additive_with_provenance" ||
+  containment.mode === "canonical_plus_additive_with_provenance_and_review_package"
 ) {
   check(
     containment.combinedSupabaseTreeMatchesApprovedRefs,
     "combined activation matches the approved canonical and additive database identities",
   );
-  if (containment.mode === "canonical_plus_additive_with_provenance") {
+  if (containment.mode.includes("with_provenance")) {
     check(
       containment.historicalProvenance?.markerCommentOnly === true,
       "combined activation preserves the comment-only historical marker",
