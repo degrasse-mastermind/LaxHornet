@@ -21,24 +21,25 @@ Branch: `chore/codex-project-configuration`
 
 Goal:
 
-Create repository-level instructions, current-state context, project-scoped Codex configuration, and a disciplined ticket workflow tailored to the actual LaxHornet codebase.
+Create repository-level instructions, current-state context, safe Codex defaults, and a disciplined ticket workflow tailored to the actual LaxHornet codebase.
 
 Acceptance criteria:
 
 - Root `AGENTS.md` accurately describes the vanilla HTML/CSS/JavaScript offline PWA.
 - `REPO_CURRENT_STATE.md` records the current architecture, release controls, Supabase boundaries, and verification entry points.
-- `.codex/config.toml` lets ChatGPT-authenticated Codex choose the newest model supported for the signed-in account, applies high reasoning where supported, uses safe local approvals, and scopes Supabase MCP to the LaxHornet project in read-only mode.
-- Supabase MCP migration writes are disabled.
+- `.codex/config.toml` lets ChatGPT-authenticated Codex choose the newest model supported for the signed-in account, applies high reasoning where supported, and uses safe local approvals.
+- Host-managed Apps/Plugins exposed through `codex_apps` are treated as separate from repository configuration.
+- Supabase app or connector tools are not used during ordinary LaxHornet implementation unless a ticket explicitly authorizes their exact project, scope, and allowed actions.
 - This ticket file contains a reusable implementation template.
-- No production code, release marker, migration, deployment, or database state is changed.
+- No production code, release marker, migration, deployment, connector permission, or database state is changed.
 
 Verification:
 
-- Review all four configuration files against the repository.
+- Review all configuration and documentation files against the repository.
 - Confirm Codex trusts the project and reports the loaded instruction/config sources.
 - Confirm `/model` shows a model supported by the signed-in ChatGPT account without a startup error.
-- Confirm `/mcp` shows the project-scoped Supabase server after OAuth authentication.
-- Confirm the Supabase MCP cannot apply migrations.
+- Confirm Codex recognizes `codex_apps` connectors as host-managed capabilities rather than repository-scoped tools.
+- Confirm Codex does not invoke Supabase, Vercel, Resend, or other write-capable app actions during ordinary repository work without explicit ticket authorization.
 
 ### LH-DEV-002 — Establish local Supabase CLI workflow
 
@@ -70,14 +71,14 @@ Status: `PROPOSED`
 
 Goal:
 
-Create a safe Supabase development project or branch so Codex can eventually test authorized database writes without access to production data.
+Create a safe Supabase development project or branch so authorized database changes can be tested without access to production data.
 
 Candidate acceptance criteria:
 
 - Development environment contains synthetic data only.
 - Environment identifiers and purpose are documented without committing secrets.
 - Production and development targets are unmistakably separated.
-- Write-capable MCP is scoped only to the development target.
+- Any write-capable connector or MCP is scoped only to the development target.
 - Tool approvals remain enabled for mutations.
 - Promotion to production still occurs only through reviewed migration files and release procedure.
 
@@ -174,7 +175,7 @@ Implement only [TICKET ID] from TICKETS.md.
 
 First read AGENTS.md, REPO_CURRENT_STATE.md, TICKETS.md, and inspect the actual relevant code. Then provide a brief implementation plan naming the expected files, risks, and tests. Do not edit until the plan is internally consistent with the repository.
 
-Stay strictly within the ticket's scope and acceptance criteria. Preserve the vanilla static PWA, offline-first behavior, authorization boundaries, disclosure rules, Supabase migration provenance, and release controls. Do not deploy, apply remote migrations, change production configuration, or merge to main.
+Stay strictly within the ticket's scope and acceptance criteria. Preserve the vanilla static PWA, offline-first behavior, authorization boundaries, disclosure rules, Supabase migration provenance, and release controls. Do not use host-managed connector actions, deploy, apply remote migrations, change production configuration, or merge to main unless the ticket explicitly authorizes that exact action.
 
 After implementation, run the smallest relevant tests, then broader regression if warranted. Update REPO_CURRENT_STATE.md and the ticket completion record with durable facts. Finish with the diff summary, tests and results, risks, and unresolved items.
 ```
