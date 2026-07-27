@@ -2531,6 +2531,35 @@ button:focus-visible,
     0 5px 12px rgba(0, 0, 0, 0.24);
 }
 
+.stat-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  filter: grayscale(0.72);
+  transform: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.stat-button:disabled .label,
+.stat-button:disabled .points {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.live-event-capture-state:empty {
+  display: none;
+}
+
+.live-event-gate-message {
+  margin: 12px 0 10px;
+  padding: 11px 13px;
+  border: 1px solid rgba(241, 185, 56, 0.5);
+  border-radius: var(--lh-radius-md);
+  color: #fff3cf;
+  background: rgba(73, 48, 3, 0.82);
+  font-size: 0.86rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .stat-button.positive,
 .stat-button.offense {
   --stat-accent: var(--offense);

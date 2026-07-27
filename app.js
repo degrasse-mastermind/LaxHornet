@@ -2708,6 +2708,48 @@ function trackedTimeStatusLabel(status = "") {
   return status === "needs_review" ? "Needs review" : status === "estimated" ? "Estimated" : "Complete";
 }
 
+function liveEventCaptureGate(game, now = Date.now()) {
+  if (!hasTrackedPlayingTime(game)) {
+    return {
+      required: false,
+      allowed: true,
+      code: "not_tracked",
+      message: "",
+      clockRunning: false,
+      playerOnField: false,
+    };
+  }
+  const clockRunning = projectedTrackedClock(game, now)?.isRunning === true;
+  const playerOnField = trackedTimeSummary(game, now)?.onField === true;
+  if (clockRunning && playerOnField) {
+    return {
+      required: true,
+      allowed: true,
+      code: "ready",
+      message: "",
+      clockRunning,
+      playerOnField,
+    };
+  }
+  const message = !clockRunning && !playerOnField
+    ? "Start the clock and tap PLAYER IN to record events."
+    : !clockRunning
+      ? "Start or resume the game clock to record events."
+      : "Tap PLAYER IN to record events.";
+  return {
+    required: true,
+    allowed: false,
+    code: !clockRunning && !playerOnField
+      ? "clock_stopped_player_out"
+      : !clockRunning
+        ? "clock_stopped_player_in"
+        : "clock_running_player_out",
+    message,
+    clockRunning,
+    playerOnField,
+  };
+}
+
 function trackedTimeService() {
   if (trackedPlayingTimeService) return trackedPlayingTimeService;
   const factory = window.LaxHornetTrackedPlayingTime?.createTrackedPlayingTimeService;
@@ -3423,18 +3465,24 @@ function logEvent(statKey) {
   if (!state.activeGame) {
     showToast("Start a game first");
     navigate("start");
-    return;
+    return null;
   }
   if (!canEditGame(state.activeGame)) {
     showToast("View-only team access");
-    return;
+    return null;
   }
 
   const stat = STAT_BY_KEY[statKey];
+  if (!stat) return null;
+  const captureGate = liveEventCaptureGate(state.activeGame);
+  if (!captureGate.allowed) {
+    showToast(captureGate.message);
+    return null;
+  }
   let note = "";
   if (statKey === "note") {
     note = window.prompt("Add a quick note")?.trim() || "";
-    if (!note) return;
+    if (!note) return null;
   }
 
   const operation = createGameEventOperation(state.activeGame, () => {
@@ -3474,6 +3522,7 @@ function logEvent(statKey) {
   const event = operation.event;
   render();
   showToast(`${stat.label} added · ${event.quarter} ${formatTime(event.timestamp)}`);
+  return event;
 }
 
 function undoLastEvent() {
@@ -8963,12 +9012,16 @@ function renderStartGame() {
 function renderStatButton(stat, options = {}) {
   const promoStep = Number.isFinite(options.promoStep) ? Number(options.promoStep) : null;
   const statAttr = options.interactive === false ? `data-promo-stat="${stat.key}"` : `data-stat="${stat.key}"`;
+  const captureBlocked = options.interactive !== false && options.captureGate?.allowed === false;
+  const captureAttrs = captureBlocked
+    ? ` disabled aria-disabled="true" aria-describedby="liveEventCaptureMessage"`
+    : "";
   const promoAttrs =
     promoStep === null
       ? ""
       : ` data-promo-step="${promoStep}" style="--promo-step: ${promoStep};"`;
   return `
-    <button class="stat-button ${stat.tone}${options.compact ? " compact" : ""}${promoStep === null ? "" : " promo-hit"}" type="button" ${statAttr}${promoAttrs}>
+    <button class="stat-button ${stat.tone}${options.compact ? " compact" : ""}${promoStep === null ? "" : " promo-hit"}" type="button" ${statAttr}${promoAttrs}${captureAttrs}>
       <span class="label">${stat.label}</span>
       <span class="points">${stat.points === 0 ? "note" : `${pointText(stat.points)} impact`}</span>
     </button>
@@ -8984,6 +9037,7 @@ function renderStatButtonsForKeys(keys = [], options = {}) {
       renderStatButton(stat, {
         compact: options.compact,
         interactive: options.interactive,
+        captureGate: options.captureGate,
         promoStep: Number.isFinite(stepByKey[stat.key]) ? stepByKey[stat.key] : null,
       }),
     )
@@ -9003,14 +9057,14 @@ function renderLiveStatGroups(options = {}) {
             <h3>Quick Plays</h3>
             <span>${escapeHTML((IMPACT_POSITION_WEIGHTS[liveTrackerPositionGroup(player)]?.label || "Default"))}</span>
           </div>
-          <div class="tracker-grid">${renderStatButtonsForKeys(defaultKeys)}</div>
+          <div class="tracker-grid">${renderStatButtonsForKeys(defaultKeys, { captureGate: options.captureGate })}</div>
         </div>
         <div class="stat-group more-plays ${state.morePlaysExpanded ? "expanded" : "collapsed"}">
           <button class="more-plays-toggle" type="button" data-action="toggle-more-plays" aria-expanded="${state.morePlaysExpanded}">
             <strong>More Plays</strong>
             <span>${state.morePlaysExpanded ? "Hide less-used stats" : "Show all other stats"}</span>
           </button>
-          ${state.morePlaysExpanded ? `<div class="tracker-grid">${renderStatButtonsForKeys(moreKeys, { compact: true })}</div>` : ""}
+          ${state.morePlaysExpanded ? `<div class="tracker-grid">${renderStatButtonsForKeys(moreKeys, { compact: true, captureGate: options.captureGate })}</div>` : ""}
         </div>
       </section>
     `;
@@ -9248,6 +9302,7 @@ function renderLiveTracker() {
   const statusLine = `${escapeHTML(game.currentQuarter)} <span aria-hidden="true">&middot;</span> vs ${escapeHTML(game.opponent || "Opponent")}`;
   const liveShareEligibility = secureLiveShareEligibility(game);
   const liveShareAvailable = liveShareEligibility.available;
+  const eventCaptureGate = liveEventCaptureGate(game);
   const liveMeta = [formatDate(game.date), periodFormatLabel(game), game.location]
     .filter(Boolean)
     .map((item) => escapeHTML(item))
@@ -9297,7 +9352,15 @@ function renderLiveTracker() {
       <div class="live-pill"><strong>${game.events.length}</strong><span>Events</span></div>
     </section>
 
-    ${renderLiveStatGroups({ player })}
+    <div class="live-event-capture-state" data-live-event-capture-state="${eventCaptureGate.code}">
+      ${
+        eventCaptureGate.message
+          ? `<p class="live-event-gate-message" id="liveEventCaptureMessage" role="status" aria-live="polite">${escapeHTML(eventCaptureGate.message)}</p>`
+          : ""
+      }
+    </div>
+
+    ${renderLiveStatGroups({ player, captureGate: eventCaptureGate })}
 
     <section class="card pad live-recent-log" style="margin-top: 12px;">
       <h3>Recent Log</h3>
@@ -13857,6 +13920,12 @@ function refreshTrackedClockDisplay() {
   const clock = projectedTrackedClock(state.activeGame);
   const summary = trackedTimeSummary(state.activeGame);
   if (!clock || !summary) return;
+  const captureGate = liveEventCaptureGate(state.activeGame);
+  const captureStateElement = document.querySelector("[data-live-event-capture-state]");
+  if (captureStateElement?.dataset.liveEventCaptureState !== captureGate.code) {
+    render();
+    return;
+  }
   const clockElement = document.querySelector("[data-tracked-clock]");
   const clockStateElement = document.querySelector("[data-tracked-clock-state]");
   const activeShiftElement = document.querySelector("[data-active-shift]");

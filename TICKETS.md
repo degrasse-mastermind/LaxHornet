@@ -241,31 +241,33 @@ Provide a complete, private, local-first Phase 1 experience for tracking one sel
 - Added pure deterministic shift derivation with duplicate, overlap, ordering, period, recovery, and synchronization review states.
 - Added Total, Game share, Shifts, Average, Longest, completeness status, and compact shift history to Game Review.
 - Added governed correction revisions, manual missed shifts, tombstone removal, unmatched-boundary resolution, and invalid-edit rejection.
-- Preserved ordinary stat events, Game Impact, Possible Next Focus, public Live Share, public/family recaps, selected CSV, and existing games without tracked-time configuration.
+- Gated every new live performance event, including notes and indirect calls, behind `clock_running && player_on_field` for tracked-time games.
+- Kept event controls visible with accessible disabled states and exact contextual instructions for each blocked clock/participation combination.
+- Preserved non-tracked and historical event behavior, Game Review corrections/tombstones, Game Impact, Possible Next Focus, public Live Share, public/family recaps, and selected CSV.
 
 #### Out of scope
 
 - No performance-rate, fatigue, shift-event, season-trend, position-by-shift, team substitution, coach comparison, or AI analysis.
 - No production migration, deployment, merge, release marker, cache-name, script-query-version, or release-manifest change.
-- No change to public disclosure allowlists or ordinary stat-event semantics.
+- No change to public disclosure allowlists or event behavior outside opted-in tracked-time live capture.
 
 #### Verification
 
-- `node tools/test_tracked_playing_time_ui.mjs`: 39/39 passed.
+- `node tools/test_tracked_playing_time_ui.mjs`: 44/44 passed.
 - `node tools/test_tracked_playing_time_service.mjs`: 16/16 passed.
 - `node tools/test_tracked_playing_time_foundation.mjs`: 11/11 passed.
 - `node tools/test_tracked_playing_time_manual_scenarios.mjs`: 7/7 passed.
-- `node tools/test_tracked_playing_time_ui_browser.cjs`: 18/18 rendered checks passed with no console errors.
+- `node tools/test_tracked_playing_time_ui_browser.cjs`: 33/33 rendered checks passed with no console errors.
 - `supabase db reset --local`: passed with the tracked-time migration applied.
 - `supabase test db supabase/tests/tracked_playing_time_foundation.sql`: 37/37 passed.
 - `node tools/run_v283_local_regression.mjs`: 29/29 groups passed.
 - Secret/host scan and `git diff --check`: passed within the full regression.
-- GitHub Actions run `30261706471`: passed, including the new UI contracts and manual scenarios as named steps.
+- GitHub Actions baseline run `30261706471`: passed; the final event-gating commit requires a fresh PR run before review handoff.
 
 #### Risks and rollback
 
 - The foundation is still an unapplied draft, so production cloud synchronization is intentionally unavailable pending separate approval and deployment; local tracking remains usable.
-- A review browser that reaches a backend without the tracked-time RPCs now fails soft to device-only tracking for that session; the backend limitation is not presented as corrupt or ambiguous playing-time evidence.
+- A review browser that reaches a backend without the tracked-time RPCs fails soft to device-only tracking for that session; the local event gate remains authoritative and is unaffected by hosted capability availability.
 - Running-clock recovery gaps longer than 30 seconds freeze and require review rather than inventing time.
 - Feature rollback is the removal of the additive UI/service wiring before release. Accepted database history remains governed by the foundation's fail-closed rollback.
 

@@ -26,11 +26,51 @@
     },
     {
       "passed": true,
+      "message": "stopped and off-field tracked game disables every visible performance-event control"
+    },
+    {
+      "passed": true,
+      "message": "stopped and off-field tracked game shows the exact combined instruction"
+    },
+    {
+      "passed": true,
+      "message": "score, Save, End Game, clock, and Player In controls remain enabled while events are gated"
+    },
+    {
+      "passed": true,
+      "message": "central guard blocks goal and note creation before prompts, score, event, operation, or confirmation side effects"
+    },
+    {
+      "passed": true,
+      "message": "manual score control remains usable while performance events are gated"
+    },
+    {
+      "passed": true,
+      "message": "stopped and on-field tracked game blocks Assist with the exact clock instruction"
+    },
+    {
+      "passed": true,
       "message": "Player In changes to unmistakable on-field state"
     },
     {
       "passed": true,
-      "message": "active shift timer follows running game clock (observed Playing 0:02)"
+      "message": "active shift timer follows running game clock (observed Playing 0:01)"
+    },
+    {
+      "passed": true,
+      "message": "running and on-field tracked game enables event controls without a warning"
+    },
+    {
+      "passed": true,
+      "message": "running and on-field event creates one event, score increment, event operation, and confirmation"
+    },
+    {
+      "passed": true,
+      "message": "Undo remains enabled after a valid performance event"
+    },
+    {
+      "passed": true,
+      "message": "Undo remains usable and rolls back the valid event and automatic score increment"
     },
     {
       "passed": true,
@@ -46,11 +86,27 @@
     },
     {
       "passed": true,
+      "message": "refresh restores the running and on-field enabled gate state"
+    },
+    {
+      "passed": true,
       "message": "paused clock freezes active shift display"
     },
     {
       "passed": true,
-      "message": "period end closes shift and opens next period off field"
+      "message": "pausing mid-shift immediately blocks event creation without ending the active shift"
+    },
+    {
+      "passed": true,
+      "message": "clock resume re-enables events because the player remains on field"
+    },
+    {
+      "passed": true,
+      "message": "running and off-field tracked game blocks Ground Ball and Caused Turnover with the exact Player In instruction"
+    },
+    {
+      "passed": true,
+      "message": "period end closes the shift, opens the next period off field, and restores the combined event gate"
     },
     {
       "passed": true,
@@ -67,6 +123,10 @@
     {
       "passed": true,
       "message": "older game renders the no-data message"
+    },
+    {
+      "passed": true,
+      "message": "non-tracked live games preserve immediate performance-event logging without clock or participation state"
     },
     {
       "passed": true,

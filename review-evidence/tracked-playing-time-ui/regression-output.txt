@@ -74,6 +74,14 @@ EXIT: 0
 
 ===== tracked playing time UI contracts =====
 PASS existing game path does not invent tracked-time configuration
+PASS missing tracked-time RPCs switch the session to device-only tracking
+PASS unavailable tracked-time cloud sync does not create a data-quality issue
+PASS live tracking explains the review-build account-sync fallback
+PASS tracked live-event gate requires a running clock and on-field player
+PASS central live-event creation checks the gate before operations or score changes
+PASS blocked live stat controls are visibly and accessibly disabled
+PASS non-tracked live games bypass the event-capture gate
+PASS Game Review event creation remains outside the live-capture gate
 PASS configured game starts paused and off field
 PASS one Player In creates one effective private boundary
 PASS one Player Out completes one shift
@@ -110,7 +118,7 @@ PASS tracked-time service loads before app.js
 PASS family/public recap builders do not reference tracked-time data
 PASS private full backup retains tracked state through normalized games
 
-36/36 tracked playing time UI tests passed.
+44/44 tracked playing time UI tests passed.
 
 EXIT: 0
 
@@ -130,27 +138,52 @@ EXIT: 0
 ===== tracked playing time browser =====
 STEP setup
 NAV { screen: 'start', hasToggle: true }
-STEP live clock
+STEP missing backend foundation
+STEP event gate stopped and off field
+STEP event gate stopped and on field
+STEP event gate running and on field
+STEP event gate stopped and on field after pause
+STEP event gate running and off field
 STEP period end
 STEP game end
 STEP correction
 STEP no data
+STEP non-tracked compatibility
 PASS setup shows conservative opt-in
 PASS tracked-time duration fields activate
 PASS new tracked game starts visibly off field
+PASS missing tracked-time RPC falls back to device-only tracking without marking shift evidence for review
+PASS transient network errors do not disable tracked-time account sync
+PASS repeated missing-RPC reports produce one bounded console notice
+PASS stopped and off-field tracked game disables every visible performance-event control
+PASS stopped and off-field tracked game shows the exact combined instruction
+PASS score, Save, End Game, clock, and Player In controls remain enabled while events are gated
+PASS central guard blocks goal and note creation before prompts, score, event, operation, or confirmation side effects
+PASS manual score control remains usable while performance events are gated
+PASS stopped and on-field tracked game blocks Assist with the exact clock instruction
 PASS Player In changes to unmistakable on-field state
-PASS active shift timer follows running game clock
+PASS active shift timer follows running game clock (observed Playing 0:01)
+PASS running and on-field tracked game enables event controls without a warning
+PASS running and on-field event creates one event, score increment, event operation, and confirmation
+PASS Undo remains enabled after a valid performance event
+PASS Undo remains usable and rolls back the valid event and automatic score increment
 PASS running refresh restores one continuous active shift without duplicate Player In
 PASS offline pending participation operation survives refresh
+PASS fresh page session re-enables tracked-time capability detection
+PASS refresh restores the running and on-field enabled gate state
 PASS paused clock freezes active shift display
-PASS period end closes shift and opens next period off field
+PASS pausing mid-shift immediately blocks event creation without ending the active shift
+PASS clock resume re-enables events because the player remains on field
+PASS running and off-field tracked game blocks Ground Ball and Caused Turnover with the exact Player In instruction
+PASS period end closes the shift, opens the next period off field, and restores the combined event gate
 PASS Game Review identifies system-closed shifts
 PASS valid live and system boundaries produce Complete
 PASS correction recalculates and marks Estimated
 PASS older game renders the no-data message
+PASS non-tracked live games preserve immediate performance-event logging without clock or participation state
 PASS browser console has no errors
 
-14/14 browser checks passed.
+33/33 browser checks passed.
 
 EXIT: 0
 
@@ -341,7 +374,7 @@ PASS: secure viewer makes no ordinary games/events request
 PASS: v283 activation removes the stale v281 cache
 PASS: unknown and expired tokens remain neutral
 PASS: synthetic roster-connected game renders the real live tracker
-PASS: first live tracker button records immediately (observed 1; Ground Ball added · Q1 7:20 AM)
+PASS: first live tracker button records immediately (observed 1; Ground Ball added · Q1 8:25 AM)
 PASS: two events are recorded through the live tracking UI
 PASS: live tracker events persist locally before secure sharing
 PASS: signed-in token creation uses the approved RPC
@@ -639,21 +672,18 @@ EXIT: 0
 
 warning: in the working copy of 'REPO_CURRENT_STATE.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'TICKETS.md', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'app.html', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'app.js', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'review-evidence/event-pipeline-release-control-cleanup/export-audit-evidence.json', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'review-evidence/event-pipeline-release-control-cleanup/failure-mode-evidence.json', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'review-evidence/event-pipeline-release-control-cleanup/local-browser-results.txt', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'review-evidence/event-pipeline-release-control-cleanup/local-network-request-inventory.json', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'review-evidence/event-pipeline-release-control-cleanup/public-payload-sample.json', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'review-evidence/event-pipeline-release-control-cleanup/script-order-proof.json', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'review-evidence/event-pipeline-release-control-cleanup/service-worker-cache-proof.txt', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'review-evidence/event-pipeline-release-control-cleanup/token-lifecycle-evidence.json', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'service-worker.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'review-evidence/tracked-playing-time-ui/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'review-evidence/tracked-playing-time-ui/browser-results.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'review-evidence/tracked-playing-time-ui/manual-scenarios.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'review-evidence/tracked-playing-time-ui/regression-output.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'review-evidence/tracked-playing-time-ui/test-results.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'styles.css', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'tools/run_v283_local_regression.mjs', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'tools/test_tracked_playing_time_foundation.mjs', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'tracked-playing-time-service.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_tracked_playing_time_ui.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_tracked_playing_time_ui_browser.cjs', LF will be replaced by CRLF the next time Git touches it
 EXIT: 0
 
 MODE: canonical_plus_additive

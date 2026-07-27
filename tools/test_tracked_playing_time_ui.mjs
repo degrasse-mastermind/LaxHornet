@@ -21,6 +21,7 @@ vm.runInContext(source("tracked-playing-time-service.js"), context);
 const api = context.window.LaxHornetTrackedPlayingTime;
 const app = source("app.js");
 const appHtml = source("app.html");
+const styles = source("styles.css");
 const worker = source("service-worker.js");
 const migration = source("supabase/migrations/20260727000000_tracked_playing_time_operations.sql");
 const results = [];
@@ -95,6 +96,49 @@ test("unavailable tracked-time cloud sync does not create a data-quality issue",
 
 test("live tracking explains the review-build account-sync fallback", () => {
   assert.match(app, /Account sync is not available in this review build\./);
+});
+
+test("tracked live-event gate requires a running clock and on-field player", () => {
+  const gate = app.slice(
+    app.indexOf("function liveEventCaptureGate"),
+    app.indexOf("function trackedTimeService"),
+  );
+  assert.match(gate, /clockRunning && playerOnField/);
+  assert.match(gate, /Start the clock and tap PLAYER IN to record events\./);
+  assert.match(gate, /Start or resume the game clock to record events\./);
+  assert.match(gate, /Tap PLAYER IN to record events\./);
+});
+
+test("central live-event creation checks the gate before operations or score changes", () => {
+  const logger = app.slice(app.indexOf("function logEvent"), app.indexOf("function undoLastEvent"));
+  assert.ok(logger.indexOf("liveEventCaptureGate") < logger.indexOf("createGameEventOperation"));
+  assert.ok(logger.indexOf("liveEventCaptureGate") < logger.indexOf("applyScoreIncrementForStat"));
+  assert.match(logger, /if \(!captureGate\.allowed\)[\s\S]*showToast\(captureGate\.message\)[\s\S]*return null/);
+});
+
+test("blocked live stat controls are visibly and accessibly disabled", () => {
+  assert.match(app, /disabled aria-disabled="true" aria-describedby="liveEventCaptureMessage"/);
+  assert.match(app, /role="status" aria-live="polite"/);
+  assert.match(styles, /\.stat-button:disabled/);
+  assert.match(styles, /\.live-event-gate-message/);
+});
+
+test("non-tracked live games bypass the event-capture gate", () => {
+  const gate = app.slice(
+    app.indexOf("function liveEventCaptureGate"),
+    app.indexOf("function trackedTimeService"),
+  );
+  assert.match(gate, /if \(!hasTrackedPlayingTime\(game\)\)/);
+  assert.match(gate, /required: false,[\s\S]*allowed: true/);
+});
+
+test("Game Review event creation remains outside the live-capture gate", () => {
+  const reviewAdd = app.slice(
+    app.indexOf('if (form.dataset.form === "event-add")'),
+    app.indexOf('if (form.dataset.form === "event-edit")'),
+  );
+  assert.match(reviewAdd, /createGameEventOperation/);
+  assert.doesNotMatch(reviewAdd, /liveEventCaptureGate/);
 });
 
 test("configured game starts paused and off field", () => {
