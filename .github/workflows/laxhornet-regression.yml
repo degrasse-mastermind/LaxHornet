@@ -40,6 +40,28 @@ jobs:
           python --version
           git --version
 
+      - name: Resolve release-control refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          database_candidate="$(jq -r '.databaseCandidate' release/laxhornet-release-manifest.json)"
+          pre_cutover_runtime="$(jq -r '.preCutoverRuntime' release/laxhornet-release-manifest.json)"
+          cleanup_candidate="$(jq -r '.cleanupCandidate' release/laxhornet-release-manifest.json)"
+          additive_paths="supabase/migrations/20260723040000_event_pipeline_capabilities.sql,supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql"
+
+          if git merge-base --is-ancestor "$database_candidate" HEAD \
+            && git merge-base --is-ancestor "$cleanup_candidate" HEAD; then
+            release_base="$(git merge-base "$database_candidate" "$pre_cutover_runtime")"
+            echo "LAXHORNET_AUTHORIZED_DB_REF=$database_candidate" >> "$GITHUB_ENV"
+            echo "LAXHORNET_APPROVED_ADDITIVE_REF=$cleanup_candidate" >> "$GITHUB_ENV"
+          else
+            release_base="7cf58df9a43ce235fc6068bd4c50549e05906de4"
+          fi
+
+          echo "LAXHORNET_RELEASE_BASE_REF=$release_base" >> "$GITHUB_ENV"
+          echo "LAXHORNET_ALLOWED_ADDITIVE_DB_PATHS=$additive_paths" >> "$GITHUB_ENV"
+          echo "Release base: $release_base"
+
       - name: Check root JavaScript syntax
         shell: bash
         run: |
@@ -59,7 +81,7 @@ jobs:
         run: node tools/test_update_release.mjs
 
       - name: Release manifest validation
-        run: node tools/validate_release_manifest.mjs
+        run: node tools/validate_release_manifest.mjs --require-combined --combined-ref=HEAD
 
       - name: Release hygiene
         run: node tools/test_release_hygiene.mjs
