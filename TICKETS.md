@@ -205,7 +205,7 @@ Add the private, local-first data foundation for authoritative game-clock state 
 - `node tools/test_tracked_playing_time_service.mjs`: 16/16 passed.
 - `node tools/test_tracked_playing_time_foundation.mjs`: static migration/privacy/containment contracts added.
 - `node tools/run_v283_local_regression.mjs`: 26/26 groups passed locally.
-- GitHub Actions is required to be green before merge.
+- GitHub Actions run `30258266639` passed every named regression step on draft PR #24.
 
 #### Risks and rollback
 

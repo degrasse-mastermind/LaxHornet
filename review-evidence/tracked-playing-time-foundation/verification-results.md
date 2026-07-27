@@ -16,6 +16,7 @@ All database checks used the local Supabase stack only. No project link, product
 | pgTAP after reapply | PASS; 37/37 |
 | New unindexed foreign-key advisor findings | PASS; none after adding covering indexes |
 | Broad portable regression: `node tools/run_v283_local_regression.mjs` | PASS; 26/26 groups |
+| GitHub Actions `LaxHornet Regression`, run `30258266639` | PASS; every named pull-request step |
 
 ## Lint and advisors
 
@@ -25,4 +26,4 @@ Security advisors report informational `rls_enabled_no_policy` entries for the n
 
 ## Portable checks
 
-The branch adds the focused service and static foundation tests to both `tools/run_v283_local_regression.mjs` and the pull-request workflow. The complete local runner passed 26/26 groups; `regression-output.txt` contains the command-level output. GitHub Actions remains a separate remote result and must be green before merge.
+The branch adds the focused service and static foundation tests to both `tools/run_v283_local_regression.mjs` and the pull-request workflow. The complete local runner passed 26/26 groups; `regression-output.txt` contains the command-level output. GitHub Actions run `30258266639` also passed every named step on draft PR #24.
