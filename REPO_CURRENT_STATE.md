@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-07-27  
 Baseline branch: `main`  
-Baseline commit: `962b8ee3246f3c85c48b66203aec1fea669774da`  
+Baseline commit: `3bfc84c56fbb7e3579f7d4222fff02393fec78fe`  
 Current release marker: `v283`
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
@@ -65,6 +65,8 @@ The release manifest records:
 
 Do not rewrite, reorder, squash, rename, or silently regenerate these migration files. Any new migration must be additive, timestamped, reviewed, tested locally, and reflected in release-control documentation.
 
+The verified Windows local migration workflow is documented in `docs/LOCAL_SUPABASE_WORKFLOW.md`. It uses Docker Desktop, the Supabase CLI, explicit local-only commands, and a reduced stack where Storage-related services are excluded. It must not be replaced with linked or production-mutating commands.
+
 ## Deployment and release control
 
 - Static deployment uses GitHub Pages from the `main` branch repository root.
@@ -106,6 +108,21 @@ node tools/run_v283_local_regression.mjs
 
 That runner covers JavaScript syntax, event-operation contracts, game-scope capabilities, update/release checks, release-manifest validation, containment and hygiene, minimum disclosure, secure disclosure, Product Alignment, Trust Spine contracts, SQL acceptance/rollback tests, deletion permissions, cleanup, secret scanning, and `git diff --check`.
 
+### GitHub Actions regression
+
+`.github/workflows/laxhornet-regression.yml` provides the durable read-only CI layer.
+
+- Runs automatically for pull requests and manually through `workflow_dispatch`.
+- Uses `ubuntu-latest`, Node.js 22, and Python 3.12.
+- Uses Node-24-compatible official actions: `actions/checkout@v5`, `actions/setup-node@v6`, and `actions/setup-python@v6`.
+- Uses `contents: read` permissions and no repository or environment secrets.
+- Resolves release-control refs from the committed release manifest and repository ancestry.
+- Runs existing JavaScript, release, disclosure, Trust Spine, Python permission/cleanup, secret-scan, and diff-hygiene checks as individually named steps.
+- Installs pinned `@electric-sql/pglite@0.5.4` temporarily only for embedded-database tests, without committing package metadata or enabling dependency caching.
+- Does not deploy, publish, merge, start Docker, invoke the Supabase CLI, create Supabase branches, contact production services, or mutate remote state.
+
+A green GitHub Actions result complements but does not replace browser, mobile-device, visual, game-day, or local Supabase migration testing.
+
 ## Current engineering constraints
 
 - Preserve the vanilla static PWA unless an approved architecture decision changes it.
@@ -124,6 +141,7 @@ That runner covers JavaScript syntax, event-operation contracts, game-scope capa
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
 - Coordinated version and service-worker release hygiene.
+- Maintenance of GitHub Action majors and portability of the CI-selected regression checks.
 
 ## Update protocol
 
