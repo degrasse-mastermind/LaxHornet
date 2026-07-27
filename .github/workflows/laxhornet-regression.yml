@@ -40,9 +40,6 @@ jobs:
           python --version
           git --version
 
-      - name: Install embedded database test dependency
-        run: npm install --no-save --no-package-lock --ignore-scripts @electric-sql/pglite@0.5.4
-
       - name: Check root JavaScript syntax
         shell: bash
         run: |
@@ -64,11 +61,14 @@ jobs:
       - name: Release manifest validation
         run: node tools/validate_release_manifest.mjs
 
-      - name: Phase-aware release containment
-        run: node tools/test_release_containment_phase_aware.mjs
-
       - name: Release hygiene
         run: node tools/test_release_hygiene.mjs
+
+      - name: Install embedded database test dependency
+        run: npm install --no-save --no-package-lock --ignore-scripts @electric-sql/pglite@0.5.4
+
+      - name: Phase-aware release containment
+        run: node tools/test_release_containment_phase_aware.mjs
 
       - name: Minimum disclosure contracts
         run: node tools/test_minimum_disclosure.mjs
