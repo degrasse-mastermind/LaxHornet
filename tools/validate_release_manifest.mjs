@@ -29,6 +29,13 @@ const gitBuffer = (...args) => execFileSync("git", args, { cwd: root });
 const gitFile = (ref, file) => git("show", `${ref}:${file}`);
 const gitFileSha256 = (ref, file) =>
   createHash("sha256").update(gitBuffer("show", `${ref}:${file}`)).digest("hex");
+const reviewedTextSha256 = (bytes) => {
+  const canonicalCrLf = bytes
+    .toString("utf8")
+    .replace(/\r\n/g, "\n")
+    .replace(/\n/g, "\r\n");
+  return createHash("sha256").update(Buffer.from(canonicalCrLf, "utf8")).digest("hex");
+};
 const existsAt = (ref, file) => {
   try {
     git("cat-file", "-e", `${ref}:${file}`);
@@ -52,8 +59,8 @@ for (const [name, ref] of [
 }
 
 expect(
-  manifest.finalMainBaseSha === "2b773bce9eb858870c06b95b35051c34fbbad8bc",
-  "finalMainBaseSha must identify the reviewed v283 main base",
+  manifest.finalMainBaseSha === "fc9c079d69757cfc2667dea7e1dfcc56524dce56",
+  "finalMainBaseSha must identify the reviewed v284 main base",
 );
 expect(
   manifest.databaseTreeMode === "canonical_plus_additive_with_provenance",
@@ -93,7 +100,7 @@ for (const file of TRACKED_PLAYING_TIME_REVIEW_DB_PATHS) {
   const absolute = path.join(root, file);
   expect(fs.existsSync(absolute), `tracked playing time review file is missing: ${file}`);
   if (fs.existsSync(absolute)) {
-    const localHash = createHash("sha256").update(fs.readFileSync(absolute)).digest("hex");
+    const localHash = reviewedTextSha256(fs.readFileSync(absolute));
     expect(
       trackedTimeReview?.sha256?.[file] === localHash,
       `tracked playing time review SHA-256 is stale: ${file}`,

@@ -43,7 +43,7 @@ const GAME_SCOPE_TYPES = Object.freeze({
 const PUBLIC_LIVE_SHARE_POLL_MS = 4000;
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v283";
+const APP_VERSION = "v284";
 window.LAXHORNET_DISCLOSURE_STATUS = Object.freeze({
   appVersion: APP_VERSION,
   ready: SECURE_DISCLOSURE_RUNTIME_READY,
@@ -8542,7 +8542,7 @@ function operationalHealthSnapshot() {
     exportAuditReady: Boolean(TRUSTED_DISCLOSURE_FEATURES.exportAuditRpc && capabilities?.exportAudit),
     anonymousTables: "Denied by release contract",
     legacyCompatibility: "Present",
-    manifestRelease: "v283",
+    manifestRelease: "v284",
   };
 }
 

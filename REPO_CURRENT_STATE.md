@@ -1,9 +1,10 @@
 # LaxHornet Repository Current State
 
 Last reviewed: 2026-07-27  
-Baseline branch: `main`  
-Baseline commit: `2deb8c8df92a612d233f9dad58765e0a22bee618`
-Current release marker: `v283`
+Baseline branch: `release/v284-tracked-playing-time`
+Baseline commit: `fc9c079d69757cfc2667dea7e1dfcc56524dce56`
+Current repository release marker: `v284`
+Current production marker: `v283` pending the coordinated v284 database-first cutover
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
 
@@ -37,7 +38,8 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
 - `localStorage` remains the immediate source for offline game tracking and user-facing continuity.
 - Supabase synchronization is optional and must not block core game-day tracking.
 - Runtime includes local delete markers and event-operation capabilities.
-- `main` contains the reviewed Tracked Playing Time foundation from merged PR #24. PR #25 adds the opt-in Phase 1 UI and remains undeployed while its integration review is open.
+- `main` contains the reviewed Tracked Playing Time foundation from merged PR #24 and the opt-in Phase 1 UI from merged PR #25.
+- The v284 release branch changes only coordinated version/cache surfaces, release controls, tests, and documentation before the separately gated production migration and frontend deployment.
 - Any synchronization change must preserve offline operation, reconnection behavior, deduplication, authorization boundaries, and existing saved data.
 
 ## Supabase backend
@@ -62,7 +64,7 @@ The release manifest records:
 - A historical production schema snapshot and provenance marker.
 - Canonical forward migrations for the legacy baseline, Trust Spine Release 1, minimum-necessary disclosure, and disclosure/evidence fixes.
 - An additive event-pipeline capability migration.
-- A separately contained, review-only Tracked Playing Time package with one forward migration, one rollback reference, and one pgTAP contract file. It is not listed as production-applied or pending for the v283 cutover.
+- A separately contained Tracked Playing Time package with one forward migration, one rollback reference, and one pgTAP contract file. Its reviewed Windows/CRLF identities are recorded in the v284 manifest; it remains marked unapplied until the production cutover is verified.
 - Required ordering, rollback references, approved file identities, and pending-production expectations.
 
 Do not rewrite, reorder, squash, rename, or silently regenerate these migration files. Any new migration must be additive, timestamped, reviewed, tested locally, and reflected in release-control documentation.
@@ -74,7 +76,7 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
 - Static deployment uses GitHub Pages from the `main` branch repository root.
 - Custom domain: `laxhornet.mybranford.com`.
 - Release coordination includes `version.json`, service-worker/cache markers, script query versions, and `release/laxhornet-release-manifest.json`.
-- Current release marker is `v283`.
+- Current repository release marker is `v284`; production remains v283 until the database-first release gates pass.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 
@@ -113,6 +115,15 @@ node tools/run_v283_local_regression.mjs
 
 That runner covers JavaScript syntax, event-operation contracts, tracked-playing-time service and static foundation contracts, game-scope capabilities, update/release checks, release-manifest validation, containment and hygiene, minimum disclosure, secure disclosure, Product Alignment, Trust Spine contracts, SQL acceptance/rollback tests, deletion permissions, cleanup, secret scanning, and `git diff --check`.
 
+Release preparation starts with the reusable preflight and uses one fail-fast local command:
+
+```powershell
+node tools/run_release_preflight.mjs --check --release v284
+node tools/run_release_verification.mjs v284
+```
+
+`docs/RELEASE_VERIFICATION_WORKFLOW.md` records the exact modes, pinned disposable dependencies, cleanup behavior, resume rules, and production prohibition. The release command starts and stops only the documented local Supabase stack, preserves external failure logs, and does not contact production.
+
 ### GitHub Actions regression
 
 `.github/workflows/laxhornet-regression.yml` provides the durable read-only CI layer.
@@ -137,7 +148,7 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Preserve youth-data privacy and use synthetic data in tests.
 - Keep MethodNorth and LaxHornet connected but not combined.
 - Do not alter production defaults, activate staged backend capabilities, deploy migrations, or release from an ordinary feature ticket.
-- On `feature/tracked-playing-time-ui`, Tracked Playing Time is an explicit per-game opt-in with persisted clock controls, Player In/Out boundaries, deterministic shift derivation, safe recovery, governed corrections, and a private Game Review summary. New live performance events in opted-in games are accepted only while the tracked clock is running and the selected player is on field; the central event logger enforces the rule before prompts, score changes, event operations, synchronization, or confirmation changes. Non-tracked and historical-game behavior remains unchanged. Its database objects remain reachable only through authenticated, scope-checked RPCs; public Live Share, recap, and scoped CSV contracts exclude clock and participation history. If a review browser reaches a backend without those RPCs, the client treats the tracked-time `PGRST202` response as a backend-availability limitation, keeps device-local tracking active, and does not mislabel otherwise valid shift evidence as needing review.
+- In the v284 release candidate, Tracked Playing Time is an explicit per-game opt-in with persisted clock controls, Player In/Out boundaries, deterministic shift derivation, safe recovery, governed corrections, and a private Game Review summary. New live performance events in opted-in games are accepted only while the tracked clock is running and the selected player is on field; the central event logger enforces the rule before prompts, score changes, event operations, synchronization, or confirmation changes. Non-tracked and historical-game behavior remains unchanged. Its database objects remain reachable only through authenticated, scope-checked RPCs; public Live Share, recap, and scoped CSV contracts exclude clock and participation history. If a browser reaches a backend without those RPCs, the client treats the tracked-time `PGRST202` response as a backend-availability limitation, keeps device-local tracking active, and does not mislabel otherwise valid shift evidence as needing review.
 
 ## Known areas requiring continued care
 
@@ -146,7 +157,7 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Live Share and export disclosure boundaries.
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
-- Tracked Playing Time still requires PR #25 review, coordinated release/version approval, production migration verification, and signed-in production smoke validation.
+- Tracked Playing Time still requires the coordinated v284 release PR, production migration verification, signed-in production smoke validation, and final evidence closure.
 - Coordinated version and service-worker release hygiene.
 - Maintenance of GitHub Action majors and portability of the CI-selected regression checks.
 

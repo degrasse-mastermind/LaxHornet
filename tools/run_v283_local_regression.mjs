@@ -14,6 +14,7 @@ const evidenceFile =
     "regression-output.txt",
   );
 const python = process.env.LAXHORNET_PYTHON || "python";
+const failFast = process.argv.includes("--fail-fast");
 const manifest = JSON.parse(
   readFileSync(path.join(root, "release", "laxhornet-release-manifest.json"), "utf8"),
 );
@@ -49,7 +50,7 @@ const tests = [
   { name: "tracked playing time manual scenarios", command: process.execPath, args: ["tools/test_tracked_playing_time_manual_scenarios.mjs"] },
   { name: "tracked playing time browser", command: process.execPath, args: ["tools/test_tracked_playing_time_ui_browser.cjs"] },
   { name: "game scope and capability contracts", command: process.execPath, args: ["tools/test_game_scope_capabilities.mjs"] },
-  { name: "v283 update release", command: process.execPath, args: ["tools/test_update_release.mjs"] },
+  { name: "v284 update release", command: process.execPath, args: ["tools/test_update_release.mjs"] },
   {
     name: "release manifest validation",
     command: process.execPath,
@@ -81,6 +82,8 @@ const tests = [
 
 const log = [];
 let failed = 0;
+let completed = 0;
+let firstFailed = "";
 
 for (const test of tests) {
   let localServer;
@@ -109,7 +112,11 @@ for (const test of tests) {
     },
   });
   const exitCode = Number.isInteger(result.status) ? result.status : 1;
-  if (exitCode !== 0) failed += 1;
+  completed += 1;
+  if (exitCode !== 0) {
+    failed += 1;
+    firstFailed ||= test.name;
+  }
   if (localServer && !localServer.killed) localServer.kill();
   log.push(
     `===== ${test.name} =====`,
@@ -118,14 +125,16 @@ for (const test of tests) {
     `EXIT: ${exitCode}`,
     "",
   );
+  if (failFast && exitCode !== 0) break;
 }
 
 log.push(
   `MODE: ${combinedMode ? "canonical_plus_additive" : "stacked_additive"}`,
-  `TOTAL: ${tests.length - failed} passed, ${failed} failed`,
+  `TOTAL: ${completed - failed} passed, ${failed} failed${completed < tests.length ? `, ${tests.length - completed} not run` : ""}`,
+  ...(firstFailed ? [`FIRST_FAILED: ${firstFailed}`] : []),
   "",
 );
 writeFileSync(evidenceFile, log.join("\n"));
-console.log(log.at(-2));
+console.log(log.findLast((line) => line.startsWith("TOTAL:")));
 
 if (failed) process.exitCode = 1;

@@ -1,6 +1,6 @@
 {
-  "release": "v283",
-  "finalMainBaseSha": "2b773bce9eb858870c06b95b35051c34fbbad8bc",
+  "release": "v284",
+  "finalMainBaseSha": "fc9c079d69757cfc2667dea7e1dfcc56524dce56",
   "databaseCandidate": "ad96e428d675fba8fac7752fd108ea06827fa0ad",
   "preCutoverRuntime": "f4ead54b44fcb5710fe4ed3eed39ab5f1694def4",
   "activationCandidate": "7cf58df9a43ce235fc6068bd4c50549e05906de4",
@@ -18,9 +18,9 @@
       "productionApplied": false,
       "productionAuthorizationRequired": true,
       "sha256": {
-        "supabase/migrations/20260727000000_tracked_playing_time_operations.sql": "623be1072d4ebfe579177a4001f535e245c05a22dcdb302e05c6ae70382cbffa",
-        "supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql": "43871a66c8d41902e455f68a495977150c4d4f4620e29e22c7f1cb807916bf3d",
-        "supabase/tests/tracked_playing_time_foundation.sql": "4a1371d3f02b24397b8199e82a96156a511615ebab64e4f7f11edfc7cf541147"
+        "supabase/migrations/20260727000000_tracked_playing_time_operations.sql": "e0f28f527992c4083635ce4e23c6be880c787c3c16c95a11198eabc70e243cb9",
+        "supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql": "f949d0d934bd3ccafdde6ebbb779b5522941f382363b0f528901366996b13ee3",
+        "supabase/tests/tracked_playing_time_foundation.sql": "69c83141be962d4339730bdce1cc0a0a11f32e432c85132626b2ea2b6bd7a65d"
       }
     }
   ],
