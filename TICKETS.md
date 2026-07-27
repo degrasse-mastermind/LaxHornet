@@ -269,11 +269,11 @@ Provide a complete, private, local-first Phase 1 experience for tracking one sel
 
 #### Completion record
 
-Commit/PR: draft UI PR pending final commit and push; foundation draft PR #24.
+Commit/PR: implementation commit `8c1c9d3`; draft pull request #25 stacked on foundation draft PR #24.
 Files changed: `app.html`, `app.js`, `styles.css`, `service-worker.js`, `tracked-playing-time-service.js`, focused tests, review evidence, `TICKETS.md`, and `REPO_CURRENT_STATE.md`.
 Evidence: `review-evidence/tracked-playing-time-ui/`
 `REPO_CURRENT_STATE.md` updated: `YES`
-Remaining work: product review, GitHub Actions confirmation, signed-in device validation against an approved non-production backend, foundation approval, and separately authorized release/version coordination.
+Remaining work: product review, GitHub Actions confirmation, signed-in device validation against an approved non-production backend, foundation approval, and separately authorized release/version coordination. Do not merge or deploy from this ticket.
 
 ## Ticket template
 
