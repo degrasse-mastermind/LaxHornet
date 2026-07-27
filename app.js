@@ -593,6 +593,7 @@ let sharedGamePollTimer = null;
 let trustSpineSyncInFlight = null;
 let gameEventOperationService = null;
 let trackedPlayingTimeService = null;
+let trackedPlayingTimeCloudAvailability = "unknown";
 let backendCapabilityState = {
   value: null,
   checkedAt: 0,
@@ -2713,7 +2714,12 @@ function trackedTimeService() {
   if (typeof factory !== "function") throw new Error("Tracked playing time service is unavailable");
   trackedPlayingTimeService = factory({
     persistLocal: persistAll,
-    canUseCloud: () => Boolean(supabaseClient && currentUserId() && !state.isOffline),
+    canUseCloud: () => Boolean(
+      supabaseClient
+      && currentUserId()
+      && !state.isOffline
+      && trackedPlayingTimeCloudAvailability !== "unavailable"
+    ),
     sendClock: async (payload) => {
       const game = state.activeGame?.id === payload.game_id
         ? state.activeGame
@@ -2725,6 +2731,7 @@ function trackedTimeService() {
         { p_clock: payload },
       );
       if (error || data?.outcome !== "accepted") throw error || new Error(data?.code || "Clock synchronization rejected");
+      trackedPlayingTimeCloudAvailability = "available";
       const local = trackedTimeState(game);
       if (local) local.syncIssue = "";
       return data;
@@ -2740,6 +2747,7 @@ function trackedTimeService() {
         { p_operations: operations },
       );
       if (error || data?.outcome !== "accepted") throw error || new Error(data?.code || "Participation synchronization rejected");
+      trackedPlayingTimeCloudAvailability = "available";
       const local = trackedTimeState(game);
       if (local) local.syncIssue = "";
       return data;
@@ -2750,17 +2758,34 @@ function trackedTimeService() {
         { p_game_id: gameId },
       );
       if (error) throw error;
+      trackedPlayingTimeCloudAvailability = "available";
       return data;
     },
-    reportError: (error) => {
-      const game = state.activeGame || currentReviewGame();
-      const local = trackedTimeState(game);
-      if (local) local.syncIssue = String(error?.message || "Playing time synchronization needs attention.");
-      reportSyncError(error);
-      persistAll();
-    },
+    reportError: reportTrackedPlayingTimeSyncError,
   });
   return trackedPlayingTimeService;
+}
+
+function reportTrackedPlayingTimeSyncError(error) {
+  const game = state.activeGame || currentReviewGame();
+  const local = trackedTimeState(game);
+  if (isTrackedPlayingTimeRpcUnavailable(error)) {
+    const firstDetection = trackedPlayingTimeCloudAvailability !== "unavailable";
+    trackedPlayingTimeCloudAvailability = "unavailable";
+    if (local) local.syncIssue = "";
+    state.syncStatus = "Playing time saved on this phone";
+    persistAll();
+    if (firstDetection) {
+      console.info("Tracked playing time account sync is unavailable; continuing with device-only tracking.");
+      showToast("Playing time is saved on this phone");
+    } else {
+      render();
+    }
+    return;
+  }
+  if (local) local.syncIssue = String(error?.message || "Playing time synchronization needs attention.");
+  reportSyncError(error);
+  persistAll();
 }
 
 function initializeTrackedTimeForGame(game) {
@@ -4431,6 +4456,12 @@ function isTeamSetupError(error = {}) {
 function isMissingRpcError(error = {}) {
   const text = supabaseErrorText(error);
   return /could not find the function|schema cache|PGRST202|function .* does not exist/i.test(text);
+}
+
+function isTrackedPlayingTimeRpcUnavailable(error = {}) {
+  const text = supabaseErrorText(error);
+  return isMissingRpcError(error)
+    && /\blh_(?:initialize_game_clock|update_game_clock|reconcile_game_clock|read_game_clock|create_participation_operation|correct_participation_operation|tombstone_participation_operation|list_effective_participation|reconcile_participation_operations)\b/i.test(text);
 }
 
 function isPermissionError(error = {}) {
@@ -9189,7 +9220,11 @@ function renderTrackedPlayingTimeLive(game) {
           aria-label="${summary.onField ? "Record Player Out" : "Record Player In"}"
         >${summary.onField ? "PLAYER OUT" : "PLAYER IN"}</button>
       </div>
-      <p class="field-help">Clock and participation save on this device immediately. Playing time stays out of Live Share.</p>
+      <p class="field-help">${
+        trackedPlayingTimeCloudAvailability === "unavailable"
+          ? "Playing time is saved on this device. Account sync is not available in this review build."
+          : "Clock and participation save on this device immediately. Playing time stays out of Live Share."
+      }</p>
     </section>
   `;
 }

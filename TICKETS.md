@@ -251,11 +251,11 @@ Provide a complete, private, local-first Phase 1 experience for tracking one sel
 
 #### Verification
 
-- `node tools/test_tracked_playing_time_ui.mjs`: 36/36 passed.
+- `node tools/test_tracked_playing_time_ui.mjs`: 39/39 passed.
 - `node tools/test_tracked_playing_time_service.mjs`: 16/16 passed.
 - `node tools/test_tracked_playing_time_foundation.mjs`: 11/11 passed.
 - `node tools/test_tracked_playing_time_manual_scenarios.mjs`: 7/7 passed.
-- `node tools/test_tracked_playing_time_ui_browser.cjs`: 14/14 rendered checks passed with no console errors.
+- `node tools/test_tracked_playing_time_ui_browser.cjs`: 18/18 rendered checks passed with no console errors.
 - `supabase db reset --local`: passed with the tracked-time migration applied.
 - `supabase test db supabase/tests/tracked_playing_time_foundation.sql`: 37/37 passed.
 - `node tools/run_v283_local_regression.mjs`: 29/29 groups passed.
@@ -265,6 +265,7 @@ Provide a complete, private, local-first Phase 1 experience for tracking one sel
 #### Risks and rollback
 
 - The foundation is still an unapplied draft, so production cloud synchronization is intentionally unavailable pending separate approval and deployment; local tracking remains usable.
+- A review browser that reaches a backend without the tracked-time RPCs now fails soft to device-only tracking for that session; the backend limitation is not presented as corrupt or ambiguous playing-time evidence.
 - Running-clock recovery gaps longer than 30 seconds freeze and require review rather than inventing time.
 - Feature rollback is the removal of the additive UI/service wiring before release. Accepted database history remains governed by the foundation's fail-closed rollback.
 

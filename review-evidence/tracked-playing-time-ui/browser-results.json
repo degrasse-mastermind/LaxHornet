@@ -14,11 +14,23 @@
     },
     {
       "passed": true,
+      "message": "missing tracked-time RPC falls back to device-only tracking without marking shift evidence for review"
+    },
+    {
+      "passed": true,
+      "message": "transient network errors do not disable tracked-time account sync"
+    },
+    {
+      "passed": true,
+      "message": "repeated missing-RPC reports produce one bounded console notice"
+    },
+    {
+      "passed": true,
       "message": "Player In changes to unmistakable on-field state"
     },
     {
       "passed": true,
-      "message": "active shift timer follows running game clock"
+      "message": "active shift timer follows running game clock (observed Playing 0:02)"
     },
     {
       "passed": true,
@@ -27,6 +39,10 @@
     {
       "passed": true,
       "message": "offline pending participation operation survives refresh"
+    },
+    {
+      "passed": true,
+      "message": "fresh page session re-enables tracked-time capability detection"
     },
     {
       "passed": true,

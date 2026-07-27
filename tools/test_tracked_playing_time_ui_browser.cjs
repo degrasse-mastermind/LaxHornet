@@ -10,6 +10,7 @@ const port = Number(process.env.LAXHORNET_TRACKED_TIME_PORT || 5263);
 const baseUrl = `http://127.0.0.1:${port}`;
 const results = [];
 const consoleErrors = [];
+const trackedTimeFallbackNotices = [];
 
 fs.mkdirSync(screenshotRoot, { recursive: true });
 
@@ -71,6 +72,12 @@ async function screenshot(page, name, fullPage = true) {
   page.setDefaultTimeout(7000);
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
+    if (
+      message.type() === "info"
+      && message.text().includes("Tracked playing time account sync is unavailable")
+    ) {
+      trackedTimeFallbackNotices.push(message.text());
+    }
   });
   page.on("pageerror", (error) => consoleErrors.push(error.message));
 
@@ -107,6 +114,50 @@ async function screenshot(page, name, fullPage = true) {
     await page.locator(".tracked-time-live").scrollIntoViewIfNeeded();
     await screenshot(page, "02-mobile-player-in-state.png", false);
 
+    console.log("STEP missing backend foundation");
+    const missingFoundation = await page.evaluate(() => {
+      reportTrackedPlayingTimeSyncError({
+        code: "PGRST202",
+        message: "Could not find the function public.lh_reconcile_participation_operations(p_operations) in the schema cache",
+      });
+      reportTrackedPlayingTimeSyncError({
+        code: "PGRST202",
+        message: "Could not find the function public.lh_reconcile_participation_operations(p_operations) in the schema cache",
+      });
+      state.toast = "";
+      render();
+      const local = trackedTimeState(state.activeGame);
+      return {
+        cloudAvailability: trackedPlayingTimeCloudAvailability,
+        transientNetworkClassifiedAsMissing: isTrackedPlayingTimeRpcUnavailable({
+          code: "503",
+          message: "Network request failed",
+        }),
+        syncIssue: local.syncIssue,
+        status: trackedTimeSummary(state.activeGame).status,
+        bodyText: document.body.innerText,
+      };
+    });
+    check(
+      missingFoundation.cloudAvailability === "unavailable"
+        && missingFoundation.syncIssue === ""
+        && missingFoundation.status === "complete"
+        && missingFoundation.bodyText.includes("Account sync is not available in this review build."),
+      "missing tracked-time RPC falls back to device-only tracking without marking shift evidence for review",
+    );
+    check(
+      missingFoundation.transientNetworkClassifiedAsMissing === false,
+      "transient network errors do not disable tracked-time account sync",
+    );
+    check(
+      trackedTimeFallbackNotices.length === 1,
+      "repeated missing-RPC reports produce one bounded console notice",
+    );
+    await page.locator(".tracked-time-live .field-help").evaluate((element) => {
+      element.scrollIntoView({ block: "center" });
+    });
+    await screenshot(page, "02b-mobile-device-only-fallback.png", false);
+
     console.log("STEP live clock");
     await page.evaluate(() => {
       state.isOffline = true;
@@ -114,10 +165,14 @@ async function screenshot(page, name, fullPage = true) {
     });
     await page.getByRole("button", { name: "Record Player In" }).click();
     await page.getByRole("button", { name: "Start", exact: true }).click();
-    await page.waitForTimeout(1250);
+    await page.waitForTimeout(2250);
     bodyText = await page.locator("body").innerText();
+    const activeShiftText = await page.locator("[data-active-shift]").innerText();
     check(bodyText.includes("ON FIELD") && bodyText.includes("PLAYER OUT"), "Player In changes to unmistakable on-field state");
-    check(/Playing 0:0[1-2]/.test(bodyText), "active shift timer follows running game clock");
+    check(
+      /^Playing 0:0[1-3]$/.test(activeShiftText),
+      `active shift timer follows running game clock (observed ${activeShiftText})`,
+    );
     await page.locator(".tracked-time-live").scrollIntoViewIfNeeded();
     await screenshot(page, "03-mobile-running-player-out-state.png", false);
 
@@ -145,6 +200,7 @@ async function screenshot(page, name, fullPage = true) {
         pending: local.participationOperations[0]?.syncState,
         gameId: state.activeGame.id,
         onField: value.onField,
+        cloudAvailability: trackedPlayingTimeCloudAvailability,
       };
     });
     check(
@@ -154,6 +210,10 @@ async function screenshot(page, name, fullPage = true) {
       "running refresh restores one continuous active shift without duplicate Player In",
     );
     check(afterRefresh.pending === "pending", "offline pending participation operation survives refresh");
+    check(
+      afterRefresh.cloudAvailability === "unknown",
+      "fresh page session re-enables tracked-time capability detection",
+    );
 
     await page.getByRole("button", { name: "Pause", exact: true }).click();
     const pausedText = await page.locator("[data-active-shift]").innerText();

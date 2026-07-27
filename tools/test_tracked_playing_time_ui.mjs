@@ -77,6 +77,26 @@ test("existing game path does not invent tracked-time configuration", () => {
   assert.match(app, /Playing time was not tracked for this game\./);
 });
 
+test("missing tracked-time RPCs switch the session to device-only tracking", () => {
+  assert.match(app, /trackedPlayingTimeCloudAvailability !== "unavailable"/);
+  assert.match(app, /function isTrackedPlayingTimeRpcUnavailable\(error = \{\}\)/);
+  assert.match(app, /trackedPlayingTimeCloudAvailability = "unavailable"/);
+});
+
+test("unavailable tracked-time cloud sync does not create a data-quality issue", () => {
+  const handler = app.slice(
+    app.indexOf("function reportTrackedPlayingTimeSyncError"),
+    app.indexOf("function initializeTrackedTimeForGame"),
+  );
+  assert.match(handler, /if \(local\) local\.syncIssue = ""/);
+  assert.match(handler, /state\.syncStatus = "Playing time saved on this phone"/);
+  assert.match(handler, /return;[\s\S]*if \(local\) local\.syncIssue/);
+});
+
+test("live tracking explains the review-build account-sync fallback", () => {
+  assert.match(app, /Account sync is not available in this review build\./);
+});
+
 test("configured game starts paused and off field", () => {
   assert.equal(clock.isRunning, false);
   assert.equal(summary([]).onField, false);
@@ -262,7 +282,7 @@ test("tracked-time RPCs are not granted to anonymous users", () => {
 });
 
 test("selected CSV remains event-only", () => {
-  const csvBuilder = app.slice(app.indexOf("function buildCSV"), app.indexOf("function buildFullBackup"));
+  const csvBuilder = app.slice(app.indexOf("function buildCSV"), app.indexOf("function downloadFile"));
   assert.match(csvBuilder, /normalizedGame\.events/);
   assert.doesNotMatch(csvBuilder, /trackedPlayingTime|participationOperations/);
 });
