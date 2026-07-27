@@ -216,7 +216,7 @@ Add the private, local-first data foundation for authoritative game-clock state 
 
 #### Completion record
 
-Commit/PR: draft pull request to be recorded after publication.
+Commit/PR: implementation commits `e2477d0` and `025aaf3`; draft pull request #24.
 Evidence: `review-evidence/tracked-playing-time-foundation/`
 `REPO_CURRENT_STATE.md` updated: `YES`
 Remaining work: reviewer approval, green CI, signed-in browser/device validation during the later UI ticket, and separately authorized production migration/deployment.
