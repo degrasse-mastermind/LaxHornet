@@ -10068,6 +10068,34 @@ function buildPostGamePatterns(events = [], totals = {}, player = state.player, 
   ]);
 }
 
+function recentNextFocusKeys(game = {}, player = state.player, limit = 3) {
+  const engine = window.LaxHornetNextFocus;
+  if (!engine?.recommendNextFocus) return [];
+  return visibleGamesForPlayer(player)
+    .filter((item) => item.id !== game.id)
+    .sort((left, right) => {
+      const leftTime = Date.parse(left.endedAt || left.savedAt || left.date || left.createdAt || "") || 0;
+      const rightTime = Date.parse(right.endedAt || right.savedAt || right.date || right.createdAt || "") || 0;
+      return rightTime - leftTime || String(right.id || "").localeCompare(String(left.id || ""));
+    })
+    .slice(0, limit)
+    .map((item) => engine.recommendNextFocus(item.events || [], {
+      player: gamePlayerSnapshot(item),
+      deletedEventIds: state.deletedEventIds,
+    }).focusKey)
+    .filter(Boolean);
+}
+
+function differentiatedNextFocus(game = {}, events = [], player = state.player) {
+  const engine = window.LaxHornetNextFocus;
+  if (!engine?.recommendNextFocus) return null;
+  return engine.recommendNextFocus(events, {
+    player,
+    deletedEventIds: state.deletedEventIds,
+    recentFocusKeys: recentNextFocusKeys(game, player),
+  });
+}
+
 function playExplanationForKey(key, player = state.player) {
   const name = playerFirstName(player);
   const explanations = {
@@ -10140,7 +10168,8 @@ function buildPostGameIntelligence(game = {}, events = [], playerContext = state
   const possessionQuality = possessionQualitySequence(normalizedEvents);
   const primary = patterns[0] || detectLowDataPattern(normalizedEvents, computedTotals, player);
   const nextPattern = patterns.find((pattern) => pattern.focus?.tryThisNextGame) || primary;
-  const nextFocus = {
+  const differentiatedFocus = differentiatedNextFocus(game, normalizedEvents, player);
+  const nextFocus = differentiatedFocus || {
     focusTitle: nextPattern.focus?.focusTitle || "Track one simple pattern",
     whyThisFits: nextPattern.focus?.whyThisFits || "The tracked game has a clear next development step.",
     tryThisNextGame: nextPattern.focus?.tryThisNextGame || "Pick one area to watch, such as ground balls, clears, or smart decisions.",
@@ -10148,18 +10177,14 @@ function buildPostGameIntelligence(game = {}, events = [], playerContext = state
     category: nextPattern.focus?.category || nextPattern.category || "development",
     evidence: (nextPattern.evidence || primary.evidence || []).filter(Boolean).slice(0, 3),
   };
-  const hasEnoughEvidence = Number(computedTotals.eventCount || normalizedEvents.length || 0) >= 3;
+  const hasEnoughEvidence = differentiatedFocus
+    ? !differentiatedFocus.profile.lowEvidence
+    : Number(computedTotals.eventCount || normalizedEvents.length || 0) >= 3;
   const teamWinGrowthPattern = hasEnoughEvidence
     ? buildTeamWinGrowthPattern(game, normalizedEvents, computedTotals, player, nextFocus)
     : null;
   const primaryPattern = teamWinGrowthPattern || primary;
-  const activeNextFocus = teamWinGrowthPattern?.focus
-    ? {
-        ...nextFocus,
-        ...teamWinGrowthPattern.focus,
-        evidence: teamWinGrowthPattern.evidence?.filter(Boolean).slice(0, 3) || nextFocus.evidence,
-      }
-    : nextFocus;
+  const activeNextFocus = nextFocus;
   const insightPatterns = teamWinGrowthPattern
     ? [
         teamWinGrowthPattern,
@@ -10468,7 +10493,9 @@ function developmentTakeawayForTotals(totals = {}, player = state.player, topCon
 function renderDevelopmentTakeaway(totals = {}, player = state.player, topContribution = "", game = null, intelligence = null) {
   const reviewIntelligence = intelligence || (game ? buildPostGameIntelligence(game, game.events || [], player, totals, calculateSeasonTotalsForPlayer(player)) : null);
   const takeaway = reviewIntelligence?.developmentTakeaway || developmentTakeawayForTotals(totals, player, topContribution, game);
-  const hasEnoughEvidence = Number(totals.eventCount || game?.events?.length || 0) >= 3;
+  const hasEnoughEvidence = reviewIntelligence
+    ? Boolean(reviewIntelligence.developmentTakeaway)
+    : Number(totals.eventCount || game?.events?.length || 0) >= 3;
   const recorded = familyRecapStatLine(totals, player) || `${Number(totals.eventCount || 0)} recorded event${Number(totals.eventCount || 0) === 1 ? "" : "s"}`;
   const interpretation = hasEnoughEvidence && takeaway
     ? `Based on the recorded events, ${takeaway.whatWentWell || takeaway.wentWell} ${takeaway.whyItMattered || takeaway.why}`
@@ -10492,6 +10519,9 @@ function renderDevelopmentTakeaway(totals = {}, player = state.player, topContri
         <p><span>Recorded</span>${escapeHTML(recorded)}</p>
         <p><span>What this may suggest</span>${escapeHTML(interpretation)}</p>
         <p><span>Possible next focus</span>${escapeHTML(possibleFocus)}</p>
+        ${hasEnoughEvidence && reviewIntelligence?.nextFocusRecommendation?.whyThisFits
+          ? `<p><span>Why this appeared</span>${escapeHTML(reviewIntelligence.nextFocusRecommendation.whyThisFits)}</p>`
+          : ""}
       </div>
       ${hasEnoughEvidence ? focusTools : ""}
     </section>
@@ -11942,6 +11972,7 @@ function renderDemoPage() {
   const seasonTotals = calculateSeasonTotalsFromGames([game]);
   const headlineMetrics = dashboardHeadlineMetrics(seasonTotals, DEMO_PLAYER).slice(0, 6);
   const demoTopContribution = topContributionForTotals(totals).label;
+  const demoIntelligence = buildPostGameIntelligence(game, game.events, DEMO_PLAYER, totals, seasonTotals);
   return renderShell(`
     <section class="screen-title">
       <h2>Demo Game</h2>
@@ -11995,7 +12026,7 @@ function renderDemoPage() {
         <div class="event-list">${game.events.slice(-5).reverse().map(renderEventRow).join("")}</div>
       </section>
 
-      ${renderDevelopmentTakeaway(totals, DEMO_PLAYER, demoTopContribution)}
+      ${renderDevelopmentTakeaway(totals, DEMO_PLAYER, demoTopContribution, null, demoIntelligence)}
       ${renderWhyThesePlaysMatter(game.events, {
         title: "Why these demo plays matter",
         helper: "Sample explanations that help parents connect plays to development.",
