@@ -26,7 +26,7 @@ Use Codex with the local repository folder for:
 - Reviewing diffs and debugging failures.
 - Updating the repository documentation required by the ticket.
 
-Codex may edit the working tree, but it must not deploy, merge, or mutate the production database without explicit authorization.
+Codex may edit the working tree, but it must not deploy, merge, invoke write-capable connector actions, or mutate a remote database without explicit ticket authorization.
 
 ### Git and GitHub: durable change control
 
@@ -47,7 +47,21 @@ Use Supabase for:
 - Narrow RPCs and Realtime behavior.
 - Edge Functions for server-side operations that cannot safely run in the browser.
 
-Do not create a custom MCP server merely to let Codex inspect Supabase. Use Supabase's hosted MCP server, project-scoped and read-only for the current production-connected project.
+Repository work must use committed SQL, local tests, and explicit release procedures as the source of truth. Do not rely on a connector session as the record of a database change.
+
+## Host-managed Apps and Plugins
+
+Codex may expose connectors through a host-managed runtime such as `codex_apps`. These apps can include GitHub, Google Drive, Notion, Supabase, Vercel, Figma, Canva, Resend, and other services.
+
+These connectors are not configured or permissioned by this repository. Their availability and action permissions come from the signed-in ChatGPT account, workspace settings, installed plugins/apps, OAuth grants, and the current Codex surface.
+
+For LaxHornet:
+
+- Treat every host-managed connector as out of scope unless the active ticket explicitly authorizes it.
+- Do not infer that a connector is read-only merely because the repository says remote writes are prohibited.
+- Do not use Supabase, Vercel, Resend, GitHub write actions, or other mutation-capable connectors during ordinary feature work.
+- A ticket that authorizes a connector must name the service, target project or repository, allowed actions, prohibited actions, verification, and rollback.
+- Connector availability is optional. Ordinary LaxHornet coding must remain possible using the local repository and Git alone.
 
 ## First-time local activation
 
@@ -66,37 +80,7 @@ Open the ChatGPT desktop app, select **Codex**, and open:
 C:\Users\user\Documents\LaxHornet
 ```
 
-Trust the project when prompted. Project-scoped `.codex/config.toml` and its MCP settings are ignored until the project is trusted.
-
-The repository already contains the tailored `AGENTS.md`; do not run `/init`, because `/init` would only generate a generic `AGENTS.md` scaffold.
-
-## Authenticate the Supabase MCP connection
-
-Preferred desktop route:
-
-1. In Codex, open **Settings > MCP servers**.
-2. Locate `supabase` from the project configuration.
-3. Select **Authenticate** and complete the Supabase OAuth flow.
-4. Restart Codex if prompted.
-5. Type `/mcp` and confirm that `supabase` is connected.
-
-CLI route from the repository directory:
-
-```powershell
-codex mcp login supabase
-codex mcp list
-```
-
-The committed MCP configuration:
-
-- Is scoped to project `ulbmjcvnyznvmjgpstno`.
-- Uses `read_only=true`.
-- Enables only documentation, database inspection, and debugging groups.
-- Exposes only an explicit inspection-tool allowlist.
-- Denies `apply_migration`.
-- Prompts before each MCP tool call.
-
-Do not broaden these permissions for the live project. A future write-capable MCP connection should point only to a separate development project or database branch containing synthetic data.
+Trust the project when prompted. The repository already contains the tailored `AGENTS.md`; do not run `/init`, because `/init` would only generate a generic scaffold.
 
 ## Confirm the active Codex configuration
 
@@ -117,11 +101,9 @@ The project defaults are:
 - Local sandbox: `workspace-write`.
 - Approval policy: `on-request`.
 
-The repository intentionally does not set a fixed `model` value. ChatGPT-authenticated Codex model availability can differ by plan, staged rollout, client version, and workspace controls. A hard-pinned model can prevent Codex from starting even when another capable model is available.
+The repository intentionally does not set a fixed `model` value. ChatGPT-authenticated Codex model availability can differ by plan, staged rollout, client version, and workspace controls. Use `/model` to inspect and select from the options actually offered to the signed-in account. Use `/reasoning` to verify or adjust reasoning level.
 
-Use `/model` to inspect and select from the models actually offered to the signed-in account. Use `/reasoning` to verify or adjust the reasoning level. Do not type an invented combined identifier such as `/model GPT5.high`.
-
-GPT-5.6 requires a sufficiently current Codex client and may still be unavailable during staged rollout. When it is offered in `/model`, it can be selected there without changing repository files.
+The `/mcp` view may report host-managed apps through `codex_apps`. That is informational; it does not make those connectors part of an approved LaxHornet ticket.
 
 To verify that repository instructions loaded, ask Codex:
 
@@ -165,10 +147,10 @@ Implement only [TICKET ID] from TICKETS.md.
 
 First read AGENTS.md, REPO_CURRENT_STATE.md, TICKETS.md, and inspect the actual relevant code. Then provide a brief implementation plan naming the expected files, risks, and tests.
 
-Stay strictly within the ticket's scope and acceptance criteria. Preserve the vanilla static PWA, offline-first behavior, authorization boundaries, disclosure rules, Supabase migration provenance, and release controls. Do not deploy, apply remote migrations, change production configuration, or merge to main.
+Stay strictly within the ticket's scope and acceptance criteria. Preserve the vanilla static PWA, offline-first behavior, authorization boundaries, disclosure rules, Supabase migration provenance, and release controls. Do not invoke host-managed connector actions, deploy, apply remote migrations, change production configuration, or merge to main unless the ticket explicitly authorizes that exact action.
 ```
 
-Review the plan before implementation when it proposes data changes, authorization changes, a new dependency, a broad refactor, or release-marker changes.
+Review the plan before implementation when it proposes data changes, authorization changes, a new dependency, a broad refactor, connector use, or release-marker changes.
 
 ### 5. Implement and test locally
 
@@ -203,7 +185,7 @@ git diff
 git diff --check
 ```
 
-Reject unrelated cleanup, invented architecture, unexplained dependencies, untested behavior changes, production secrets, or broad database access.
+Reject unrelated cleanup, invented architecture, unexplained dependencies, untested behavior changes, production secrets, broad database access, or undeclared connector usage.
 
 ### 7. Commit and push intentionally
 
@@ -225,19 +207,19 @@ Before the ticket is considered complete:
 
 ## Database-change workflow
 
-A database ticket must produce a reviewed timestamped migration in `supabase/migrations/`. It must not edit historical migration identity or apply changes through the live-project MCP connection.
+A database ticket must produce a reviewed timestamped migration in `supabase/migrations/`. It must not edit historical migration identity or apply changes through an ordinary connector session.
 
 Until the separate local/development Supabase workflow is established:
 
-- Codex may inspect committed SQL and read-only metadata.
+- Codex may inspect committed SQL.
 - Codex may draft a new migration file on a feature branch.
 - Codex may run repository-contained local SQL tests that do not contact production.
-- Codex may not run `supabase db push`, repair remote migration history, deploy an Edge Function, or apply a migration remotely.
+- Codex may not use a Supabase app/connector to push, repair remote history, deploy an Edge Function, apply a migration, create a branch, or change remote data.
 
 Production database activation requires its own release ticket, reviewed migration sequence, verification evidence, rollback/recovery plan, and explicit authorization.
 
 ## Recommended next setup tickets
 
 1. `LH-DEV-002`: verify the existing migration sequence against a local Supabase stack without touching the linked project.
-2. `LH-DEV-003`: establish a separate non-production Supabase target with synthetic data for write-capable development tooling.
+2. `LH-DEV-003`: establish a separate non-production Supabase target with synthetic data for authorized backend testing.
 3. `LH-DEV-004`: add pull-request regression checks in GitHub Actions without changing deployment behavior.
