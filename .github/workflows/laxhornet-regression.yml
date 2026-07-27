@@ -81,6 +81,12 @@ jobs:
       - name: Tracked playing time foundation contracts
         run: node tools/test_tracked_playing_time_foundation.mjs
 
+      - name: Tracked playing time UI contracts
+        run: node tools/test_tracked_playing_time_ui.mjs
+
+      - name: Tracked playing time manual scenarios
+        run: node tools/test_tracked_playing_time_manual_scenarios.mjs
+
       - name: Game scope capability contracts
         run: node tools/test_game_scope_capabilities.mjs
 

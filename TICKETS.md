@@ -173,7 +173,7 @@ Add a pull-request and manual-dispatch GitHub Actions workflow that runs the rep
 
 ### LH-21 — Tracked Playing Time private data foundation
 
-Status: `REVIEW`
+Status: `DONE`
 Branch: `feature/tracked-playing-time-foundation`
 Related design document: `docs/TRACKED_PLAYING_TIME_FOUNDATION.md`
 
@@ -212,14 +212,72 @@ Add the private, local-first data foundation for authoritative game-clock state 
 - Participation history may include child-associated game/player identifiers and is private by default.
 - Clock recovery can be marked `estimated` or `needs_review`; uncertain elapsed time is not silently invented.
 - The rollback refuses to destroy accepted participation history. Review/export and an explicit disposal decision are required before destructive rollback.
-- Future UI integration must preserve immediate local persistence and must not expose tracked time through public Live Share, recap, or default CSV.
+- UI integration must preserve immediate local persistence and must not expose tracked time through public Live Share, recap, or default CSV.
 
 #### Completion record
 
-Commit/PR: implementation commits `e2477d0` and `025aaf3`; draft pull request #24.
+Commit/PR: implementation commits `e2477d0` and `025aaf3`; pull request #24 merged as `2deb8c8df92a612d233f9dad58765e0a22bee618`.
 Evidence: `review-evidence/tracked-playing-time-foundation/`
 `REPO_CURRENT_STATE.md` updated: `YES`
-Remaining work: reviewer approval, green CI, signed-in browser/device validation during the later UI ticket, and separately authorized production migration/deployment.
+Remaining work: coordinated production migration and release verification under the separately authorized release procedure.
+
+### LH-22 — Tracked Playing Time Phase 1 user experience
+
+Status: `READY FOR PRODUCT REVIEW`
+Branch: `feature/tracked-playing-time-ui`
+Base: `main` at foundation merge `2deb8c8df92a612d233f9dad58765e0a22bee618`
+Related design document: `docs/TRACKED_PLAYING_TIME_FOUNDATION.md`
+
+#### Goal
+
+Provide a complete, private, local-first Phase 1 experience for tracking one selected player's on-field time during a game, recovering it safely, correcting it through append-only operations, and reviewing deterministic shift totals after the game.
+
+#### Completed scope
+
+- Added a conservative per-game opt-in with quarter/half format defaults, editable regulation duration, and optional overtime duration.
+- Loaded and offline-cached the foundation companion service without changing the v283 release marker or cache name.
+- Added persisted Start, Pause, Resume, End Period, Player In, and Player Out controls with a live active-shift timer.
+- Added system period-end and game-end closures, next-period off-field behavior, bounded refresh recovery, offline persistence, and idempotent retry.
+- Added pure deterministic shift derivation with duplicate, overlap, ordering, period, recovery, and synchronization review states.
+- Added Total, Game share, Shifts, Average, Longest, completeness status, and compact shift history to Game Review.
+- Added governed correction revisions, manual missed shifts, tombstone removal, unmatched-boundary resolution, and invalid-edit rejection.
+- Gated every new live performance event, including notes and indirect calls, behind `clock_running && player_on_field` for tracked-time games.
+- Kept event controls visible with accessible disabled states and exact contextual instructions for each blocked clock/participation combination.
+- Preserved non-tracked and historical event behavior, Game Review corrections/tombstones, Game Impact, Possible Next Focus, public Live Share, public/family recaps, and selected CSV.
+
+#### Out of scope
+
+- No performance-rate, fatigue, shift-event, season-trend, position-by-shift, team substitution, coach comparison, or AI analysis.
+- No production migration, deployment, merge, release marker, cache-name, script-query-version, or release-manifest change.
+- No change to public disclosure allowlists or event behavior outside opted-in tracked-time live capture.
+
+#### Verification
+
+- `node tools/test_tracked_playing_time_ui.mjs`: 44/44 passed.
+- `node tools/test_tracked_playing_time_service.mjs`: 16/16 passed.
+- `node tools/test_tracked_playing_time_foundation.mjs`: 11/11 passed.
+- `node tools/test_tracked_playing_time_manual_scenarios.mjs`: 7/7 passed.
+- `node tools/test_tracked_playing_time_ui_browser.cjs`: 33/33 rendered checks passed with no console errors.
+- `supabase db reset --local`: passed with the tracked-time migration applied.
+- `supabase test db supabase/tests/tracked_playing_time_foundation.sql`: 37/37 passed.
+- `node tools/run_v283_local_regression.mjs`: 29/29 groups passed.
+- Secret/host scan and `git diff --check`: passed within the full regression.
+- GitHub Actions portable regression is required on the final PR head; the post-push result is recorded on PR #25.
+
+#### Risks and rollback
+
+- The foundation is merged but still unapplied in production, so hosted tracked-time synchronization remains unavailable pending the coordinated migration; local tracking remains usable.
+- A review browser that reaches a backend without the tracked-time RPCs fails soft to device-only tracking for that session; the local event gate remains authoritative and is unaffected by hosted capability availability.
+- Running-clock recovery gaps longer than 30 seconds freeze and require review rather than inventing time.
+- Feature rollback is the removal of the additive UI/service wiring before release. Accepted database history remains governed by the foundation's fail-closed rollback.
+
+#### Completion record
+
+Commit/PR: implementation commits through `0ca2a00`; draft pull request #25 retargeted to `main` after foundation PR #24 merged.
+Files changed: `app.html`, `app.js`, `styles.css`, `service-worker.js`, `tracked-playing-time-service.js`, `.github/workflows/laxhornet-regression.yml`, focused tests, review evidence, `TICKETS.md`, and `REPO_CURRENT_STATE.md`.
+Evidence: `review-evidence/tracked-playing-time-ui/`
+`REPO_CURRENT_STATE.md` updated: `YES`
+Remaining work: final integration review and the separately authorized coordinated v284 migration, deployment, and production verification.
 
 ## Ticket template
 

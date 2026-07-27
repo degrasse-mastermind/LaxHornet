@@ -1,0 +1,137 @@
+{
+  "results": [
+    {
+      "passed": true,
+      "message": "setup shows conservative opt-in"
+    },
+    {
+      "passed": true,
+      "message": "tracked-time duration fields activate"
+    },
+    {
+      "passed": true,
+      "message": "new tracked game starts visibly off field"
+    },
+    {
+      "passed": true,
+      "message": "missing tracked-time RPC falls back to device-only tracking without marking shift evidence for review"
+    },
+    {
+      "passed": true,
+      "message": "transient network errors do not disable tracked-time account sync"
+    },
+    {
+      "passed": true,
+      "message": "repeated missing-RPC reports produce one bounded console notice"
+    },
+    {
+      "passed": true,
+      "message": "stopped and off-field tracked game disables every visible performance-event control"
+    },
+    {
+      "passed": true,
+      "message": "stopped and off-field tracked game shows the exact combined instruction"
+    },
+    {
+      "passed": true,
+      "message": "score, Save, End Game, clock, and Player In controls remain enabled while events are gated"
+    },
+    {
+      "passed": true,
+      "message": "central guard blocks goal and note creation before prompts, score, event, operation, or confirmation side effects"
+    },
+    {
+      "passed": true,
+      "message": "manual score control remains usable while performance events are gated"
+    },
+    {
+      "passed": true,
+      "message": "stopped and on-field tracked game blocks Assist with the exact clock instruction"
+    },
+    {
+      "passed": true,
+      "message": "Player In changes to unmistakable on-field state"
+    },
+    {
+      "passed": true,
+      "message": "active shift timer follows running game clock (observed Playing 0:01)"
+    },
+    {
+      "passed": true,
+      "message": "running and on-field tracked game enables event controls without a warning"
+    },
+    {
+      "passed": true,
+      "message": "running and on-field event creates one event, score increment, event operation, and confirmation"
+    },
+    {
+      "passed": true,
+      "message": "Undo remains enabled after a valid performance event"
+    },
+    {
+      "passed": true,
+      "message": "Undo remains usable and rolls back the valid event and automatic score increment"
+    },
+    {
+      "passed": true,
+      "message": "running refresh restores one continuous active shift without duplicate Player In"
+    },
+    {
+      "passed": true,
+      "message": "offline pending participation operation survives refresh"
+    },
+    {
+      "passed": true,
+      "message": "fresh page session re-enables tracked-time capability detection"
+    },
+    {
+      "passed": true,
+      "message": "refresh restores the running and on-field enabled gate state"
+    },
+    {
+      "passed": true,
+      "message": "paused clock freezes active shift display"
+    },
+    {
+      "passed": true,
+      "message": "pausing mid-shift immediately blocks event creation without ending the active shift"
+    },
+    {
+      "passed": true,
+      "message": "clock resume re-enables events because the player remains on field"
+    },
+    {
+      "passed": true,
+      "message": "running and off-field tracked game blocks Ground Ball and Caused Turnover with the exact Player In instruction"
+    },
+    {
+      "passed": true,
+      "message": "period end closes the shift, opens the next period off field, and restores the combined event gate"
+    },
+    {
+      "passed": true,
+      "message": "Game Review identifies system-closed shifts"
+    },
+    {
+      "passed": true,
+      "message": "valid live and system boundaries produce Complete"
+    },
+    {
+      "passed": true,
+      "message": "correction recalculates and marks Estimated"
+    },
+    {
+      "passed": true,
+      "message": "older game renders the no-data message"
+    },
+    {
+      "passed": true,
+      "message": "non-tracked live games preserve immediate performance-event logging without clock or participation state"
+    },
+    {
+      "passed": true,
+      "message": "browser console has no errors"
+    }
+  ],
+  "consoleErrors": []
+}

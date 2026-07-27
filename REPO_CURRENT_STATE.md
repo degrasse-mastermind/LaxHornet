@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-07-27  
 Baseline branch: `main`  
-Baseline commit: `2a0435817d7302b1041542d0ef0f54c9697e8bc0`
+Baseline commit: `2deb8c8df92a612d233f9dad58765e0a22bee618`
 Current release marker: `v283`
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
@@ -37,7 +37,7 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
 - `localStorage` remains the immediate source for offline game tracking and user-facing continuity.
 - Supabase synchronization is optional and must not block core game-day tracking.
 - Runtime includes local delete markers and event-operation capabilities.
-- The review-only Tracked Playing Time foundation adds a companion local-first clock and participation-operation service. It is not loaded by the current UI and does not change existing game tracking.
+- `main` contains the reviewed Tracked Playing Time foundation from merged PR #24. PR #25 adds the opt-in Phase 1 UI and remains undeployed while its integration review is open.
 - Any synchronization change must preserve offline operation, reconnection behavior, deduplication, authorization boundaries, and existing saved data.
 
 ## Supabase backend
@@ -137,7 +137,7 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Preserve youth-data privacy and use synthetic data in tests.
 - Keep MethodNorth and LaxHornet connected but not combined.
 - Do not alter production defaults, activate staged backend capabilities, deploy migrations, or release from an ordinary feature ticket.
-- Tracked Playing Time remains a private data foundation only: its database objects are reachable through authenticated, scope-checked RPCs; the companion service is not yet wired into `app.html`; and public Live Share, recap, and scoped CSV contracts exclude clock and participation history.
+- On `feature/tracked-playing-time-ui`, Tracked Playing Time is an explicit per-game opt-in with persisted clock controls, Player In/Out boundaries, deterministic shift derivation, safe recovery, governed corrections, and a private Game Review summary. New live performance events in opted-in games are accepted only while the tracked clock is running and the selected player is on field; the central event logger enforces the rule before prompts, score changes, event operations, synchronization, or confirmation changes. Non-tracked and historical-game behavior remains unchanged. Its database objects remain reachable only through authenticated, scope-checked RPCs; public Live Share, recap, and scoped CSV contracts exclude clock and participation history. If a review browser reaches a backend without those RPCs, the client treats the tracked-time `PGRST202` response as a backend-availability limitation, keeps device-local tracking active, and does not mislabel otherwise valid shift evidence as needing review.
 
 ## Known areas requiring continued care
 
@@ -146,7 +146,7 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Live Share and export disclosure boundaries.
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
-- UI integration, in-game controls, and game-review presentation for Tracked Playing Time remain future work after this foundation is reviewed.
+- Tracked Playing Time still requires PR #25 review, coordinated release/version approval, production migration verification, and signed-in production smoke validation.
 - Coordinated version and service-worker release hygiene.
 - Maintenance of GitHub Action majors and portability of the CI-selected regression checks.
 

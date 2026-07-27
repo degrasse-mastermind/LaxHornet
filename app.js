@@ -592,6 +592,8 @@ let sharedGameChannel = null;
 let sharedGamePollTimer = null;
 let trustSpineSyncInFlight = null;
 let gameEventOperationService = null;
+let trackedPlayingTimeService = null;
+let trackedPlayingTimeCloudAvailability = "unknown";
 let backendCapabilityState = {
   value: null,
   checkedAt: 0,
@@ -670,6 +672,9 @@ const state = {
   gameSavedSummaryId: "",
   liveSharePromptGameId: "",
   pendingTeamAccessReview: null,
+  trackedTimeEditorMode: "",
+  trackedTimeEditingShiftId: "",
+  trackedTimeFormError: "",
 };
 
 mergeRosterPlayersIntoPlayers();
@@ -682,6 +687,7 @@ state.nextGameFocus = activeNextGameFocusForPlayer(state.player);
 state.games = state.games.map((game) => normalizeGame(game, state.player));
 state.activeGame = state.activeGame ? normalizeGame(state.activeGame, state.player) : null;
 state.trackingSession = normalizeTrackingSession(state.trackingSession, state.activeGame);
+recoverTrackedClockOnLoad(state.activeGame);
 mergePlayersFromGames([state.activeGame, ...state.games].filter(Boolean));
 persistAll();
 
@@ -2588,7 +2594,7 @@ function makeGame(formData) {
   const teamId = player.teamId || "";
   const rosterPlayerId = player.rosterPlayerId || (teamId ? player.id : "");
   const scopeType = teamId && rosterPlayerId ? GAME_SCOPE_TYPES.TEAM_ROSTER : GAME_SCOPE_TYPES.PERSONAL;
-  return {
+  const game = {
     id: uid("game"),
     scopeType,
     playerId: player.id,
@@ -2615,6 +2621,352 @@ function makeGame(formData) {
     savedAt: null,
     endedAt: null,
   };
+  if (formData.get("trackPlayingTime") === "on") {
+    const regulationMinutes = Number(formData.get("regulationPeriodMinutes"));
+    const overtimeMinutes = Number(formData.get("overtimeMinutes"));
+    const clockState = window.LaxHornetTrackedPlayingTime.createClockState({
+      gameId: game.id,
+      playerId: game.playerId,
+      teamId: game.teamId,
+      rosterPlayerId: game.rosterPlayerId,
+      scopeType: game.scopeType,
+      periodFormat,
+      currentPeriod: currentQuarter,
+      regulationPeriodDurationSeconds: Math.round(regulationMinutes * 60),
+      overtimeDurationSeconds: Number.isFinite(overtimeMinutes) && overtimeMinutes > 0
+        ? Math.round(overtimeMinutes * 60)
+        : null,
+    });
+    game.trackedPlayingTime = {
+      version: 1,
+      enabled: true,
+      clockState,
+      participationOperations: [],
+      remoteEffectiveParticipation: [],
+      syncIssue: "",
+    };
+  }
+  return game;
+}
+
+function hasTrackedPlayingTime(game) {
+  return Boolean(
+    game?.trackedPlayingTime?.version === 1
+    && game.trackedPlayingTime.enabled === true
+    && game.trackedPlayingTime.clockState,
+  );
+}
+
+function trackedTimeState(game) {
+  if (!hasTrackedPlayingTime(game)) return null;
+  return window.LaxHornetTrackedPlayingTime.trackedPlayingTimeState(game);
+}
+
+function recoverTrackedClockOnLoad(game) {
+  const local = trackedTimeState(game);
+  if (!local?.clockState) return;
+  const recovery = window.LaxHornetTrackedPlayingTime.classifyClockRecovery(
+    local.clockState,
+    Date.now(),
+    { maximumCertainGapSeconds: 30 },
+  );
+  if (!recovery.clockState) {
+    local.syncIssue = "The saved clock could not be recovered.";
+    return;
+  }
+  local.clockState = recovery.clockState;
+  if (recovery.status === "needs_review") {
+    local.recoveryIssue = "The app was away too long to prove the running clock position.";
+  }
+}
+
+function projectedTrackedClock(game, now = Date.now()) {
+  const local = trackedTimeState(game);
+  if (!local?.clockState) return null;
+  return window.LaxHornetTrackedPlayingTime.projectClock(local.clockState, now);
+}
+
+function trackedTimeSummary(game, now = Date.now()) {
+  const local = trackedTimeState(game);
+  if (!local) return null;
+  const clockState = projectedTrackedClock(game, now);
+  const syncIssue = local.syncIssue || local.recoveryIssue || "";
+  return window.LaxHornetTrackedPlayingTime.derivePlayingTimeSummary({
+    operations: local.participationOperations,
+    clockState,
+    syncIssue,
+  });
+}
+
+function formatPlayingTime(seconds = 0) {
+  const safeSeconds = Math.max(0, Math.round(Number(seconds) || 0));
+  const minutes = Math.floor(safeSeconds / 60);
+  return `${minutes}:${String(safeSeconds % 60).padStart(2, "0")}`;
+}
+
+function trackedTimeStatusLabel(status = "") {
+  return status === "needs_review" ? "Needs review" : status === "estimated" ? "Estimated" : "Complete";
+}
+
+function liveEventCaptureGate(game, now = Date.now()) {
+  if (!hasTrackedPlayingTime(game)) {
+    return {
+      required: false,
+      allowed: true,
+      code: "not_tracked",
+      message: "",
+      clockRunning: false,
+      playerOnField: false,
+    };
+  }
+  const clockRunning = projectedTrackedClock(game, now)?.isRunning === true;
+  const playerOnField = trackedTimeSummary(game, now)?.onField === true;
+  if (clockRunning && playerOnField) {
+    return {
+      required: true,
+      allowed: true,
+      code: "ready",
+      message: "",
+      clockRunning,
+      playerOnField,
+    };
+  }
+  const message = !clockRunning && !playerOnField
+    ? "Start the clock and tap PLAYER IN to record events."
+    : !clockRunning
+      ? "Start or resume the game clock to record events."
+      : "Tap PLAYER IN to record events.";
+  return {
+    required: true,
+    allowed: false,
+    code: !clockRunning && !playerOnField
+      ? "clock_stopped_player_out"
+      : !clockRunning
+        ? "clock_stopped_player_in"
+        : "clock_running_player_out",
+    message,
+    clockRunning,
+    playerOnField,
+  };
+}
+
+function trackedTimeService() {
+  if (trackedPlayingTimeService) return trackedPlayingTimeService;
+  const factory = window.LaxHornetTrackedPlayingTime?.createTrackedPlayingTimeService;
+  if (typeof factory !== "function") throw new Error("Tracked playing time service is unavailable");
+  trackedPlayingTimeService = factory({
+    persistLocal: persistAll,
+    canUseCloud: () => Boolean(
+      supabaseClient
+      && currentUserId()
+      && !state.isOffline
+      && trackedPlayingTimeCloudAvailability !== "unavailable"
+    ),
+    sendClock: async (payload) => {
+      const game = state.activeGame?.id === payload.game_id
+        ? state.activeGame
+        : state.games.find((item) => item.id === payload.game_id);
+      if (game && !(await syncGameToSupabase(game))) return false;
+      const initialize = Object.prototype.hasOwnProperty.call(payload, "period_format");
+      const { data, error } = await supabaseClient.rpc(
+        initialize ? "lh_initialize_game_clock" : "lh_update_game_clock",
+        { p_clock: payload },
+      );
+      if (error || data?.outcome !== "accepted") throw error || new Error(data?.code || "Clock synchronization rejected");
+      trackedPlayingTimeCloudAvailability = "available";
+      const local = trackedTimeState(game);
+      if (local) local.syncIssue = "";
+      return data;
+    },
+    sendOperations: async (operations) => {
+      const gameId = operations[0]?.game_id || "";
+      const game = state.activeGame?.id === gameId
+        ? state.activeGame
+        : state.games.find((item) => item.id === gameId);
+      if (game && !(await syncGameToSupabase(game))) return false;
+      const { data, error } = await supabaseClient.rpc(
+        "lh_reconcile_participation_operations",
+        { p_operations: operations },
+      );
+      if (error || data?.outcome !== "accepted") throw error || new Error(data?.code || "Participation synchronization rejected");
+      trackedPlayingTimeCloudAvailability = "available";
+      const local = trackedTimeState(game);
+      if (local) local.syncIssue = "";
+      return data;
+    },
+    readEffectiveOperations: async (gameId) => {
+      const { data, error } = await supabaseClient.rpc(
+        "lh_list_effective_participation",
+        { p_game_id: gameId },
+      );
+      if (error) throw error;
+      trackedPlayingTimeCloudAvailability = "available";
+      return data;
+    },
+    reportError: reportTrackedPlayingTimeSyncError,
+  });
+  return trackedPlayingTimeService;
+}
+
+function reportTrackedPlayingTimeSyncError(error) {
+  const game = state.activeGame || currentReviewGame();
+  const local = trackedTimeState(game);
+  if (isTrackedPlayingTimeRpcUnavailable(error)) {
+    const firstDetection = trackedPlayingTimeCloudAvailability !== "unavailable";
+    trackedPlayingTimeCloudAvailability = "unavailable";
+    if (local) local.syncIssue = "";
+    state.syncStatus = "Playing time saved on this phone";
+    persistAll();
+    if (firstDetection) {
+      console.info("Tracked playing time account sync is unavailable; continuing with device-only tracking.");
+      showToast("Playing time is saved on this phone");
+    } else {
+      render();
+    }
+    return;
+  }
+  if (local) local.syncIssue = String(error?.message || "Playing time synchronization needs attention.");
+  reportSyncError(error);
+  persistAll();
+}
+
+function initializeTrackedTimeForGame(game) {
+  const local = trackedTimeState(game);
+  if (!local) return;
+  trackedTimeService().initializeClock({ game, clockState: local.clockState });
+}
+
+function updateTrackedClock(game, nextClock, baseRevision) {
+  const local = trackedTimeState(game);
+  if (!local) return;
+  local.recoveryIssue = "";
+  trackedTimeService().updateClock({ game, clockState: nextClock, baseRevision });
+  game.currentQuarter = nextClock.currentPeriod;
+  game.savedAt = new Date().toISOString();
+  persistAll();
+}
+
+function createParticipationOperation(game, operationKind, context = {}) {
+  const clock = context.clockState || projectedTrackedClock(game);
+  if (!clock) return null;
+  const operationId = uid("participation");
+  return {
+    operationId,
+    clientOperationId: uid("participation-client"),
+    logicalEventId: uid("participation-logical"),
+    targetOperationId: "",
+    gameId: game.id,
+    playerId: game.playerId,
+    operationKind,
+    period: context.period || clock.currentPeriod,
+    gameClockSeconds: context.gameClockSeconds ?? clock.clockSecondsRemaining,
+    occurredAt: context.occurredAt || new Date().toISOString(),
+    clientCreatedAt: new Date().toISOString(),
+    source: context.source || "live",
+    systemCloseReason: context.systemCloseReason || null,
+    recoveryUncertain: clock.recoveryState === "needs_review",
+    changeReason: context.changeReason || "",
+    revision: null,
+    syncState: "pending",
+  };
+}
+
+function appendTrackedParticipation(game, operation) {
+  if (!operation) return null;
+  return trackedTimeService().appendParticipationOperation({ game, operation });
+}
+
+function togglePlayerParticipation() {
+  const game = state.activeGame;
+  const summary = trackedTimeSummary(game);
+  if (!game || !summary) return;
+  const operationKind = summary.onField ? "player_out" : "player_in";
+  appendTrackedParticipation(game, createParticipationOperation(game, operationKind));
+  game.savedAt = new Date().toISOString();
+  persistAll();
+  render();
+  showToast(operationKind === "player_in" ? "Player is on field" : "Player is off field");
+}
+
+function changeTrackedClock(action) {
+  const game = state.activeGame;
+  const local = trackedTimeState(game);
+  if (!local) return;
+  const before = projectedTrackedClock(game);
+  let next = before;
+  if (action === "start") next = window.LaxHornetTrackedPlayingTime.startClock(before);
+  if (action === "pause") next = window.LaxHornetTrackedPlayingTime.pauseClock(before);
+  if (action === "resume") next = window.LaxHornetTrackedPlayingTime.resumeClock(before);
+  updateTrackedClock(game, next, local.clockState.revision);
+  render();
+}
+
+function nextTrackedPeriod(clock) {
+  const periods = window.LaxHornetTrackedPlayingTime.PERIODS[clock.periodFormat];
+  const currentIndex = periods.indexOf(clock.currentPeriod);
+  const next = periods[currentIndex + 1] || "";
+  if (next === "OT" && !clock.overtimeDurationSeconds) return "";
+  return next;
+}
+
+function endTrackedPeriod() {
+  const game = state.activeGame;
+  const local = trackedTimeState(game);
+  if (!local) return;
+  const projected = projectedTrackedClock(game);
+  const summary = trackedTimeSummary(game);
+  const endedClock = {
+    ...projected,
+    clockSecondsRemaining: 0,
+    isRunning: false,
+    pausedAt: new Date().toISOString(),
+    clientUpdatedAt: new Date().toISOString(),
+    revision: projected.revision + 1,
+  };
+  local.clockState = endedClock;
+  if (summary.onField) {
+    appendTrackedParticipation(game, createParticipationOperation(game, "player_out", {
+      clockState: endedClock,
+      gameClockSeconds: 0,
+      source: "system_period_end",
+      systemCloseReason: "period_end",
+    }));
+  }
+  const nextPeriod = nextTrackedPeriod(endedClock);
+  if (nextPeriod) {
+    const nextClock = window.LaxHornetTrackedPlayingTime.transitionPeriod(endedClock, nextPeriod);
+    updateTrackedClock(game, nextClock, projected.revision);
+  } else {
+    updateTrackedClock(game, endedClock, projected.revision);
+  }
+  render();
+  showToast(summary.onField
+    ? `Shift closed at 0:00${nextPeriod ? `; ${nextPeriod} ready` : ""}`
+    : nextPeriod ? `${nextPeriod} ready` : "Period ended");
+}
+
+function closeTrackedShiftForGameEnd(game) {
+  const local = trackedTimeState(game);
+  const summary = trackedTimeSummary(game);
+  if (!local || !summary?.onField) return false;
+  const baseRevision = local.clockState.revision;
+  const context = window.LaxHornetTrackedPlayingTime.gameEndClosureContext(local.clockState);
+  const closedClock = window.LaxHornetTrackedPlayingTime.persistClockPosition({
+    ...projectedTrackedClock(game),
+    isRunning: false,
+    pausedAt: context.occurredAt,
+    clientUpdatedAt: context.occurredAt,
+  }, context.occurredAt);
+  appendTrackedParticipation(game, createParticipationOperation(game, "player_out", {
+    clockState: closedClock,
+    period: context.period,
+    gameClockSeconds: context.gameClockSeconds,
+    occurredAt: context.occurredAt,
+    source: context.source,
+    systemCloseReason: context.systemCloseReason,
+  }));
+  updateTrackedClock(game, closedClock, baseRevision);
+  return true;
 }
 
 function calculateTotals(events = [], player = state.player) {
@@ -3113,18 +3465,24 @@ function logEvent(statKey) {
   if (!state.activeGame) {
     showToast("Start a game first");
     navigate("start");
-    return;
+    return null;
   }
   if (!canEditGame(state.activeGame)) {
     showToast("View-only team access");
-    return;
+    return null;
   }
 
   const stat = STAT_BY_KEY[statKey];
+  if (!stat) return null;
+  const captureGate = liveEventCaptureGate(state.activeGame);
+  if (!captureGate.allowed) {
+    showToast(captureGate.message);
+    return null;
+  }
   let note = "";
   if (statKey === "note") {
     note = window.prompt("Add a quick note")?.trim() || "";
-    if (!note) return;
+    if (!note) return null;
   }
 
   const operation = createGameEventOperation(state.activeGame, () => {
@@ -3164,6 +3522,7 @@ function logEvent(statKey) {
   const event = operation.event;
   render();
   showToast(`${stat.label} added · ${event.quarter} ${formatTime(event.timestamp)}`);
+  return event;
 }
 
 function undoLastEvent() {
@@ -3288,6 +3647,7 @@ function clearLiveTrackingTransientState(gameId = "") {
   state.tagEditingEventId = null;
   state.tagDraftTags = [];
   state.focusEditorContext = "";
+  clearTrackedShiftEditor();
   if (!gameId || state.gameSavedSummaryId === gameId) state.gameSavedSummaryId = "";
   if (!gameId || state.liveSharePromptGameId === gameId) state.liveSharePromptGameId = "";
 }
@@ -3385,6 +3745,7 @@ function confirmEndGame() {
     showToast("View-only team access");
     return;
   }
+  const trackedShiftClosed = closeTrackedShiftForGameEnd(state.activeGame);
   state.activeGame.status = "complete";
   state.activeGame.endedAt = new Date().toISOString();
   state.activeGame.savedAt = new Date().toISOString();
@@ -3403,7 +3764,9 @@ function confirmEndGame() {
   persistAll();
   reconcileGameEventOperations(completedGame);
   render();
-  showToast(`Game saved. Review ${possessiveName(playerFirstName(gamePlayerSnapshot(completedGame)))} impact.`);
+  showToast(trackedShiftClosed
+    ? "Active shift closed and game saved."
+    : `Game saved. Review ${possessiveName(playerFirstName(gamePlayerSnapshot(completedGame)))} impact.`);
 }
 
 function deleteGame(id) {
@@ -4142,6 +4505,12 @@ function isTeamSetupError(error = {}) {
 function isMissingRpcError(error = {}) {
   const text = supabaseErrorText(error);
   return /could not find the function|schema cache|PGRST202|function .* does not exist/i.test(text);
+}
+
+function isTrackedPlayingTimeRpcUnavailable(error = {}) {
+  const text = supabaseErrorText(error);
+  return isMissingRpcError(error)
+    && /\blh_(?:initialize_game_clock|update_game_clock|reconcile_game_clock|read_game_clock|create_participation_operation|correct_participation_operation|tombstone_participation_operation|list_effective_participation|reconcile_participation_operations)\b/i.test(text);
 }
 
 function isPermissionError(error = {}) {
@@ -8612,6 +8981,28 @@ function renderStartGame() {
             }
           </div>
         </div>
+        <section class="tracked-time-setup">
+          <label class="confirm-check tracked-time-choice">
+            <input id="trackPlayingTime" name="trackPlayingTime" type="checkbox" data-track-playing-time-toggle />
+            <span>
+              <strong>Track playing time for this game</strong>
+              <small>Optional and private. Starts with the player off field.</small>
+            </span>
+          </label>
+          <div class="tracked-time-duration-fields" data-track-playing-time-fields hidden>
+            <div class="form-grid two">
+              <div class="field">
+                <label for="regulationPeriodMinutes">Minutes per period</label>
+                <input id="regulationPeriodMinutes" name="regulationPeriodMinutes" type="number" min="1" max="90" step="1" value="12" required disabled />
+              </div>
+              <div class="field">
+                <label for="overtimeMinutes">Overtime minutes <span class="muted">(optional)</span></label>
+                <input id="overtimeMinutes" name="overtimeMinutes" type="number" min="1" max="30" step="1" placeholder="4" disabled />
+              </div>
+            </div>
+            <p class="field-help">The private game clock is stored on this device first. It is not added to Live Share or public recaps.</p>
+          </div>
+        </section>
         <button class="btn positive" type="submit" ${viewOnlyTeamPlayer ? "disabled" : ""}>Start Tracking</button>
       </section>
     </form>
@@ -8621,12 +9012,16 @@ function renderStartGame() {
 function renderStatButton(stat, options = {}) {
   const promoStep = Number.isFinite(options.promoStep) ? Number(options.promoStep) : null;
   const statAttr = options.interactive === false ? `data-promo-stat="${stat.key}"` : `data-stat="${stat.key}"`;
+  const captureBlocked = options.interactive !== false && options.captureGate?.allowed === false;
+  const captureAttrs = captureBlocked
+    ? ` disabled aria-disabled="true" aria-describedby="liveEventCaptureMessage"`
+    : "";
   const promoAttrs =
     promoStep === null
       ? ""
       : ` data-promo-step="${promoStep}" style="--promo-step: ${promoStep};"`;
   return `
-    <button class="stat-button ${stat.tone}${options.compact ? " compact" : ""}${promoStep === null ? "" : " promo-hit"}" type="button" ${statAttr}${promoAttrs}>
+    <button class="stat-button ${stat.tone}${options.compact ? " compact" : ""}${promoStep === null ? "" : " promo-hit"}" type="button" ${statAttr}${promoAttrs}${captureAttrs}>
       <span class="label">${stat.label}</span>
       <span class="points">${stat.points === 0 ? "note" : `${pointText(stat.points)} impact`}</span>
     </button>
@@ -8642,6 +9037,7 @@ function renderStatButtonsForKeys(keys = [], options = {}) {
       renderStatButton(stat, {
         compact: options.compact,
         interactive: options.interactive,
+        captureGate: options.captureGate,
         promoStep: Number.isFinite(stepByKey[stat.key]) ? stepByKey[stat.key] : null,
       }),
     )
@@ -8661,14 +9057,14 @@ function renderLiveStatGroups(options = {}) {
             <h3>Quick Plays</h3>
             <span>${escapeHTML((IMPACT_POSITION_WEIGHTS[liveTrackerPositionGroup(player)]?.label || "Default"))}</span>
           </div>
-          <div class="tracker-grid">${renderStatButtonsForKeys(defaultKeys)}</div>
+          <div class="tracker-grid">${renderStatButtonsForKeys(defaultKeys, { captureGate: options.captureGate })}</div>
         </div>
         <div class="stat-group more-plays ${state.morePlaysExpanded ? "expanded" : "collapsed"}">
           <button class="more-plays-toggle" type="button" data-action="toggle-more-plays" aria-expanded="${state.morePlaysExpanded}">
             <strong>More Plays</strong>
             <span>${state.morePlaysExpanded ? "Hide less-used stats" : "Show all other stats"}</span>
           </button>
-          ${state.morePlaysExpanded ? `<div class="tracker-grid">${renderStatButtonsForKeys(moreKeys, { compact: true })}</div>` : ""}
+          ${state.morePlaysExpanded ? `<div class="tracker-grid">${renderStatButtonsForKeys(moreKeys, { compact: true, captureGate: options.captureGate })}</div>` : ""}
         </div>
       </section>
     `;
@@ -8834,6 +9230,59 @@ function renderLiveScoreControl(game) {
   `;
 }
 
+function renderTrackedPlayingTimeLive(game) {
+  const local = trackedTimeState(game);
+  const summary = trackedTimeSummary(game);
+  const clock = projectedTrackedClock(game);
+  if (!local || !summary || !clock) return "";
+  const activeSeconds = summary.onField && summary.activeStart?.period === clock.currentPeriod
+    ? Math.max(0, summary.activeStart.gameClockSeconds - clock.clockSecondsRemaining)
+    : 0;
+  const clockAction = clock.clockSecondsRemaining === 0
+    ? ""
+    : clock.isRunning
+      ? `<button class="btn secondary tracked-clock-button" type="button" data-action="tracked-clock-pause">Pause</button>`
+      : `<button class="btn positive tracked-clock-button" type="button" data-action="${clock.startedAt ? "tracked-clock-resume" : "tracked-clock-start"}">${clock.startedAt ? "Resume" : "Start"}</button>`;
+  const nextPeriod = nextTrackedPeriod(clock);
+  return `
+    <section class="tracked-time-live card pad" aria-labelledby="trackedTimeLiveTitle">
+      <div class="tracked-clock-heading">
+        <div>
+          <span class="eyebrow" id="trackedTimeLiveTitle">Private playing time</span>
+          <strong class="tracked-clock-period">${escapeHTML(clock.currentPeriod)}</strong>
+        </div>
+        <div class="tracked-clock-readout">
+          <strong data-tracked-clock>${formatPlayingTime(clock.clockSecondsRemaining)}</strong>
+          <span data-tracked-clock-state>${clock.isRunning ? "Running" : "Paused"}</span>
+        </div>
+      </div>
+      <div class="tracked-clock-actions">
+        ${clockAction}
+        <button class="btn neutral tracked-clock-button" type="button" data-action="tracked-period-end">
+          End Period${nextPeriod ? ` &amp; Open ${escapeHTML(nextPeriod)}` : ""}
+        </button>
+      </div>
+      <div class="participation-state ${summary.onField ? "on-field" : "off-field"}" data-participation-state>
+        <div>
+          <span class="participation-state-label">${summary.onField ? "ON FIELD" : "OFF FIELD"}</span>
+          <strong data-active-shift>${summary.onField ? `Playing ${formatPlayingTime(activeSeconds)}` : "Ready for next shift"}</strong>
+        </div>
+        <button
+          class="participation-button ${summary.onField ? "player-out" : "player-in"}"
+          type="button"
+          data-action="tracked-player-toggle"
+          aria-label="${summary.onField ? "Record Player Out" : "Record Player In"}"
+        >${summary.onField ? "PLAYER OUT" : "PLAYER IN"}</button>
+      </div>
+      <p class="field-help">${
+        trackedPlayingTimeCloudAvailability === "unavailable"
+          ? "Playing time is saved on this device. Account sync is not available in this review build."
+          : "Clock and participation save on this device immediately. Playing time stays out of Live Share."
+      }</p>
+    </section>
+  `;
+}
+
 function renderLiveTracker() {
   if (!state.activeGame) {
     return renderShell(`
@@ -8853,6 +9302,7 @@ function renderLiveTracker() {
   const statusLine = `${escapeHTML(game.currentQuarter)} <span aria-hidden="true">&middot;</span> vs ${escapeHTML(game.opponent || "Opponent")}`;
   const liveShareEligibility = secureLiveShareEligibility(game);
   const liveShareAvailable = liveShareEligibility.available;
+  const eventCaptureGate = liveEventCaptureGate(game);
   const liveMeta = [formatDate(game.date), periodFormatLabel(game), game.location]
     .filter(Boolean)
     .map((item) => escapeHTML(item))
@@ -8876,12 +9326,23 @@ function renderLiveTracker() {
     ${renderLivePlayerCard(player)}
     ${renderLastEventConfirmation(game)}
 
-    <div class="period-tabs" role="group" aria-label="Period selector">
-      ${periods.map(
-        (period) =>
-          `<button class="period-tab ${game.currentQuarter === period ? "active" : ""}" type="button" data-quarter="${period}">${period}</button>`,
-      ).join("")}
-    </div>
+    ${
+      hasTrackedPlayingTime(game)
+        ? `<div class="period-tabs tracked-period-tabs" role="list" aria-label="Game periods">
+            ${periods.map(
+              (period) =>
+                `<span class="period-tab ${game.currentQuarter === period ? "active" : ""}" role="listitem">${period}</span>`,
+            ).join("")}
+          </div>`
+        : `<div class="period-tabs" role="group" aria-label="Period selector">
+            ${periods.map(
+              (period) =>
+                `<button class="period-tab ${game.currentQuarter === period ? "active" : ""}" type="button" data-quarter="${period}">${period}</button>`,
+            ).join("")}
+          </div>`
+    }
+
+    ${renderTrackedPlayingTimeLive(game)}
 
     ${renderLiveScoreControl(game)}
 
@@ -8891,7 +9352,15 @@ function renderLiveTracker() {
       <div class="live-pill"><strong>${game.events.length}</strong><span>Events</span></div>
     </section>
 
-    ${renderLiveStatGroups({ player })}
+    <div class="live-event-capture-state" data-live-event-capture-state="${eventCaptureGate.code}">
+      ${
+        eventCaptureGate.message
+          ? `<p class="live-event-gate-message" id="liveEventCaptureMessage" role="status" aria-live="polite">${escapeHTML(eventCaptureGate.message)}</p>`
+          : ""
+      }
+    </div>
+
+    ${renderLiveStatGroups({ player, captureGate: eventCaptureGate })}
 
     <section class="card pad live-recent-log" style="margin-top: 12px;">
       <h3>Recent Log</h3>
@@ -11227,6 +11696,121 @@ function renderReviewStatsSection(totals, events = [], postGameIntelligence = nu
   `;
 }
 
+function renderTrackedShiftEditor(game, summary) {
+  if (!state.trackedTimeEditorMode) return "";
+  const editingShift = state.trackedTimeEditorMode === "edit"
+    ? summary.shifts.find((shift) => shift.id === state.trackedTimeEditingShiftId)
+    : null;
+  const clock = trackedTimeState(game).clockState;
+  const period = editingShift?.period || clock.currentPeriod || periodsForGame(game)[0];
+  return `
+    <form class="tracked-shift-editor form-grid" data-form="tracked-shift" data-game-id="${escapeHTML(game.id)}">
+      <h4>${editingShift ? "Correct shift" : "Add missed shift"}</h4>
+      <p class="muted small">${editingShift
+        ? "Changes append correction revisions; the original boundaries remain preserved."
+        : "Manual shifts are marked Estimated."}</p>
+      <div class="form-grid three">
+        <div class="field">
+          <label for="trackedShiftPeriod">Period</label>
+          <select id="trackedShiftPeriod" name="period">
+            ${periodsForGame(game).map((item) => `<option value="${item}" ${item === period ? "selected" : ""}>${item}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label for="trackedShiftStart">Start clock</label>
+          <input id="trackedShiftStart" name="startClock" inputmode="numeric" placeholder="10:00" value="${editingShift ? formatPlayingTime(editingShift.startClockSeconds) : ""}" required />
+        </div>
+        <div class="field">
+          <label for="trackedShiftEnd">End clock</label>
+          <input id="trackedShiftEnd" name="endClock" inputmode="numeric" placeholder="7:30" value="${editingShift ? formatPlayingTime(editingShift.endClockSeconds) : ""}" required />
+        </div>
+      </div>
+      ${state.trackedTimeFormError ? `<p class="form-error" role="alert">${escapeHTML(state.trackedTimeFormError)}</p>` : ""}
+      <div class="edit-actions">
+        <button class="btn positive" type="submit">${editingShift ? "Save correction" : "Add shift"}</button>
+        <button class="btn secondary" type="button" data-action="tracked-shift-cancel">Cancel</button>
+      </div>
+    </form>
+  `;
+}
+
+function renderTrackedPlayingTimeReview(game, canEditCurrentGame) {
+  const summary = trackedTimeSummary(game);
+  if (!summary) {
+    return `
+      <section class="review-section tracked-time-review">
+        <div class="card pad">
+          <h3>Tracked Playing Time</h3>
+          <p class="muted small">Playing time was not tracked for this game.</p>
+        </div>
+      </section>
+    `;
+  }
+  const status = trackedTimeStatusLabel(summary.status);
+  return `
+    <section class="review-section tracked-time-review" aria-labelledby="trackedTimeReviewTitle">
+      <div class="card pad">
+        <div class="section-head compact-head">
+          <div>
+            <h3 id="trackedTimeReviewTitle">Tracked Playing Time</h3>
+            <p class="muted small">Private shift history derived only from Player In and Player Out boundaries.</p>
+          </div>
+          <span class="tracked-status ${summary.status}">${status}</span>
+        </div>
+        <div class="tracked-time-metrics">
+          <div><span>Total</span><strong>${formatPlayingTime(summary.totalSeconds)}</strong></div>
+          ${summary.gameShare === null ? "" : `<div><span>Game share</span><strong>${summary.gameShare}%</strong></div>`}
+          <div><span>Shifts</span><strong>${summary.shiftCount}</strong></div>
+          <div><span>Average shift</span><strong>${formatPlayingTime(summary.averageSeconds)}</strong></div>
+          <div><span>Longest shift</span><strong>${formatPlayingTime(summary.longestSeconds)}</strong></div>
+        </div>
+        <p class="tracked-status-explanation"><strong>${status}:</strong> ${escapeHTML(summary.statusExplanation)}</p>
+        <div class="tracked-shift-history">
+          <div class="section-head compact-head">
+            <h4>Shift history</h4>
+            ${canEditCurrentGame && !state.trackedTimeEditorMode ? `<button class="mini-btn light" type="button" data-action="tracked-shift-add">Add missed shift</button>` : ""}
+          </div>
+          ${summary.shifts.length
+            ? summary.shifts.map((shift, index) => `
+                <div class="tracked-shift-row">
+                  <span class="badge">${escapeHTML(shift.period)}</span>
+                  <span>
+                    <strong>Shift ${index + 1}: ${formatPlayingTime(shift.startClockSeconds)} &rarr; ${formatPlayingTime(shift.endClockSeconds)}</strong>
+                    <small>${[
+                      formatPlayingTime(shift.durationSeconds),
+                      shift.corrected ? "Corrected" : "",
+                      shift.manual ? "Manual" : "",
+                      shift.systemClosed ? "System closed" : "",
+                    ].filter(Boolean).join(" · ")}</small>
+                  </span>
+                  ${canEditCurrentGame ? `<span class="tracked-shift-actions">
+                    <button class="mini-btn" type="button" data-tracked-shift-edit="${escapeHTML(shift.id)}">Edit</button>
+                    <button class="mini-btn danger" type="button" data-tracked-shift-delete="${escapeHTML(shift.id)}">Remove</button>
+                  </span>` : ""}
+                </div>
+              `).join("")
+            : `<p class="muted small">No completed shifts yet.</p>`}
+        </div>
+        ${summary.issues.length ? `
+          <div class="tracked-time-issues">
+            <h4>Review issues</h4>
+            ${summary.issues.map((issue) => `
+              <div class="tracked-time-issue">
+                <span>${escapeHTML(issue.detail)}</span>
+                ${canEditCurrentGame && issue.operation
+                  ? `<button class="mini-btn danger" type="button" data-tracked-operation-remove="${escapeHTML(issue.operation.operationId)}">Resolve by removing boundary</button>`
+                  : ""}
+              </div>
+            `).join("")}
+          </div>
+        ` : ""}
+        ${canEditCurrentGame ? renderTrackedShiftEditor(game, summary) : ""}
+        <p class="safety-note">Tracked playing time is private. It is excluded from Live Share, family links, public recaps, and selected CSV exports.</p>
+      </div>
+    </section>
+  `;
+}
+
 function renderReview() {
   const game = currentReviewGame();
   if (!game) {
@@ -11267,6 +11851,7 @@ function renderReview() {
 
     <section class="stack review-screen-stack lh-review-page">
       ${renderReviewSummarySection(game, player, totals)}
+      ${renderTrackedPlayingTimeReview(game, canEditCurrentGame)}
       ${renderGameStorySection(postGameIntelligence)}
       ${renderDevelopmentTakeaway(totals, player, topContribution.label, game, postGameIntelligence)}
       ${renderFamilyRecapSection(game, player, totals, postGameIntelligence)}
@@ -12552,6 +13137,18 @@ function handleSubmit(event) {
     if (state.activeGame && !window.confirm("Replace the current active game? Save it first if needed.")) {
       return;
     }
+    if (formData.get("trackPlayingTime") === "on") {
+      const regulationMinutes = Number(formData.get("regulationPeriodMinutes"));
+      const overtimeMinutes = Number(formData.get("overtimeMinutes"));
+      if (!Number.isFinite(regulationMinutes) || regulationMinutes < 1 || regulationMinutes > 90) {
+        showToast("Enter valid minutes per period");
+        return;
+      }
+      if (formData.get("overtimeMinutes") && (!Number.isFinite(overtimeMinutes) || overtimeMinutes < 1 || overtimeMinutes > 30)) {
+        showToast("Enter valid overtime minutes or leave it blank");
+        return;
+      }
+    }
     state.activeGame = makeGame(formData);
     state.trackingSession = {
       gameId: state.activeGame.id,
@@ -12567,6 +13164,7 @@ function handleSubmit(event) {
     if (state.activeGame.isShared) state.liveSharePromptGameId = state.activeGame.id;
     persistAll();
     syncGameToSupabase(state.activeGame);
+    initializeTrackedTimeForGame(state.activeGame);
     navigate("live");
     showToast("Live game started");
   }
@@ -12705,6 +13303,10 @@ function handleSubmit(event) {
     loadSharedGame(formData.get("shareCode"));
   }
 
+  if (form.dataset.form === "tracked-shift") {
+    saveTrackedShift(form, formData);
+  }
+
 }
 
 function handleClick(event) {
@@ -12769,8 +13371,46 @@ function handleClick(event) {
     return;
   }
 
+  const trackedShiftEdit = event.target.closest("[data-tracked-shift-edit]");
+  if (trackedShiftEdit) {
+    state.trackedTimeEditorMode = "edit";
+    state.trackedTimeEditingShiftId = trackedShiftEdit.dataset.trackedShiftEdit;
+    state.trackedTimeFormError = "";
+    render();
+    document.querySelector(".tracked-shift-editor")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+
+  const trackedShiftDelete = event.target.closest("[data-tracked-shift-delete]");
+  if (trackedShiftDelete) {
+    removeTrackedShift(trackedShiftDelete.dataset.trackedShiftDelete);
+    return;
+  }
+
+  const trackedOperationRemove = event.target.closest("[data-tracked-operation-remove]");
+  if (trackedOperationRemove) {
+    removeUnmatchedTrackedBoundary(trackedOperationRemove.dataset.trackedOperationRemove);
+    return;
+  }
+
   const action = event.target.closest("[data-action]");
   if (action) {
+    if (action.dataset.action === "tracked-player-toggle") togglePlayerParticipation();
+    if (action.dataset.action === "tracked-clock-start") changeTrackedClock("start");
+    if (action.dataset.action === "tracked-clock-pause") changeTrackedClock("pause");
+    if (action.dataset.action === "tracked-clock-resume") changeTrackedClock("resume");
+    if (action.dataset.action === "tracked-period-end") endTrackedPeriod();
+    if (action.dataset.action === "tracked-shift-add") {
+      state.trackedTimeEditorMode = "add";
+      state.trackedTimeEditingShiftId = "";
+      state.trackedTimeFormError = "";
+      render();
+      document.querySelector(".tracked-shift-editor")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    if (action.dataset.action === "tracked-shift-cancel") {
+      clearTrackedShiftEditor();
+      render();
+    }
     if (action.dataset.action === "undo") undoLastEvent();
     if (action.dataset.action === "score-goal-for") updateActiveGameScore("for");
     if (action.dataset.action === "score-goal-against") updateActiveGameScore("against");
@@ -13073,9 +13713,230 @@ function handleDialogKeydown(event) {
 
 function handleChange(event) {
   const input = event.target.closest("[data-import-json]");
-  if (!input) return;
-  prepareImportJSONFile(input.files?.[0]);
-  input.value = "";
+  if (input) {
+    prepareImportJSONFile(input.files?.[0]);
+    input.value = "";
+    return;
+  }
+  if (event.target.matches("[data-track-playing-time-toggle]")) {
+    const fields = document.querySelector("[data-track-playing-time-fields]");
+    if (!fields) return;
+    fields.hidden = !event.target.checked;
+    fields.querySelectorAll("input").forEach((field) => {
+      field.disabled = !event.target.checked;
+    });
+    return;
+  }
+  if (event.target.matches("#periodFormat")) {
+    const format = event.target.value;
+    const regulationInput = document.querySelector("#regulationPeriodMinutes");
+    const startingPeriod = document.querySelector("#startingPeriod");
+    if (regulationInput) regulationInput.value = format === "halves" ? "24" : "12";
+    if (startingPeriod) {
+      const periods = PERIOD_FORMATS[format]?.periods || PERIOD_FORMATS.quarters.periods;
+      startingPeriod.innerHTML = periods
+        .filter((period) => period !== "OT")
+        .map((period) => `<option value="${period}">${period}</option>`)
+        .join("");
+    }
+  }
+}
+
+function parseTrackedClockInput(value) {
+  const match = String(value || "").trim().match(/^(\d{1,3}):([0-5]\d)$/);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function trackedPeriodDuration(game, period) {
+  const clock = trackedTimeState(game)?.clockState;
+  if (!clock) return 0;
+  return period === "OT"
+    ? clock.overtimeDurationSeconds || 0
+    : clock.regulationPeriodDurationSeconds || 0;
+}
+
+function validateTrackedShift(game, summary, candidate, ignoredShiftId = "") {
+  if (!periodsForGame(game).includes(candidate.period)) return "Choose a valid period.";
+  const maximum = trackedPeriodDuration(game, candidate.period);
+  if (!maximum) return "That period has no configured duration.";
+  if (candidate.startClockSeconds > maximum || candidate.endClockSeconds > maximum) {
+    return `Clock values must be within ${formatPlayingTime(maximum)}.`;
+  }
+  if (candidate.startClockSeconds < candidate.endClockSeconds) {
+    return "End clock must be later in the period than start clock.";
+  }
+  if (candidate.startClockSeconds === candidate.endClockSeconds) {
+    return "A shift must have a positive duration.";
+  }
+  const overlap = summary.shifts.find((shift) => (
+    shift.id !== ignoredShiftId
+    && shift.period === candidate.period
+    && candidate.startClockSeconds > shift.endClockSeconds
+    && candidate.endClockSeconds < shift.startClockSeconds
+  ));
+  return overlap ? "This shift overlaps an existing shift." : "";
+}
+
+function correctionOperation(game, currentOperation, values = {}) {
+  return {
+    operationId: uid("participation"),
+    clientOperationId: uid("participation-client"),
+    logicalEventId: currentOperation.logicalEventId,
+    targetOperationId: currentOperation.operationId,
+    gameId: game.id,
+    playerId: currentOperation.playerId || game.playerId,
+    operationKind: "correct",
+    period: values.period,
+    gameClockSeconds: values.gameClockSeconds,
+    occurredAt: new Date().toISOString(),
+    clientCreatedAt: new Date().toISOString(),
+    source: "manual",
+    systemCloseReason: null,
+    recoveryUncertain: false,
+    changeReason: "Game Review shift correction",
+    revision: null,
+    syncState: "pending",
+  };
+}
+
+function tombstoneParticipationOperation(game, currentOperation, reason = "Removed in Game Review") {
+  return {
+    operationId: uid("participation"),
+    clientOperationId: uid("participation-client"),
+    logicalEventId: currentOperation.logicalEventId,
+    targetOperationId: currentOperation.operationId,
+    gameId: game.id,
+    playerId: currentOperation.playerId || game.playerId,
+    operationKind: "tombstone",
+    period: "",
+    gameClockSeconds: null,
+    occurredAt: null,
+    clientCreatedAt: new Date().toISOString(),
+    source: "manual",
+    systemCloseReason: null,
+    recoveryUncertain: false,
+    changeReason: reason,
+    revision: null,
+    syncState: "pending",
+  };
+}
+
+function clearTrackedShiftEditor() {
+  state.trackedTimeEditorMode = "";
+  state.trackedTimeEditingShiftId = "";
+  state.trackedTimeFormError = "";
+}
+
+function saveTrackedShift(form, formData) {
+  const game = state.games.find((item) => item.id === form.dataset.gameId);
+  const summary = trackedTimeSummary(game);
+  if (!game || !summary || !canEditGame(game)) return;
+  const candidate = {
+    period: String(formData.get("period") || ""),
+    startClockSeconds: parseTrackedClockInput(formData.get("startClock")),
+    endClockSeconds: parseTrackedClockInput(formData.get("endClock")),
+  };
+  if (candidate.startClockSeconds === null || candidate.endClockSeconds === null) {
+    state.trackedTimeFormError = "Use clock format M:SS, for example 7:30.";
+    render();
+    return;
+  }
+  const editingShift = state.trackedTimeEditorMode === "edit"
+    ? summary.shifts.find((shift) => shift.id === state.trackedTimeEditingShiftId)
+    : null;
+  const validationError = validateTrackedShift(game, summary, candidate, editingShift?.id || "");
+  if (validationError) {
+    state.trackedTimeFormError = validationError;
+    render();
+    return;
+  }
+
+  if (editingShift) {
+    if (
+      editingShift.period !== candidate.period
+      || editingShift.startClockSeconds !== candidate.startClockSeconds
+    ) {
+      appendTrackedParticipation(game, correctionOperation(game, editingShift.startOperation, {
+        period: candidate.period,
+        gameClockSeconds: candidate.startClockSeconds,
+      }));
+    }
+    if (
+      editingShift.period !== candidate.period
+      || editingShift.endClockSeconds !== candidate.endClockSeconds
+    ) {
+      appendTrackedParticipation(game, correctionOperation(game, editingShift.endOperation, {
+        period: candidate.period,
+        gameClockSeconds: candidate.endClockSeconds,
+      }));
+    }
+  } else {
+    appendTrackedParticipation(game, createParticipationOperation(game, "player_in", {
+      period: candidate.period,
+      gameClockSeconds: candidate.startClockSeconds,
+      source: "manual",
+    }));
+    appendTrackedParticipation(game, createParticipationOperation(game, "player_out", {
+      period: candidate.period,
+      gameClockSeconds: candidate.endClockSeconds,
+      source: "manual",
+    }));
+  }
+  game.savedAt = new Date().toISOString();
+  clearTrackedShiftEditor();
+  persistAll();
+  render();
+  showToast(editingShift ? "Shift correction saved" : "Missed shift added");
+}
+
+function removeTrackedShift(shiftId) {
+  const game = currentReviewGame();
+  const summary = trackedTimeSummary(game);
+  const shift = summary?.shifts.find((item) => item.id === shiftId);
+  if (!game || !shift || !canEditGame(game)) return;
+  if (!window.confirm("Remove this shift? Its accepted boundaries will be preserved as tombstoned history.")) return;
+  appendTrackedParticipation(game, tombstoneParticipationOperation(game, shift.startOperation, "Invalid shift removed"));
+  appendTrackedParticipation(game, tombstoneParticipationOperation(game, shift.endOperation, "Invalid shift removed"));
+  game.savedAt = new Date().toISOString();
+  persistAll();
+  render();
+  showToast("Shift removed");
+}
+
+function removeUnmatchedTrackedBoundary(operationId) {
+  const game = currentReviewGame();
+  const summary = trackedTimeSummary(game);
+  const operation = summary?.effectiveOperations.find((item) => item.operationId === operationId);
+  if (!game || !operation || !canEditGame(game)) return;
+  appendTrackedParticipation(game, tombstoneParticipationOperation(game, operation, "Unmatched boundary resolved"));
+  persistAll();
+  render();
+  showToast("Unmatched boundary resolved");
+}
+
+function refreshTrackedClockDisplay() {
+  if (state.screen !== "live" || !hasTrackedPlayingTime(state.activeGame)) return;
+  const clock = projectedTrackedClock(state.activeGame);
+  const summary = trackedTimeSummary(state.activeGame);
+  if (!clock || !summary) return;
+  const captureGate = liveEventCaptureGate(state.activeGame);
+  const captureStateElement = document.querySelector("[data-live-event-capture-state]");
+  if (captureStateElement?.dataset.liveEventCaptureState !== captureGate.code) {
+    render();
+    return;
+  }
+  const clockElement = document.querySelector("[data-tracked-clock]");
+  const clockStateElement = document.querySelector("[data-tracked-clock-state]");
+  const activeShiftElement = document.querySelector("[data-active-shift]");
+  if (clockElement) clockElement.textContent = formatPlayingTime(clock.clockSecondsRemaining);
+  if (clockStateElement) clockStateElement.textContent = clock.isRunning ? "Running" : "Paused";
+  if (activeShiftElement && summary.onField) {
+    const activeSeconds = summary.activeStart?.period === clock.currentPeriod
+      ? Math.max(0, summary.activeStart.gameClockSeconds - clock.clockSecondsRemaining)
+      : 0;
+    activeShiftElement.textContent = `Playing ${formatPlayingTime(activeSeconds)}`;
+  }
 }
 
 function registerServiceWorker() {
@@ -13340,6 +14201,12 @@ window.addEventListener("online", async () => {
   if (state.authUser) {
     await loadCloudGames({ silent: true });
     await eventOperationService().retryGameEventOperations();
+    const trackedGames = [state.activeGame, ...state.games].filter(hasTrackedPlayingTime);
+    await Promise.all(trackedGames.map(async (game) => {
+      const reconciled = await trackedTimeService().reconcileParticipationOperations(game);
+      if (reconciled) trackedTimeState(game).syncIssue = "";
+      return reconciled;
+    }));
     const hasPendingTrustSpineWork = Object.values(trustSpineState().events).some(
       (record) => record.pendingOperations.length || record.conflict || record.lastError,
     );
@@ -13357,4 +14224,5 @@ window.addEventListener("offline", () => {
   render();
 });
 registerServiceWorker();
+window.setInterval(refreshTrackedClockDisplay, 500);
 initApp();
