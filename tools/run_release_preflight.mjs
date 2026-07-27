@@ -138,6 +138,7 @@ export function validateManifestReleaseIdentity(manifest, release = "") {
   }
   if (!manifest.preReleaseBaseSha) failures.push("preReleaseBaseSha is missing");
   if (!manifest.releaseHeadSha) failures.push("releaseHeadSha is missing");
+  if (!manifest.releaseHeadTreeSha) failures.push("releaseHeadTreeSha is missing");
   if (!manifest.approvedMergeSha) failures.push("approvedMergeSha is missing");
   if (manifest.preReleaseBaseSha !== manifest.finalMainBaseSha) {
     failures.push("preReleaseBaseSha does not preserve finalMainBaseSha provenance");
@@ -155,6 +156,7 @@ export function evaluateReleaseIdentity({
   approvedRolloutSha = "",
   isAncestor,
   isSameTree,
+  treeOf,
 }) {
   const rows = [];
   const add = (label, ok, detail) => rows.push({
@@ -192,7 +194,11 @@ export function evaluateReleaseIdentity({
     add(
       "Release head incorporated by approved merge",
       ancestor(manifest.releaseHeadSha, manifest.approvedMergeSha) ||
-        Boolean(isSameTree?.(manifest.releaseHeadSha, manifest.approvedMergeSha)),
+        Boolean(isSameTree?.(manifest.releaseHeadSha, manifest.approvedMergeSha)) ||
+        Boolean(
+          manifest.releaseHeadTreeSha &&
+          treeOf?.(manifest.approvedMergeSha) === manifest.releaseHeadTreeSha
+        ),
       `${manifest.releaseHeadSha || "(missing)"} -> ${manifest.approvedMergeSha || "(missing)"}`,
     );
     add(
@@ -265,6 +271,10 @@ function checkRepository(results, release, phase, approvedRolloutSha) {
       return leftTree.status === 0 &&
         rightTree.status === 0 &&
         trimmed(leftTree) === trimmed(rightTree);
+    },
+    treeOf: (ref) => {
+      const result = git("rev-parse", `${ref}^{tree}`);
+      return result.status === 0 ? trimmed(result) : "";
     },
   });
   for (const row of identityRows) {

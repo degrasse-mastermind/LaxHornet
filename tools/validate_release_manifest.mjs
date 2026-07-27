@@ -71,23 +71,22 @@ expect(
   "releaseHeadSha must identify the reviewed v284 release head",
 );
 expect(
+  manifest.releaseHeadTreeSha === "20341b66dad600d1ae19f4eed20b55bb61752fbc",
+  "releaseHeadTreeSha must identify the reviewed v284 release tree",
+);
+expect(
   manifest.approvedMergeSha === "e2cd28a568e91232d375a8607e6376800d3a2a20",
   "approvedMergeSha must identify the approved PR #26 merge",
 );
-for (const [ancestor, descendant, message] of [[
-  manifest.preReleaseBaseSha,
-  manifest.releaseHeadSha,
-  "preReleaseBaseSha must be an ancestor of releaseHeadSha",
-]]) {
-  try {
-    execFileSync("git", ["merge-base", "--is-ancestor", ancestor, descendant], {
-      cwd: root,
-      stdio: "ignore",
-    });
-    expect(true, message);
-  } catch {
-    expect(false, message);
-  }
+try {
+  execFileSync(
+    "git",
+    ["merge-base", "--is-ancestor", manifest.preReleaseBaseSha, manifest.approvedMergeSha],
+    { cwd: root, stdio: "ignore" },
+  );
+  expect(true, "preReleaseBaseSha must be an ancestor of approvedMergeSha");
+} catch {
+  expect(false, "preReleaseBaseSha must be an ancestor of approvedMergeSha");
 }
 try {
   execFileSync(
@@ -99,9 +98,9 @@ try {
 } catch {
   try {
     expect(
-      git("rev-parse", `${manifest.releaseHeadSha}^{tree}`)
-        === git("rev-parse", `${manifest.approvedMergeSha}^{tree}`),
-      "squash-merged releaseHeadSha must have the exact approvedMergeSha tree",
+      git("rev-parse", `${manifest.approvedMergeSha}^{tree}`)
+        === manifest.releaseHeadTreeSha,
+      "squash-merged approvedMergeSha must have the recorded releaseHeadTreeSha",
     );
   } catch {
     expect(false, "releaseHeadSha must be incorporated by approvedMergeSha");

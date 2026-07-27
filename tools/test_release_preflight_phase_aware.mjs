@@ -18,6 +18,7 @@ const manifest = {
   finalMainBaseSha: base,
   preReleaseBaseSha: base,
   releaseHeadSha: releaseHead,
+  releaseHeadTreeSha: "20341b66dad600d1ae19f4eed20b55bb61752fbc",
   approvedMergeSha: merge,
 };
 const ancestry = new Set([
@@ -51,6 +52,7 @@ function preparation(overrides = {}) {
     manifest,
     isAncestor,
     isSameTree,
+    treeOf: (ref) => ref === merge ? manifest.releaseHeadTreeSha : "",
     ...overrides,
   });
 }
@@ -65,6 +67,7 @@ function production(overrides = {}) {
     manifest,
     isAncestor,
     isSameTree,
+    treeOf: (ref) => ref === merge ? manifest.releaseHeadTreeSha : "",
     ...overrides,
   });
 }
@@ -115,7 +118,11 @@ test("production accepts the exact approved main merge SHA", () => {
 test("production requires the release head to be incorporated by the merge", () => {
   assert.equal(
     failed(
-      production({ isAncestor: () => false, isSameTree: () => false }),
+      production({
+        isAncestor: () => false,
+        isSameTree: () => false,
+        treeOf: () => "",
+      }),
       "Release head incorporated by approved merge",
     ),
     true,
