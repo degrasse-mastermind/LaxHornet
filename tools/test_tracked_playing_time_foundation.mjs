@@ -1,15 +1,22 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
 const migrationPath =
   "supabase/migrations/20260727000000_tracked_playing_time_operations.sql";
+const expectedMigrationSha256 =
+  "E0F28F527992C4083635CE4E23C6BE880C787C3C16C95A11198EABC70E243CB9";
 const rollbackPath =
   "supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql";
 const testSqlPath = "supabase/tests/tracked_playing_time_foundation.sql";
 const servicePath = "tracked-playing-time-service.js";
+const publicLiveShareSqlPaths = [
+  "supabase/migrations/20260723010000_trust_spine_release_1.sql",
+  "supabase/migrations/20260723020000_minimum_necessary_disclosure.sql",
+];
 const results = [];
 
 function source(file) {
@@ -18,6 +25,54 @@ function source(file) {
 
 function git(...args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+}
+
+function gitPathExists(ref, file) {
+  try {
+    execFileSync("git", ["cat-file", "-e", `${ref}:${file}`], {
+      cwd: root,
+      stdio: "ignore",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function changedPaths(...paths) {
+  return git("diff", "--name-only", "origin/main", "--", ...paths)
+    .split(/\r?\n/)
+    .filter(Boolean);
+}
+
+function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex").toUpperCase();
+}
+
+function reviewedWindowsSha256(bytes) {
+  const canonicalCrLf = bytes
+    .toString("utf8")
+    .replace(/\r\n/g, "\n")
+    .replace(/\n/g, "\r\n");
+  return sha256(Buffer.from(canonicalCrLf, "utf8"));
+}
+
+function assertFoundationMigrationPhase(state) {
+  assert.equal(state.rollbackExists, true, rollbackPath);
+  assert.equal(state.currentMigrationSha256, expectedMigrationSha256);
+  assert.deepEqual(state.changedPublicLiveShareSql, []);
+  assert.deepEqual(state.changedLegacySchemaFiles, []);
+
+  if (!state.mainHasFoundationHistory) {
+    assert.equal(state.mainMigrationExists, false);
+    assert.deepEqual(state.changedMigrations, [migrationPath]);
+    return;
+  }
+
+  assert.equal(state.mainMigrationExists, true);
+  assert.equal(state.headMigrationBlob, state.mainMigrationBlob);
+  assert.deepEqual(state.changedMigrations, []);
+  assert.deepEqual(state.changedRollback, []);
 }
 
 function test(name, callback) {
@@ -36,17 +91,81 @@ const app = source("app.js");
 const appHtml = source("app.html");
 const manifest = JSON.parse(source("release/laxhornet-release-manifest.json"));
 
-test("foundation uses the single required forward migration", () => {
-  const changedMigrations = git(
-    "diff",
-    "--name-only",
-    "origin/main",
-    "--",
-    "supabase/migrations",
-  )
-    .split(/\r?\n/)
-    .filter(Boolean);
-  assert.deepEqual(changedMigrations, [migrationPath]);
+test("foundation migration contract is phase-aware and immutable", () => {
+  const mainHasFoundationHistory = Boolean(
+    git("log", "--format=%H", "origin/main", "--", migrationPath),
+  );
+  const mainMigrationExists = gitPathExists("origin/main", migrationPath);
+  const state = {
+    mainHasFoundationHistory,
+    mainMigrationExists,
+    currentMigrationSha256: reviewedWindowsSha256(
+      fs.readFileSync(path.join(root, migrationPath)),
+    ),
+    headMigrationBlob: git("rev-parse", `HEAD:${migrationPath}`),
+    mainMigrationBlob: mainMigrationExists
+      ? git("rev-parse", `origin/main:${migrationPath}`)
+      : null,
+    changedMigrations: changedPaths("supabase/migrations"),
+    changedRollback: changedPaths(rollbackPath),
+    changedPublicLiveShareSql: changedPaths(...publicLiveShareSqlPaths),
+    changedLegacySchemaFiles: changedPaths("supabase-schema.sql"),
+    rollbackExists: fs.existsSync(path.join(root, rollbackPath)),
+  };
+
+  assertFoundationMigrationPhase(state);
+
+  assert.doesNotThrow(() =>
+    assertFoundationMigrationPhase({
+      ...state,
+      mainHasFoundationHistory: false,
+      mainMigrationExists: false,
+      mainMigrationBlob: null,
+      changedMigrations: [migrationPath],
+      changedRollback: [rollbackPath],
+    }),
+  );
+  assert.throws(() =>
+    assertFoundationMigrationPhase({
+      ...state,
+      currentMigrationSha256: "0".repeat(64),
+    }),
+  );
+  assert.throws(() =>
+    assertFoundationMigrationPhase({
+      ...state,
+      changedPublicLiveShareSql: [publicLiveShareSqlPaths[0]],
+    }),
+  );
+
+  if (mainHasFoundationHistory) {
+    assert.throws(() =>
+      assertFoundationMigrationPhase({
+        ...state,
+        mainMigrationExists: false,
+      }),
+    );
+    assert.throws(() =>
+      assertFoundationMigrationPhase({
+        ...state,
+        headMigrationBlob: "0".repeat(40),
+      }),
+    );
+    assert.throws(() =>
+      assertFoundationMigrationPhase({
+        ...state,
+        changedMigrations: [migrationPath],
+      }),
+    );
+    assert.throws(() =>
+      assertFoundationMigrationPhase({
+        ...state,
+        changedMigrations: [
+          "supabase/migrations/20260723040000_event_pipeline_capabilities.sql",
+        ],
+      }),
+    );
+  }
 });
 
 test("forward, rollback, and pgTAP paths are exact", () => {
