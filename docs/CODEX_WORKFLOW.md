@@ -111,13 +111,17 @@ Inside Codex:
 
 The project defaults are:
 
-- Model: `gpt-5.6`.
-- Reasoning: `high`.
-- Plan-mode reasoning: `high`.
+- Model: the newest model currently supported for the signed-in ChatGPT account and installed Codex client.
+- Reasoning: `high`, when supported by the selected model.
+- Plan-mode reasoning: `high`, when supported by the selected model.
 - Local sandbox: `workspace-write`.
 - Approval policy: `on-request`.
 
-The older command `/model GPT5.high` is not the configuration syntax. Use `/model` and `/reasoning` interactively, or the committed `model` and `model_reasoning_effort` settings.
+The repository intentionally does not set a fixed `model` value. ChatGPT-authenticated Codex model availability can differ by plan, staged rollout, client version, and workspace controls. A hard-pinned model can prevent Codex from starting even when another capable model is available.
+
+Use `/model` to inspect and select from the models actually offered to the signed-in account. Use `/reasoning` to verify or adjust the reasoning level. Do not type an invented combined identifier such as `/model GPT5.high`.
+
+GPT-5.6 requires a sufficiently current Codex client and may still be unavailable during staged rollout. When it is offered in `/model`, it can be selected there without changing repository files.
 
 To verify that repository instructions loaded, ask Codex:
 
