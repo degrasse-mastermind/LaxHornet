@@ -5,27 +5,14 @@
 # different model availability based on plan, rollout, client version, and
 # workspace controls. Let Codex select the newest supported model for the
 # signed-in account, then verify it with `/model`.
+#
+# MCP servers are intentionally not declared here. In the current Windows
+# desktop session, project-level MCP declarations were visible in configuration
+# but were not instantiated as runtime tools. Runtime MCP connections must be
+# configured in the user's `~/.codex/config.toml`, then validated with `/mcp`.
+# Repository policy in AGENTS.md still governs which server may be used.
 
 model_reasoning_effort = "high"
 plan_mode_reasoning_effort = "high"
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
-
-# The explicit name prevents confusion with any user-level or global staging
-# server. For LaxHornet work, this is the only authorized Supabase MCP server.
-[mcp_servers.supabase_production_readonly]
-url = "https://mcp.supabase.com/mcp?project_ref=ulbmjcvnyznvmjgpstno&read_only=true&features=docs%2Cdatabase%2Cdebugging"
-auth = "oauth"
-enabled = true
-required = false
-default_tools_approval_mode = "prompt"
-enabled_tools = [
-  "search_docs",
-  "list_tables",
-  "list_extensions",
-  "list_migrations",
-  "execute_sql",
-  "get_logs",
-  "get_advisors",
-]
-disabled_tools = ["apply_migration"]
