@@ -431,6 +431,158 @@
     return [...heads.values()];
   }
 
+  function periodSequence(periodFormat = "quarters") {
+    return PERIODS[PERIODS[periodFormat] ? periodFormat : "quarters"];
+  }
+
+  function compareParticipationOperations(left, right, periodFormat = "quarters") {
+    const periods = periodSequence(periodFormat);
+    const leftPeriod = periods.indexOf(left.period);
+    const rightPeriod = periods.indexOf(right.period);
+    if (leftPeriod !== rightPeriod) {
+      return (leftPeriod < 0 ? Number.MAX_SAFE_INTEGER : leftPeriod)
+        - (rightPeriod < 0 ? Number.MAX_SAFE_INTEGER : rightPeriod);
+    }
+    if (left.gameClockSeconds !== right.gameClockSeconds) {
+      return right.gameClockSeconds - left.gameClockSeconds;
+    }
+    const occurredDifference = Date.parse(left.occurredAt || left.clientCreatedAt)
+      - Date.parse(right.occurredAt || right.clientCreatedAt);
+    if (occurredDifference) return occurredDifference;
+    return left.clientOperationId.localeCompare(right.clientOperationId);
+  }
+
+  function configuredGameDurationSeconds(clockState, effectiveOperations = []) {
+    if (!clockState) return null;
+    let clock;
+    try {
+      clock = normalizeClockState(clockState);
+    } catch {
+      return null;
+    }
+    const regulationPeriods = clock.periodFormat === "halves" ? 2 : 4;
+    let total = regulationPeriods * clock.regulationPeriodDurationSeconds;
+    const usedOvertime = clock.currentPeriod === "OT"
+      || effectiveOperations.some((operation) => operation.period === "OT");
+    if (usedOvertime) {
+      if (!clock.overtimeDurationSeconds) return null;
+      total += clock.overtimeDurationSeconds;
+    }
+    return total;
+  }
+
+  function derivePlayingTimeSummary({
+    operations = [],
+    clockState = null,
+    syncIssue = "",
+  } = {}) {
+    const periodFormat = clockState?.periodFormat || "quarters";
+    const effectiveOperations = resolveEffectiveParticipationOperations(operations)
+      .sort((left, right) => compareParticipationOperations(left, right, periodFormat));
+    const shifts = [];
+    const issues = [];
+    let activeStart = null;
+
+    const addIssue = (code, operation, detail) => {
+      issues.push({
+        code,
+        operation,
+        period: operation?.period || "",
+        detail,
+      });
+    };
+
+    for (const operation of effectiveOperations) {
+      if (!periodSequence(periodFormat).includes(operation.period)) {
+        addIssue("missing_period_context", operation, "A participation boundary has no valid period.");
+        continue;
+      }
+      if (operation.recoveryUncertain) {
+        addIssue("recovery_uncertain", operation, "Clock recovery could not prove the exact boundary.");
+      }
+      if (operation.operationKind === "player_in") {
+        if (activeStart) {
+          addIssue("overlapping_player_in", operation, "Player In was recorded while the player was already on field.");
+          continue;
+        }
+        activeStart = operation;
+        continue;
+      }
+      if (operation.operationKind !== "player_out") continue;
+      if (!activeStart) {
+        addIssue("unmatched_player_out", operation, "Player Out has no matching Player In.");
+        continue;
+      }
+      if (activeStart.period !== operation.period) {
+        addIssue("cross_period_shift", operation, "A shift cannot cross a period boundary.");
+        activeStart = null;
+        continue;
+      }
+      const durationSeconds = activeStart.gameClockSeconds - operation.gameClockSeconds;
+      if (durationSeconds < 0) {
+        addIssue("invalid_clock_order", operation, "Shift end occurs before its start.");
+        activeStart = null;
+        continue;
+      }
+      shifts.push({
+        id: `${activeStart.logicalEventId}:${operation.logicalEventId}`,
+        startOperation: activeStart,
+        endOperation: operation,
+        period: activeStart.period,
+        startClockSeconds: activeStart.gameClockSeconds,
+        endClockSeconds: operation.gameClockSeconds,
+        durationSeconds,
+        sources: [...new Set([activeStart.source, operation.source])],
+        corrected: Boolean(activeStart.corrected || operation.corrected),
+        manual: activeStart.source === "manual" || operation.source === "manual",
+        systemClosed: ["system_period_end", "system_game_end"].includes(operation.source),
+        reviewIssue: null,
+      });
+      activeStart = null;
+    }
+
+    if (activeStart) {
+      addIssue("unmatched_player_in", activeStart, "Player In is still open.");
+    }
+    if (syncIssue) {
+      issues.push({
+        code: "sync_issue",
+        operation: null,
+        period: "",
+        detail: String(syncIssue),
+      });
+    }
+
+    const totalSeconds = shifts.reduce((total, shift) => total + shift.durationSeconds, 0);
+    const shiftCount = shifts.length;
+    const manualOrCorrected = shifts.some((shift) => shift.manual || shift.corrected);
+    const status = issues.length ? "needs_review" : manualOrCorrected ? "estimated" : "complete";
+    const configuredDurationSeconds = configuredGameDurationSeconds(clockState, effectiveOperations);
+    const gameShare = configuredDurationSeconds
+      ? Math.round((totalSeconds / configuredDurationSeconds) * 100)
+      : null;
+
+    return {
+      effectiveOperations,
+      shifts,
+      issues,
+      activeStart,
+      onField: Boolean(activeStart),
+      totalSeconds,
+      shiftCount,
+      averageSeconds: shiftCount ? Math.round(totalSeconds / shiftCount) : 0,
+      longestSeconds: shiftCount ? Math.max(...shifts.map((shift) => shift.durationSeconds)) : 0,
+      configuredDurationSeconds,
+      gameShare,
+      status,
+      statusExplanation: issues.length
+        ? issues[0].detail
+        : manualOrCorrected
+          ? "Includes a manual entry or correction."
+          : "All tracked shifts have valid live or system boundaries.",
+    };
+  }
+
   function createTrackedPlayingTimeService(hooks = {}) {
     const persistLocal = requiredFunction(hooks.persistLocal, "persistLocal");
     const sendClock = requiredFunction(hooks.sendClock, "sendClock");
@@ -553,6 +705,8 @@
     clockRpcPayload,
     trackedPlayingTimeState,
     resolveEffectiveParticipationOperations,
+    configuredGameDurationSeconds,
+    derivePlayingTimeSummary,
     createTrackedPlayingTimeService,
   });
 })(window);

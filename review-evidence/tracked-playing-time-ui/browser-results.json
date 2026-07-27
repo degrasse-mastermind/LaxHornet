@@ -1,0 +1,61 @@
+{
+  "results": [
+    {
+      "passed": true,
+      "message": "setup shows conservative opt-in"
+    },
+    {
+      "passed": true,
+      "message": "tracked-time duration fields activate"
+    },
+    {
+      "passed": true,
+      "message": "new tracked game starts visibly off field"
+    },
+    {
+      "passed": true,
+      "message": "Player In changes to unmistakable on-field state"
+    },
+    {
+      "passed": true,
+      "message": "active shift timer follows running game clock"
+    },
+    {
+      "passed": true,
+      "message": "running refresh restores one continuous active shift without duplicate Player In"
+    },
+    {
+      "passed": true,
+      "message": "offline pending participation operation survives refresh"
+    },
+    {
+      "passed": true,
+      "message": "paused clock freezes active shift display"
+    },
+    {
+      "passed": true,
+      "message": "period end closes shift and opens next period off field"
+    },
+    {
+      "passed": true,
+      "message": "Game Review identifies system-closed shifts"
+    },
+    {
+      "passed": true,
+      "message": "valid live and system boundaries produce Complete"
+    },
+    {
+      "passed": true,
+      "message": "correction recalculates and marks Estimated"
+    },
+    {
+      "passed": true,
+      "message": "older game renders the no-data message"
+    },
+    {
+      "passed": true,
+      "message": "browser console has no errors"
+    }
+  ],
+  "consoleErrors": []
+}

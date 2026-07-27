@@ -221,6 +221,60 @@ Evidence: `review-evidence/tracked-playing-time-foundation/`
 `REPO_CURRENT_STATE.md` updated: `YES`
 Remaining work: reviewer approval, green CI, signed-in browser/device validation during the later UI ticket, and separately authorized production migration/deployment.
 
+### LH-22 — Tracked Playing Time Phase 1 user experience
+
+Status: `READY FOR PRODUCT REVIEW`
+Branch: `feature/tracked-playing-time-ui`
+Base: `feature/tracked-playing-time-foundation` at `ab5c546665e05edcea82683b9a786aa433fa5c61`
+Related design document: `docs/TRACKED_PLAYING_TIME_FOUNDATION.md`
+
+#### Goal
+
+Provide a complete, private, local-first Phase 1 experience for tracking one selected player's on-field time during a game, recovering it safely, correcting it through append-only operations, and reviewing deterministic shift totals after the game.
+
+#### Completed scope
+
+- Added a conservative per-game opt-in with quarter/half format defaults, editable regulation duration, and optional overtime duration.
+- Loaded and offline-cached the foundation companion service without changing the v283 release marker or cache name.
+- Added persisted Start, Pause, Resume, End Period, Player In, and Player Out controls with a live active-shift timer.
+- Added system period-end and game-end closures, next-period off-field behavior, bounded refresh recovery, offline persistence, and idempotent retry.
+- Added pure deterministic shift derivation with duplicate, overlap, ordering, period, recovery, and synchronization review states.
+- Added Total, Game share, Shifts, Average, Longest, completeness status, and compact shift history to Game Review.
+- Added governed correction revisions, manual missed shifts, tombstone removal, unmatched-boundary resolution, and invalid-edit rejection.
+- Preserved ordinary stat events, Game Impact, Possible Next Focus, public Live Share, public/family recaps, selected CSV, and existing games without tracked-time configuration.
+
+#### Out of scope
+
+- No performance-rate, fatigue, shift-event, season-trend, position-by-shift, team substitution, coach comparison, or AI analysis.
+- No production migration, deployment, merge, release marker, cache-name, script-query-version, or release-manifest change.
+- No change to public disclosure allowlists or ordinary stat-event semantics.
+
+#### Verification
+
+- `node tools/test_tracked_playing_time_ui.mjs`: 36/36 passed.
+- `node tools/test_tracked_playing_time_service.mjs`: 16/16 passed.
+- `node tools/test_tracked_playing_time_foundation.mjs`: 11/11 passed.
+- `node tools/test_tracked_playing_time_manual_scenarios.mjs`: 7/7 passed.
+- `node tools/test_tracked_playing_time_ui_browser.cjs`: 14/14 rendered checks passed with no console errors.
+- `supabase db reset --local`: passed with the tracked-time migration applied.
+- `supabase test db supabase/tests/tracked_playing_time_foundation.sql`: 37/37 passed.
+- `node tools/run_v283_local_regression.mjs`: 29/29 groups passed.
+- Secret/host scan and `git diff --check`: passed within the full regression.
+
+#### Risks and rollback
+
+- The foundation is still an unapplied draft, so production cloud synchronization is intentionally unavailable pending separate approval and deployment; local tracking remains usable.
+- Running-clock recovery gaps longer than 30 seconds freeze and require review rather than inventing time.
+- Feature rollback is the removal of the additive UI/service wiring before release. Accepted database history remains governed by the foundation's fail-closed rollback.
+
+#### Completion record
+
+Commit/PR: draft UI PR pending final commit and push; foundation draft PR #24.
+Files changed: `app.html`, `app.js`, `styles.css`, `service-worker.js`, `tracked-playing-time-service.js`, focused tests, review evidence, `TICKETS.md`, and `REPO_CURRENT_STATE.md`.
+Evidence: `review-evidence/tracked-playing-time-ui/`
+`REPO_CURRENT_STATE.md` updated: `YES`
+Remaining work: product review, GitHub Actions confirmation, signed-in device validation against an approved non-production backend, foundation approval, and separately authorized release/version coordination.
+
 ## Ticket template
 
 Copy this section for each implementation ticket.

@@ -37,7 +37,7 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
 - `localStorage` remains the immediate source for offline game tracking and user-facing continuity.
 - Supabase synchronization is optional and must not block core game-day tracking.
 - Runtime includes local delete markers and event-operation capabilities.
-- The review-only Tracked Playing Time foundation adds a companion local-first clock and participation-operation service. It is not loaded by the current UI and does not change existing game tracking.
+- The stacked Tracked Playing Time review branches add a companion local-first clock and participation-operation service plus an opt-in Phase 1 UI. The feature remains unapplied and undeployed while foundation PR #24 and the UI review are open.
 - Any synchronization change must preserve offline operation, reconnection behavior, deduplication, authorization boundaries, and existing saved data.
 
 ## Supabase backend
@@ -137,7 +137,7 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Preserve youth-data privacy and use synthetic data in tests.
 - Keep MethodNorth and LaxHornet connected but not combined.
 - Do not alter production defaults, activate staged backend capabilities, deploy migrations, or release from an ordinary feature ticket.
-- Tracked Playing Time remains a private data foundation only: its database objects are reachable through authenticated, scope-checked RPCs; the companion service is not yet wired into `app.html`; and public Live Share, recap, and scoped CSV contracts exclude clock and participation history.
+- On `feature/tracked-playing-time-ui`, Tracked Playing Time is an explicit per-game opt-in with persisted clock controls, Player In/Out boundaries, deterministic shift derivation, safe recovery, governed corrections, and a private Game Review summary. Its database objects remain reachable only through authenticated, scope-checked RPCs; public Live Share, recap, and scoped CSV contracts exclude clock and participation history.
 
 ## Known areas requiring continued care
 
@@ -146,7 +146,7 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Live Share and export disclosure boundaries.
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
-- UI integration, in-game controls, and game-review presentation for Tracked Playing Time remain future work after this foundation is reviewed.
+- Tracked Playing Time still requires product review, foundation approval, signed-in device validation against an approved non-production backend, and separately authorized release/version coordination.
 - Coordinated version and service-worker release hygiene.
 - Maintenance of GitHub Action majors and portability of the CI-selected regression checks.
 

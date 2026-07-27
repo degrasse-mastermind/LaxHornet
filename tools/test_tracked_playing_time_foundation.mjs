@@ -110,10 +110,8 @@ test("new tables use forced RLS with no direct browser grants", () => {
 
 test("public Live Share contract is not redefined or expanded", () => {
   assert.doesNotMatch(migration, /lh_public_live_share_game/);
-  assert.equal(
-    git("diff", "--name-only", "origin/main", "--", "app.js", "app.html"),
-    "",
-  );
+  assert.doesNotMatch(app, /trackedPlayingTime[\s\S]{0,300}publicLiveShareGameFromPayload/);
+  assert.doesNotMatch(app, /publicLiveShareGameFromPayload[\s\S]{0,300}trackedPlayingTime/);
 });
 
 test("private backup retains game-local tracked state while scoped CSV remains event-only", () => {
@@ -123,11 +121,13 @@ test("private backup retains game-local tracked state while scoped CSV remains e
   assert.match(app, /return normalizedGame\.events\.map\(\(event\) =>/);
 });
 
-test("client service remains local-first and outside the UI ticket", () => {
+test("client service remains local-first and loads before the UI", () => {
   assert.match(service, /persistLocal/);
   assert.match(service, /participationOperations/);
   assert.match(service, /reconcileParticipationOperations/);
-  assert.doesNotMatch(appHtml, /tracked-playing-time-service\.js/);
+  const serviceIndex = appHtml.indexOf("tracked-playing-time-service.js");
+  const appIndex = appHtml.indexOf("app.js");
+  assert.ok(serviceIndex >= 0 && serviceIndex < appIndex);
 });
 
 test("rollback fails closed when history exists and removes only foundation objects", () => {

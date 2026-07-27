@@ -4792,6 +4792,278 @@ form.account-card .account-actions {
     linear-gradient(180deg, var(--lh-carbon-800) 0%, var(--lh-carbon-900) 42%, var(--lh-black) 100%);
 }
 
+.tracked-time-setup {
+  border: 1px solid rgba(246, 190, 0, 0.3);
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(246, 190, 0, 0.06);
+}
+
+.tracked-time-choice {
+  align-items: flex-start;
+}
+
+.tracked-time-choice span {
+  display: grid;
+  gap: 3px;
+}
+
+.tracked-time-choice small {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.tracked-time-duration-fields {
+  margin-top: 14px;
+}
+
+.tracked-time-duration-fields[hidden] {
+  display: none;
+}
+
+.tracked-time-live {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 12px;
+  border-color: rgba(246, 190, 0, 0.45);
+}
+
+.tracked-clock-heading,
+.participation-state,
+.tracked-clock-actions,
+.tracked-shift-row,
+.tracked-time-issue {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tracked-clock-heading .eyebrow {
+  display: block;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tracked-clock-period {
+  display: block;
+  margin-top: 3px;
+  font-size: 1.35rem;
+}
+
+.tracked-clock-readout {
+  display: grid;
+  justify-items: end;
+}
+
+.tracked-clock-readout strong {
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(2rem, 11vw, 3.25rem);
+  line-height: 1;
+}
+
+.tracked-clock-readout span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.tracked-clock-actions {
+  align-items: stretch;
+}
+
+.tracked-clock-button {
+  flex: 1;
+  min-height: 46px;
+}
+
+.participation-state {
+  border: 2px solid currentColor;
+  border-radius: 18px;
+  padding: 14px;
+}
+
+.participation-state.off-field {
+  color: #d9dde4;
+  background: #1c222a;
+}
+
+.participation-state.on-field {
+  color: #ffe26b;
+  background: #292306;
+}
+
+.participation-state > div {
+  display: grid;
+  gap: 4px;
+}
+
+.participation-state-label {
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.participation-state strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.participation-button {
+  min-width: 132px;
+  min-height: 64px;
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 18px;
+  font: inherit;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.participation-button.player-in {
+  color: #09140e;
+  background: #72e6a1;
+}
+
+.participation-button.player-out {
+  color: #1b0c0a;
+  background: #ff9d7a;
+}
+
+.tracked-period-tabs .period-tab {
+  cursor: default;
+}
+
+.tracked-time-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.tracked-time-metrics > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--lh-surface-soft);
+}
+
+.tracked-time-metrics span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.tracked-time-metrics strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.tracked-status {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.tracked-status.complete {
+  color: #72e6a1;
+}
+
+.tracked-status.estimated {
+  color: #ffe26b;
+}
+
+.tracked-status.needs_review {
+  color: #ff9d7a;
+}
+
+.tracked-status-explanation {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.tracked-shift-history,
+.tracked-time-issues {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.tracked-shift-row,
+.tracked-time-issue {
+  border-top: 1px solid var(--lh-line-light);
+  padding: 10px 0;
+}
+
+.tracked-shift-row > span:nth-child(2) {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+}
+
+.tracked-shift-row small {
+  color: var(--muted);
+}
+
+.tracked-shift-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.tracked-time-issue {
+  align-items: flex-start;
+  color: #ffd2c4;
+}
+
+.tracked-shift-editor {
+  margin-top: 18px;
+  border-top: 1px solid var(--lh-line-light);
+  padding-top: 18px;
+}
+
+.form-error {
+  margin: 0;
+  color: #ffb59d;
+  font-weight: 700;
+}
+
+@media (max-width: 700px) {
+  .tracked-time-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tracked-clock-actions,
+  .tracked-shift-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .participation-state {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .participation-button {
+    width: 100%;
+    min-height: 72px;
+  }
+
+  .tracked-shift-actions {
+    width: 100%;
+  }
+
+  .tracked-shift-actions .mini-btn {
+    flex: 1;
+  }
+}
+
 .noscript-fallback img {
   width: min(260px, 72vw);
   height: auto;
@@ -4973,6 +5245,10 @@ a.btn {
 
   .form-grid.two {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .form-grid.three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .roster-edit-details {

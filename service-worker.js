@@ -26,6 +26,7 @@ const APP_ASSETS = [
   RUNTIME_CONFIG_ASSET,
   "./event-operation-service.js?v=283",
   "./next-focus-recommendation.js?v=283",
+  "./tracked-playing-time-service.js?v=283",
   "./app.js?v=283",
   "./manifest.json?v=283",
   "./assets/icon.svg?v=11",
