@@ -262,7 +262,7 @@ Provide a complete, private, local-first Phase 1 experience for tracking one sel
 - `supabase test db supabase/tests/tracked_playing_time_foundation.sql`: 37/37 passed.
 - `node tools/run_v283_local_regression.mjs`: 29/29 groups passed.
 - Secret/host scan and `git diff --check`: passed within the full regression.
-- GitHub Actions baseline run `30261706471`: passed; the final event-gating commit requires a fresh PR run before review handoff.
+- GitHub Actions portable regression is required on the final PR head; the post-push result is recorded on PR #25.
 
 #### Risks and rollback
 
