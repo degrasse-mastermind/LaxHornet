@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-07-27  
 Baseline branch: `main`  
-Baseline commit: `3bfc84c56fbb7e3579f7d4222fff02393fec78fe`  
+Baseline commit: `2a0435817d7302b1041542d0ef0f54c9697e8bc0`
 Current release marker: `v283`
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
@@ -37,6 +37,7 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
 - `localStorage` remains the immediate source for offline game tracking and user-facing continuity.
 - Supabase synchronization is optional and must not block core game-day tracking.
 - Runtime includes local delete markers and event-operation capabilities.
+- The review-only Tracked Playing Time foundation adds a companion local-first clock and participation-operation service. It is not loaded by the current UI and does not change existing game tracking.
 - Any synchronization change must preserve offline operation, reconnection behavior, deduplication, authorization boundaries, and existing saved data.
 
 ## Supabase backend
@@ -61,6 +62,7 @@ The release manifest records:
 - A historical production schema snapshot and provenance marker.
 - Canonical forward migrations for the legacy baseline, Trust Spine Release 1, minimum-necessary disclosure, and disclosure/evidence fixes.
 - An additive event-pipeline capability migration.
+- A separately contained, review-only Tracked Playing Time package with one forward migration, one rollback reference, and one pgTAP contract file. It is not listed as production-applied or pending for the v283 cutover.
 - Required ordering, rollback references, approved file identities, and pending-production expectations.
 
 Do not rewrite, reorder, squash, rename, or silently regenerate these migration files. Any new migration must be additive, timestamped, reviewed, tested locally, and reflected in release-control documentation.
@@ -98,6 +100,9 @@ Focused checks include:
 ```powershell
 node tools/test_event_operation_service.mjs
 node tools/test_game_scope_capabilities.mjs
+node tools/test_tracked_playing_time_service.mjs
+node tools/test_tracked_playing_time_foundation.mjs
+supabase test db --local supabase/tests/tracked_playing_time_foundation.sql
 ```
 
 The current broad local regression entry point is:
@@ -106,7 +111,7 @@ The current broad local regression entry point is:
 node tools/run_v283_local_regression.mjs
 ```
 
-That runner covers JavaScript syntax, event-operation contracts, game-scope capabilities, update/release checks, release-manifest validation, containment and hygiene, minimum disclosure, secure disclosure, Product Alignment, Trust Spine contracts, SQL acceptance/rollback tests, deletion permissions, cleanup, secret scanning, and `git diff --check`.
+That runner covers JavaScript syntax, event-operation contracts, tracked-playing-time service and static foundation contracts, game-scope capabilities, update/release checks, release-manifest validation, containment and hygiene, minimum disclosure, secure disclosure, Product Alignment, Trust Spine contracts, SQL acceptance/rollback tests, deletion permissions, cleanup, secret scanning, and `git diff --check`.
 
 ### GitHub Actions regression
 
@@ -132,6 +137,7 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Preserve youth-data privacy and use synthetic data in tests.
 - Keep MethodNorth and LaxHornet connected but not combined.
 - Do not alter production defaults, activate staged backend capabilities, deploy migrations, or release from an ordinary feature ticket.
+- Tracked Playing Time remains a private data foundation only: its database objects are reachable through authenticated, scope-checked RPCs; the companion service is not yet wired into `app.html`; and public Live Share, recap, and scoped CSV contracts exclude clock and participation history.
 
 ## Known areas requiring continued care
 
@@ -140,6 +146,7 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Live Share and export disclosure boundaries.
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
+- UI integration, in-game controls, and game-review presentation for Tracked Playing Time remain future work after this foundation is reviewed.
 - Coordinated version and service-worker release hygiene.
 - Maintenance of GitHub Action majors and portability of the CI-selected regression checks.
 

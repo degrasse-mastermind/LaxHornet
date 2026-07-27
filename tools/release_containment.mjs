@@ -18,6 +18,12 @@ export const APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS = Object.freeze([
   "supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql",
 ]);
 
+export const TRACKED_PLAYING_TIME_REVIEW_DB_PATHS = Object.freeze([
+  "supabase/migrations/20260727000000_tracked_playing_time_operations.sql",
+  "supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql",
+  "supabase/tests/tracked_playing_time_foundation.sql",
+]);
+
 export const APPROVED_HISTORICAL_PROVENANCE_PATHS = Object.freeze([
   "supabase/migrations/20260723010607_remote_schema.sql",
   "supabase/production-history/20260723010607_remote_schema.sql",
@@ -367,6 +373,7 @@ function validateCanonicalPlusAdditiveTree({
   authorizedDbCommit,
   approvedAdditiveCommit,
   headCommit,
+  allowedAdditiveDbPaths = [],
 }) {
   const canonicalSupabaseFiles = listFilesAt(repoRoot, authorizedDbCommit, "supabase");
   const expectedSupabaseSources = new Map(
@@ -392,6 +399,7 @@ function validateCanonicalPlusAdditiveTree({
   const expectedFiles = [
     ...expectedSupabaseSources.keys(),
     ...(historicalProvenancePresent ? APPROVED_HISTORICAL_PROVENANCE_PATHS : []),
+    ...allowedAdditiveDbPaths,
   ];
   assertMatchingFileSet(
     expectedFiles,
@@ -406,9 +414,12 @@ function validateCanonicalPlusAdditiveTree({
     "COMBINED_SUPABASE_FILE_IDENTITY_MISMATCH",
     "The combined Supabase tree does not match the approved canonical and additive file identities.",
   );
-  return historicalProvenancePresent
-    ? validateHistoricalProvenance({ repoRoot, headRef: headCommit })
-    : null;
+  return {
+    historicalProvenance: historicalProvenancePresent
+      ? validateHistoricalProvenance({ repoRoot, headRef: headCommit })
+      : null,
+    reviewAdditiveDatabaseFiles: [...allowedAdditiveDbPaths].sort(),
+  };
 }
 
 export function validateReleaseContainment({
@@ -433,11 +444,16 @@ export function validateReleaseContainment({
   const releaseDeltaFiles = changedFiles(normalizedRoot, releaseBaseCommit, headCommit);
   const normalizedAuthorizedRef = String(authorizedDbRef || "").trim();
   const normalizedApprovedAdditiveRef = String(approvedAdditiveRef || "").trim();
+  const normalizedAllowedAdditiveDbPaths = [
+    ...new Set(
+      (allowedAdditiveDbPaths || [])
+        .map((file) => String(file).trim().replaceAll("\\", "/"))
+        .filter(Boolean),
+    ),
+  ].sort();
 
   if (!normalizedAuthorizedRef) {
-    const allowedAdditive = new Set(
-      (allowedAdditiveDbPaths || []).map((file) => String(file).trim().replaceAll("\\", "/")).filter(Boolean),
-    );
+    const allowedAdditive = new Set(normalizedAllowedAdditiveDbPaths);
     const databaseDelta = releaseDeltaFiles.filter(isCanonicalDatabasePath);
     const forbidden = databaseDelta.filter((file) => !allowedAdditive.has(file));
     if (forbidden.length) {
@@ -498,16 +514,22 @@ export function validateReleaseContainment({
       );
     }
 
-    const historicalProvenance = validateCanonicalPlusAdditiveTree({
+    const reviewAdditiveDatabaseFiles = normalizedAllowedAdditiveDbPaths.filter(
+      (file) => !APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS.includes(file),
+    );
+    const combinedTree = validateCanonicalPlusAdditiveTree({
       repoRoot: normalizedRoot,
       authorizedDbCommit,
       approvedAdditiveCommit,
       headCommit,
+      allowedAdditiveDbPaths: reviewAdditiveDatabaseFiles,
     });
 
     return {
-      mode: historicalProvenance
-        ? "canonical_plus_additive_with_provenance"
+      mode: combinedTree.historicalProvenance
+        ? reviewAdditiveDatabaseFiles.length
+          ? "canonical_plus_additive_with_provenance_and_review_package"
+          : "canonical_plus_additive_with_provenance"
         : "canonical_plus_additive",
       repoRoot: normalizedRoot,
       releaseBaseRef,
@@ -522,12 +544,16 @@ export function validateReleaseContainment({
       authorizedSupabaseDeltaFiles: authorizedDeltaFiles.filter(
         (file) => file === "supabase" || file.startsWith("supabase/"),
       ),
-      allowedAdditiveDatabaseFiles: [...APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS],
+      allowedAdditiveDatabaseFiles: [
+        ...APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
+        ...reviewAdditiveDatabaseFiles,
+      ],
+      reviewAdditiveDatabaseFiles,
       postAuthorizationDatabaseFiles: [],
       supabaseTreeMatchesAuthorizedRef: null,
       canonicalSupabaseFilesMatchAuthorizedRef: true,
       combinedSupabaseTreeMatchesApprovedRefs: true,
-      historicalProvenance,
+      historicalProvenance: combinedTree.historicalProvenance,
     };
   }
 

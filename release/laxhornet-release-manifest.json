@@ -7,6 +7,23 @@
   "cleanupCandidate": "0050f054df826dbe4343515b79079dd6c80793bc",
   "minimumSchemaCapability": 1,
   "databaseTreeMode": "canonical_plus_additive_with_provenance",
+  "reviewDatabaseTreeMode": "canonical_plus_additive_with_provenance_and_review_package",
+  "reviewDatabasePackages": [
+    {
+      "name": "tracked_playing_time_foundation",
+      "status": "draft_review",
+      "forwardMigration": "supabase/migrations/20260727000000_tracked_playing_time_operations.sql",
+      "rollbackReference": "supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql",
+      "testSql": "supabase/tests/tracked_playing_time_foundation.sql",
+      "productionApplied": false,
+      "productionAuthorizationRequired": true,
+      "sha256": {
+        "supabase/migrations/20260727000000_tracked_playing_time_operations.sql": "623be1072d4ebfe579177a4001f535e245c05a22dcdb302e05c6ae70382cbffa",
+        "supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql": "43871a66c8d41902e455f68a495977150c4d4f4620e29e22c7f1cb807916bf3d",
+        "supabase/tests/tracked_playing_time_foundation.sql": "4a1371d3f02b24397b8199e82a96156a511615ebab64e4f7f11edfc7cf541147"
+      }
+    }
+  ],
   "productionHistoricalMigration": {
     "version": "20260723010607",
     "name": "remote_schema",
@@ -44,6 +61,15 @@
     "supabase/migrations/20260723020000_minimum_necessary_disclosure.sql",
     "supabase/migrations/20260723030000_fix_disclosure_audit_and_evidence_validation.sql",
     "supabase/migrations/20260723040000_event_pipeline_capabilities.sql"
+  ],
+  "reviewMigrationSequence": [
+    "supabase/migrations/20260723000000_laxhornet_legacy_baseline.sql",
+    "supabase/migrations/20260723010000_trust_spine_release_1.sql",
+    "supabase/migrations/20260723010607_remote_schema.sql",
+    "supabase/migrations/20260723020000_minimum_necessary_disclosure.sql",
+    "supabase/migrations/20260723030000_fix_disclosure_audit_and_evidence_validation.sql",
+    "supabase/migrations/20260723040000_event_pipeline_capabilities.sql",
+    "supabase/migrations/20260727000000_tracked_playing_time_operations.sql"
   ],
   "expectedRemoteAppliedMigrations": [
     "supabase/migrations/20260723010607_remote_schema.sql"

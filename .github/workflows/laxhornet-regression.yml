@@ -48,7 +48,7 @@ jobs:
           database_candidate="$(jq -r '.databaseCandidate' release/laxhornet-release-manifest.json)"
           pre_cutover_runtime="$(jq -r '.preCutoverRuntime' release/laxhornet-release-manifest.json)"
           cleanup_candidate="$(jq -r '.cleanupCandidate' release/laxhornet-release-manifest.json)"
-          additive_paths="supabase/migrations/20260723040000_event_pipeline_capabilities.sql,supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql"
+          additive_paths="supabase/migrations/20260723040000_event_pipeline_capabilities.sql,supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql,supabase/migrations/20260727000000_tracked_playing_time_operations.sql,supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql,supabase/tests/tracked_playing_time_foundation.sql"
 
           if git merge-base --is-ancestor "$database_candidate" HEAD \
             && git merge-base --is-ancestor "$cleanup_candidate" HEAD; then
@@ -74,6 +74,12 @@ jobs:
 
       - name: Event operation service contracts
         run: node tools/test_event_operation_service.mjs
+
+      - name: Tracked playing time service contracts
+        run: node tools/test_tracked_playing_time_service.mjs
+
+      - name: Tracked playing time foundation contracts
+        run: node tools/test_tracked_playing_time_foundation.mjs
 
       - name: Game scope capability contracts
         run: node tools/test_game_scope_capabilities.mjs

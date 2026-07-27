@@ -171,6 +171,55 @@ Add a pull-request and manual-dispatch GitHub Actions workflow that runs the rep
 - Files changed: `.github/workflows/laxhornet-regression.yml`, `TICKETS.md`, and `REPO_CURRENT_STATE.md`.
 - Remaining work: maintain action majors and portable test coverage as the repository evolves; browser/device QA and the local Supabase Docker workflow remain separate verification layers.
 
+### LH-21 — Tracked Playing Time private data foundation
+
+Status: `REVIEW`
+Branch: `feature/tracked-playing-time-foundation`
+Related design document: `docs/TRACKED_PLAYING_TIME_FOUNDATION.md`
+
+#### Goal
+
+Add the private, local-first data foundation for authoritative game-clock state and append-only player participation operations without adding UI, changing existing event tracking, or expanding public disclosure.
+
+#### Completed scope
+
+- One additive migration creates private clock state, stable participation logical identities, append-only operations, and an effective resolver.
+- Nine authenticated RPCs cover clock initialization/update/reconciliation/read and participation create/correct/tombstone/list/reconciliation.
+- Personal games enforce account/player ownership; team-roster games reuse Trust Spine scope and grant authority.
+- Forced RLS, revoked direct table/view grants, fixed-search-path wrappers, immutable history triggers, request hashes, and idempotent operation IDs fail closed.
+- The companion JavaScript service provides deterministic clock projection, pause/resume/period transitions, recovery classification, game-end context, local persistence, retry, and reconciliation contracts.
+- Public Live Share and recap remain unchanged; selected CSV stays event-only; the sensitive private full backup retains per-game local tracked state.
+- Release containment and the manifest identify the three SQL artifacts as a review-only, unapplied package.
+
+#### Out of scope
+
+- No clock or substitution controls, game-review UI, or production runtime wiring.
+- No production migration, deployment, version/cache marker change, merge, or release.
+- No new public/family-facing field and no change to existing event-operation semantics.
+
+#### Verification
+
+- `supabase db reset --local`: blank-database migration sequence passed.
+- Local rollback removed only the three foundation tables/view/RPC layer and preserved the Event Pipeline and public Live Share objects.
+- Reapplying the migration to the existing local schema passed, followed by 37/37 pgTAP assertions.
+- `node tools/test_tracked_playing_time_service.mjs`: 16/16 passed.
+- `node tools/test_tracked_playing_time_foundation.mjs`: static migration/privacy/containment contracts added.
+- Broad portable regression and GitHub Actions are required before merge.
+
+#### Risks and rollback
+
+- Participation history may include child-associated game/player identifiers and is private by default.
+- Clock recovery can be marked `estimated` or `needs_review`; uncertain elapsed time is not silently invented.
+- The rollback refuses to destroy accepted participation history. Review/export and an explicit disposal decision are required before destructive rollback.
+- Future UI integration must preserve immediate local persistence and must not expose tracked time through public Live Share, recap, or default CSV.
+
+#### Completion record
+
+Commit/PR: draft pull request to be recorded after publication.
+Evidence: `review-evidence/tracked-playing-time-foundation/`
+`REPO_CURRENT_STATE.md` updated: `YES`
+Remaining work: reviewer approval, green CI, signed-in browser/device validation during the later UI ticket, and separately authorized production migration/deployment.
+
 ## Ticket template
 
 Copy this section for each implementation ticket.
