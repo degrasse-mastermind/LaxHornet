@@ -173,7 +173,7 @@ Add a pull-request and manual-dispatch GitHub Actions workflow that runs the rep
 
 ### LH-21 — Tracked Playing Time private data foundation
 
-Status: `REVIEW`
+Status: `DONE`
 Branch: `feature/tracked-playing-time-foundation`
 Related design document: `docs/TRACKED_PLAYING_TIME_FOUNDATION.md`
 
@@ -212,20 +212,20 @@ Add the private, local-first data foundation for authoritative game-clock state 
 - Participation history may include child-associated game/player identifiers and is private by default.
 - Clock recovery can be marked `estimated` or `needs_review`; uncertain elapsed time is not silently invented.
 - The rollback refuses to destroy accepted participation history. Review/export and an explicit disposal decision are required before destructive rollback.
-- Future UI integration must preserve immediate local persistence and must not expose tracked time through public Live Share, recap, or default CSV.
+- UI integration must preserve immediate local persistence and must not expose tracked time through public Live Share, recap, or default CSV.
 
 #### Completion record
 
-Commit/PR: implementation commits `e2477d0` and `025aaf3`; draft pull request #24.
+Commit/PR: implementation commits `e2477d0` and `025aaf3`; pull request #24 merged as `2deb8c8df92a612d233f9dad58765e0a22bee618`.
 Evidence: `review-evidence/tracked-playing-time-foundation/`
 `REPO_CURRENT_STATE.md` updated: `YES`
-Remaining work: reviewer approval, green CI, signed-in browser/device validation during the later UI ticket, and separately authorized production migration/deployment.
+Remaining work: coordinated production migration and release verification under the separately authorized release procedure.
 
 ### LH-22 — Tracked Playing Time Phase 1 user experience
 
 Status: `READY FOR PRODUCT REVIEW`
 Branch: `feature/tracked-playing-time-ui`
-Base: `feature/tracked-playing-time-foundation` at `ab5c546665e05edcea82683b9a786aa433fa5c61`
+Base: `main` at foundation merge `2deb8c8df92a612d233f9dad58765e0a22bee618`
 Related design document: `docs/TRACKED_PLAYING_TIME_FOUNDATION.md`
 
 #### Goal
@@ -266,18 +266,18 @@ Provide a complete, private, local-first Phase 1 experience for tracking one sel
 
 #### Risks and rollback
 
-- The foundation is still an unapplied draft, so production cloud synchronization is intentionally unavailable pending separate approval and deployment; local tracking remains usable.
+- The foundation is merged but still unapplied in production, so hosted tracked-time synchronization remains unavailable pending the coordinated migration; local tracking remains usable.
 - A review browser that reaches a backend without the tracked-time RPCs fails soft to device-only tracking for that session; the local event gate remains authoritative and is unaffected by hosted capability availability.
 - Running-clock recovery gaps longer than 30 seconds freeze and require review rather than inventing time.
 - Feature rollback is the removal of the additive UI/service wiring before release. Accepted database history remains governed by the foundation's fail-closed rollback.
 
 #### Completion record
 
-Commit/PR: implementation commit `8c1c9d3`; draft pull request #25 stacked on foundation draft PR #24.
+Commit/PR: implementation commits through `0ca2a00`; draft pull request #25 retargeted to `main` after foundation PR #24 merged.
 Files changed: `app.html`, `app.js`, `styles.css`, `service-worker.js`, `tracked-playing-time-service.js`, `.github/workflows/laxhornet-regression.yml`, focused tests, review evidence, `TICKETS.md`, and `REPO_CURRENT_STATE.md`.
 Evidence: `review-evidence/tracked-playing-time-ui/`
 `REPO_CURRENT_STATE.md` updated: `YES`
-Remaining work: product review, signed-in device validation against an approved non-production backend, foundation approval, and separately authorized release/version coordination. Do not merge or deploy from this ticket.
+Remaining work: final integration review and the separately authorized coordinated v284 migration, deployment, and production verification.
 
 ## Ticket template
 

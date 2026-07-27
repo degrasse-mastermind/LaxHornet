@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-07-27  
 Baseline branch: `main`  
-Baseline commit: `2a0435817d7302b1041542d0ef0f54c9697e8bc0`
+Baseline commit: `2deb8c8df92a612d233f9dad58765e0a22bee618`
 Current release marker: `v283`
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
@@ -37,7 +37,7 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
 - `localStorage` remains the immediate source for offline game tracking and user-facing continuity.
 - Supabase synchronization is optional and must not block core game-day tracking.
 - Runtime includes local delete markers and event-operation capabilities.
-- The stacked Tracked Playing Time review branches add a companion local-first clock and participation-operation service plus an opt-in Phase 1 UI. The feature remains unapplied and undeployed while foundation PR #24 and the UI review are open.
+- `main` contains the reviewed Tracked Playing Time foundation from merged PR #24. PR #25 adds the opt-in Phase 1 UI and remains undeployed while its integration review is open.
 - Any synchronization change must preserve offline operation, reconnection behavior, deduplication, authorization boundaries, and existing saved data.
 
 ## Supabase backend
@@ -146,7 +146,7 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Live Share and export disclosure boundaries.
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
-- Tracked Playing Time still requires product review, foundation approval, signed-in device validation against an approved non-production backend, and separately authorized release/version coordination.
+- Tracked Playing Time still requires PR #25 review, coordinated release/version approval, production migration verification, and signed-in production smoke validation.
 - Coordinated version and service-worker release hygiene.
 - Maintenance of GitHub Action majors and portability of the CI-selected regression checks.
 
