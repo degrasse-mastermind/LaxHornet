@@ -11,7 +11,9 @@ plan_mode_reasoning_effort = "high"
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
 
-[mcp_servers.supabase]
+# The explicit name prevents confusion with any user-level or global staging
+# server. For LaxHornet work, this is the only authorized Supabase MCP server.
+[mcp_servers.supabase_production_readonly]
 url = "https://mcp.supabase.com/mcp?project_ref=ulbmjcvnyznvmjgpstno&read_only=true&features=docs%2Cdatabase%2Cdebugging"
 auth = "oauth"
 enabled = true
