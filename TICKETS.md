@@ -50,7 +50,8 @@ Completion record:
 
 ### LH-DEV-002 — Establish local Supabase CLI workflow
 
-Status: `PROPOSED`
+Status: `DONE`
+Branch: `chore/lh-dev-002-local-supabase`
 
 Goal:
 
@@ -64,13 +65,24 @@ Required safeguards:
 - Do not run `supabase db push`.
 - Do not repair remote migration history without a separately approved release ticket.
 
-Candidate acceptance criteria:
+Acceptance criteria:
 
 - Supabase CLI version is recorded.
 - Local stack starts successfully.
 - Existing migrations are inspected in their required order.
 - Local reset/migration verification results are documented.
 - Any drift or provenance issue is reported without changing production.
+
+Completion record:
+
+- Pull request: #18
+- Merge commit: `8f0e45ec5f3fc6a3faf47e690665367487461b13`
+- Verified environment: Docker Engine `29.6.2`, Docker Compose `v5.3.1`, and Supabase CLI `2.109.1` on Windows.
+- Local startup: Reduced stack started successfully with `storage-api`, `imgproxy`, `logflare`, and `vector` excluded after the full stack produced an unhealthy Storage container.
+- Migration verification: `supabase db reset --local` completed successfully and reapplied all six committed migrations in filename order.
+- Documentation: `docs/LOCAL_SUPABASE_WORKFLOW.md` records the verified commands, expected notices, stopped services, cleanup procedure, and prohibited remote commands.
+- Repository hygiene: `supabase/.branches/` is ignored as generated local metadata.
+- Scope confirmation: No remote link, database push, linked reset, migration repair, connector mutation, migration SQL change, runtime change, deployment change, or production data change occurred.
 
 ### LH-DEV-003 — Create a non-production Supabase development target
 
@@ -91,19 +103,91 @@ Candidate acceptance criteria:
 
 ### LH-DEV-004 — Add GitHub Actions regression checks
 
-Status: `PROPOSED`
+Status: `READY`
+Branch: `chore/lh-dev-004-ci-regression`
 
-Goal:
+#### Goal
 
-Run appropriate existing LaxHornet regression checks automatically on pull requests without changing GitHub Pages deployment behavior.
+Add a pull-request and manual-dispatch GitHub Actions workflow that runs the repository's existing non-deployment regression checks and reports failures clearly, without contacting Supabase production, requiring repository secrets, or changing GitHub Pages deployment behavior.
 
-Candidate acceptance criteria:
+#### In scope
 
-- Workflow runs on pull requests and manual dispatch.
-- Workflow uses existing repository test scripts rather than inventing a second test system.
-- No production deployment occurs from the workflow.
-- Secrets are not required for ordinary static/runtime checks.
-- Results clearly identify failed checks.
+- Add one workflow under `.github/workflows/` for pull requests and `workflow_dispatch`.
+- Use the existing repository test scripts and Node/Python syntax or contract checks that can run in a clean GitHub-hosted runner.
+- Install only the runtime dependencies required by the existing tests.
+- Preserve test output as ordinary job logs; upload an artifact only when an existing test already produces a useful local evidence file and doing so does not expose secrets or sensitive data.
+- Use least-privilege GitHub Actions permissions.
+
+#### Out of scope
+
+- No GitHub Pages deployment or deployment workflow changes.
+- No Supabase CLI linking, local Docker stack startup, remote migration inspection, database push, migration repair, Edge Function deployment, or connector action.
+- No production, staging, preview-branch, Vercel, Resend, or other external-service mutation.
+- No modification to runtime code, migration SQL, release markers, service-worker cache names, or release manifests merely to satisfy CI.
+- Do not force the full Windows-specific local Supabase Docker workflow into GitHub Actions as part of this ticket.
+
+#### Current behavior
+
+- Pull requests rely on manually reported local verification.
+- Existing repository scripts already cover JavaScript syntax, event-operation contracts, game-scope capabilities, release-manifest validation, containment and hygiene, minimum disclosure, secure disclosure, Product Alignment, Trust Spine contracts, selected embedded database checks, Python permission/cleanup checks, secret scanning, and `git diff --check`.
+- `tools/run_v283_local_regression.mjs` is the current broad local entry point, but Codex must inspect it and determine which checks are portable to GitHub-hosted runners before selecting the CI command set.
+
+#### Requirements
+
+- Workflow events: `pull_request` and `workflow_dispatch` only.
+- Permissions must default to read-only repository contents unless a documented check requires something narrower and still non-mutating.
+- The workflow must not use repository or environment secrets.
+- The workflow must not deploy, push, publish, merge, create Supabase branches, or call remote production services.
+- Pin official GitHub Actions to stable major versions and document runtime versions.
+- Use dependency caching only when the repository actually has a lockfile or deterministic dependency source.
+- Commands must fail the job on test failure and make the failing test identifiable.
+- A documentation-only PR should still run the lightweight checks unless path filtering is explicitly justified and tested.
+
+#### Acceptance criteria
+
+- A workflow file exists under `.github/workflows/` and is valid YAML.
+- The workflow runs on pull requests and manual dispatch.
+- The workflow uses existing LaxHornet test scripts rather than creating a parallel test framework.
+- No production deployment or remote Supabase mutation is possible from the workflow.
+- No secrets are required.
+- The job output clearly identifies each failed command or test group.
+- The workflow passes on its own pull request, or any runner incompatibility is documented and resolved without weakening existing safety controls.
+- `TICKETS.md` and `REPO_CURRENT_STATE.md` are updated with durable completion facts before merge.
+
+#### Expected files
+
+- `.github/workflows/laxhornet-regression.yml` or a similarly clear workflow name.
+- `TICKETS.md`.
+- `REPO_CURRENT_STATE.md` only if CI becomes a durable repository capability.
+- Existing test scripts only when a narrowly scoped portability fix is necessary and behavior remains unchanged.
+
+#### Verification plan
+
+```powershell
+# Local review
+Get-Content .github\workflows\laxhornet-regression.yml
+git diff --check
+
+# Existing focused or broad checks selected after repository inspection
+node tools/run_v283_local_regression.mjs
+```
+
+Also verify the GitHub Actions run on the pull request and a manual `workflow_dispatch` run before marking the ticket `DONE`.
+
+#### Risks and rollback
+
+- Risk: CI may rely on tools or services available locally but absent on GitHub-hosted runners.
+- Risk: the broad regression runner may contain release-state assumptions that require a portable subset or explicit environment setup.
+- Risk: overly broad workflow permissions or secret usage would create unnecessary supply-chain exposure.
+- Rollback: remove or disable the single workflow file; no runtime, database, or production rollback should be required.
+
+#### Completion record
+
+Commit/PR:  
+Files changed:  
+Tests and results:  
+`REPO_CURRENT_STATE.md` updated: `YES/NO`  
+Remaining work:
 
 ## Ticket template
 
