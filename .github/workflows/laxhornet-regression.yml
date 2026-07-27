@@ -1,0 +1,120 @@
+name: LaxHornet Regression
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: laxhornet-regression-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    name: Portable regression checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Report runtime versions
+        run: |
+          node --version
+          npm --version
+          python --version
+          git --version
+
+      - name: Resolve release-control refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          database_candidate="$(jq -r '.databaseCandidate' release/laxhornet-release-manifest.json)"
+          pre_cutover_runtime="$(jq -r '.preCutoverRuntime' release/laxhornet-release-manifest.json)"
+          cleanup_candidate="$(jq -r '.cleanupCandidate' release/laxhornet-release-manifest.json)"
+          additive_paths="supabase/migrations/20260723040000_event_pipeline_capabilities.sql,supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql"
+
+          if git merge-base --is-ancestor "$database_candidate" HEAD \
+            && git merge-base --is-ancestor "$cleanup_candidate" HEAD; then
+            release_base="$(git merge-base "$database_candidate" "$pre_cutover_runtime")"
+            echo "LAXHORNET_AUTHORIZED_DB_REF=$database_candidate" >> "$GITHUB_ENV"
+            echo "LAXHORNET_APPROVED_ADDITIVE_REF=$cleanup_candidate" >> "$GITHUB_ENV"
+          else
+            release_base="7cf58df9a43ce235fc6068bd4c50549e05906de4"
+          fi
+
+          echo "LAXHORNET_RELEASE_BASE_REF=$release_base" >> "$GITHUB_ENV"
+          echo "LAXHORNET_ALLOWED_ADDITIVE_DB_PATHS=$additive_paths" >> "$GITHUB_ENV"
+          echo "Release base: $release_base"
+
+      - name: Check root JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            echo "==> node --check $file"
+            node --check "$file"
+          done < <(find . -maxdepth 1 -type f -name '*.js' -print0 | sort -z)
+
+      - name: Event operation service contracts
+        run: node tools/test_event_operation_service.mjs
+
+      - name: Game scope capability contracts
+        run: node tools/test_game_scope_capabilities.mjs
+
+      - name: Update release contract
+        run: node tools/test_update_release.mjs
+
+      - name: Release manifest validation
+        run: node tools/validate_release_manifest.mjs --require-combined --combined-ref=HEAD
+
+      - name: Release hygiene
+        run: node tools/test_release_hygiene.mjs
+
+      - name: Install embedded database test dependency
+        run: npm install --no-save --no-package-lock --ignore-scripts @electric-sql/pglite@0.5.4
+
+      - name: Phase-aware release containment
+        run: node tools/test_release_containment_phase_aware.mjs
+
+      - name: Minimum disclosure contracts
+        run: node tools/test_minimum_disclosure.mjs
+
+      - name: Secure disclosure activation contracts
+        run: node tools/test_secure_disclosure_activation.mjs
+
+      - name: Product Alignment contracts
+        run: node tools/test_product_alignment_remediation.mjs
+
+      - name: Trust Spine source contracts
+        run: node tools/test_trust_spine_release1.mjs
+
+      - name: Cancel Game contracts
+        run: python tools/test_cancel_game.py
+
+      - name: Delete permission contracts
+        run: python tools/test_delete_rpc_permissions.py
+
+      - name: Player-removal cleanup contracts
+        run: python tools/test_player_removal_request_cleanup.py
+
+      - name: Event pipeline secret scan
+        run: node tools/test_event_pipeline_secret_scan.mjs
+
+      - name: Git diff hygiene
+        run: git diff --check
