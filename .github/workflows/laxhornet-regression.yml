@@ -1,0 +1,79 @@
+name: LaxHornet Regression
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: laxhornet-regression-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    name: Portable regression checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Report runtime versions
+        run: |
+          node --version
+          python --version
+          git --version
+
+      - name: Check root JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            echo "==> node --check $file"
+            node --check "$file"
+          done < <(find . -maxdepth 1 -type f -name '*.js' -print0 | sort -z)
+
+      - name: Run event and scope contracts
+        run: |
+          node tools/test_event_operation_service.mjs
+          node tools/test_game_scope_capabilities.mjs
+
+      - name: Run release controls
+        run: |
+          node tools/test_update_release.mjs
+          node tools/validate_release_manifest.mjs
+          node tools/test_release_containment_phase_aware.mjs
+          node tools/test_release_hygiene.mjs
+
+      - name: Run disclosure and product-alignment contracts
+        run: |
+          node tools/test_minimum_disclosure.mjs
+          node tools/test_secure_disclosure_activation.mjs
+          node tools/test_product_alignment_remediation.mjs
+          node tools/test_trust_spine_release1.mjs
+
+      - name: Run Python permission and cleanup checks
+        run: |
+          python tools/test_cancel_game.py
+          python tools/test_delete_rpc_permissions.py
+          python tools/test_player_removal_request_cleanup.py
+
+      - name: Run secret scan and diff hygiene
+        run: |
+          node tools/test_event_pipeline_secret_scan.mjs
+          git diff --check
