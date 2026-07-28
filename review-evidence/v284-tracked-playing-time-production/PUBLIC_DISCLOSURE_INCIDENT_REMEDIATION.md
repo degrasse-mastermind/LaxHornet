@@ -165,8 +165,14 @@ rewritten.
 - selected private CSV/default-note boundary and family recap boundary passed;
 - unknown/expired/revoked token behavior passed;
 - browser suite contacted no hosted Supabase project and reported no console or
-  page errors.
+  page errors;
+- tracked-time browser suite: 33/33 passed after isolating service-worker
+  lifecycle behavior from the focused UI harness;
+- complete application and release regression: 33/33 groups passed;
+- canonical v284 local release verification: all 15 gates passed, including
+  blank and production-shaped database paths, rollback behavior, database
+  lint, full regression, and disposable-environment cleanup.
 
-Full regression, independent PR review, merge identity, production migration,
-deployment, final smoke, cleanup, and retained-history disposition are recorded
-in this directory after their gates complete.
+Independent PR review, merge identity, production migration, deployment, final
+smoke, cleanup, and retained-history disposition are recorded in this directory
+after their gates complete.

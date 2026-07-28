@@ -163,7 +163,7 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Live Share and export disclosure boundaries.
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
-- The v284 public-disclosure remediation still requires full regression, independent PR review, merge, application of the one corrective migration, exact-merge frontend deployment, final signed-in production smoke, synthetic cleanup, and evidence closure.
+- The v284 public-disclosure remediation passed its complete 33/33 regression and all 15 local release-verification gates. It still requires independent PR review, merge, application of the one corrective migration, exact-merge frontend deployment, final signed-in production smoke, synthetic cleanup, and evidence closure.
 - Coordinated version and service-worker release hygiene.
 - Maintenance of GitHub Action majors and portability of the CI-selected regression checks.
 

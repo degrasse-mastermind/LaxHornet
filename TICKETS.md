@@ -322,8 +322,13 @@ appear through public Live Share.
 - `tools/test_public_event_semantic_boundary.mjs`: passed.
 - Signed-in browser disclosure reproduction: 71/71 passed with the public
   payload remaining exactly two ordinary events and no hosted requests.
-- Full regression, CI, independent review, merge, and production rollout remain
-  required before `DONE`.
+- Tracked-time browser suite: 33/33 passed with focused service-worker
+  lifecycle isolation.
+- Complete application and release regression: 33/33 groups passed.
+- Canonical v284 local release verification: all 15 gates passed, including
+  both database shapes, rollback behavior, lint, regression, and cleanup.
+- CI, independent review, merge, and production rollout remain required before
+  `DONE`.
 
 #### Risks and rollback
 
