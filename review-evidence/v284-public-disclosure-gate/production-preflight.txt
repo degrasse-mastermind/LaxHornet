@@ -1,0 +1,26 @@
+V284 PRODUCTION PREFLIGHT PASSED
+
+Date: 2026-07-28
+Release: v284
+Phase: production
+Branch: main
+Approved HEAD: 1221f418c1e005606d54c545148944f9ec69f132
+Tracked worktree: clean
+
+Passed:
+- approved production HEAD and merge ancestry
+- release manifest identity and v284 markers
+- reviewed migration checksum
+- public Live Share SQL identity
+- historical migration drift check
+- Git diff hygiene
+- Node.js 24.14.0
+- Python 3.12.13
+- Docker client/server 29.6.2
+- Docker Compose 5.3.1
+- Supabase CLI 2.109.1
+- PGlite 0.5.4
+- Playwright 1.61.1
+- approved Chrome executable
+
+No migration, deployment, fixture write, or production mutation was performed.

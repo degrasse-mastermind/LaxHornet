@@ -158,7 +158,7 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Live Share and export disclosure boundaries.
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
-- The v284 local public-disclosure fixture lifecycle and full 32-group regression pass. Production public-disclosure verification, exact-main frontend deployment, signed-in browser smoke validation, and final production evidence closure remain pending. Migration and team authorization gates have passed.
+- The v284 local public-disclosure fixture lifecycle, full 32-group regression, PR #29 portable regression, and exact-SHA production preflight pass. PR #29 remains draft and unmerged. Production public-disclosure verification, exact-main frontend deployment, signed-in browser smoke validation, and final production evidence closure remain pending. Migration and team authorization gates have passed.
 - Coordinated version and service-worker release hygiene.
 - Maintenance of GitHub Action majors and portability of the CI-selected regression checks.
 

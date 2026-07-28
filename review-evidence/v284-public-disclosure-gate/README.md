@@ -389,6 +389,9 @@ Results:
   tracked-time operations;
 - the disposable stack and temporary project were removed;
 - full local regression: 32/32 groups passed.
+- PR #29 portable GitHub regression: passed;
+- exact production preflight on clean `main` at
+  `1221f418c1e005606d54c545148944f9ec69f132`: passed.
 
 Production contact during this local repair: no. Production permissions,
 migrations, RLS, grants, authorization functions, release manifest, public Live
@@ -396,6 +399,17 @@ Share SQL, and runtime code changed: no.
 
 Sanitized machine-readable proof is in `local-disclosure-result.json`; complete
 regression output is in `full-local-regression.txt`.
+
+PR #29 remains draft and unmerged. In accordance with the repository-handling
+boundary, the production synthetic disclosure lifecycle was not resumed from
+the unreviewed harness branch. Current disposition:
+
+```text
+BLOCKED — PUBLIC DISCLOSURE VERIFICATION INCOMPLETE
+```
+
+Next gate: review and merge PR #29 under the repository workflow, then rerun
+Phase 7 from clean approved `main`. The frontend remains undeployed.
 
 ### Historical LH-00 Command Center entry
 

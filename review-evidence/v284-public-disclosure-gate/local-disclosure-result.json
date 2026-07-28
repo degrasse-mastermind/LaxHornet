@@ -81,8 +81,15 @@
   "regression": {
     "local_fixture_safety": "16/16 passed",
     "release_containment": "33/33 passed",
-    "full_local_groups": "32/32 passed"
+    "full_local_groups": "32/32 passed",
+    "pr_29_portable_regression": "passed"
   },
+  "production_preflight": {
+    "approved_sha": "1221f418c1e005606d54c545148944f9ec69f132",
+    "result": "passed"
+  },
+  "production_disclosure_gate": "not resumed while PR 29 remains draft and unmerged",
+  "current_disposition": "BLOCKED — PUBLIC DISCLOSURE VERIFICATION INCOMPLETE",
   "production_contacted": false,
   "production_modified": false,
   "raw_credentials_emitted": false,
