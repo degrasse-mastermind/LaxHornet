@@ -6,9 +6,9 @@
   "tooling_identity": {
     "branch": "fix/v284-local-disclosure-fixture-seeding",
     "commit_is_recorded_in_pr_29_after_push": true,
-    "content_hashes_sha256": {
-      "tools/v284_local_disclosure_fixture.mjs": "926cfdd8de5230ccd2c2b3c7d19f526a3394b52083b818c07f9b57ec53f03871",
-      "tools/test_v284_local_disclosure_fixture.mjs": "a813d99ed1c70914cb0d1d0a4d672b04c0e30b0974b2cf0f85d7fad8807532b4"
+    "committed_git_blob_sha256": {
+      "tools/v284_local_disclosure_fixture.mjs": "8c2bfcf3848c23824a0650078f738558d26f5270e1e660b7931beeea79d11a9f",
+      "tools/test_v284_local_disclosure_fixture.mjs": "bbd92dbef2c1b6f5041faa081180ee47c7e66083e788bb5d0dc301ec196684fd"
     }
   },
   "environment": {
