@@ -1,8 +1,8 @@
 # v284 Public-Disclosure Incident Remediation
 
-Status: remediation review  
-Date: 2026-07-28  
-Production application SHA at incident confirmation: `1221f418c1e005606d54c545148944f9ec69f132`  
+Status: remediation review
+Date: 2026-07-28
+Production application SHA at incident confirmation: `1221f418c1e005606d54c545148944f9ec69f132`
 Production Supabase project: `ulbmjcvnyznvmjgpstno`
 
 All inspection and reproduction data was synthetic or aggregate. No real player,
