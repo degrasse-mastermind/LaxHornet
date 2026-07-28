@@ -4,7 +4,9 @@ const http = require("node:http");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const evidenceRoot = path.join(root, "review-evidence", "tracked-playing-time-ui");
+const evidenceRoot = process.env.LAXHORNET_TRACKED_TIME_EVIDENCE_ROOT
+  ? path.resolve(process.env.LAXHORNET_TRACKED_TIME_EVIDENCE_ROOT)
+  : path.join(root, "review-evidence", "tracked-playing-time-ui");
 const screenshotRoot = path.join(evidenceRoot, "screenshots");
 const port = Number(process.env.LAXHORNET_TRACKED_TIME_PORT || 5263);
 const baseUrl = `http://127.0.0.1:${port}`;

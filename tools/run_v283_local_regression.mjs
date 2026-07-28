@@ -53,7 +53,17 @@ const tests = [
   { name: "v284 team authorization policy", command: process.execPath, args: ["tools/test_v284_team_authorization_policy.mjs"] },
   { name: "tracked playing time UI contracts", command: process.execPath, args: ["tools/test_tracked_playing_time_ui.mjs"] },
   { name: "tracked playing time manual scenarios", command: process.execPath, args: ["tools/test_tracked_playing_time_manual_scenarios.mjs"] },
-  { name: "tracked playing time browser", command: process.execPath, args: ["tools/test_tracked_playing_time_ui_browser.cjs"] },
+  {
+    name: "tracked playing time browser",
+    command: process.execPath,
+    args: ["tools/test_tracked_playing_time_ui_browser.cjs"],
+    env: {
+      LAXHORNET_TRACKED_TIME_EVIDENCE_ROOT: path.join(
+        os.tmpdir(),
+        "laxhornet-v284-tracked-playing-time-browser",
+      ),
+    },
+  },
   { name: "public event semantic boundary", command: process.execPath, args: ["tools/test_public_event_semantic_boundary.mjs"] },
   { name: "game scope and capability contracts", command: process.execPath, args: ["tools/test_game_scope_capabilities.mjs"] },
   { name: "v284 update release", command: process.execPath, args: ["tools/test_update_release.mjs"] },
