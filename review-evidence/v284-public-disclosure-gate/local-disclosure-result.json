@@ -1,0 +1,90 @@
+{
+  "approved_sha": "1221f418c1e005606d54c545148944f9ec69f132",
+  "release": "v284",
+  "status": "PASS",
+  "mechanism": "guarded direct psql prerequisite seeding into a disposable local Supabase project",
+  "environment": {
+    "project_id": "laxhornet-v284-disclosure-local",
+    "api": "http://127.0.0.1:54321",
+    "database": "postgresql://postgres:REDACTED@127.0.0.1:54322/postgres",
+    "container": "supabase_db_laxhornet-v284-disclosure-local",
+    "production_project_rejected": true,
+    "production_host_rejected": true
+  },
+  "fixture": {
+    "synthetic_adult_users": 2,
+    "teams": 1,
+    "players": 1,
+    "games": 1,
+    "ordinary_events": 2,
+    "public_events": 2,
+    "tracked_operations": 9,
+    "lifecycle_shape": "canonical nine-key records inserted individually in sequence order"
+  },
+  "public_payload": {
+    "game_keys": [
+      "final_score_against",
+      "final_score_for",
+      "game_date",
+      "game_id",
+      "jersey_number",
+      "opponent",
+      "period_format",
+      "player_name",
+      "position",
+      "team_name"
+    ],
+    "event_keys": [
+      "category",
+      "event_id",
+      "field_zone",
+      "occurred_at",
+      "period",
+      "point_value",
+      "stat_label",
+      "stat_type"
+    ],
+    "event_count": 2,
+    "forbidden_matches": []
+  },
+  "denial_probes": {
+    "anonymous_private_rpcs": 9,
+    "anonymous_private_tables_or_views": 4,
+    "expected_status": 401,
+    "expected_code": "42501",
+    "legacy_fallback_denied": true
+  },
+  "browser": {
+    "viewport": "390x844",
+    "before_revocation": "Watching live",
+    "after_revocation": "Shared game unavailable",
+    "unexpected_api_requests": [],
+    "unexpected_diagnostics": [],
+    "stale_payload_cleared": true,
+    "selected_csv_forbidden_matches": [],
+    "recap_forbidden_matches": []
+  },
+  "cleanup": {
+    "auth_users": 0,
+    "legacy_teams": 0,
+    "legacy_games": 0,
+    "legacy_events": 0,
+    "active_tokens": 0,
+    "active_grants": 0,
+    "pending_or_conflicted_operations": 0,
+    "retained_append_only_scopes_before_teardown": 3,
+    "retained_revoked_grants_before_teardown": 2,
+    "retained_lifecycle_events_before_teardown": 6,
+    "retained_tracked_operations_before_teardown": 8,
+    "disposable_stack_removed": true
+  },
+  "regression": {
+    "local_fixture_safety": "16/16 passed",
+    "release_containment": "33/33 passed",
+    "full_local_groups": "32/32 passed"
+  },
+  "production_contacted": false,
+  "production_modified": false,
+  "raw_credentials_emitted": false,
+  "frontend_deployed": false
+}

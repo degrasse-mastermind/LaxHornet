@@ -115,3 +115,39 @@ The working tree should be clean unless an approved ticket intentionally changed
 ## Verified outcome
 
 LH-DEV-002 established that the committed migration sequence can rebuild a clean local Supabase database on Windows without linking to, pushing to, resetting, repairing, or otherwise contacting production.
+
+## v284 local-only public-disclosure fixture
+
+The v284 disclosure gate uses a disposable local project when normal REST
+prerequisite seeding is correctly blocked by least-privilege grants:
+
+```powershell
+node tools/v284_local_disclosure_fixture.mjs
+```
+
+The runner:
+
+- copies `supabase/` into a temporary directory and rewrites only the copied
+  project ID to `laxhornet-v284-disclosure-local`;
+- rejects the production project reference, production host, non-loopback
+  endpoints, unexpected ports, database names, and container names before any
+  fixture write;
+- creates only synthetic adults, teams, players, games, events, grants, and
+  tracked-time operations whose IDs begin `v284-disclosure-local-`;
+- uses direct local `psql` only for prerequisite seeding and cleanup, then
+  exercises disclosure through the normal RPC, anonymous REST, and browser
+  paths;
+- validates canonical nine-key lifecycle records individually so JSON payloads
+  cannot silently omit `undefined` fields;
+- revokes the token, deletes mutable rows and local Auth users, verifies zero
+  remaining fixture rows, stops the stack with `--no-backup`, and removes the
+  temporary project.
+
+Run the safety contracts before the integration runner:
+
+```powershell
+node tools/test_v284_local_disclosure_fixture.mjs
+```
+
+This harness must never be linked to a remote project and must never be used
+with production credentials or real youth, family, team, player, or game data.

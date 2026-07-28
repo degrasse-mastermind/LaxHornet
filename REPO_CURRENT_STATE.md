@@ -1,8 +1,8 @@
 # LaxHornet Repository Current State
 
-Last reviewed: 2026-07-27  
-Baseline branch: `release/v284-tracked-playing-time`
-Baseline commit: `fc9c079d69757cfc2667dea7e1dfcc56524dce56`
+Last reviewed: 2026-07-28
+Baseline branch: `main`
+Baseline commit: `1221f418c1e005606d54c545148944f9ec69f132`
 Current repository release marker: `v284`
 Current production marker: `v283` pending the coordinated v284 database-first cutover
 
@@ -70,7 +70,7 @@ The release manifest records:
 
 Do not rewrite, reorder, squash, rename, or silently regenerate these migration files. Any new migration must be additive, timestamped, reviewed, tested locally, and reflected in release-control documentation.
 
-The verified Windows local migration workflow is documented in `docs/LOCAL_SUPABASE_WORKFLOW.md`. It uses Docker Desktop, the Supabase CLI, explicit local-only commands, and a reduced stack where Storage-related services are excluded. It must not be replaced with linked or production-mutating commands.
+The verified Windows local migration workflow is documented in `docs/LOCAL_SUPABASE_WORKFLOW.md`. It uses Docker Desktop, the Supabase CLI, explicit local-only commands, and a reduced stack where Storage-related services are excluded. The v284 disclosure harness additionally uses guarded direct `psql` prerequisite seeding in a distinct disposable local project, then exercises the normal RPC, anonymous REST, and browser paths. It rejects production-like targets and must not be replaced with linked or production-mutating commands.
 
 ## Deployment and release control
 
@@ -158,7 +158,7 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Live Share and export disclosure boundaries.
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
-- Tracked Playing Time still requires public-disclosure verification, exact-main frontend deployment, signed-in browser smoke validation, and final production evidence closure. Migration and team authorization gates have passed.
+- The v284 local public-disclosure fixture lifecycle and full 32-group regression pass. Production public-disclosure verification, exact-main frontend deployment, signed-in browser smoke validation, and final production evidence closure remain pending. Migration and team authorization gates have passed.
 - Coordinated version and service-worker release hygiene.
 - Maintenance of GitHub Action majors and portability of the CI-selected regression checks.
 

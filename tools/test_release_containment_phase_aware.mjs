@@ -157,6 +157,18 @@ try {
     assert.deepEqual(result.allowedAdditiveDatabaseFiles, ["tools/unauthorized.sql"]);
   });
 
+  git(["switch", "-c", "bad-local-fixture-sql", "release-base"]);
+  write("tools/v284_local_disclosure_fixture.sql", "select 'local-only fixture';\n");
+  commit("Add forbidden local fixture SQL");
+  test("standalone mode rejects a local fixture SQL artifact", () => {
+    expectContainmentFailure("STANDALONE_DATABASE_CHANGE", () =>
+      validateReleaseContainment({
+        repoRoot: tempRoot,
+        releaseBaseRef: "release-base",
+      }),
+    );
+  });
+
   git(["switch", "-c", "authorized-db", "release-base"]);
   for (const [index, file] of APPROVED_AUTHORIZED_DB_PATHS.entries()) {
     write(file, `authorized candidate file ${index + 1}\n`);

@@ -268,10 +268,11 @@ Provide a complete, private, local-first Phase 1 experience for tracking one sel
 - Focused v284 verification: secure-disclosure browser passed three consecutive runs at 62/62, static minimum disclosure passed 42/42, secure activation passed 21/21, and `git diff --check` passed.
 - Reusable release controls: `tools/run_release_preflight.mjs`, `tools/run_release_verification.mjs`, and `docs/RELEASE_VERIFICATION_WORKFLOW.md` centralize release refs, exact disposable dependencies, local-stack health, fail-fast gates, cleanup, and external logs without contacting production.
 - Canonical v284 local release verification: all 15 gates passed; production-ledger provenance passed; both database reset/upgrade paths and rollback cases passed; pgTAP passed 37/37 on each path; lint contained only the documented legacy finding; the complete regression passed 29/29; cleanup removed all disposable dependencies and local Supabase containers.
+- v284 local disclosure-fixture repair: a distinct disposable local project now uses fail-closed direct-Postgres prerequisite seeding without changing production grants, RLS, migrations, or runtime code. Guard tests passed 16/16, phase-aware containment passed 33/33 including deliberate fixture-SQL rejection, the complete local disclosure lifecycle passed, and the expanded regression passed 32/32 groups.
 
 #### Risks and rollback
 
-- The foundation migration is present in production and the corrected synthetic team authorization gate passed. The v284 frontend is not yet deployed, and public-disclosure plus browser-smoke gates remain pending; local tracking remains usable.
+- The foundation migration is present in production and the corrected synthetic team authorization gate passed. The local disclosure lifecycle is green and fully cleaned up. The v284 frontend is not yet deployed, and production public-disclosure plus browser-smoke gates remain pending; local tracking remains usable.
 - A review browser that reaches a backend without the tracked-time RPCs fails soft to device-only tracking for that session; the local event gate remains authoritative and is unaffected by hosted capability availability.
 - Running-clock recovery gaps longer than 30 seconds freeze and require review rather than inventing time.
 - Feature rollback is the removal of the additive UI/service wiring before release. Accepted database history remains governed by the foundation's fail-closed rollback.
