@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -69,7 +70,17 @@ const tests = [
   { name: "release hygiene", command: process.execPath, args: ["tools/test_release_hygiene.mjs"] },
   { name: "minimum disclosure", command: process.execPath, args: ["tools/test_minimum_disclosure.mjs"] },
   { name: "secure disclosure activation", command: process.execPath, args: ["tools/test_secure_disclosure_activation.mjs"] },
-  { name: "secure disclosure browser", command: process.execPath, args: ["tools/test_secure_disclosure_activation_browser.cjs"] },
+  {
+    name: "secure disclosure browser",
+    command: process.execPath,
+    args: ["tools/test_secure_disclosure_activation_browser.cjs"],
+    env: {
+      LAXHORNET_ACTIVATION_EVIDENCE_ROOT: path.join(
+        os.tmpdir(),
+        "laxhornet-v284-secure-disclosure-browser",
+      ),
+    },
+  },
   { name: "Product Alignment source", command: process.execPath, args: ["tools/test_product_alignment_remediation.mjs"] },
   {
     name: "Product Alignment browser",
@@ -109,6 +120,7 @@ for (const test of tests) {
       ...process.env,
       LAXHORNET_RELEASE_BASE_REF: baseRef,
       LAXHORNET_ALLOWED_ADDITIVE_DB_PATHS: additivePaths,
+      ...(test.env || {}),
       ...(combinedMode
         ? {
             LAXHORNET_AUTHORIZED_DB_REF: manifest.databaseCandidate,
