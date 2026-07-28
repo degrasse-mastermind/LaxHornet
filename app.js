@@ -5798,14 +5798,24 @@ function trustSpineOperationId(kind, gameId, eventId, value = {}) {
   return `lh-${kind}-${trustSpineHash({ gameId, eventId, value })}`;
 }
 
+function publicEventSemantic(value = {}) {
+  return window.LaxHornetPublicEventSemantics?.publicSemantic(value) || null;
+}
+
+function canonicalEventSemantic(value = {}) {
+  return window.LaxHornetPublicEventSemantics?.canonicalSemantic(value) || null;
+}
+
 function trustSpineEvidenceForEvent(event = {}) {
   const normalized = normalizeEvent(event, event.gameId || "");
+  const semantic = canonicalEventSemantic(normalized);
+  if (!semantic) return null;
   return {
     occurred_at: String(normalized.timestamp || new Date().toISOString()),
     period: String(normalized.quarter || "Q1"),
-    stat_type: String(normalized.statType || "note"),
-    stat_label: String(normalized.statLabel || "Note"),
-    category: String(normalized.category || "Note"),
+    stat_type: semantic.statType,
+    stat_label: semantic.statLabel,
+    category: semantic.category,
     point_value: Number.isFinite(Number(normalized.pointValue)) ? Number(normalized.pointValue) : 0,
     field_zone: String(normalized.fieldZone || ""),
   };
@@ -5864,6 +5874,23 @@ function trustSpinePendingOperation(record, kind) {
   return record.pendingOperations.find((operation) => operation.kind === kind);
 }
 
+function trustSpineRecordCanonicalSemantic(record = {}) {
+  const accepted = canonicalEventSemantic(record.acceptedEvidence);
+  if (accepted) return accepted;
+  const create = (record.pendingOperations || []).find((operation) => operation.kind === "create");
+  return canonicalEventSemantic(create?.rpcPayload?.evidence || create?.eventEvidence);
+}
+
+function suppressPrivateTrustSpineRecord(record) {
+  if (!record) return;
+  record.pendingOperations = [];
+  record.conflict = null;
+  record.lastError = "";
+  record.publicationSuppressedReason = "unsupported_event_semantics";
+  record.publicationSuppressedAt = new Date().toISOString();
+  record.updatedAt = record.publicationSuppressedAt;
+}
+
 function enqueueTrustSpineOperation(record, operation) {
   if (!operation?.kind || !operation.clientOperationId) return;
   if (record.pendingOperations.some((item) => item.clientOperationId === operation.clientOperationId)) return;
@@ -5884,7 +5911,28 @@ function queueTrustSpineEvent(game, event) {
   if (!SECURE_DISCLOSURE_RUNTIME_READY || !currentUserId() || !hasCanonicalTrustSpineScope(game) || !event?.id) return;
   const normalizedEvent = normalizeEvent(event, game.id);
   const evidence = trustSpineEvidenceForEvent(normalizedEvent);
+  const existingRecord = trustSpineState().events[normalizedEvent.id];
+  if (!evidence) {
+    if (
+      existingRecord
+      && existingRecord.serverEventVersion >= 1
+      && canonicalEventSemantic(existingRecord.acceptedEvidence)
+      && existingRecord.lifecycleState !== "tombstoned"
+    ) {
+      suppressPrivateTrustSpineRecord(existingRecord);
+      queueTrustSpineTombstone(
+        game,
+        normalizedEvent,
+        "Event is no longer eligible for public disclosure",
+      );
+    } else {
+      suppressPrivateTrustSpineRecord(existingRecord);
+    }
+    return;
+  }
   const record = trustSpineEventRecord(game, normalizedEvent.id);
+  delete record.publicationSuppressedReason;
+  delete record.publicationSuppressedAt;
   if (record.lifecycleState === "tombstoned") return;
 
   if (record.serverEventVersion < 1) {
@@ -5938,7 +5986,11 @@ function queueTrustSpineEvent(game, event) {
 
 function queueTrustSpineTombstone(game, event, reason = "Tracker event removed") {
   if (!SECURE_DISCLOSURE_RUNTIME_READY || !currentUserId() || !hasCanonicalTrustSpineScope(game) || !event?.id) return;
-  const record = trustSpineEventRecord(game, event.id);
+  const record = trustSpineState().events[event.id];
+  if (!record || !trustSpineRecordCanonicalSemantic(record)) {
+    suppressPrivateTrustSpineRecord(record);
+    return;
+  }
   if (record.lifecycleState === "tombstoned" || trustSpinePendingOperation(record, "tombstone")) return;
   const clientCreatedAt = new Date().toISOString();
   enqueueTrustSpineOperation(record, {
@@ -5957,10 +6009,19 @@ function queueTrustSpineTombstone(game, event, reason = "Tracker event removed")
 function queueTrustSpineGameReconciliation(game) {
   if (!SECURE_DISCLOSURE_RUNTIME_READY || !currentUserId() || !hasCanonicalTrustSpineScope(game)) return;
   const normalized = normalizeGame(game);
-  const presentEventIds = new Set(normalized.events.map((event) => event.id));
+  const presentEventIds = new Set(
+    normalized.events
+      .filter((event) => trustSpineEvidenceForEvent(event))
+      .map((event) => event.id),
+  );
   normalized.events.forEach((event) => queueTrustSpineEvent(normalized, event));
   Object.values(trustSpineState().events)
-    .filter((record) => record.gameId === normalized.id && !presentEventIds.has(record.eventId) && isDeletedEvent(record.eventId))
+    .filter((record) => (
+      record.gameId === normalized.id
+      && !presentEventIds.has(record.eventId)
+      && isDeletedEvent(record.eventId)
+      && trustSpineRecordCanonicalSemantic(record)
+    ))
     .forEach((record) => queueTrustSpineTombstone(normalized, { id: record.eventId }, "Tracker event deleted"));
   persistAll();
 }
@@ -6042,6 +6103,17 @@ function acceptTrustSpineOperation(record, operation, result) {
 }
 
 async function processTrustSpineOperation(record, operation) {
+  const semanticEvidence = operation.kind === "create"
+    ? operation.rpcPayload?.evidence || operation.eventEvidence
+    : { ...record.acceptedEvidence, ...operation.eventEvidence };
+  if (operation.kind !== "tombstone" && !canonicalEventSemantic(semanticEvidence)) {
+    suppressPrivateTrustSpineRecord(record);
+    return false;
+  }
+  if (operation.kind === "tombstone" && !trustSpineRecordCanonicalSemantic(record)) {
+    suppressPrivateTrustSpineRecord(record);
+    return false;
+  }
   const rpcName = trustSpineRpcForOperation(operation.kind);
   const rpcPayload = trustSpinePayloadForOperation(record, operation);
   if (!rpcName || !rpcPayload) return false;
@@ -6109,7 +6181,9 @@ async function flushTrustSpineSync(options = {}) {
 function trustSpineGameSynchronizationStatus(game) {
   const syncState = trustSpineState();
   const scope = syncState.gameScopes[game.id];
-  const events = normalizeGame(game).events.filter((event) => !isDeletedEvent(event.id));
+  const events = normalizeGame(game).events.filter(
+    (event) => !isDeletedEvent(event.id) && trustSpineEvidenceForEvent(event),
+  );
   const records = events.map((event) => syncState.events[event.id]).filter(Boolean);
   const pending = records.some((record) => record.pendingOperations.length);
   const conflict = records.some((record) => record.conflict || record.lastError);
@@ -11317,8 +11391,11 @@ function rideHomeRecapLine(totals = {}, player = {}, intelligence = null, game =
 
 function buildFamilyRecap(game = {}, events = [], playerContext = {}, computedStats = null, intelligence = null) {
   const player = playerContext || {};
-  const totals = computedStats || calculateTotals(events || [], player);
-  const reviewIntelligence = intelligence || buildPostGameIntelligence(game, events || [], player, totals, calculateSeasonTotalsForPlayer(player));
+  const publicEvents = (events || []).filter((event) => publicEventSemantic(event));
+  const totals = computedStats && publicEvents.length === (events || []).length
+    ? computedStats
+    : calculateTotals(publicEvents, player);
+  const reviewIntelligence = intelligence || buildPostGameIntelligence(game, publicEvents, player, totals, calculateSeasonTotalsForPlayer(player));
   const title = `${playerFirstName(player)} ${familyRecapOpponentLabel(game)}`;
   const eventCount = Number(totals.eventCount || events?.length || 0);
   const topContribution = familyRecapTopContribution(totals, player);

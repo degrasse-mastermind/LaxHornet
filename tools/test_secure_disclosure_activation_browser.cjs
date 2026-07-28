@@ -4,7 +4,9 @@ const http = require("node:http");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const evidenceRoot = path.join(root, "review-evidence", "event-pipeline-release-control-cleanup");
+const evidenceRoot = process.env.LAXHORNET_ACTIVATION_EVIDENCE_ROOT
+  ? path.resolve(process.env.LAXHORNET_ACTIVATION_EVIDENCE_ROOT)
+  : path.join(root, "review-evidence", "event-pipeline-release-control-cleanup");
 const browserDir = path.join(evidenceRoot, "browser");
 const releaseVersion = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8")).version;
 const releaseVersionMatch = /^v(\d+)$/.exec(releaseVersion);
@@ -29,6 +31,28 @@ const trustApi = {
   tokenGames: new Map(),
   tokenRevoked: new Set(),
 };
+const publicEventTypeTokens = new Set([
+  "goal",
+  "assist",
+  "shot",
+  "shotongoal",
+  "goaliesave",
+  "goalallowed",
+  "faceoffwin",
+  "faceoffloss",
+  "groundball",
+  "turnover",
+  "causedturnover",
+  "defensivestop",
+  "successfulclear",
+  "failedclear",
+  "hustleplay",
+  "backedupshot",
+  "smartplay",
+  "penalty",
+]);
+const isPublicEventEvidence = (evidence = {}) =>
+  publicEventTypeTokens.has(String(evidence.stat_type || "").toLowerCase().replace(/[^a-z0-9]+/g, ""));
 
 fs.mkdirSync(browserDir, { recursive: true });
 
@@ -191,7 +215,11 @@ async function installApiRoutes(page, options = {}) {
         const gameId = trustApi.tokenGames.get(shareCode);
         const dynamicEvents = gameId
           ? [...trustApi.events.values()]
-              .filter((event) => event.gameId === gameId && event.lifecycleState === "active")
+              .filter((event) => (
+                event.gameId === gameId
+                && event.lifecycleState === "active"
+                && isPublicEventEvidence(event.evidence)
+              ))
               .sort((left, right) => left.evidence.occurred_at.localeCompare(right.evidence.occurred_at))
               .map((event) => ({ event_id: event.eventId, ...event.evidence }))
           : null;
@@ -575,6 +603,149 @@ async function newContext(browser, options = {}) {
       return state.sharedGame?.events?.map((event) => event.id) || [];
     });
     check(initialBridgeTimeline.join(",") === localTrackerEvents.join(","), "newly reconciled events appear in the secure public timeline");
+
+    const privateBoundaryRpcStart = localApiRequests.length;
+    const privateBoundaryResult = await securePage.evaluate(async () => {
+      const game = state.activeGame;
+      const privateEvents = [
+        {
+          id: "synthetic-legacy-shift-alias",
+          gameId: game.id,
+          timestamp: "2026-07-23T12:06:00.000Z",
+          quarter: "Q2",
+          statType: "legacy_shift_alias",
+          statLabel: "Legacy Participation Alias",
+          category: "Participation",
+          pointValue: 0,
+          note: "private alias note",
+        },
+        {
+          id: "synthetic-player-in-alias",
+          gameId: game.id,
+          timestamp: "2026-07-23T12:07:00.000Z",
+          quarter: "Q2",
+          statType: "player_in",
+          statLabel: "Private Legacy Alias",
+          category: "Participation",
+          pointValue: 0,
+        },
+        {
+          id: "synthetic-unknown-import",
+          gameId: game.id,
+          timestamp: "2026-07-23T12:08:00.000Z",
+          quarter: "Q2",
+          statType: "unknown_future_event",
+          statLabel: "Ground Ball",
+          category: "Offense",
+          pointValue: 0,
+          correctedAt: "2026-07-23T12:09:00.000Z",
+        },
+      ].map((event) => normalizeEvent(event, game.id));
+      game.events.push(...privateEvents);
+      state.games = [game];
+      state.trustSpineSync.events["synthetic-legacy-shift-alias"] = {
+        accountId: String(currentUserId() || ""),
+        teamId: game.teamId,
+        rosterPlayerId: game.rosterPlayerId,
+        gameId: game.id,
+        eventId: "synthetic-legacy-shift-alias",
+        serverEventVersion: 0,
+        lifecycleState: "pending",
+        acceptedEvidence: {},
+        pendingOperations: [{
+          kind: "create",
+          clientOperationId: "stale-private-create",
+          clientCreatedAt: "2026-07-23T12:06:00.000Z",
+          eventEvidence: {
+            stat_type: "legacy_shift_alias",
+            stat_label: "Legacy Participation Alias",
+            category: "Participation",
+          },
+          rpcPayload: {
+            client_operation_id: "stale-private-create",
+            event_id: "synthetic-legacy-shift-alias",
+            game_id: game.id,
+            evidence: {
+              occurred_at: "2026-07-23T12:06:00.000Z",
+              period: "Q2",
+              stat_type: "legacy_shift_alias",
+              stat_label: "Legacy Participation Alias",
+              category: "Participation",
+              point_value: 0,
+            },
+          },
+          attempts: 2,
+          lastAttemptAt: "2026-07-23T12:10:00.000Z",
+          lastError: "stale retry",
+        }],
+        acceptedReceipts: [],
+        conflict: null,
+        lastError: "stale retry",
+        updatedAt: "2026-07-23T12:10:00.000Z",
+      };
+
+      state.isOffline = true;
+      queueTrustSpineGameReconciliation(game);
+      const offlinePrivateRecords = privateEvents
+        .map((event) => state.trustSpineSync.events[event.id])
+        .filter(Boolean);
+      state.isOffline = false;
+      const synchronized = await reconcileTrustSpineGame(game);
+      queueTrustSpineTombstone(game, privateEvents[1], "Synthetic private tombstone probe");
+      await flushTrustSpineSync({ gameId: game.id });
+
+      const privateCsv = buildCSV({ scope: "current_game", gameId: game.id });
+      const recap = buildFamilyRecap(game, game.events, game.playerSnapshot);
+      state.sharedGame = normalizeGame({
+        id: game.id,
+        opponent: game.opponent,
+        events: privateEvents,
+      });
+      await loadSharedGame("SYNTHETICSECURECODE");
+      render();
+      return {
+        synchronized,
+        localPrivateCount: privateEvents.length,
+        offlinePrivateRecordCount: offlinePrivateRecords.length,
+        privateRecords: privateEvents.map((event) => state.trustSpineSync.events[event.id] || null),
+        csvRetainsPrivateLocalEvidence: privateCsv.includes("legacy_shift_alias"),
+        csvOmitsPrivateNoteByDefault: !privateCsv.includes("private alias note"),
+        recapText: recap.text,
+        publicIds: state.sharedGame?.events?.map((event) => event.id) || [],
+        publicBody: document.body.innerText,
+      };
+    });
+    const privateBoundaryRequests = localApiRequests.slice(privateBoundaryRpcStart);
+    check(privateBoundaryResult.localPrivateCount === 3, "private aliases remain intact in local saved-game evidence");
+    check(
+      privateBoundaryResult.offlinePrivateRecordCount === 1
+        && privateBoundaryResult.privateRecords.every((record) => !record || record.pendingOperations.length === 0),
+      "offline, stale, imported, corrected, and retrying private aliases cannot remain queued for Event Pipeline ingress",
+    );
+    check(privateBoundaryResult.synchronized === true, "private aliases do not prevent ordinary-event synchronization");
+    check(trustApi.events.size === 2, "signed-in synchronization leaves the authoritative ordinary-event count at exactly two");
+    check(
+      !privateBoundaryRequests.some((item) => item.pathname.endsWith("/lh_create_event")),
+      "signed-in private-alias reconciliation sends no create RPC",
+    );
+    check(
+      privateBoundaryResult.publicIds.join(",") === localTrackerEvents.join(","),
+      "stale cached private payload is replaced by exactly the two approved public events",
+    );
+    check(
+      !/Legacy Participation Alias|Private Legacy Alias|unknown_future_event/i.test(privateBoundaryResult.publicBody),
+      "Live Share browser DOM contains no private or unknown event semantics",
+    );
+    check(
+      privateBoundaryResult.csvRetainsPrivateLocalEvidence
+        && privateBoundaryResult.csvOmitsPrivateNoteByDefault,
+      "selected private CSV preserves scoped local evidence while defaulting private notes out",
+    );
+    check(
+      !/Legacy Participation Alias|Private Legacy Alias|private alias note|3 recorded events/i.test(privateBoundaryResult.recapText),
+      "family recap excludes private participation semantics and their counts",
+    );
+
     const createReplay = await securePage.evaluate(async (primaryEventId) => {
       const game = state.activeGame;
       const event = game.events.find((item) => item.id === primaryEventId);
@@ -623,8 +794,7 @@ async function newContext(browser, options = {}) {
       const event = game.events.find((item) => item.id === primaryEventId);
       const record = state.trustSpineSync.events[event.id];
       record.serverEventVersion = 1;
-      event.stat_label = undefined;
-      event.statLabel = "Recovered Ground Ball";
+      event.fieldZone = "Midfield";
       event.correctedAt = "2026-07-23T12:11:00.000Z";
       queueTrustSpineGameReconciliation(game);
       const synchronized = await reconcileTrustSpineGame(game);

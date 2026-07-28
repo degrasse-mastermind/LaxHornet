@@ -1,10 +1,10 @@
 # LaxHornet Repository Current State
 
-Last reviewed: 2026-07-27  
-Baseline branch: `release/v284-tracked-playing-time`
-Baseline commit: `fc9c079d69757cfc2667dea7e1dfcc56524dce56`
+Last reviewed: 2026-07-28
+Baseline branch: `main`
+Baseline commit: `1221f418c1e005606d54c545148944f9ec69f132`
 Current repository release marker: `v284`
-Current production marker: `v283` pending the coordinated v284 database-first cutover
+Current production marker: `v284` with public Live Share temporarily contained pending incident remediation
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
 
@@ -39,8 +39,10 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
 - Supabase synchronization is optional and must not block core game-day tracking.
 - Runtime includes local delete markers and event-operation capabilities.
 - `main` contains the reviewed Tracked Playing Time foundation from merged PR #24 and the opt-in Phase 1 UI from merged PR #25.
-- The v284 release branch changes only coordinated version/cache surfaces, release controls, tests, and documentation before the separately gated production migration and frontend deployment.
+- The v284 frontend is deployed at application SHA `1221f418c1e005606d54c545148944f9ec69f132`.
 - Production migration `20260727000000_tracked_playing_time_operations` is present exactly once and its 88 normalized statements match the reviewed migration. The v284 team authorization gate passed with an active player-scoped parent grant plus its matching claim. Team-admin-only authority remains intentionally read/list-only for tracked time.
+- A synthetic signed-in reproduction found that legacy participation-like aliases could enter the ordinary Event Pipeline and then appear in public Live Share. Aggregate inspection found no active tokens, no non-synthetic affected share, and no confirmed real-data exposure. Execute access to the affected public RPC is temporarily revoked from browser roles, producing the existing neutral unavailable state while preserving private tracking and evidence.
+- The focused remediation branch adds a closed ordinary-event vocabulary at browser ingress and public database egress. Unknown semantics default private, existing contaminated evidence is retained but omitted, and public labels/categories are canonical rather than caller-controlled.
 - Any synchronization change must preserve offline operation, reconnection behavior, deduplication, authorization boundaries, and existing saved data.
 
 ## Supabase backend
@@ -66,6 +68,7 @@ The release manifest records:
 - Canonical forward migrations for the legacy baseline, Trust Spine Release 1, minimum-necessary disclosure, and disclosure/evidence fixes.
 - An additive event-pipeline capability migration.
 - A separately contained Tracked Playing Time package with one forward migration, one rollback reference, and one pgTAP contract file. Its reviewed Windows/CRLF identities remain recorded in the v284 manifest. Live production history now independently verifies the migration is present exactly once and matches all 88 reviewed statements after line-ending normalization.
+- A separately contained v284 incident-remediation package with additive migration `20260728193942_v284_public_event_semantic_boundary`, fail-closed rollback, pgTAP coverage, and manifest checksums. It is the only expected pending production migration.
 - Required ordering, rollback references, approved file identities, and pending-production expectations.
 
 Do not rewrite, reorder, squash, rename, or silently regenerate these migration files. Any new migration must be additive, timestamped, reviewed, tested locally, and reflected in release-control documentation.
@@ -77,7 +80,7 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
 - Static deployment uses GitHub Pages from the `main` branch repository root.
 - Custom domain: `laxhornet.mybranford.com`.
 - Release coordination includes `version.json`, service-worker/cache markers, script query versions, and `release/laxhornet-release-manifest.json`.
-- Current repository release marker is `v284`; production remains v283 until the database-first release gates pass.
+- Current repository and production release marker is `v284`. Public Live Share remains temporarily unavailable until the reviewed semantic-boundary migration and corrected frontend are deployed in database-first order.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 
@@ -105,7 +108,9 @@ node tools/test_event_operation_service.mjs
 node tools/test_game_scope_capabilities.mjs
 node tools/test_tracked_playing_time_service.mjs
 node tools/test_tracked_playing_time_foundation.mjs
+node tools/test_public_event_semantic_boundary.mjs
 supabase test db --local supabase/tests/tracked_playing_time_foundation.sql
+supabase test db --local supabase/tests/v284_public_event_semantic_boundary.sql
 ```
 
 The current broad local regression entry point is:
@@ -158,7 +163,7 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Live Share and export disclosure boundaries.
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
-- Tracked Playing Time still requires public-disclosure verification, exact-main frontend deployment, signed-in browser smoke validation, and final production evidence closure. Migration and team authorization gates have passed.
+- The v284 public-disclosure remediation still requires full regression, independent PR review, merge, application of the one corrective migration, exact-merge frontend deployment, final signed-in production smoke, synthetic cleanup, and evidence closure.
 - Coordinated version and service-worker release hygiene.
 - Maintenance of GitHub Action majors and portability of the CI-selected regression checks.
 

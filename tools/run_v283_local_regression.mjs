@@ -34,6 +34,9 @@ const additivePaths = [
   "supabase/migrations/20260727000000_tracked_playing_time_operations.sql",
   "supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql",
   "supabase/tests/tracked_playing_time_foundation.sql",
+  "supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql",
+  "supabase/rollback/20260728193942_v284_public_event_semantic_boundary_rollback.sql",
+  "supabase/tests/v284_public_event_semantic_boundary.sql",
 ].join(",");
 
 const rootJavaScript = readdirSync(root)
@@ -50,6 +53,7 @@ const tests = [
   { name: "tracked playing time UI contracts", command: process.execPath, args: ["tools/test_tracked_playing_time_ui.mjs"] },
   { name: "tracked playing time manual scenarios", command: process.execPath, args: ["tools/test_tracked_playing_time_manual_scenarios.mjs"] },
   { name: "tracked playing time browser", command: process.execPath, args: ["tools/test_tracked_playing_time_ui_browser.cjs"] },
+  { name: "public event semantic boundary", command: process.execPath, args: ["tools/test_public_event_semantic_boundary.mjs"] },
   { name: "game scope and capability contracts", command: process.execPath, args: ["tools/test_game_scope_capabilities.mjs"] },
   { name: "v284 update release", command: process.execPath, args: ["tools/test_update_release.mjs"] },
   {

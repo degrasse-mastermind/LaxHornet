@@ -9,6 +9,7 @@ import {
   APPROVED_HISTORICAL_PROVENANCE_IDENTITIES,
   APPROVED_HISTORICAL_PROVENANCE_PATHS,
   TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
+  V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS,
   validateHistoricalProvenance,
   validateReleaseContainment,
 } from "./release_containment.mjs";
@@ -78,6 +79,10 @@ expect(
   manifest.approvedMergeSha === "e2cd28a568e91232d375a8607e6376800d3a2a20",
   "approvedMergeSha must identify the approved PR #26 merge",
 );
+expect(
+  manifest.incidentRemediationBaseSha === "1221f418c1e005606d54c545148944f9ec69f132",
+  "incidentRemediationBaseSha must identify the deployed v284 incident baseline",
+);
 try {
   execFileSync(
     "git",
@@ -120,8 +125,12 @@ const reviewPackages = manifest.reviewDatabasePackages || [];
 const trackedTimeReview = reviewPackages.find(
   (entry) => entry.name === "tracked_playing_time_foundation",
 );
-expect(reviewPackages.length === 1, "manifest must contain exactly one review-only database package");
+const publicEventBoundaryReview = reviewPackages.find(
+  (entry) => entry.name === "v284_public_event_semantic_boundary",
+);
+expect(reviewPackages.length === 2, "manifest must contain the two bounded v284 database packages");
 expect(Boolean(trackedTimeReview), "tracked playing time review package must be present");
+expect(Boolean(publicEventBoundaryReview), "public event semantic boundary package must be present");
 const trackedTimeReviewPaths = trackedTimeReview
   ? [
       trackedTimeReview.forwardMigration,
@@ -134,8 +143,8 @@ expect(
     === JSON.stringify([...TRACKED_PLAYING_TIME_REVIEW_DB_PATHS].sort()),
   "tracked playing time review package paths must match the explicit containment allowlist",
 );
-expect(trackedTimeReview?.status === "draft_review", "tracked playing time package must remain draft_review");
-expect(trackedTimeReview?.productionApplied === false, "review package must not claim production application");
+expect(trackedTimeReview?.status === "production_applied", "tracked playing time package must record production application");
+expect(trackedTimeReview?.productionApplied === true, "tracked playing time package must record production application");
 expect(
   trackedTimeReview?.productionAuthorizationRequired === true,
   "review package must require separate production authorization",
@@ -148,6 +157,42 @@ for (const file of TRACKED_PLAYING_TIME_REVIEW_DB_PATHS) {
     expect(
       trackedTimeReview?.sha256?.[file] === localHash,
       `tracked playing time review SHA-256 is stale: ${file}`,
+    );
+  }
+}
+
+const publicEventBoundaryPaths = publicEventBoundaryReview
+  ? [
+      publicEventBoundaryReview.forwardMigration,
+      publicEventBoundaryReview.rollbackReference,
+      publicEventBoundaryReview.testSql,
+    ]
+  : [];
+expect(
+  JSON.stringify([...publicEventBoundaryPaths].sort())
+    === JSON.stringify([...V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS].sort()),
+  "public event semantic boundary paths must match the explicit containment allowlist",
+);
+expect(
+  publicEventBoundaryReview?.status === "incident_remediation_review",
+  "public event semantic boundary must remain in incident remediation review",
+);
+expect(
+  publicEventBoundaryReview?.productionApplied === false,
+  "public event semantic boundary must not claim production application before rollout",
+);
+expect(
+  publicEventBoundaryReview?.productionAuthorizationRequired === true,
+  "public event semantic boundary must require explicit production authorization",
+);
+for (const file of V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS) {
+  const absolute = path.join(root, file);
+  expect(fs.existsSync(absolute), `public event semantic boundary file is missing: ${file}`);
+  if (fs.existsSync(absolute)) {
+    const localHash = reviewedTextSha256(fs.readFileSync(absolute));
+    expect(
+      publicEventBoundaryReview?.sha256?.[file] === localHash,
+      `public event semantic boundary SHA-256 is stale: ${file}`,
     );
   }
 }
@@ -267,33 +312,34 @@ expect(
   "productionHistoricalMigration documentation Git blob must match its approved identity",
 );
 
-const expectedMigrationSequence = [
+const approvedBaseMigrationSequence = [
   ...manifest.canonicalForwardMigrations.slice(0, 2),
   historical.markerPath,
   ...manifest.canonicalForwardMigrations.slice(2),
   ...manifest.additiveForwardMigrations,
 ];
+const expectedMigrationSequence = [
+  ...approvedBaseMigrationSequence,
+  trackedTimeReview?.forwardMigration,
+];
 expect(
   JSON.stringify(manifest.requiredMigrationSequence) === JSON.stringify(expectedMigrationSequence),
-  "requiredMigrationSequence must preserve timestamp order including the historical marker",
+  "requiredMigrationSequence must preserve the applied v284 migration order",
 );
 expect(
   JSON.stringify(manifest.reviewMigrationSequence)
-    === JSON.stringify([...expectedMigrationSequence, trackedTimeReview?.forwardMigration]),
-  "reviewMigrationSequence must append the tracked playing time migration without changing production state",
+    === JSON.stringify([...expectedMigrationSequence, publicEventBoundaryReview?.forwardMigration]),
+  "reviewMigrationSequence must append only the incident remediation migration",
 );
 expect(
   JSON.stringify(manifest.expectedRemoteAppliedMigrations)
-    === JSON.stringify([historical.markerPath]),
-  "expectedRemoteAppliedMigrations must contain only the historical production marker",
+    === JSON.stringify(expectedMigrationSequence),
+  "expectedRemoteAppliedMigrations must match the seven confirmed production migrations",
 );
 expect(
   JSON.stringify(manifest.expectedPendingProductionMigrations)
-    === JSON.stringify([
-      ...manifest.canonicalForwardMigrations,
-      ...manifest.additiveForwardMigrations,
-    ]),
-  "expectedPendingProductionMigrations must contain the five reviewed forward migrations",
+    === JSON.stringify([publicEventBoundaryReview?.forwardMigration]),
+  "expectedPendingProductionMigrations must contain only the corrective migration",
 );
 
 expect(
@@ -382,7 +428,10 @@ if (requireCombined) {
       releaseBaseRef: releaseBase,
       authorizedDbRef: manifest.databaseCandidate,
       approvedAdditiveRef: manifest.cleanupCandidate,
-      allowedAdditiveDbPaths: TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
+      allowedAdditiveDbPaths: [
+        ...TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
+        ...V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS,
+      ],
       headRef: combinedRef,
     });
     expect(
@@ -411,6 +460,7 @@ const allowedCleanupMigrations = new Set([
   historical.markerPath,
   ...manifest.canonicalForwardMigrations,
   trackedTimeReview?.forwardMigration,
+  publicEventBoundaryReview?.forwardMigration,
 ]);
 for (const file of cleanupMigrations) {
   expect(allowedCleanupMigrations.has(file), `unknown cleanup migration detected: ${file}`);

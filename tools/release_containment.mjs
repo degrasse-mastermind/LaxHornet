@@ -24,6 +24,12 @@ export const TRACKED_PLAYING_TIME_REVIEW_DB_PATHS = Object.freeze([
   "supabase/tests/tracked_playing_time_foundation.sql",
 ]);
 
+export const V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS = Object.freeze([
+  "supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql",
+  "supabase/rollback/20260728193942_v284_public_event_semantic_boundary_rollback.sql",
+  "supabase/tests/v284_public_event_semantic_boundary.sql",
+]);
+
 export const APPROVED_HISTORICAL_PROVENANCE_PATHS = Object.freeze([
   "supabase/migrations/20260723010607_remote_schema.sql",
   "supabase/production-history/20260723010607_remote_schema.sql",
