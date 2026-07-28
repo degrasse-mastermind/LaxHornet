@@ -368,7 +368,8 @@ creates only `v284-disclosure-local-` fixtures, and tears down the stack with
 
 Results:
 
-- environment and synthetic-data guard contracts: 16/16 passed;
+- environment, deployment-isolation, teardown, and session guard contracts:
+  50/50 passed;
 - phase-aware containment: 33/33 passed, including rejection of a deliberately
   added `tools/v284_local_disclosure_fixture.sql` release artifact;
 - two synthetic adult Auth users, one team, one player, one game, two ordinary
@@ -399,6 +400,16 @@ Share SQL, and runtime code changed: no.
 
 Sanitized machine-readable proof is in `local-disclosure-result.json`; complete
 regression output is in `full-local-regression.txt`.
+
+The hardened rerun additionally required an exact `0` integer for every Auth
+user, session, refresh-token, and mutable cleanup count; `null`, blank, missing,
+and nonnumeric reports fail. The old coach credential was rejected by Auth
+before and after user deletion, its refresh token was rejected, and its private
+tracked-time RPC authority was denied while the synthetic game still existed.
+The cleanup proof records stop exit `0`, zero project containers, zero open
+ports, and removal of the temporary project. The machine-readable proof binds
+these results to SHA-256 hashes of both tooling files; PR #29 records the exact
+commit after push.
 
 PR #29 remains draft and unmerged. In accordance with the repository-handling
 boundary, the production synthetic disclosure lifecycle was not resumed from

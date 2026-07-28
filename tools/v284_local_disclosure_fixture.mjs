@@ -245,14 +245,20 @@ export function assertTeardownProof(proof) {
   return true;
 }
 
+function assertExactZeroCount(value, message) {
+  assert.equal(Number.isInteger(value) && value === 0, true, message);
+}
+
 export function assertSessionRevocationProof(proof) {
   assert.ok([200, 204].includes(proof?.logoutStatus), "Auth session revocation failed");
-  assert.equal(Number(proof?.sessionsRemaining), 0, "Auth session remained after revocation");
-  assert.equal(Number(proof?.refreshTokensRemaining), 0, "refresh token remained after revocation");
+  assertExactZeroCount(proof?.sessionsRemaining, "Auth session remained after revocation or count was unavailable");
+  assertExactZeroCount(proof?.refreshTokensRemaining, "refresh token remained after revocation or count was unavailable");
   assert.equal(proof?.oldAuthTokenRejected, true, "old access token was not rejected by Auth");
+  assert.equal(proof?.oldAuthTokenRejectedAfterDelete, true, "old access token was not rejected after user deletion");
   assert.equal(proof?.oldRefreshTokenRejected, true, "old refresh token remained usable");
   assert.equal(proof?.oldPrivateRpcRejected, true, "old access token retained private RPC authority");
-  assert.equal(Number(proof?.usersRemaining), 0, "synthetic Auth user remained after deletion");
+  assert.equal(proof?.privateRpcProbeGameRows, 1, "private RPC token probe did not target the retained synthetic game");
+  assertExactZeroCount(proof?.usersRemaining, "synthetic Auth user remained after deletion or count was unavailable");
   assert.match(proof?.accessTokenFingerprint || "", /^[a-f0-9]{12}$/);
   assert.match(proof?.refreshTokenFingerprint || "", /^[a-f0-9]{12}$/);
   return true;
@@ -577,7 +583,7 @@ commit;
 `;
 }
 
-function cleanupSql(fixture, adminId, coachId) {
+function revokeFixtureGrantsSql(fixture, adminId) {
   const lifecycle = [
     {
       id: `${fixture.runId}-coach-revoked`,
@@ -605,6 +611,13 @@ function cleanupSql(fixture, adminId, coachId) {
   return `
 begin;
 ${lifecycle.map(lifecycleRecordSql).join("\n")}
+commit;
+`;
+}
+
+function removeMutableFixtureSql(fixture, adminId, coachId) {
+  return `
+begin;
 delete from public.events where game_id = ${sqlLiteral(fixture.ids.game)};
 delete from public.games where id = ${sqlLiteral(fixture.ids.game)};
 delete from public.player_claims where id = ${sqlLiteral(fixture.ids.coachClaim)};
@@ -1256,13 +1269,15 @@ async function revokeAndDeleteLocalAuthUsers(context) {
       );
     }
     const afterLogout = localAuthState(context.containerName, userId);
-    assert.equal(Number(afterLogout.sessionsRemaining), 0, `local ${role} Auth session remained`);
-    assert.equal(Number(afterLogout.refreshTokensRemaining), 0, `local ${role} refresh token remained`);
+    assertExactZeroCount(afterLogout.sessionsRemaining, `local ${role} Auth session remained or count was unavailable`);
+    assertExactZeroCount(afterLogout.refreshTokensRemaining, `local ${role} refresh token remained or count was unavailable`);
 
     let tokenProof = {
       oldAuthTokenRejected: true,
+      oldAuthTokenRejectedAfterDelete: true,
       oldRefreshTokenRejected: true,
       oldPrivateRpcRejected: true,
+      privateRpcProbeGameRows: 1,
       accessTokenFingerprint: "not_issued",
       refreshTokenFingerprint: "not_issued",
     };
@@ -1275,6 +1290,16 @@ async function revokeAndDeleteLocalAuthUsers(context) {
         headers: apiHeaders(context.publishableKey, context.publishableKey),
         body: { refresh_token: session.refresh_token },
       });
+      const privateRpcProbe = JSON.parse(psql(context.containerName, `
+select json_build_object(
+  'gameRows', (select count(*) from public.games where id = ${sqlLiteral(context.fixture.ids.game)})
+)::text;
+`));
+      assert.equal(
+        privateRpcProbe.gameRows,
+        1,
+        "old-token private RPC probe requires the synthetic game to remain present",
+      );
       const oldPrivateRpc = await rpc(
         context.apiUrl,
         context.publishableKey,
@@ -1288,6 +1313,7 @@ async function revokeAndDeleteLocalAuthUsers(context) {
         oldPrivateRpcRejected:
           oldPrivateRpc.status >= 400
           || oldPrivateRpc.body?.outcome !== "accepted",
+        privateRpcProbeGameRows: privateRpcProbe.gameRows,
         accessTokenFingerprint: tokenFingerprint(session.access_token),
         refreshTokenFingerprint: tokenFingerprint(session.refresh_token),
       };
@@ -1297,10 +1323,16 @@ async function revokeAndDeleteLocalAuthUsers(context) {
       headers: apiHeaders(context.publishableKey, context.serviceRoleKey),
     });
     assert.ok([200, 204, 404].includes(removed.status), "local synthetic Auth user deletion failed");
+    if (session) {
+      const oldAuthAfterDelete = await request(`${context.apiUrl}/auth/v1/user`, {
+        headers: apiHeaders(context.publishableKey, session.access_token),
+      });
+      tokenProof.oldAuthTokenRejectedAfterDelete = [401, 403].includes(oldAuthAfterDelete.status);
+    }
     const finalState = localAuthState(context.containerName, userId);
-    assert.equal(Number(finalState.usersRemaining), 0, `local ${role} Auth user remained`);
-    assert.equal(Number(finalState.sessionsRemaining), 0, `local ${role} Auth session remained after user deletion`);
-    assert.equal(Number(finalState.refreshTokensRemaining), 0, `local ${role} refresh token remained after user deletion`);
+    assertExactZeroCount(finalState.usersRemaining, `local ${role} Auth user remained or count was unavailable`);
+    assertExactZeroCount(finalState.sessionsRemaining, `local ${role} Auth session remained after user deletion or count was unavailable`);
+    assertExactZeroCount(finalState.refreshTokensRemaining, `local ${role} refresh token remained after user deletion or count was unavailable`);
     const proof = {
       role,
       logoutStatus: logout?.status ?? "no_session_issued",
@@ -1323,8 +1355,9 @@ async function cleanupFixture(context) {
   );
   assert.equal(publicAfterRevoke.status, 200);
   assert.equal(publicAfterRevoke.body, null);
-  psql(context.containerName, cleanupSql(context.fixture, context.adminId, context.coachId));
+  psql(context.containerName, revokeFixtureGrantsSql(context.fixture, context.adminId));
   const auth = await revokeAndDeleteLocalAuthUsers(context);
+  psql(context.containerName, removeMutableFixtureSql(context.fixture, context.adminId, context.coachId));
   const proof = JSON.parse(psql(context.containerName, `
 select json_build_object(
   'authUsers', (
@@ -1392,7 +1425,7 @@ select json_build_object(
     "activeGrants",
     "pendingOrConflictedOperations",
   ]) {
-    assert.equal(Number(proof[key]), 0, `local cleanup proof failed for ${key}`);
+    assertExactZeroCount(proof[key], `local cleanup proof failed for ${key}`);
   }
   return { ...proof, auth };
 }

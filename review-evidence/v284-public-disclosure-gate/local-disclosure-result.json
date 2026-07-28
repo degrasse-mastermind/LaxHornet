@@ -3,6 +3,14 @@
   "release": "v284",
   "status": "PASS",
   "mechanism": "guarded direct psql prerequisite seeding into a disposable local Supabase project",
+  "tooling_identity": {
+    "branch": "fix/v284-local-disclosure-fixture-seeding",
+    "commit_is_recorded_in_pr_29_after_push": true,
+    "content_hashes_sha256": {
+      "tools/v284_local_disclosure_fixture.mjs": "926cfdd8de5230ccd2c2b3c7d19f526a3394b52083b818c07f9b57ec53f03871",
+      "tools/test_v284_local_disclosure_fixture.mjs": "a813d99ed1c70914cb0d1d0a4d672b04c0e30b0974b2cf0f85d7fad8807532b4"
+    }
+  },
   "environment": {
     "project_id": "laxhornet-v284-disclosure-local",
     "api": "http://127.0.0.1:54321",
@@ -66,6 +74,18 @@
   },
   "cleanup": {
     "auth_users": 0,
+    "auth_sessions": 0,
+    "auth_refresh_tokens": 0,
+    "coach_global_logout_status": 204,
+    "old_auth_token_rejected_before_user_delete": true,
+    "old_auth_token_rejected_after_user_delete": true,
+    "old_refresh_token_rejected": true,
+    "old_private_rpc_authority_rejected_while_game_existed": true,
+    "private_rpc_probe_game_rows": 1,
+    "token_fingerprints_sha256_prefix": {
+      "access": "1a2f4474cd85",
+      "refresh": "36db186b6d1b"
+    },
     "legacy_teams": 0,
     "legacy_games": 0,
     "legacy_events": 0,
@@ -76,10 +96,14 @@
     "retained_revoked_grants_before_teardown": 2,
     "retained_lifecycle_events_before_teardown": 6,
     "retained_tracked_operations_before_teardown": 8,
+    "stop_exit_code": 0,
+    "remaining_containers": [],
+    "open_ports": [],
+    "temporary_root_removed": true,
     "disposable_stack_removed": true
   },
   "regression": {
-    "local_fixture_safety": "16/16 passed",
+    "local_fixture_safety": "50/50 passed",
     "release_containment": "33/33 passed",
     "full_local_groups": "32/32 passed",
     "pr_29_portable_regression": "passed"
@@ -89,7 +113,7 @@
     "result": "passed"
   },
   "production_disclosure_gate": "not resumed while PR 29 remains draft and unmerged",
-  "current_disposition": "BLOCKED — PUBLIC DISCLOSURE VERIFICATION INCOMPLETE",
+  "current_disposition": "LOCAL DISCLOSURE TOOLING PASSED; exact-SHA independent review pending",
   "production_contacted": false,
   "production_modified": false,
   "raw_credentials_emitted": false,
