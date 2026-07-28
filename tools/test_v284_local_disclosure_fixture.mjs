@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import {
+  APPROVED_APPLICATION_SHA,
+  APPROVED_DEPLOYMENT_BRANCH,
   LIFECYCLE_KEYS,
   LOCAL_API_URL,
   LOCAL_DB_CONTAINER,
@@ -10,9 +12,16 @@ import {
   PRODUCTION_HOST,
   PRODUCTION_PROJECT_REF,
   SYNTHETIC_PREFIX,
+  TOOLING_BRANCH,
+  TOOLING_PATHS,
+  assertDeploymentIsolationSnapshot,
   assertHomogeneousLifecycleBatch,
+  assertSessionRevocationProof,
   assertSyntheticFixtureDescriptor,
+  assertTeardownProof,
+  completeLocalTeardown,
   validateLocalTarget,
+  verifyApprovedApplicationIsolation,
 } from "./v284_local_disclosure_fixture.mjs";
 
 const results = [];
@@ -45,8 +54,51 @@ function test(name, callback) {
   }
 }
 
+async function testAsync(name, callback) {
+  try {
+    await callback();
+    results.push({ name, status: "PASS" });
+  } catch (error) {
+    results.push({ name, status: "FAIL", error: error.message });
+  }
+}
+
 function rejects(name, callback, pattern) {
   test(name, () => assert.throws(callback, pattern));
+}
+
+function deploymentSnapshot(overrides = {}) {
+  return {
+    approvedSha: APPROVED_APPLICATION_SHA,
+    approvedRefSha: APPROVED_APPLICATION_SHA,
+    deploymentBranch: APPROVED_DEPLOYMENT_BRANCH,
+    treePaths: ["app.html", "app.js", "service-worker.js", "release/laxhornet-release-manifest.json"],
+    runtimeSources: {
+      "app.html": "<script src=\"app.js\"></script>",
+      "app.js": "console.log('app');",
+      "service-worker.js": "const ASSETS = ['app.js'];",
+      "release/laxhornet-release-manifest.json": "{\"release\":\"v284\"}",
+    },
+    workflowSources: {
+      ".github/workflows/laxhornet-regression.yml": "on: [push]",
+    },
+    ...overrides,
+  };
+}
+
+function validSessionProof(overrides = {}) {
+  return {
+    logoutStatus: 204,
+    sessionsRemaining: 0,
+    refreshTokensRemaining: 0,
+    oldAuthTokenRejected: true,
+    oldRefreshTokenRejected: true,
+    oldPrivateRpcRejected: true,
+    usersRemaining: 0,
+    accessTokenFingerprint: "a1b2c3d4e5f6",
+    refreshTokenFingerprint: "0f1e2d3c4b5a",
+    ...overrides,
+  };
 }
 
 test("accepts the exact disposable local target", () => {
@@ -177,6 +229,152 @@ test("runner has no production mutation command", () => {
   assert.match(source, /--no-backup/);
   assert.match(source, /validateLocalTarget/);
 });
+
+test("approved main tree is isolated from the tooling branch", () => {
+  const result = verifyApprovedApplicationIsolation();
+  assert.equal(result.approvedSha, APPROVED_APPLICATION_SHA);
+  assert.equal(result.deploymentBranch, APPROVED_DEPLOYMENT_BRANCH);
+  assert.equal(result.toolingPathsAbsent, true);
+});
+test("accepts an isolated exact-SHA deployment snapshot", () => {
+  assert.equal(assertDeploymentIsolationSnapshot(deploymentSnapshot()).toolingPathsAbsent, true);
+});
+for (const toolingPath of TOOLING_PATHS) {
+  rejects(
+    `rejects approved application tree containing ${toolingPath}`,
+    () => assertDeploymentIsolationSnapshot(deploymentSnapshot({
+      treePaths: [...deploymentSnapshot().treePaths, toolingPath],
+    })),
+    /contains tooling path/,
+  );
+}
+rejects(
+  "rejects a tooling branch as deployment source",
+  () => assertDeploymentIsolationSnapshot(deploymentSnapshot({ deploymentBranch: TOOLING_BRANCH })),
+  /cannot be a deployment source/,
+);
+rejects(
+  "rejects approved main SHA drift",
+  () => assertDeploymentIsolationSnapshot(deploymentSnapshot({ approvedRefSha: "f".repeat(40) })),
+  /ref drifted/,
+);
+for (const file of ["app.html", "app.js", "service-worker.js", "release/laxhornet-release-manifest.json"]) {
+  rejects(
+    `rejects tooling reference in ${file}`,
+    () => assertDeploymentIsolationSnapshot(deploymentSnapshot({
+      runtimeSources: {
+        ...deploymentSnapshot().runtimeSources,
+        [file]: "tools/v284_local_disclosure_fixture.mjs",
+      },
+    })),
+    /references non-deployable tooling/,
+  );
+}
+rejects(
+  "rejects a deployment workflow that copies from the tooling branch",
+  () => assertDeploymentIsolationSnapshot(deploymentSnapshot({
+    workflowSources: {
+      ".github/workflows/pages.yml": `git checkout ${TOOLING_BRANCH}`,
+    },
+  })),
+  /copies or deploys non-deployable tooling/,
+);
+
+await testAsync("accepts fully proven teardown", async () => {
+  let removed = false;
+  const proof = await completeLocalTeardown("C:\\synthetic\\fixture", {
+    stop: async () => ({ exitCode: 0 }),
+    listContainers: async () => [],
+    isPortOpen: async () => false,
+    removeTemporaryRoot: async () => { removed = true; },
+    temporaryRootExists: () => !removed,
+  });
+  assert.equal(proof.disposableStackRemoved, true);
+});
+await testAsync("rejects stop command failure", async () => {
+  await assert.rejects(
+    completeLocalTeardown("C:\\synthetic\\fixture", {
+      stop: async () => ({ exitCode: 1 }),
+    }),
+    /did not exit 0/,
+  );
+});
+await testAsync("rejects stop command timeout", async () => {
+  await assert.rejects(
+    completeLocalTeardown("C:\\synthetic\\fixture", {
+      stop: async () => { throw new Error("timed out"); },
+    }),
+    /timed out/,
+  );
+});
+await testAsync("rejects surviving disposable container", async () => {
+  await assert.rejects(
+    completeLocalTeardown("C:\\synthetic\\fixture", {
+      stop: async () => ({ exitCode: 0 }),
+      listContainers: async () => [LOCAL_DB_CONTAINER],
+    }),
+    /containers survived/,
+  );
+});
+await testAsync("rejects surviving disposable port", async () => {
+  await assert.rejects(
+    completeLocalTeardown("C:\\synthetic\\fixture", {
+      stop: async () => ({ exitCode: 0 }),
+      listContainers: async () => [],
+      isPortOpen: async (port) => port === 54321,
+    }),
+    /ports survived/,
+  );
+});
+await testAsync("rejects partial teardown with surviving directory", async () => {
+  await assert.rejects(
+    completeLocalTeardown("C:\\synthetic\\fixture", {
+      stop: async () => ({ exitCode: 0 }),
+      listContainers: async () => [],
+      isPortOpen: async () => false,
+      removeTemporaryRoot: async () => {},
+      temporaryRootExists: () => true,
+    }),
+    /directory survived/,
+  );
+});
+await testAsync("rejects cleanup verifier failure", async () => {
+  await assert.rejects(
+    completeLocalTeardown("C:\\synthetic\\fixture", {
+      stop: async () => ({ exitCode: 0 }),
+      listContainers: async () => { throw new Error("inventory unavailable"); },
+    }),
+    /inventory unavailable/,
+  );
+});
+rejects(
+  "rejects optimistic teardown success flag",
+  () => assertTeardownProof({
+    stopExitCode: 0,
+    remainingContainers: [],
+    openPorts: [],
+    temporaryRootRemoved: false,
+    disposableStackRemoved: true,
+  }),
+  /directory survived/,
+);
+
+test("accepts complete Auth session-revocation proof", () => {
+  assert.equal(assertSessionRevocationProof(validSessionProof()), true);
+});
+for (const [name, overrides, pattern] of [
+  ["rejects logout failure", { logoutStatus: 500 }, /revocation failed/],
+  ["rejects surviving Auth session", { sessionsRemaining: 1 }, /session remained/],
+  ["rejects surviving refresh token", { refreshTokensRemaining: 1 }, /refresh token remained/],
+  ["rejects deleted user with surviving session", { usersRemaining: 0, sessionsRemaining: 1 }, /session remained/],
+  ["rejects usable old access token", { oldAuthTokenRejected: false }, /old access token/],
+  ["rejects usable old refresh token", { oldRefreshTokenRejected: false }, /old refresh token/],
+  ["rejects retained private RPC authority", { oldPrivateRpcRejected: false }, /private RPC authority/],
+  ["rejects unavailable session inspection", { sessionsRemaining: undefined }, /session remained/],
+  ["rejects false zero-session cleanup report", { sessionsRemaining: "unknown" }, /session remained/],
+]) {
+  rejects(name, () => assertSessionRevocationProof(validSessionProof(overrides)), pattern);
+}
 
 for (const result of results) {
   process.stdout.write(`${result.status} ${result.name}${result.error ? `: ${result.error}` : ""}\n`);

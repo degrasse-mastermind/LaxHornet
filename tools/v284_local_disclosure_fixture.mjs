@@ -3,17 +3,26 @@ import { createHash, randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const PRODUCTION_PROJECT_REF = "ulbmjcvnyznvmjgpstno";
 export const PRODUCTION_HOST = `${PRODUCTION_PROJECT_REF}.supabase.co`;
+export const APPROVED_APPLICATION_SHA = "1221f418c1e005606d54c545148944f9ec69f132";
+export const APPROVED_DEPLOYMENT_BRANCH = "main";
+export const TOOLING_BRANCH = "fix/v284-local-disclosure-fixture-seeding";
 export const LOCAL_PROJECT_ID = "laxhornet-v284-disclosure-local";
 export const LOCAL_API_URL = "http://127.0.0.1:54321";
 export const LOCAL_DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 export const LOCAL_DB_CONTAINER = `supabase_db_${LOCAL_PROJECT_ID}`;
 export const SYNTHETIC_PREFIX = "v284-disclosure-local-";
+export const LOCAL_PROJECT_PORTS = Object.freeze([54321, 54322, 54323, 54324]);
+export const TOOLING_PATHS = Object.freeze([
+  "tools/v284_local_disclosure_fixture.mjs",
+  "tools/test_v284_local_disclosure_fixture.mjs",
+]);
 
 export const LIFECYCLE_KEYS = Object.freeze([
   "actor_grant_id",
@@ -122,6 +131,37 @@ export function validateLocalTarget({
   return true;
 }
 
+export function assertDeploymentIsolationSnapshot({
+  approvedSha,
+  approvedRefSha,
+  deploymentBranch,
+  treePaths,
+  runtimeSources,
+  workflowSources,
+}) {
+  assert.equal(approvedSha, APPROVED_APPLICATION_SHA, "approved application SHA mismatch");
+  assert.equal(approvedRefSha, approvedSha, "approved application ref drifted");
+  assert.equal(deploymentBranch, APPROVED_DEPLOYMENT_BRANCH, "tooling branch cannot be a deployment source");
+  const normalizedPaths = new Set((treePaths || []).map((value) => value.replaceAll("\\", "/")));
+  for (const toolingPath of TOOLING_PATHS) {
+    assert.ok(!normalizedPaths.has(toolingPath), `approved application tree contains tooling path ${toolingPath}`);
+  }
+  const forbiddenReference = /v284_local_disclosure_fixture|test_v284_local_disclosure_fixture|fix\/v284-local-disclosure-fixture-seeding/i;
+  for (const [file, content] of Object.entries(runtimeSources || {})) {
+    assert.doesNotMatch(String(content), forbiddenReference, `${file} references non-deployable tooling`);
+  }
+  for (const [file, content] of Object.entries(workflowSources || {})) {
+    assert.doesNotMatch(String(content), forbiddenReference, `${file} copies or deploys non-deployable tooling`);
+  }
+  return {
+    approvedSha,
+    deploymentBranch,
+    toolingPathsAbsent: true,
+    runtimeReferencesAbsent: true,
+    workflowReferencesAbsent: true,
+  };
+}
+
 function walkUndefined(value, location = "$") {
   if (value === undefined) throw new Error(`undefined fixture value at ${location}`);
   if (Array.isArray(value)) {
@@ -196,6 +236,28 @@ export function assertSyntheticFixtureDescriptor(fixture) {
   return true;
 }
 
+export function assertTeardownProof(proof) {
+  assert.equal(proof?.stopExitCode, 0, "local Supabase stop did not exit 0");
+  assert.deepEqual(proof?.remainingContainers, [], "disposable project containers survived teardown");
+  assert.deepEqual(proof?.openPorts, [], "disposable project ports survived teardown");
+  assert.equal(proof?.temporaryRootRemoved, true, "temporary harness directory survived teardown");
+  assert.equal(proof?.disposableStackRemoved, true, "optimistic teardown success rejected");
+  return true;
+}
+
+export function assertSessionRevocationProof(proof) {
+  assert.ok([200, 204].includes(proof?.logoutStatus), "Auth session revocation failed");
+  assert.equal(Number(proof?.sessionsRemaining), 0, "Auth session remained after revocation");
+  assert.equal(Number(proof?.refreshTokensRemaining), 0, "refresh token remained after revocation");
+  assert.equal(proof?.oldAuthTokenRejected, true, "old access token was not rejected by Auth");
+  assert.equal(proof?.oldRefreshTokenRejected, true, "old refresh token remained usable");
+  assert.equal(proof?.oldPrivateRpcRejected, true, "old access token retained private RPC authority");
+  assert.equal(Number(proof?.usersRemaining), 0, "synthetic Auth user remained after deletion");
+  assert.match(proof?.accessTokenFingerprint || "", /^[a-f0-9]{12}$/);
+  assert.match(proof?.refreshTokenFingerprint || "", /^[a-f0-9]{12}$/);
+  return true;
+}
+
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: options.cwd || root,
@@ -206,9 +268,58 @@ function run(command, args, options = {}) {
     env: { ...process.env, ...(options.env || {}) },
   });
   if (result.status !== 0) {
-    throw new Error(`${options.label || command} failed with exit ${result.status ?? 1}`);
+    const diagnostic = String(result.stderr || "")
+      .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "[REDACTED_JWT]")
+      .trim()
+      .slice(-4000);
+    throw new Error(
+      `${options.label || command} failed with exit ${result.status ?? 1}` +
+        (diagnostic ? `: ${diagnostic}` : ""),
+    );
   }
   return result;
+}
+
+function gitOutput(args) {
+  return run("git", args, { label: `git ${args[0]}` }).stdout.trim();
+}
+
+function gitTextAt(ref, file) {
+  const result = spawnSync("git", ["show", `${ref}:${file}`], {
+    cwd: root,
+    encoding: "utf8",
+    windowsHide: true,
+    timeout: 30000,
+  });
+  if (result.status === 128) return "";
+  if (result.status !== 0) throw new Error(`git show failed for ${file}`);
+  return result.stdout;
+}
+
+export function verifyApprovedApplicationIsolation() {
+  const approvedRefSha = gitOutput(["rev-parse", "origin/main"]);
+  const treePaths = gitOutput(["ls-tree", "-r", "--name-only", APPROVED_APPLICATION_SHA])
+    .split(/\r?\n/)
+    .filter(Boolean);
+  const runtimePaths = treePaths.filter((file) => (
+    !file.includes("/")
+    && /\.(?:html|js|json)$/i.test(file)
+  )).concat(["release/laxhornet-release-manifest.json"]);
+  const workflowPaths = treePaths.filter((file) => /^\.github\/workflows\/.+\.ya?ml$/i.test(file));
+  const runtimeSources = Object.fromEntries(
+    runtimePaths.map((file) => [file, gitTextAt(APPROVED_APPLICATION_SHA, file)]),
+  );
+  const workflowSources = Object.fromEntries(
+    workflowPaths.map((file) => [file, gitTextAt(APPROVED_APPLICATION_SHA, file)]),
+  );
+  return assertDeploymentIsolationSnapshot({
+    approvedSha: APPROVED_APPLICATION_SHA,
+    approvedRefSha,
+    deploymentBranch: APPROVED_DEPLOYMENT_BRANCH,
+    treePaths,
+    runtimeSources,
+    workflowSources,
+  });
 }
 
 function psql(containerName, sql) {
@@ -554,6 +665,10 @@ function apiHeaders(publishableKey, token, extra = {}) {
     "Content-Type": "application/json",
     ...extra,
   };
+}
+
+function tokenFingerprint(token) {
+  return createHash("sha256").update(String(token)).digest("hex").slice(0, 12);
 }
 
 async function createAuthUser(apiUrl, publishableKey, serviceRoleKey, fixture, role, password) {
@@ -1111,19 +1226,92 @@ async function verifyBrowserDisclosure(context, disclosure) {
   }
 }
 
-async function deleteLocalAuthUsers(context) {
-  for (const userId of [context.coachId, context.adminId].filter(Boolean)) {
-    await request(`${context.apiUrl}/auth/v1/admin/users/${userId}/logout`, {
-      method: "POST",
-      headers: apiHeaders(context.publishableKey, context.serviceRoleKey),
-      body: {},
-    });
+function localAuthState(containerName, userId) {
+  return JSON.parse(psql(containerName, `
+select json_build_object(
+  'usersRemaining', (select count(*) from auth.users where id = ${sqlLiteral(userId)}::uuid),
+  'sessionsRemaining', (select count(*) from auth.sessions where user_id::text = ${sqlLiteral(userId)}),
+  'refreshTokensRemaining', (select count(*) from auth.refresh_tokens where user_id::text = ${sqlLiteral(userId)})
+)::text;
+`));
+}
+
+async function revokeAndDeleteLocalAuthUsers(context) {
+  const proofs = [];
+  for (const { role, userId, session } of [
+    { role: "coach", userId: context.coachId, session: context.coachSession },
+    { role: "admin", userId: context.adminId, session: null },
+  ].filter((entry) => entry.userId)) {
+    const logout = session
+      ? await request(`${context.apiUrl}/auth/v1/logout?scope=global`, {
+          method: "POST",
+          headers: apiHeaders(context.publishableKey, session.access_token),
+          body: {},
+        })
+      : null;
+    if (session) {
+      assert.ok(
+        [200, 204].includes(logout.status),
+        `local ${role} Auth session revocation failed with status ${logout.status}`,
+      );
+    }
+    const afterLogout = localAuthState(context.containerName, userId);
+    assert.equal(Number(afterLogout.sessionsRemaining), 0, `local ${role} Auth session remained`);
+    assert.equal(Number(afterLogout.refreshTokensRemaining), 0, `local ${role} refresh token remained`);
+
+    let tokenProof = {
+      oldAuthTokenRejected: true,
+      oldRefreshTokenRejected: true,
+      oldPrivateRpcRejected: true,
+      accessTokenFingerprint: "not_issued",
+      refreshTokenFingerprint: "not_issued",
+    };
+    if (session) {
+      const oldAuth = await request(`${context.apiUrl}/auth/v1/user`, {
+        headers: apiHeaders(context.publishableKey, session.access_token),
+      });
+      const oldRefresh = await request(`${context.apiUrl}/auth/v1/token?grant_type=refresh_token`, {
+        method: "POST",
+        headers: apiHeaders(context.publishableKey, context.publishableKey),
+        body: { refresh_token: session.refresh_token },
+      });
+      const oldPrivateRpc = await rpc(
+        context.apiUrl,
+        context.publishableKey,
+        "lh_read_game_clock",
+        { p_game_id: context.fixture.ids.game },
+        session.access_token,
+      );
+      tokenProof = {
+        oldAuthTokenRejected: [401, 403].includes(oldAuth.status),
+        oldRefreshTokenRejected: oldRefresh.status >= 400,
+        oldPrivateRpcRejected:
+          oldPrivateRpc.status >= 400
+          || oldPrivateRpc.body?.outcome !== "accepted",
+        accessTokenFingerprint: tokenFingerprint(session.access_token),
+        refreshTokenFingerprint: tokenFingerprint(session.refresh_token),
+      };
+    }
     const removed = await request(`${context.apiUrl}/auth/v1/admin/users/${userId}`, {
       method: "DELETE",
       headers: apiHeaders(context.publishableKey, context.serviceRoleKey),
     });
     assert.ok([200, 204, 404].includes(removed.status), "local synthetic Auth user deletion failed");
+    const finalState = localAuthState(context.containerName, userId);
+    assert.equal(Number(finalState.usersRemaining), 0, `local ${role} Auth user remained`);
+    assert.equal(Number(finalState.sessionsRemaining), 0, `local ${role} Auth session remained after user deletion`);
+    assert.equal(Number(finalState.refreshTokensRemaining), 0, `local ${role} refresh token remained after user deletion`);
+    const proof = {
+      role,
+      logoutStatus: logout?.status ?? "no_session_issued",
+      ...finalState,
+      ...tokenProof,
+      noSessionIssued: !session,
+    };
+    if (session) assertSessionRevocationProof(proof);
+    proofs.push(proof);
   }
+  return proofs;
 }
 
 async function cleanupFixture(context) {
@@ -1136,12 +1324,20 @@ async function cleanupFixture(context) {
   assert.equal(publicAfterRevoke.status, 200);
   assert.equal(publicAfterRevoke.body, null);
   psql(context.containerName, cleanupSql(context.fixture, context.adminId, context.coachId));
-  await deleteLocalAuthUsers(context);
+  const auth = await revokeAndDeleteLocalAuthUsers(context);
   const proof = JSON.parse(psql(context.containerName, `
 select json_build_object(
   'authUsers', (
     select count(*) from auth.users
     where raw_user_meta_data ->> 'fixture_run_id' = ${sqlLiteral(context.fixture.runId)}
+  ),
+  'authSessions', (
+    select count(*) from auth.sessions
+    where user_id::text in (${sqlLiteral(context.adminId)}, ${sqlLiteral(context.coachId)})
+  ),
+  'authRefreshTokens', (
+    select count(*) from auth.refresh_tokens
+    where user_id::text in (${sqlLiteral(context.adminId)}, ${sqlLiteral(context.coachId)})
   ),
   'legacyTeams', (select count(*) from public.teams where id = ${sqlLiteral(context.fixture.ids.team)}),
   'legacyGames', (select count(*) from public.games where id = ${sqlLiteral(context.fixture.ids.game)}),
@@ -1187,6 +1383,8 @@ select json_build_object(
 `));
   for (const key of [
     "authUsers",
+    "authSessions",
+    "authRefreshTokens",
     "legacyTeams",
     "legacyGames",
     "legacyEvents",
@@ -1196,7 +1394,7 @@ select json_build_object(
   ]) {
     assert.equal(Number(proof[key]), 0, `local cleanup proof failed for ${key}`);
   }
-  return proof;
+  return { ...proof, auth };
 }
 
 function startLocalStack(tempRoot) {
@@ -1249,19 +1447,85 @@ $guard$;
   return normalized;
 }
 
-function stopLocalStack(tempRoot) {
-  try {
+function isTcpPortOpen(port, timeout = 300) {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ host: "127.0.0.1", port });
+    let settled = false;
+    const finish = (open) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(open);
+    };
+    socket.setTimeout(timeout, () => finish(false));
+    socket.once("connect", () => finish(true));
+    socket.once("error", () => finish(false));
+  });
+}
+
+async function waitForPortToClose(port) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (!(await isTcpPortOpen(port))) return false;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return true;
+}
+
+function projectContainers() {
+  return run(
+    "docker",
+    ["ps", "-a", "--format", "{{.Names}}"],
+    { label: "local Docker container inventory", timeout: 30000 },
+  ).stdout
+    .split(/\r?\n/)
+    .map((value) => value.trim())
+    .filter((value) => value.endsWith(`_${LOCAL_PROJECT_ID}`));
+}
+
+export async function completeLocalTeardown(tempRoot, operations = {}) {
+  const stop = operations.stop || (() => {
     run(
       "supabase",
       ["stop", "--workdir", tempRoot, "--no-backup"],
       { label: "local Supabase stop", timeout: 60000 },
     );
-  } catch {
-    // The caller verifies container removal and reports any remaining failure.
+    return { exitCode: 0 };
+  });
+  const listContainers = operations.listContainers || projectContainers;
+  const isPortStillOpen = operations.isPortOpen || waitForPortToClose;
+  const removeTemporaryRoot = operations.removeTemporaryRoot || (() => safeRemoveTempRoot(tempRoot));
+  const temporaryRootExists = operations.temporaryRootExists || (() => fs.existsSync(tempRoot));
+
+  const stopResult = await stop();
+  const proof = {
+    stopExitCode: stopResult?.exitCode,
+    remainingContainers: await listContainers(),
+    openPorts: [],
+    temporaryRootRemoved: false,
+    disposableStackRemoved: false,
+  };
+  assert.equal(proof.stopExitCode, 0, "local Supabase stop did not exit 0");
+  assert.deepEqual(proof.remainingContainers, [], "disposable project containers survived teardown");
+  for (const port of LOCAL_PROJECT_PORTS) {
+    if (await isPortStillOpen(port)) proof.openPorts.push(port);
   }
+  assert.deepEqual(proof.openPorts, [], "disposable project ports survived teardown");
+  await removeTemporaryRoot();
+  proof.temporaryRootRemoved = !temporaryRootExists();
+  assert.equal(proof.temporaryRootRemoved, true, "temporary harness directory survived teardown");
+  proof.disposableStackRemoved = true;
+  assertTeardownProof(proof);
+  return proof;
+}
+
+function cleanupFailure(error) {
+  const failure = new Error(`cleanup_failed: ${error?.message || "local teardown verification failed"}`);
+  failure.code = "cleanup_failed";
+  return failure;
 }
 
 export async function runLocalDisclosureFixture() {
+  const deploymentIsolation = verifyApprovedApplicationIsolation();
   validateLocalTarget({
     apiUrl: LOCAL_API_URL,
     dbUrl: LOCAL_DB_URL,
@@ -1274,6 +1538,9 @@ export async function runLocalDisclosureFixture() {
   const password = `V284-${randomBytes(18).toString("base64url")}!`;
   let context = null;
   let stackStarted = false;
+  let summary = null;
+  let operationError = null;
+  let teardown = null;
   try {
     copyLocalProject(tempRoot);
     stackStarted = true;
@@ -1315,9 +1582,11 @@ export async function runLocalDisclosureFixture() {
     const api = await verifyApiDisclosure(context, context.disclosure);
     const browser = await verifyBrowserDisclosure(context, context.disclosure);
     const cleanup = await cleanupFixture(context);
-    const summary = {
+    context.cleanupComplete = true;
+    summary = {
       status: "PASS",
       mechanism: "direct guarded psql seeding into a disposable local Supabase container",
+      deploymentIsolation,
       environment: {
         projectId: LOCAL_PROJECT_ID,
         apiHost: "127.0.0.1",
@@ -1344,36 +1613,52 @@ export async function runLocalDisclosureFixture() {
       productionContacted: false,
       productionPermissionsChanged: false,
       rawCredentialsEmitted: false,
-      disposableStackRemoved: true,
     };
-    return summary;
+  } catch (error) {
+    operationError = error;
   } finally {
-    if (context && context.adminId && context.coachId) {
+    if (context && context.disclosure && context.coachSession && !context.cleanupComplete) {
       try {
-        if (context.disclosure && context.coachSession) {
-          await acceptedRpc(
-            context.apiUrl,
-            context.publishableKey,
-            "lh_revoke_live_share_tokens",
-            { p_game_id: context.fixture.ids.game },
-            context.coachSession.access_token,
-          );
-        }
+        await acceptedRpc(
+          context.apiUrl,
+          context.publishableKey,
+          "lh_revoke_live_share_tokens",
+          { p_game_id: context.fixture.ids.game },
+          context.coachSession.access_token,
+        );
       } catch {
-        // Best-effort only; normal cleanup performs and verifies revocation.
-      }
-      try {
-        await deleteLocalAuthUsers(context);
-      } catch {
-        // Disposable stack teardown remains authoritative.
+        // The overall operation already fails; verified stack destruction remains mandatory.
       }
     }
-    if (stackStarted) stopLocalStack(tempRoot);
-    safeRemoveTempRoot(tempRoot);
+    try {
+      if (stackStarted) {
+        teardown = await completeLocalTeardown(tempRoot);
+      } else {
+        safeRemoveTempRoot(tempRoot);
+        assert.equal(fs.existsSync(tempRoot), false, "temporary harness directory survived setup failure");
+      }
+    } catch (error) {
+      throw cleanupFailure(error);
+    }
   }
+  if (operationError) throw operationError;
+  assert.ok(summary, "local disclosure summary was not produced");
+  assertTeardownProof(teardown);
+  return {
+    ...summary,
+    teardown,
+    disposableStackRemoved: true,
+  };
 }
 
 async function main() {
+  if (process.argv.includes("--verify-deployment-isolation")) {
+    process.stdout.write(`${JSON.stringify({
+      status: "PASS",
+      deploymentIsolation: verifyApprovedApplicationIsolation(),
+    }, null, 2)}\n`);
+    return;
+  }
   const summary = await runLocalDisclosureFixture();
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 }
