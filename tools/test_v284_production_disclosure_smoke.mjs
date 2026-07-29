@@ -391,10 +391,15 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
     source,
     /item\.statType === "goal"\s*\?\s*"invalid_public_event_evidence"\s*:\s*"unsupported_event_semantics"/,
   );
-  const offlineMode = source.indexOf("await trackerContext.setOffline(true)");
+  const ordinaryJourneyCheck = source.indexOf("hosted ordinary game journey failed");
+  const correctionCheck = source.indexOf("hosted correction did not synchronize", ordinaryJourneyCheck);
+  const offlineMode = source.indexOf("await trackerContext.setOffline(true)", correctionCheck);
   const offlineGoalClick = source.indexOf("page.locator('[data-stat=\"goal\"]').click()", offlineMode);
-  const offlineRetry = source.indexOf("hosted offline retry did not reconcile", offlineMode);
-  const endGameJourney = source.indexOf("endGame()", offlineRetry);
+  const offlineRetention = source.indexOf("offline event was not retained locally", offlineGoalClick);
+  const offlineRetry = source.indexOf("hosted offline retry did not reconcile", offlineRetention);
+  const tombstoneSync = source.indexOf("hosted tombstone did not synchronize", offlineRetry);
+  const tombstoneLifecycle = source.indexOf("hosted event did not become tombstoned", tombstoneSync);
+  const endGameJourney = source.indexOf("endGame()", tombstoneLifecycle);
   const savedModalClose = source.indexOf('[data-action="close-saved-game"]');
   const savedModalClick = source.indexOf("await savedGameModalClose.click()", savedModalClose);
   const restoreActiveGame = source.indexOf(
@@ -405,10 +410,15 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   const restoreRender = source.indexOf("render()", restoreLiveScreen);
   const formerFailureBoundary = source.indexOf("const boundaries =", restoreRender);
   assert.ok(
-    offlineMode >= 0
+    ordinaryJourneyCheck >= 0
+      && correctionCheck > ordinaryJourneyCheck
+      && offlineMode > correctionCheck
       && offlineGoalClick > offlineMode
-      && offlineRetry > offlineGoalClick
-      && endGameJourney > offlineRetry
+      && offlineRetention > offlineGoalClick
+      && offlineRetry > offlineRetention
+      && tombstoneSync > offlineRetry
+      && tombstoneLifecycle > tombstoneSync
+      && endGameJourney > tombstoneLifecycle
       && savedModalClose > endGameJourney
       && savedModalClick > savedModalClose
       && restoreActiveGame > savedModalClick
