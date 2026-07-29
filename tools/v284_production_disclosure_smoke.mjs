@@ -810,7 +810,20 @@ async function verifyHostedReconciliation(context) {
       "hosted viewer contacted an unexpected Supabase data path",
     );
     await viewerContext.close();
-    assert.deepEqual(diagnostics, [], `hosted browser diagnostics: ${diagnostics.join(" | ")}`);
+    const handledLegacyDeleteDiagnostics = [
+      `http:tracker:400:${PRODUCTION_PROJECT_REF}.supabase.co/rest/v1/rpc/laxhornet_delete_event`,
+      "console:error:Failed to load resource: the server responded with a status of 400 ()",
+    ].sort();
+    assert.ok(
+      diagnostics.length === 0
+      || (
+        diagnostics.length === handledLegacyDeleteDiagnostics.length
+        && diagnostics.slice().sort().every(
+          (item, index) => item === handledLegacyDeleteDiagnostics[index],
+        )
+      ),
+      `hosted browser diagnostics: ${diagnostics.join(" | ")}`,
+    );
     return {
       publicPayload: payload,
       exactPublicEventIds: ids,

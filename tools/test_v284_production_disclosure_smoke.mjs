@@ -429,6 +429,14 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   assert.match(source, /http:tracker:\$\{response\.status\(\)\}:\$\{url\.host\}\$\{url\.pathname\}/);
   assert.match(source, /http:viewer:\$\{response\.status\(\)\}:\$\{url\.host\}\$\{url\.pathname\}/);
   assert.doesNotMatch(source, /http:(?:tracker|viewer):[\s\S]*url\.search/);
+  assert.match(
+    source,
+    /handledLegacyDeleteDiagnostics = \[[\s\S]*laxhornet_delete_event[\s\S]*status of 400 \(\)[\s\S]*\]\.sort\(\)/,
+  );
+  assert.match(
+    source,
+    /diagnostics\.length === 0[\s\S]*diagnostics\.length === handledLegacyDeleteDiagnostics\.length[\s\S]*item === handledLegacyDeleteDiagnostics\[index\]/,
+  );
   assert.match(source, /if \(ok && pending === 0\) return attempt;/);
   assert.match(source, /window\.setTimeout\(resolve, attempt \* 250\)/);
   assert.match(
