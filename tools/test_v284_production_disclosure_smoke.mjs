@@ -50,7 +50,7 @@ const validCleanup = {
   userProfiles: 0,
   activeTokens: 0,
   activeGrants: 0,
-  clockRows: 0,
+  runningClockRows: 0,
   activeEventVersions: 0,
   activeParticipation: 0,
   pendingEventOperations: 0,
@@ -59,6 +59,7 @@ const validCleanup = {
   retainedParticipationOperations: 9,
   retainedLifecycleEvents: 6,
   retainedGameScopes: 2,
+  retainedClockRows: 1,
   oldAccessTokenRejected: true,
   oldRefreshTokenRejected: true,
   oldPrivateRpcRejected: true,
@@ -161,6 +162,7 @@ for (const key of [
   "retainedParticipationOperations",
   "retainedLifecycleEvents",
   "retainedGameScopes",
+  "retainedClockRows",
 ]) {
   rejects(
     `rejects unavailable ${key}`,
@@ -186,7 +188,7 @@ for (const key of [
   "userProfiles",
   "activeTokens",
   "activeGrants",
-  "clockRows",
+  "runningClockRows",
   "activeEventVersions",
   "activeParticipation",
   "pendingEventOperations",
@@ -349,6 +351,11 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   assert.match(source, /revokeFixtureGrantsSafelySql/);
   assert.doesNotMatch(source, /if\s*\(\s*context\.seedComplete/);
   assert.match(source, /trackedOperationCount:\s*9/);
+  assert.match(source, /is_running\s*=\s*false/);
+  assert.match(
+    source,
+    /delete from public\.lh_game_clock_states clock[\s\S]*not exists \([\s\S]*from public\.lh_participation_operations operation/i,
+  );
   const revokeStart = source.indexOf("async function revokeTokens(");
   const revokeCatch = source.indexOf("} catch {", revokeStart);
   const directTokenFallback = source.indexOf("update public.lh_live_share_tokens", revokeStart);

@@ -118,6 +118,7 @@ export function assertCleanupProof(proof) {
     "retainedParticipationOperations",
     "retainedLifecycleEvents",
     "retainedGameScopes",
+    "retainedClockRows",
   ]) {
     assert.equal(Number.isInteger(proof[key]), true, `${key} retained-history count is not an integer`);
     assert.ok(proof[key] >= 0, `${key} retained-history count is negative`);
@@ -135,7 +136,7 @@ export function assertCleanupProof(proof) {
     "userProfiles",
     "activeTokens",
     "activeGrants",
-    "clockRows",
+    "runningClockRows",
     "activeEventVersions",
     "activeParticipation",
     "pendingEventOperations",
@@ -1090,7 +1091,7 @@ function cleanupCounts(context) {
 select json_build_object(
   'authUsers', (select count(*)::integer from auth.users where id in (${sqlLiteral(context.adminId)}::uuid, ${sqlLiteral(context.coachId)}::uuid)),
   'authSessions', (select count(*)::integer from auth.sessions where user_id in (${sqlLiteral(context.adminId)}::uuid, ${sqlLiteral(context.coachId)}::uuid)),
-  'refreshTokens', (select count(*)::integer from auth.refresh_tokens where user_id in (${sqlLiteral(context.adminId)}::uuid, ${sqlLiteral(context.coachId)}::uuid)),
+  'refreshTokens', (select count(*)::integer from auth.refresh_tokens where user_id in (${sqlLiteral(context.adminId)}, ${sqlLiteral(context.coachId)})),
   'legacyEvents', (select count(*)::integer from public.events where game_id = ${sqlLiteral(context.fixture.ids.game)}),
   'legacyGames', (select count(*)::integer from public.games where id = ${sqlLiteral(context.fixture.ids.game)}),
   'playerClaims', (select count(*)::integer from public.player_claims where id = ${sqlLiteral(context.fixture.ids.coachClaim)}),
@@ -1108,10 +1109,11 @@ select json_build_object(
         where events.grant_id = grants.id and events.event_type in ('revoked', 'expired')
       )
   ),
-  'clockRows', (
+  'runningClockRows', (
     select count(*)::integer
     from public.lh_game_clock_states
     where game_id in (${sqlLiteral(context.fixture.ids.game)}, ${sqlLiteral(context.halvesGameId)})
+      and is_running = true
   ),
   'activeEventVersions', (select count(*)::integer from public.lh_event_effective_versions where game_id = ${sqlLiteral(context.fixture.ids.game)} and lifecycle_state = 'active'),
   'pendingEventOperations', (select count(*)::integer from public.lh_event_operations where game_id = ${sqlLiteral(context.fixture.ids.game)} and outcome_class = 'pending'),
@@ -1122,6 +1124,11 @@ select json_build_object(
   'retainedGameScopes', (
     select count(*)::integer
     from public.lh_game_scopes
+    where game_id in (${sqlLiteral(context.fixture.ids.game)}, ${sqlLiteral(context.halvesGameId)})
+  ),
+  'retainedClockRows', (
+    select count(*)::integer
+    from public.lh_game_clock_states
     where game_id in (${sqlLiteral(context.fixture.ids.game)}, ${sqlLiteral(context.halvesGameId)})
   )
 ) result;
@@ -1150,9 +1157,26 @@ async function cleanup(context) {
   await attempt(() => closeResidualParticipation(context));
   await attempt(async () => {
     databaseQuery(`
-delete from public.lh_game_clock_states
-where game_id in (${sqlLiteral(context.fixture.ids.game)}, ${sqlLiteral(context.halvesGameId)})
-returning game_id;
+update public.lh_game_clock_states
+set
+  is_running = false,
+  started_at = null,
+  paused_at = now(),
+  client_updated_at = now(),
+  server_updated_at = now(),
+  recovery_state = 'complete',
+  revision = revision + 1,
+  updated_at = now()
+where game_id in (${sqlLiteral(context.fixture.ids.game)}, ${sqlLiteral(context.halvesGameId)});
+
+delete from public.lh_game_clock_states clock
+where clock.game_id in (${sqlLiteral(context.fixture.ids.game)}, ${sqlLiteral(context.halvesGameId)})
+  and not exists (
+    select 1
+    from public.lh_participation_operations operation
+    where operation.game_id = clock.game_id
+  )
+returning clock.game_id;
 `);
   });
   await attempt(async () => {
@@ -1267,6 +1291,7 @@ insert into public.lh_game_scopes(
   assert.ok(cleanupProof.retainedParticipationOperations >= 9, "successful smoke retained too few participation operations");
   assert.equal(cleanupProof.retainedLifecycleEvents, 6, "successful smoke lifecycle history count mismatch");
   assert.equal(cleanupProof.retainedGameScopes, 2, "successful smoke game-scope history count mismatch");
+  assert.equal(cleanupProof.retainedClockRows, 1, "successful smoke retained clock dependency count mismatch");
   const summary = sanitizeSummary({
     status: "PASS",
     environment: "production",
@@ -1284,6 +1309,7 @@ insert into public.lh_game_scopes(
       participationOperations: cleanupProof.retainedParticipationOperations,
       grantLifecycleEvents: cleanupProof.retainedLifecycleEvents,
       gameScopes: cleanupProof.retainedGameScopes,
+      clockStates: cleanupProof.retainedClockRows,
       inert: true,
       private: true,
       synthetic: true,
