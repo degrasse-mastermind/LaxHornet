@@ -189,8 +189,12 @@ rewritten.
 - complete application and release regression: 33/33 groups passed;
 - canonical v284 local release verification: all 17 gates passed, including
   blank and production-shaped database paths, rollback behavior, database
-  lint, both disclosure pgTAP runs, full regression, and disposable-environment
-  cleanup. This complete verifier must be rerun after the latest hardening.
+  lint, both 45-test disclosure pgTAP runs, the 73/73 signed-in browser journey,
+  full regression, and disposable-environment cleanup at exact candidate commit
+  `d4a30baa64134e05b01d644ccf33d8e3ba88913d`.
+
+Latest complete verifier evidence:
+`C:\Users\user\AppData\Local\Temp\laxhornet-release-verification\ac1635a85a56\v284-2026-07-29T17-17-02-443Z`
 
 Independent PR review, merge identity, production migration, deployment, final
 smoke, cleanup, and retained-history disposition are recorded in this directory

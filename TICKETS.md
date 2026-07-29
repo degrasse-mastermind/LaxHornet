@@ -337,12 +337,14 @@ appear through public Live Share.
   lifecycle isolation.
 - Complete application and release regression: 33/33 groups passed.
 - Canonical v284 local release verification: all 17 gates passed, including
-  both database shapes, two 41-test disclosure pgTAP runs, rollback behavior,
-  lint, 33/33 regression groups, and cleanup.
+  both database shapes, two 45-test disclosure pgTAP runs, rollback behavior,
+  lint, 33/33 regression groups, the 73/73 signed-in browser journey, and
+  cleanup at exact candidate commit `d4a30baa64134e05b01d644ccf33d8e3ba88913d`.
 - Initial independent review found four actionable gaps; the first re-review
   confirmed those fixes and found two additional tombstone/retry gaps. All six
-  are now fixed locally. Full regression, CI rerun, clean exact-SHA independent
-  re-review, merge, and production rollout remain required before `DONE`.
+  are now fixed locally and the full regression rerun is green. CI rerun, clean
+  exact-SHA independent re-review, merge, and production rollout remain
+  required before `DONE`.
 
 #### Risks and rollback
 
