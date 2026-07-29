@@ -908,21 +908,85 @@ order by event_id;
 
 async function revokeTokens(context) {
   if (!context.coachSession) return;
-  const result = await rpc(
-    context.apiUrl,
-    context.publishableKey,
-    "lh_revoke_live_share_tokens",
-    { p_game_id: context.fixture.ids.game },
-    context.coachSession.access_token,
-  );
-  assert.equal(result.status, 200, "Live Share token revocation failed");
-  assert.equal(result.body?.outcome, "accepted", "Live Share token revocation was not accepted");
+  let rpcAccepted = false;
+  try {
+    const result = await rpc(
+      context.apiUrl,
+      context.publishableKey,
+      "lh_revoke_live_share_tokens",
+      { p_game_id: context.fixture.ids.game },
+      context.coachSession.access_token,
+    );
+    rpcAccepted = result.status === 200 && result.body?.outcome === "accepted";
+  } catch {
+    rpcAccepted = false;
+  }
   databaseQuery(`
 update public.lh_live_share_tokens
 set revoked_at = coalesce(revoked_at, now())
 where game_id = ${sqlLiteral(context.fixture.ids.game)}
 returning token_id;
 `);
+  const neutral = await rpc(
+    context.apiUrl,
+    context.publishableKey,
+    "lh_public_live_share_game",
+    { p_share_code: context.disclosure?.shareCode || "V284-SYNTHETIC-CLEANUP" },
+  );
+  assert.equal(neutral.status, 200, "post-cleanup public token probe failed");
+  assert.equal(neutral.body, null, "post-cleanup public token remained usable");
+  return { rpcAccepted, directFallbackVerified: true, publicTokenNeutral: true };
+}
+
+async function closeResidualParticipation(context) {
+  if (!context.coachSession) return [];
+  const active = databaseQuery(`
+with latest_by_player as (
+  select distinct on (effective.player_id)
+    effective.player_id,
+    effective.operation_kind,
+    clock.current_period,
+    clock.clock_seconds_remaining
+  from public.lh_effective_participation_operations effective
+  join public.lh_game_clock_states clock on clock.game_id = effective.game_id
+  where effective.game_id = ${sqlLiteral(context.fixture.ids.game)}
+    and effective.operation_kind in ('player_in', 'player_out')
+  order by effective.player_id, effective.created_at desc, effective.revision_sequence desc
+)
+select player_id, current_period, clock_seconds_remaining
+from latest_by_player
+where operation_kind = 'player_in'
+order by player_id;
+`);
+  const outcomes = [];
+  for (const [index, row] of active.entries()) {
+    const timestamp = new Date().toISOString();
+    const result = await acceptedRpc(
+      context.apiUrl,
+      context.publishableKey,
+      "lh_create_participation_operation",
+      {
+        p_operation: {
+          operation_id: `${context.fixture.runId}-cleanup-player-out-${index}`,
+          client_operation_id: `${context.fixture.runId}-cleanup-player-out-${index}-client`,
+          logical_event_id: `${context.fixture.runId}-cleanup-player-out-${index}-logical`,
+          game_id: context.fixture.ids.game,
+          operation_kind: "player_out",
+          player_id: row.player_id,
+          period: row.current_period,
+          game_clock_seconds: row.clock_seconds_remaining,
+          occurred_at: timestamp,
+          client_created_at: timestamp,
+          source: "recovery",
+          system_close_reason: null,
+          recovery_uncertain: true,
+        },
+      },
+      context.coachSession.access_token,
+    );
+    outcomes.push({ playerId: row.player_id, code: result.code });
+  }
+  return outcomes;
 }
 
 async function deleteAuthUsers(context) {
@@ -1005,16 +1069,16 @@ select json_build_object(
   'activeEventVersions', (select count(*)::integer from public.lh_event_effective_versions where game_id = ${sqlLiteral(context.fixture.ids.game)} and lifecycle_state = 'active'),
   'activeParticipation', (
     select count(*)::integer
-    from public.lh_effective_participation_operations p
-    where p.game_id = ${sqlLiteral(context.fixture.ids.game)}
-      and p.operation_kind = 'player_in'
-      and not exists (
-        select 1 from public.lh_effective_participation_operations p2
-        where p2.game_id = p.game_id
-          and p2.player_id = p.player_id
-          and p2.operation_kind = 'player_out'
-          and p2.occurred_at >= p.occurred_at
-      )
+    from (
+      select distinct on (effective.player_id)
+        effective.player_id,
+        effective.operation_kind
+      from public.lh_effective_participation_operations effective
+      where effective.game_id = ${sqlLiteral(context.fixture.ids.game)}
+        and effective.operation_kind in ('player_in', 'player_out')
+      order by effective.player_id, effective.created_at desc, effective.revision_sequence desc
+    ) latest
+    where latest.operation_kind = 'player_in'
   ),
   'pendingEventOperations', (select count(*)::integer from public.lh_event_operations where game_id = ${sqlLiteral(context.fixture.ids.game)} and outcome_class = 'pending'),
   'conflictedEventOperations', (select count(*)::integer from public.lh_event_operations where game_id = ${sqlLiteral(context.fixture.ids.game)} and outcome_class = 'conflicted'),
@@ -1041,6 +1105,7 @@ async function cleanup(context) {
   };
   await attempt(() => revokeTokens(context));
   await attempt(() => tombstoneActiveEvents(context));
+  await attempt(() => closeResidualParticipation(context));
   await attempt(async () => {
     databaseQuery(`
 delete from public.lh_game_clock_states

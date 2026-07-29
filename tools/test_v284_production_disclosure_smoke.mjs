@@ -305,12 +305,35 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   assert.match(source, /PRODUCTION CLEANUP FAILED/);
   assert.match(source, /finally\s*\{/);
   assert.match(source, /tombstoneActiveEvents/);
+  assert.match(source, /closeResidualParticipation/);
   assert.match(source, /revokeTokens/);
   assert.match(source, /deleteAuthUsers/);
   assert.match(source, /removeMutableFixtureSql/);
   assert.match(source, /revokeFixtureGrantsSafelySql/);
   assert.doesNotMatch(source, /if\s*\(\s*context\.seedComplete/);
   assert.match(source, /trackedOperationCount:\s*9/);
+  const revokeStart = source.indexOf("async function revokeTokens(");
+  const revokeCatch = source.indexOf("} catch {", revokeStart);
+  const directTokenFallback = source.indexOf("update public.lh_live_share_tokens", revokeStart);
+  const neutralTokenProbe = source.indexOf('"lh_public_live_share_game"', directTokenFallback);
+  assert.ok(
+    revokeStart >= 0
+      && revokeCatch > revokeStart
+      && directTokenFallback > revokeCatch
+      && neutralTokenProbe > directTokenFallback,
+    "token cleanup fallback and neutral proof must survive RPC failure",
+  );
+  const cleanupStart = source.indexOf("async function cleanup(context)");
+  const residualClose = source.indexOf("closeResidualParticipation(context)", cleanupStart);
+  const clockDelete = source.indexOf("delete from public.lh_game_clock_states", cleanupStart);
+  const grantRevoke = source.indexOf("revokeFixtureGrantsSafelySql(context)", cleanupStart);
+  assert.ok(
+    cleanupStart >= 0
+      && residualClose > cleanupStart
+      && clockDelete > residualClose
+      && grantRevoke > clockDelete,
+    "residual participation must close before clock and authority teardown",
+  );
   assert.match(source, /unsupported_event_semantics/);
   assert.match(source, /Legacy Participation Alias/);
   assert.match(source, /Player In at 12:34/);
