@@ -385,6 +385,8 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
     "residual participation must close before clock and authority teardown",
   );
   assert.match(source, /unsupported_event_semantics/);
+  assert.match(source, /invalid_public_event_evidence/);
+  assert.match(source, /expectedCode/);
   assert.match(source, /Legacy Participation Alias/);
   assert.match(source, /Player In at 12:34/);
   assert.doesNotMatch(source, /supabase\s+db\s+push|migration\s+repair|functions\s+deploy/i);

@@ -788,13 +788,13 @@ async function verifyHostedReconciliation(context) {
 
 async function runAdversarialRpcChecks(context) {
   const observedAliases = [
-    ["legacy_shift_alias", "Legacy Participation Alias", "Private Legacy Alias", "Midfield"],
-    ["player_in", "Player In", "Tracked Playing Time", "Midfield"],
-    ["goal", "Goal", "Offense", "Player In at 12:34"],
-    ["unknown_future_event", "Unknown Future Event", "Unknown", "Midfield"],
+    ["legacy_shift_alias", "Legacy Participation Alias", "Private Legacy Alias", "Midfield", "unsupported_event_semantics"],
+    ["player_in", "Player In", "Tracked Playing Time", "Midfield", "unsupported_event_semantics"],
+    ["goal", "Goal", "Offense", "Player In at 12:34", "invalid_public_event_evidence"],
+    ["unknown_future_event", "Unknown Future Event", "Unknown", "Midfield", "unsupported_event_semantics"],
   ];
   const results = [];
-  for (const [statType, statLabel, category, fieldZone] of observedAliases) {
+  for (const [statType, statLabel, category, fieldZone, expectedCode] of observedAliases) {
     const operationId = `${context.fixture.runId}-rejected-${results.length}`;
     const result = await rpc(
       context.apiUrl,
@@ -822,7 +822,7 @@ async function runAdversarialRpcChecks(context) {
     );
     assert.equal(result.status, 200, `${statType} rejection HTTP status mismatch`);
     assert.equal(result.body?.outcome, "rejected", `${statType} was not rejected`);
-    assert.equal(result.body?.code, "unsupported_event_semantics", `${statType} rejection code mismatch`);
+    assert.equal(result.body?.code, expectedCode, `${statType} rejection code mismatch`);
     results.push({ statType, code: result.body.code });
   }
   return results;
