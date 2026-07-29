@@ -115,6 +115,15 @@ export function assertPrewriteState(state) {
 
 export function assertCleanupProof(proof) {
   for (const key of [
+    "retainedEventOperations",
+    "retainedParticipationOperations",
+    "retainedLifecycleEvents",
+    "retainedGameScopes",
+  ]) {
+    assert.equal(Number.isInteger(proof[key]), true, `${key} retained-history count is not an integer`);
+    assert.ok(proof[key] >= 0, `${key} retained-history count is negative`);
+  }
+  for (const key of [
     "authUsers",
     "authSessions",
     "refreshTokens",
@@ -141,6 +150,15 @@ export function assertCleanupProof(proof) {
   assert.equal(proof.oldPrivateRpcRejected, true, "old private RPC authority remained usable");
   assert.equal(proof.realDataTouched, false, "cleanup proof did not preserve the real-data boundary");
   return true;
+}
+
+export function isOldPrivateAuthorityRejected(result) {
+  return [401, 403].includes(result?.status)
+    || (
+      result?.status === 200
+      && result?.body?.outcome === "rejected"
+      && ["unauthorized", "unauthorized_scope", "authority_changed"].includes(result?.body?.code)
+    );
 }
 
 function configProjectId() {
@@ -868,7 +886,7 @@ async function oldAuthorityProof(context) {
   return {
     oldAccessTokenRejected: [401, 403].includes(access.status),
     oldRefreshTokenRejected: [400, 401, 403].includes(refresh.status),
-    oldPrivateRpcRejected: privateRpc.status !== 200 || privateRpc.body?.outcome !== "accepted",
+    oldPrivateRpcRejected: isOldPrivateAuthorityRejected(privateRpc),
   };
 }
 
@@ -1058,6 +1076,10 @@ insert into public.lh_game_scopes(
   }
   if (operationError) throw operationError;
   assert.ok(result && cleanupProof, "production smoke did not produce complete evidence");
+  assert.ok(cleanupProof.retainedEventOperations >= 7, "successful smoke retained too few Event Pipeline operations");
+  assert.ok(cleanupProof.retainedParticipationOperations >= 9, "successful smoke retained too few participation operations");
+  assert.equal(cleanupProof.retainedLifecycleEvents, 6, "successful smoke lifecycle history count mismatch");
+  assert.equal(cleanupProof.retainedGameScopes, 2, "successful smoke game-scope history count mismatch");
   const summary = sanitizeSummary({
     status: "PASS",
     environment: "production",

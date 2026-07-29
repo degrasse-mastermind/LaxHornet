@@ -98,6 +98,28 @@ const allowedEventKeys = [
   "stat_label",
   "stat_type",
 ].sort();
+const expectedFixturePublicSemantics = new Map([
+  ["groundBall", Object.freeze({
+    stat_label: "Ground Ball",
+    category: "Effort / IQ",
+    point_value: 2,
+  })],
+  ["assist", Object.freeze({
+    stat_label: "Assist",
+    category: "Offense",
+    point_value: 3,
+  })],
+]);
+const allowedPublicPeriods = new Set(["Q1", "Q2", "Q3", "Q4", "H1", "H2", "OT"]);
+const allowedPublicFieldZones = new Set([
+  "",
+  "Offensive end",
+  "Midfield",
+  "Defensive end",
+  "Sideline",
+  "Endline",
+  "Crease",
+]);
 
 function sortedKeys(value) {
   return Object.keys(value || {}).sort();
@@ -904,7 +926,7 @@ commit;
     expiredCode,
     revokedCode,
     unknownCode: randomBytes(18).toString("hex").toUpperCase(),
-    trackedOperationCount: 9,
+    trackedOperationCount: 8,
   };
 }
 
@@ -912,9 +934,24 @@ export function assertPublicPayload(payload) {
   assert.ok(payload?.game && Array.isArray(payload.events), "public payload missing");
   assert.deepEqual(sortedKeys(payload.game), allowedGameKeys, "public game allowlist mismatch");
   assert.equal(payload.events.length, 2, "public ordinary event count mismatch");
+  const observedTypes = new Set();
   payload.events.forEach((event) => {
     assert.deepEqual(sortedKeys(event), allowedEventKeys, "public event allowlist mismatch");
+    const semantic = expectedFixturePublicSemantics.get(event.stat_type);
+    assert.ok(semantic, `noncanonical public stat type ${event.stat_type}`);
+    assert.equal(event.stat_label, semantic.stat_label, "public stat label is noncanonical");
+    assert.equal(event.category, semantic.category, "public category is noncanonical");
+    assert.equal(event.point_value, semantic.point_value, "public point value is noncanonical");
+    assert.ok(allowedPublicPeriods.has(event.period), "public period is noncanonical");
+    assert.ok(allowedPublicFieldZones.has(event.field_zone), "public field zone is noncanonical");
+    assert.equal(
+      new Date(event.occurred_at).toISOString(),
+      event.occurred_at,
+      "public timestamp is noncanonical",
+    );
+    observedTypes.add(event.stat_type);
   });
+  assert.deepEqual(observedTypes, new Set(expectedFixturePublicSemantics.keys()), "public semantic set mismatch");
   const serialized = JSON.stringify(payload).toLowerCase();
   const forbiddenMatches = FORBIDDEN_DISCLOSURE_TERMS.filter((term) => serialized.includes(term));
   assert.deepEqual(forbiddenMatches, [], "public payload exposed tracked-time fields");

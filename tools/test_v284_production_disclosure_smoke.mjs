@@ -5,6 +5,7 @@ import {
   APPROVED_APPLICATION_SHA,
   PRODUCTION_PROJECT_REF,
   TOOLING_BRANCH,
+  assertPublicPayload,
 } from "./v284_local_disclosure_fixture.mjs";
 import {
   PRODUCTION_API_URL,
@@ -12,6 +13,7 @@ import {
   assertCleanupProof,
   assertPrewriteState,
   assertProductionTarget,
+  isOldPrivateAuthorityRejected,
   parseApprovedToolingSha,
 } from "./v284_production_disclosure_smoke.mjs";
 
@@ -52,10 +54,50 @@ const validCleanup = {
   activeParticipation: 0,
   pendingEventOperations: 0,
   conflictedEventOperations: 0,
+  retainedEventOperations: 7,
+  retainedParticipationOperations: 9,
+  retainedLifecycleEvents: 6,
+  retainedGameScopes: 2,
   oldAccessTokenRejected: true,
   oldRefreshTokenRejected: true,
   oldPrivateRpcRejected: true,
   realDataTouched: false,
+};
+const validPublicPayload = {
+  game: {
+    final_score_against: 4,
+    final_score_for: 6,
+    game_date: "2026-07-28",
+    game_id: "synthetic-game",
+    jersey_number: "99",
+    opponent: "V284 Synthetic Opponent",
+    period_format: "quarters",
+    player_name: "V284 Synthetic Player",
+    position: "Midfield",
+    team_name: "V284 Synthetic Team",
+  },
+  events: [
+    {
+      category: "Effort / IQ",
+      event_id: "event-a",
+      field_zone: "Midfield",
+      occurred_at: "2026-07-28T12:00:00.000Z",
+      period: "Q1",
+      point_value: 2,
+      stat_label: "Ground Ball",
+      stat_type: "groundBall",
+    },
+    {
+      category: "Offense",
+      event_id: "event-b",
+      field_zone: "Offensive end",
+      occurred_at: "2026-07-28T12:01:00.000Z",
+      period: "Q1",
+      point_value: 3,
+      stat_label: "Assist",
+      stat_type: "assist",
+    },
+  ],
 };
 
 function test(name, callback) {
@@ -114,6 +156,23 @@ test("accepts exact-zero production cleanup", () => {
   assert.equal(assertCleanupProof(validCleanup), true);
 });
 for (const key of [
+  "retainedEventOperations",
+  "retainedParticipationOperations",
+  "retainedLifecycleEvents",
+  "retainedGameScopes",
+]) {
+  rejects(
+    `rejects unavailable ${key}`,
+    () => assertCleanupProof({ ...validCleanup, [key]: null }),
+    /not an integer/,
+  );
+  rejects(
+    `rejects negative ${key}`,
+    () => assertCleanupProof({ ...validCleanup, [key]: -1 }),
+    /is negative/,
+  );
+}
+for (const key of [
   "authUsers",
   "authSessions",
   "refreshTokens",
@@ -163,6 +222,50 @@ rejects(
   () => assertCleanupProof({ ...validCleanup, realDataTouched: true }),
   /real-data boundary/,
 );
+
+test("accepts exact canonical public fixture semantics", () => {
+  assert.equal(assertPublicPayload(validPublicPayload).eventCount, 2);
+});
+for (const [name, eventOverride, pattern] of [
+  ["rejects a private public-payload type", { stat_type: "player_in" }, /noncanonical public stat type/],
+  ["rejects an unknown public-payload type", { stat_type: "future_event" }, /noncanonical public stat type/],
+  ["rejects a poisoned public label", { stat_label: "Player In" }, /stat label is noncanonical/],
+  ["rejects a poisoned public category", { category: "Private Legacy Alias" }, /category is noncanonical/],
+  ["rejects a poisoned public point value", { point_value: 99 }, /point value is noncanonical/],
+  ["rejects a poisoned public period", { period: "SHIFT" }, /period is noncanonical/],
+  ["rejects a poisoned public field zone", { field_zone: "Player In at 12:34" }, /field zone is noncanonical/],
+  ["rejects a noncanonical public timestamp", { occurred_at: "2026-07-28 12:00:00" }, /timestamp is noncanonical/],
+]) {
+  rejects(
+    name,
+    () => assertPublicPayload({
+      ...validPublicPayload,
+      events: [
+        { ...validPublicPayload.events[0], ...eventOverride },
+        validPublicPayload.events[1],
+      ],
+    }),
+    pattern,
+  );
+}
+
+test("accepts only explicit old private-authority rejection", () => {
+  assert.equal(isOldPrivateAuthorityRejected({ status: 401, body: null }), true);
+  assert.equal(isOldPrivateAuthorityRejected({
+    status: 200,
+    body: { outcome: "rejected", code: "unauthorized_scope" },
+  }), true);
+});
+for (const result of [
+  { status: 500, body: { message: "server failure" } },
+  { status: 404, body: null },
+  { status: 200, body: { outcome: "accepted", code: "clock_read" } },
+  { status: 200, body: { outcome: "rejected", code: "unexpected" } },
+]) {
+  test(`does not treat ${result.status}/${result.body?.code || "none"} as revoked authority`, () => {
+    assert.equal(isOldPrivateAuthorityRejected(result), false);
+  });
+}
 
 test("runner contains mandatory production guards and fail-closed cleanup", () => {
   const source = fs.readFileSync(
