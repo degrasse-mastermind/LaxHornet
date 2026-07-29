@@ -181,6 +181,13 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   assert.match(source, /Legacy Participation Alias/);
   assert.match(source, /Player In at 12:34/);
   assert.doesNotMatch(source, /supabase\s+db\s+push|migration\s+repair|functions\s+deploy/i);
+  const baseSeed = source.indexOf("databaseQuery(productionSeedSql(");
+  const cleanupArmed = source.indexOf("context.seedComplete = true", baseSeed);
+  const halvesSeed = source.indexOf("insert into public.lh_game_scopes(", baseSeed);
+  assert.ok(
+    baseSeed >= 0 && cleanupArmed > baseSeed && halvesSeed > cleanupArmed,
+    "cleanup must be armed immediately after the first committed seed transaction",
+  );
 });
 
 const failures = results.filter((item) => item.status === "FAIL");

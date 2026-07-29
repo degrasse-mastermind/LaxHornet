@@ -1017,6 +1017,7 @@ export async function runProductionDisclosureSmoke(argv = process.argv.slice(2))
     );
     const lifecycle = makeLifecycleRecords(fixture, context.adminId, context.coachId);
     databaseQuery(productionSeedSql(fixture, context.adminId, context.coachId, lifecycle));
+    context.seedComplete = true;
     databaseQuery(`
 insert into public.lh_game_scopes(
   game_id, team_id, roster_player_id, opponent_snapshot, game_date_snapshot,
@@ -1032,7 +1033,6 @@ insert into public.lh_game_scopes(
   0
 );
 `);
-    context.seedComplete = true;
     context.coachSession = await signIn(
       context.apiUrl,
       context.publishableKey,
