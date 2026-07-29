@@ -1093,7 +1093,11 @@ select json_build_object(
   'authSessions', (select count(*)::integer from auth.sessions where user_id in (${sqlLiteral(context.adminId)}::uuid, ${sqlLiteral(context.coachId)}::uuid)),
   'refreshTokens', (select count(*)::integer from auth.refresh_tokens where user_id in (${sqlLiteral(context.adminId)}, ${sqlLiteral(context.coachId)})),
   'legacyEvents', (select count(*)::integer from public.events where game_id = ${sqlLiteral(context.fixture.ids.game)}),
-  'legacyGames', (select count(*)::integer from public.games where id = ${sqlLiteral(context.fixture.ids.game)}),
+  'legacyGames', (
+    select count(*)::integer
+    from public.games
+    where id in (${sqlLiteral(context.fixture.ids.game)}, ${sqlLiteral(context.halvesGameId)})
+  ),
   'playerClaims', (select count(*)::integer from public.player_claims where id = ${sqlLiteral(context.fixture.ids.coachClaim)}),
   'teamMembers', (select count(*)::integer from public.team_members where team_id = ${sqlLiteral(context.fixture.ids.team)}),
   'rosterPlayers', (select count(*)::integer from public.roster_players where id = ${sqlLiteral(context.fixture.ids.player)}),
@@ -1185,6 +1189,10 @@ returning clock.game_id;
   });
   await attempt(() => deleteAuthUsers(context));
   await attempt(async () => {
+    databaseQuery(`
+delete from public.events where game_id = ${sqlLiteral(context.halvesGameId)};
+delete from public.games where id = ${sqlLiteral(context.halvesGameId)};
+`);
     databaseQuery(removeMutableFixtureSql(context.fixture, context.adminId, context.coachId));
   });
   const authority = await oldAuthorityProof(context);
@@ -1248,6 +1256,37 @@ export async function runProductionDisclosureSmoke(argv = process.argv.slice(2))
     const lifecycle = makeLifecycleRecords(fixture, context.adminId, context.coachId);
     databaseQuery(productionSeedSql(fixture, context.adminId, context.coachId, lifecycle));
     databaseQuery(`
+begin;
+insert into public.games(
+  id, player_id, user_id, share_code, is_shared, opponent, game_date,
+  location, game_type, period_format, player_snapshot, current_quarter,
+  status, team_id, roster_player_id, created_at, saved_at, ended_at
+) values (
+  ${sqlLiteral(context.halvesGameId)},
+  ${sqlLiteral(fixture.ids.player)},
+  ${sqlLiteral(context.coachId)}::uuid,
+  ${sqlLiteral(`${fixture.runId}-HALVES-LEGACY`)},
+  false,
+  'V284 Synthetic Halves Opponent',
+  date '2026-07-28',
+  'V284 Synthetic Field',
+  'Synthetic halves clock test',
+  'halves',
+  jsonb_build_object(
+    'id', ${sqlLiteral(fixture.ids.player)},
+    'name', ${sqlLiteral(fixture.playerName)},
+    'number', '99',
+    'position', 'Midfield',
+    'team', ${sqlLiteral(fixture.teamName)}
+  ),
+  'H1',
+  'completed',
+  ${sqlLiteral(fixture.ids.team)},
+  ${sqlLiteral(fixture.ids.player)},
+  now(),
+  now(),
+  now()
+);
 insert into public.lh_game_scopes(
   game_id, team_id, roster_player_id, opponent_snapshot, game_date_snapshot,
   period_format_snapshot, final_score_for, final_score_against
@@ -1261,6 +1300,7 @@ insert into public.lh_game_scopes(
   0,
   0
 );
+commit;
 `);
     context.coachSession = await signIn(
       context.apiUrl,

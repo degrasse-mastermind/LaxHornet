@@ -351,6 +351,12 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   assert.match(source, /revokeFixtureGrantsSafelySql/);
   assert.doesNotMatch(source, /if\s*\(\s*context\.seedComplete/);
   assert.match(source, /trackedOperationCount:\s*9/);
+  const halvesLegacySeed = source.indexOf("insert into public.games(", source.indexOf("productionSeedSql("));
+  const halvesScopeSeed = source.indexOf("insert into public.lh_game_scopes(", halvesLegacySeed);
+  assert.ok(
+    halvesLegacySeed >= 0 && halvesScopeSeed > halvesLegacySeed,
+    "halves clock scope must have a synthetic legacy game registration",
+  );
   assert.match(source, /is_running\s*=\s*false/);
   assert.match(
     source,
