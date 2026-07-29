@@ -83,6 +83,54 @@ expect(
   manifest.incidentRemediationBaseSha === "1221f418c1e005606d54c545148944f9ec69f132",
   "incidentRemediationBaseSha must identify the deployed v284 incident baseline",
 );
+expect(
+  manifest.incidentRemediationHeadSha === "19f3f89d1120fce167f59237e355bb7cc04394c0",
+  "incidentRemediationHeadSha must identify the reviewed PR #30 head",
+);
+expect(
+  manifest.incidentRemediationMergeSha === "effca6952e647b7424f96675f390fc80d5c42368",
+  "incidentRemediationMergeSha must identify the approved PR #30 merge",
+);
+expect(
+  manifest.productionApplicationSha === manifest.incidentRemediationMergeSha,
+  "productionApplicationSha must identify the deployed incident-remediation merge",
+);
+expect(
+  manifest.productionSmokeToolingSha === "0ce0f6734318b07bbf7156e91c79d05d40bd7222",
+  "productionSmokeToolingSha must identify the independently reviewed tooling",
+);
+expect(
+  manifest.productionUrl === "https://laxhornet.mybranford.com",
+  "productionUrl must identify the approved LaxHornet production origin",
+);
+expect(
+  manifest.productionSmokeEvidence
+    === "review-evidence/v284-tracked-playing-time-production/production-smoke-results.json",
+  "productionSmokeEvidence must identify the sanitized closeout result",
+);
+expect(
+  manifest.productionVerifiedAt === "2026-07-29",
+  "productionVerifiedAt must record the completed production gate date",
+);
+expect(
+  fs.existsSync(path.join(root, manifest.productionSmokeEvidence || "")),
+  "sanitized production smoke evidence must exist",
+);
+try {
+  execFileSync(
+    "git",
+    [
+      "merge-base",
+      "--is-ancestor",
+      manifest.incidentRemediationHeadSha,
+      manifest.incidentRemediationMergeSha,
+    ],
+    { cwd: root, stdio: "ignore" },
+  );
+  expect(true, "incident remediation head must be incorporated by its merge");
+} catch {
+  expect(false, "incident remediation head must be incorporated by its merge");
+}
 try {
   execFileSync(
     "git",
@@ -174,12 +222,12 @@ expect(
   "public event semantic boundary paths must match the explicit containment allowlist",
 );
 expect(
-  publicEventBoundaryReview?.status === "incident_remediation_review",
-  "public event semantic boundary must remain in incident remediation review",
+  publicEventBoundaryReview?.status === "production_applied",
+  "public event semantic boundary must record production application",
 );
 expect(
-  publicEventBoundaryReview?.productionApplied === false,
-  "public event semantic boundary must not claim production application before rollout",
+  publicEventBoundaryReview?.productionApplied === true,
+  "public event semantic boundary must record production application",
 );
 expect(
   publicEventBoundaryReview?.productionAuthorizationRequired === true,
@@ -321,6 +369,7 @@ const approvedBaseMigrationSequence = [
 const expectedMigrationSequence = [
   ...approvedBaseMigrationSequence,
   trackedTimeReview?.forwardMigration,
+  publicEventBoundaryReview?.forwardMigration,
 ];
 expect(
   JSON.stringify(manifest.requiredMigrationSequence) === JSON.stringify(expectedMigrationSequence),
@@ -328,18 +377,18 @@ expect(
 );
 expect(
   JSON.stringify(manifest.reviewMigrationSequence)
-    === JSON.stringify([...expectedMigrationSequence, publicEventBoundaryReview?.forwardMigration]),
-  "reviewMigrationSequence must append only the incident remediation migration",
+    === JSON.stringify(expectedMigrationSequence),
+  "reviewMigrationSequence must match the completed production migration sequence",
 );
 expect(
   JSON.stringify(manifest.expectedRemoteAppliedMigrations)
     === JSON.stringify(expectedMigrationSequence),
-  "expectedRemoteAppliedMigrations must match the seven confirmed production migrations",
+  "expectedRemoteAppliedMigrations must match the eight confirmed production migrations",
 );
 expect(
   JSON.stringify(manifest.expectedPendingProductionMigrations)
-    === JSON.stringify([publicEventBoundaryReview?.forwardMigration]),
-  "expectedPendingProductionMigrations must contain only the corrective migration",
+    === JSON.stringify([]),
+  "expectedPendingProductionMigrations must be empty after production rollout",
 );
 
 expect(
@@ -487,5 +536,5 @@ if (failures.length) {
 }
 
 console.log(
-  `Release manifest valid for ${manifest.release} (${requireCombined ? `combined ref ${combinedRef}` : "stacked review mode"}).`,
+  `Release manifest valid for ${manifest.release} (${requireCombined ? `combined ref ${combinedRef}` : "production-applied manifest"}).`,
 );
