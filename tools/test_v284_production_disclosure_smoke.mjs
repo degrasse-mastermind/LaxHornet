@@ -419,8 +419,13 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   assert.match(source, /const trackerNetwork = \[\];\s+const viewerNetwork = \[\];/);
   assert.match(source, /trackerNetwork\.push\(/);
   assert.match(source, /viewerNetwork\.push\(/);
-  assert.match(source, /const viewerApi = viewerNetwork\.filter\(/);
+  assert.match(
+    source,
+    /viewerNetwork\.every\(\(item\) => item\.host === `\$\{PRODUCTION_PROJECT_REF\}\.supabase\.co`\)/,
+  );
+  assert.match(source, /const viewerApi = viewerNetwork;/);
   assert.doesNotMatch(source, /const viewerApi = network\.filter\(/);
+  assert.doesNotMatch(source, /const viewerApi = viewerNetwork\.filter\(/);
   assert.match(
     source,
     /\{ statType: "legacy_shift_alias", tracked: false, reason: "", pending: 0 \}[\s\S]*\{ statType: "goal", tracked: false, reason: "", pending: 0 \}/,

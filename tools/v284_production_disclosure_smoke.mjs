@@ -768,9 +768,11 @@ async function verifyHostedReconciliation(context) {
       /Legacy Participation Alias|Private Legacy Alias|unknown_future_event|Player In at 12:34|SYNTHETIC_PRIVATE/i,
       "hosted Live Share DOM disclosed forbidden semantics",
     );
-    const viewerApi = viewerNetwork.filter(
-      (item) => item.host === `${PRODUCTION_PROJECT_REF}.supabase.co`,
+    assert.ok(
+      viewerNetwork.every((item) => item.host === `${PRODUCTION_PROJECT_REF}.supabase.co`),
+      "hosted viewer contacted an unexpected Supabase project",
     );
+    const viewerApi = viewerNetwork;
     assert.ok(
       viewerApi.some((item) => item.path === "/rest/v1/rpc/lh_public_live_share_game"),
       "hosted viewer did not use the public-safe RPC",
