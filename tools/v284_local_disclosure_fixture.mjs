@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 export const PRODUCTION_PROJECT_REF = "ulbmjcvnyznvmjgpstno";
 export const PRODUCTION_HOST = `${PRODUCTION_PROJECT_REF}.supabase.co`;
-export const APPROVED_APPLICATION_SHA = "1221f418c1e005606d54c545148944f9ec69f132";
+export const APPROVED_APPLICATION_SHA = "effca6952e647b7424f96675f390fc80d5c42368";
 export const APPROVED_DEPLOYMENT_BRANCH = "main";
 export const TOOLING_BRANCH = "fix/v284-local-disclosure-fixture-seeding";
 export const LOCAL_PROJECT_ID = "laxhornet-v284-disclosure-local";
@@ -22,6 +22,8 @@ export const LOCAL_PROJECT_PORTS = Object.freeze([54321, 54322, 54323, 54324]);
 export const TOOLING_PATHS = Object.freeze([
   "tools/v284_local_disclosure_fixture.mjs",
   "tools/test_v284_local_disclosure_fixture.mjs",
+  "tools/v284_production_disclosure_smoke.mjs",
+  "tools/test_v284_production_disclosure_smoke.mjs",
 ]);
 
 export const LIFECYCLE_KEYS = Object.freeze([
@@ -356,7 +358,7 @@ function psql(containerName, sql) {
   ).stdout.trim();
 }
 
-function sqlLiteral(value) {
+export function sqlLiteral(value) {
   if (value === null) return "null";
   return `'${String(value).replaceAll("'", "''")}'`;
 }
@@ -380,7 +382,7 @@ insert into public.lh_grant_lifecycle_events(
 );`;
 }
 
-function createFixtureDescriptor() {
+export function createFixtureDescriptor() {
   const runId = `${SYNTHETIC_PREFIX}${Date.now().toString(36)}-${randomBytes(3).toString("hex")}`;
   const ids = {
     team: `${runId}-team`,
@@ -406,7 +408,7 @@ function createFixtureDescriptor() {
   return fixture;
 }
 
-function makeLifecycleRecords(fixture, adminId, coachId) {
+export function makeLifecycleRecords(fixture, adminId, coachId) {
   const base = Date.now() - 10 * 60 * 1000;
   return {
     admin: [
@@ -460,7 +462,7 @@ function makeLifecycleRecords(fixture, adminId, coachId) {
   };
 }
 
-function seedSql(fixture, adminId, coachId, lifecycle) {
+export function seedSql(fixture, adminId, coachId, lifecycle) {
   const now = new Date(Date.now() - 8 * 60 * 1000).toISOString();
   const eventB = new Date(Date.now() - 7 * 60 * 1000).toISOString();
   return `
@@ -583,7 +585,7 @@ commit;
 `;
 }
 
-function revokeFixtureGrantsSql(fixture, adminId) {
+export function revokeFixtureGrantsSql(fixture, adminId) {
   const lifecycle = [
     {
       id: `${fixture.runId}-coach-revoked`,
@@ -615,7 +617,7 @@ commit;
 `;
 }
 
-function removeMutableFixtureSql(fixture, adminId, coachId) {
+export function removeMutableFixtureSql(fixture, adminId, coachId) {
   return `
 begin;
 delete from public.events where game_id = ${sqlLiteral(fixture.ids.game)};
@@ -655,7 +657,7 @@ function safeRemoveTempRoot(tempRoot) {
   if (fs.existsSync(resolved)) fs.rmSync(resolved, { recursive: true, force: true });
 }
 
-async function request(url, { method = "GET", headers = {}, body } = {}) {
+export async function request(url, { method = "GET", headers = {}, body } = {}) {
   const response = await fetch(url, {
     method,
     headers,
@@ -671,7 +673,7 @@ async function request(url, { method = "GET", headers = {}, body } = {}) {
   return { status: response.status, body: parsed };
 }
 
-function apiHeaders(publishableKey, token, extra = {}) {
+export function apiHeaders(publishableKey, token, extra = {}) {
   return {
     apikey: publishableKey,
     Authorization: `Bearer ${token}`,
@@ -684,7 +686,7 @@ function tokenFingerprint(token) {
   return createHash("sha256").update(String(token)).digest("hex").slice(0, 12);
 }
 
-async function createAuthUser(apiUrl, publishableKey, serviceRoleKey, fixture, role, password) {
+export async function createAuthUser(apiUrl, publishableKey, serviceRoleKey, fixture, role, password) {
   const email = role === "admin" ? fixture.adminEmail : fixture.coachEmail;
   const result = await request(`${apiUrl}/auth/v1/admin/users`, {
     method: "POST",
@@ -705,7 +707,7 @@ async function createAuthUser(apiUrl, publishableKey, serviceRoleKey, fixture, r
   return result.body.id;
 }
 
-async function signIn(apiUrl, publishableKey, email, password) {
+export async function signIn(apiUrl, publishableKey, email, password) {
   const result = await request(`${apiUrl}/auth/v1/token?grant_type=password`, {
     method: "POST",
     headers: apiHeaders(publishableKey, publishableKey),
@@ -716,7 +718,7 @@ async function signIn(apiUrl, publishableKey, email, password) {
   return result.body;
 }
 
-async function rpc(apiUrl, publishableKey, name, args, token = publishableKey) {
+export async function rpc(apiUrl, publishableKey, name, args, token = publishableKey) {
   return request(`${apiUrl}/rest/v1/rpc/${name}`, {
     method: "POST",
     headers: apiHeaders(publishableKey, token),
@@ -724,25 +726,25 @@ async function rpc(apiUrl, publishableKey, name, args, token = publishableKey) {
   });
 }
 
-async function acceptedRpc(apiUrl, publishableKey, name, args, token) {
+export async function acceptedRpc(apiUrl, publishableKey, name, args, token) {
   const result = await rpc(apiUrl, publishableKey, name, args, token);
   assert.equal(result.status, 200, `${name} HTTP status mismatch`);
   assert.equal(result.body?.outcome, "accepted", `${name} outcome mismatch`);
   return result.body;
 }
 
-async function createPrivateAndPublicEvidence(context) {
+export async function createPrivateAndPublicEvidence(context) {
   const { apiUrl, publishableKey, fixture, coachSession, containerName } = context;
   const now = Date.now();
-  for (const event of [
+  const ordinaryEvents = [
     {
       id: `${fixture.runId}-trust-event-a`,
       occurredAt: new Date(now - 6 * 60 * 1000).toISOString(),
-      statType: "ground_ball",
+      statType: "groundBall",
       statLabel: "Ground Ball",
-      category: "Possession",
-      pointValue: 1,
-      fieldZone: "midfield",
+      category: "Effort / IQ",
+      pointValue: 2,
+      fieldZone: "Midfield",
     },
     {
       id: `${fixture.runId}-trust-event-b`,
@@ -750,10 +752,11 @@ async function createPrivateAndPublicEvidence(context) {
       statType: "assist",
       statLabel: "Assist",
       category: "Offense",
-      pointValue: 2,
-      fieldZone: "offense",
+      pointValue: 3,
+      fieldZone: "Offensive end",
     },
-  ]) {
+  ];
+  for (const event of context.createOrdinaryEvents === false ? [] : ordinaryEvents) {
     const created = await acceptedRpc(apiUrl, publishableKey, "lh_create_event", {
       p_operation: {
         client_operation_id: `${fixture.runId}-create-${event.id}`,
@@ -869,7 +872,7 @@ async function createPrivateAndPublicEvidence(context) {
   assert.match(token.shareCode, /^[A-F0-9]{32}$/);
   const expiredCode = randomBytes(18).toString("hex").toUpperCase();
   const revokedCode = randomBytes(18).toString("hex").toUpperCase();
-  psql(containerName, `
+  const insertTokenSql = `
 begin;
 insert into public.lh_live_share_tokens(
   token_id, token_hash, game_id, created_by_user_id, created_by_grant_id,
@@ -890,7 +893,12 @@ insert into public.lh_live_share_tokens(
     null, now() - interval '1 hour'
   );
 commit;
-`);
+`;
+  if (context.databaseQuery) {
+    await context.databaseQuery(insertTokenSql);
+  } else {
+    psql(containerName, insertTokenSql);
+  }
   return {
     shareCode: token.shareCode,
     expiredCode,
@@ -900,7 +908,7 @@ commit;
   };
 }
 
-function assertPublicPayload(payload) {
+export function assertPublicPayload(payload) {
   assert.ok(payload?.game && Array.isArray(payload.events), "public payload missing");
   assert.deepEqual(sortedKeys(payload.game), allowedGameKeys, "public game allowlist mismatch");
   assert.equal(payload.events.length, 2, "public ordinary event count mismatch");
@@ -919,7 +927,7 @@ function assertPublicPayload(payload) {
   };
 }
 
-async function verifyApiDisclosure(context, evidence) {
+export async function verifyApiDisclosure(context, evidence) {
   const { apiUrl, publishableKey, fixture } = context;
   const publicRead = await rpc(apiUrl, publishableKey, "lh_public_live_share_game", {
     p_share_code: evidence.shareCode,
