@@ -118,6 +118,7 @@ assert.match(worker, /\.\/public-event-semantics\.js\?v=284/);
 assert.match(app, /if \(!evidence\) return null;/);
 assert.match(app, /const eventCount = publicEvents\.length;/);
 assert.match(app, /suppressPrivateTrustSpineRecord/);
+assert.match(app, /trustSpineAttemptedReplayOperation/);
 assert.match(app, /unsupported_event_semantics/);
 assert.match(
   migration,
@@ -137,6 +138,11 @@ assert.match(
   migration,
   /lh_replay_or_tamper\([\s\S]*lh_operation_hash\(p_operation\)[\s\S]*lh_public_event_evidence/i,
   "raw immutable operation replay precedes new evidence validation",
+);
+assert.match(
+  migration,
+  /create or replace function public\.lh_tombstone_event\(p_operation jsonb\)[\s\S]*lh_mutation_grant_for_game\([\s\S]*lh_replay_or_tamper\([\s\S]*lh_tombstone_event_impl\(p_operation\)/i,
+  "tombstones authorize scope and resolve raw replay before inspecting event state",
 );
 assert.match(
   migration,

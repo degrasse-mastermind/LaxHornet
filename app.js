@@ -5906,9 +5906,23 @@ function trustSpineRecordCanonicalSemantic(record = {}) {
   );
 }
 
+function trustSpineAttemptedReplayOperation(operation = {}) {
+  return (
+    Number(operation.attempts || 0) > 0
+    && Boolean(String(operation.lastAttemptAt || "").trim())
+    && Boolean(String(operation.clientOperationId || "").trim())
+    && (
+      operation.kind === "tombstone"
+      || (operation.rpcPayload && typeof operation.rpcPayload === "object")
+    )
+  );
+}
+
 function suppressPrivateTrustSpineRecord(record) {
   if (!record) return;
-  record.pendingOperations = [];
+  record.pendingOperations = (record.pendingOperations || []).filter(
+    (operation) => trustSpineAttemptedReplayOperation(operation),
+  );
   record.conflict = null;
   record.lastError = "";
   record.publicationSuppressedReason = "unsupported_event_semantics";
@@ -6128,11 +6142,13 @@ function acceptTrustSpineOperation(record, operation, result) {
 }
 
 async function processTrustSpineOperation(record, operation) {
+  const attemptedReplay = trustSpineAttemptedReplayOperation(operation);
   const semanticEvidence = operation.kind === "create"
     ? operation.rpcPayload?.evidence || operation.eventEvidence
     : { ...record.acceptedEvidence, ...operation.eventEvidence };
   if (
     operation.kind !== "tombstone"
+    && !attemptedReplay
     && !canonicalEventEvidenceForGame(
       semanticEvidence,
       trustSpineGameById(record.gameId),
@@ -6141,7 +6157,11 @@ async function processTrustSpineOperation(record, operation) {
     suppressPrivateTrustSpineRecord(record);
     return false;
   }
-  if (operation.kind === "tombstone" && !trustSpineRecordCanonicalSemantic(record)) {
+  if (
+    operation.kind === "tombstone"
+    && !attemptedReplay
+    && !trustSpineRecordCanonicalSemantic(record)
+  ) {
     suppressPrivateTrustSpineRecord(record);
     return false;
   }

@@ -163,7 +163,7 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Live Share and export disclosure boundaries.
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
-- The v284 public-disclosure remediation passed its complete 33/33 regression and all 17 local release-verification gates, including 41/41 disclosure pgTAP checks on both database shapes. It still requires independent re-review, merge, application of the one corrective migration, exact-merge frontend deployment, final signed-in production smoke, synthetic cleanup, and evidence closure.
+- The v284 public-disclosure remediation passed its complete 33/33 regression and all 17 local release-verification gates before the latest review hardening. The latest focused rerun passes 45/45 disclosure pgTAP checks on both database shapes and 73/73 signed-in browser checks; the complete release verifier and exact-SHA independent review must be rerun before merge. Production still requires application of the one corrective migration, exact-merge frontend deployment, final signed-in synthetic smoke, cleanup, and evidence closure.
 - Coordinated version and service-worker release hygiene.
 - Maintenance of GitHub Action majors and portability of the CI-selected regression checks.
 

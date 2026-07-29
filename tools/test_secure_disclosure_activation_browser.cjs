@@ -188,7 +188,7 @@ async function installApiRoutes(page, options = {}) {
     const url = request.url();
     const pathname = new URL(url).pathname;
     const post = request.postDataJSON?.() || {};
-    localApiRequests.push({ method: request.method(), pathname });
+    localApiRequests.push({ method: request.method(), pathname, post });
     if (pathname.endsWith("/lh_release_capabilities")) {
       await route.fulfill({
         status: 200,
@@ -261,6 +261,17 @@ async function installApiRoutes(page, options = {}) {
         await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(rejected) });
         return;
       }
+      if (!isPublicEventEvidence(operation.evidence) && operation.evidence?.stat_type !== "note") {
+        const rejected = {
+          outcome: "rejected",
+          code: "unsupported_event_semantics",
+          eventId: operation.event_id,
+          gameId: operation.game_id,
+        };
+        trustApi.operations.set(operationId, rejected);
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(rejected) });
+        return;
+      }
       const existing = trustApi.events.get(operation.event_id);
       const result = existing
         ? { outcome: "rejected", code: "event_id_already_used", eventId: operation.event_id, gameId: operation.game_id }
@@ -284,6 +295,21 @@ async function installApiRoutes(page, options = {}) {
       const prior = trustApi.operations.get(operationId);
       if (prior) {
         await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(prior) });
+        return;
+      }
+      if (
+        operation.changes?.stat_type
+        && !isPublicEventEvidence(operation.changes)
+        && operation.changes.stat_type !== "note"
+      ) {
+        const rejected = {
+          outcome: "rejected",
+          code: "unsupported_event_semantics",
+          eventId: operation.event_id,
+          gameId: operation.game_id,
+        };
+        trustApi.operations.set(operationId, rejected);
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(rejected) });
         return;
       }
       const existing = trustApi.events.get(operation.event_id);
@@ -611,6 +637,52 @@ async function newContext(browser, options = {}) {
     });
     check(initialBridgeTimeline.join(",") === localTrackerEvents.join(","), "newly reconciled events appear in the secure public timeline");
 
+    trustApi.operations.set("stale-private-create", {
+      outcome: "accepted",
+      code: "created",
+      replay: true,
+      serverEventVersion: 1,
+      eventId: "synthetic-legacy-shift-alias",
+      gameId: "synthetic-secure-game",
+    });
+    trustApi.events.set("synthetic-legacy-shift-alias", {
+      eventId: "synthetic-legacy-shift-alias",
+      gameId: "synthetic-secure-game",
+      evidence: {
+        occurred_at: "2026-07-23T12:06:00.000Z",
+        period: "Q2",
+        stat_type: "legacy_shift_alias",
+        stat_label: "Legacy Participation Alias",
+        category: "Participation",
+        point_value: 0,
+      },
+      serverEventVersion: 1,
+      lifecycleState: "active",
+    });
+    trustApi.operations.set("stale-private-correction", {
+      outcome: "accepted",
+      code: "corrected",
+      replay: true,
+      serverEventVersion: 2,
+      eventId: "synthetic-legacy-correction-retry",
+      gameId: "synthetic-secure-game",
+    });
+    trustApi.events.set("synthetic-legacy-correction-retry", {
+      eventId: "synthetic-legacy-correction-retry",
+      gameId: "synthetic-secure-game",
+      evidence: {
+        occurred_at: "2026-07-23T12:06:30.000Z",
+        period: "Q2",
+        stat_type: "legacy_shift_alias",
+        stat_label: "Legacy Correction Alias",
+        category: "Participation",
+        point_value: 0,
+        field_zone: "",
+      },
+      serverEventVersion: 2,
+      lifecycleState: "active",
+    });
+
     const privateBoundaryRpcStart = localApiRequests.length;
     const privateBoundaryResult = await securePage.evaluate(async () => {
       const game = state.activeGame;
@@ -625,6 +697,26 @@ async function newContext(browser, options = {}) {
           category: "Participation",
           pointValue: 0,
           note: "private alias note",
+        },
+        {
+          id: "synthetic-legacy-correction-retry",
+          gameId: game.id,
+          timestamp: "2026-07-23T12:06:30.000Z",
+          quarter: "Q2",
+          statType: "legacy_shift_alias",
+          statLabel: "Legacy Correction Alias",
+          category: "Participation",
+          pointValue: 0,
+        },
+        {
+          id: "synthetic-legacy-never-accepted",
+          gameId: game.id,
+          timestamp: "2026-07-23T12:06:45.000Z",
+          quarter: "Q2",
+          statType: "legacy_shift_alias",
+          statLabel: "Never Accepted Alias",
+          category: "Participation",
+          pointValue: 0,
         },
         {
           id: "synthetic-player-in-alias",
@@ -723,6 +815,97 @@ async function newContext(browser, options = {}) {
         lastError: "stale retry",
         updatedAt: "2026-07-23T12:10:00.000Z",
       };
+      state.trustSpineSync.events["synthetic-legacy-correction-retry"] = {
+        accountId: String(currentUserId() || ""),
+        teamId: game.teamId,
+        rosterPlayerId: game.rosterPlayerId,
+        gameId: game.id,
+        eventId: "synthetic-legacy-correction-retry",
+        serverEventVersion: 1,
+        lifecycleState: "active",
+        acceptedEvidence: {
+          occurred_at: "2026-07-23T12:06:30.000Z",
+          period: "Q2",
+          stat_type: "goal",
+          stat_label: "Goal",
+          category: "Offense",
+          point_value: 5,
+          field_zone: "",
+        },
+        pendingOperations: [{
+          kind: "correct",
+          clientOperationId: "stale-private-correction",
+          clientCreatedAt: "2026-07-23T12:06:31.000Z",
+          eventEvidence: {
+            stat_type: "legacy_shift_alias",
+            stat_label: "Legacy Correction Alias",
+            category: "Participation",
+            point_value: 0,
+          },
+          rpcPayload: {
+            client_operation_id: "stale-private-correction",
+            event_id: "synthetic-legacy-correction-retry",
+            game_id: game.id,
+            base_server_event_version: 1,
+            changes: {
+              stat_type: "legacy_shift_alias",
+              stat_label: "Legacy Correction Alias",
+              category: "Participation",
+              point_value: 0,
+            },
+            correction_reason: "Pre-upgrade synthetic correction",
+            client_created_at: "2026-07-23T12:06:31.000Z",
+          },
+          attempts: 1,
+          lastAttemptAt: "2026-07-23T12:10:30.000Z",
+          lastError: "response lost",
+        }],
+        acceptedReceipts: [],
+        conflict: null,
+        lastError: "response lost",
+        updatedAt: "2026-07-23T12:10:30.000Z",
+      };
+      state.trustSpineSync.events["synthetic-legacy-never-accepted"] = {
+        accountId: String(currentUserId() || ""),
+        teamId: game.teamId,
+        rosterPlayerId: game.rosterPlayerId,
+        gameId: game.id,
+        eventId: "synthetic-legacy-never-accepted",
+        serverEventVersion: 0,
+        lifecycleState: "pending",
+        acceptedEvidence: {},
+        pendingOperations: [{
+          kind: "create",
+          clientOperationId: "stale-private-never-accepted",
+          clientCreatedAt: "2026-07-23T12:06:45.000Z",
+          eventEvidence: {
+            stat_type: "legacy_shift_alias",
+            stat_label: "Never Accepted Alias",
+            category: "Participation",
+            point_value: 0,
+          },
+          rpcPayload: {
+            client_operation_id: "stale-private-never-accepted",
+            event_id: "synthetic-legacy-never-accepted",
+            game_id: game.id,
+            evidence: {
+              occurred_at: "2026-07-23T12:06:45.000Z",
+              period: "Q2",
+              stat_type: "legacy_shift_alias",
+              stat_label: "Never Accepted Alias",
+              category: "Participation",
+              point_value: 0,
+            },
+          },
+          attempts: 1,
+          lastAttemptAt: "2026-07-23T12:10:45.000Z",
+          lastError: "response lost",
+        }],
+        acceptedReceipts: [],
+        conflict: null,
+        lastError: "response lost",
+        updatedAt: "2026-07-23T12:10:45.000Z",
+      };
 
       state.isOffline = true;
       queueTrustSpineGameReconciliation(game);
@@ -755,20 +938,52 @@ async function newContext(browser, options = {}) {
         privateOnlyRecapText: privateOnlyRecap.text,
         publicIds: state.sharedGame?.events?.map((event) => event.id) || [],
         publicBody: document.body.innerText,
+        neverAcceptedRecord:
+          state.trustSpineSync.events["synthetic-legacy-never-accepted"] || null,
       };
     });
     const privateBoundaryRequests = localApiRequests.slice(privateBoundaryRpcStart);
-    check(privateBoundaryResult.localPrivateCount === 6, "private and poisoned events remain intact in local saved-game evidence");
+    check(privateBoundaryResult.localPrivateCount === 8, "private and poisoned events remain intact in local saved-game evidence");
     check(
-      privateBoundaryResult.offlinePrivateRecordCount === 1
+      privateBoundaryResult.offlinePrivateRecordCount === 3
         && privateBoundaryResult.privateRecords.every((record) => !record || record.pendingOperations.length === 0),
-      "offline, stale, imported, corrected, and retrying private aliases cannot remain queued for Event Pipeline ingress",
+      "offline, stale, imported, corrected, and replayed private aliases cannot remain queued for new Event Pipeline ingress",
     );
     check(privateBoundaryResult.synchronized === true, "private aliases do not prevent ordinary-event synchronization");
-    check(trustApi.events.size === 2, "signed-in synchronization leaves the authoritative ordinary-event count at exactly two");
     check(
-      !privateBoundaryRequests.some((item) => item.pathname.endsWith("/lh_create_event")),
-      "signed-in private-alias reconciliation sends no create RPC",
+      [...trustApi.events.values()].filter((event) => isPublicEventEvidence(event.evidence)).length === 2,
+      "signed-in synchronization leaves the authoritative public ordinary-event count at exactly two",
+    );
+    const replayRequests = privateBoundaryRequests.filter((item) => (
+      item.pathname.endsWith("/lh_create_event")
+      || item.pathname.endsWith("/lh_correct_event")
+    ));
+    check(
+      replayRequests.length === 3
+        && replayRequests.some((item) => (
+          item.pathname.endsWith("/lh_create_event")
+          && item.post?.p_operation?.client_operation_id === "stale-private-create"
+          && item.post?.p_operation?.evidence?.stat_type === "legacy_shift_alias"
+        ))
+        && replayRequests.some((item) => (
+          item.pathname.endsWith("/lh_correct_event")
+          && item.post?.p_operation?.client_operation_id === "stale-private-correction"
+          && item.post?.p_operation?.changes?.stat_type === "legacy_shift_alias"
+        )),
+      "attempted pre-upgrade create and correction payloads reach replay-first wrappers exactly once",
+    );
+    const neverAcceptedRetryCleared = (
+      replayRequests.some((item) => (
+        item.pathname.endsWith("/lh_create_event")
+        && item.post?.p_operation?.client_operation_id === "stale-private-never-accepted"
+      ))
+        && privateBoundaryResult.neverAcceptedRecord?.pendingOperations?.length === 0
+        && trustApi.operations.get("stale-private-never-accepted")?.code === "unsupported_event_semantics"
+        && !trustApi.events.has("synthetic-legacy-never-accepted")
+    );
+    check(
+      neverAcceptedRetryCleared,
+      "a never-accepted pre-upgrade private retry is cleared only after authoritative rejection",
     );
     check(
       privateBoundaryResult.publicIds.join(",") === localTrackerEvents.join(","),

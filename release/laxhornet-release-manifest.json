@@ -37,9 +37,9 @@
       "productionApplied": false,
       "productionAuthorizationRequired": true,
       "sha256": {
-        "supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql": "31b4758362b712f1fe890c9aea79fdd5dc99eb8716bd94f91da37953215ad050",
+        "supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql": "16bf3d25f4a886a06d00655dce956fdef614f34fec4e74cbf5ef8b7754f85d52",
         "supabase/rollback/20260728193942_v284_public_event_semantic_boundary_rollback.sql": "3d6085cb7e686d8243639ad676043986cf28a7c586280bf1c7c342fa32ab7bf5",
-        "supabase/tests/v284_public_event_semantic_boundary.sql": "f30cfb2f822caf1c829799eef048bbba8766712936d6136903c8351aa05c112e"
+        "supabase/tests/v284_public_event_semantic_boundary.sql": "5842cf58cb4c6dfe4bbcfa31fcc38b395197e2395b01c590c78ff1d13a85e9e4"
       }
     }
   ],

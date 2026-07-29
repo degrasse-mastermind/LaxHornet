@@ -391,6 +391,52 @@ begin
 end;
 $$;
 
+create or replace function public.lh_tombstone_event(p_operation jsonb)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  actor_id uuid := auth.uid();
+  grant_id text;
+  replay jsonb;
+begin
+  if actor_id is null then
+    return pg_catalog.jsonb_build_object(
+      'outcome', 'rejected',
+      'code', 'unauthorized_scope'
+    );
+  end if;
+
+  grant_id := lh_trust_private.lh_mutation_grant_for_game(
+    actor_id,
+    p_operation ->> 'game_id'
+  );
+  if grant_id is null then
+    return pg_catalog.jsonb_build_object(
+      'outcome', 'rejected',
+      'code', 'unauthorized_scope'
+    );
+  end if;
+
+  if coalesce(p_operation ->> 'client_operation_id', '') <> '' then
+    replay := lh_trust_private.lh_replay_or_tamper(
+      actor_id,
+      p_operation ->> 'client_operation_id',
+      'tombstone_event',
+      lh_trust_private.lh_operation_hash(p_operation)
+    );
+    if replay is not null then
+      return replay;
+    end if;
+  end if;
+
+  return lh_trust_private.lh_tombstone_event_impl(p_operation);
+end;
+$$;
+
 create or replace function lh_trust_private.lh_public_live_share_game_impl(p_share_code text)
 returns jsonb
 language plpgsql
@@ -493,11 +539,14 @@ $$;
 
 alter function public.lh_create_event(jsonb) owner to postgres;
 alter function public.lh_correct_event(jsonb) owner to postgres;
+alter function public.lh_tombstone_event(jsonb) owner to postgres;
 alter function lh_trust_private.lh_public_live_share_game_impl(text) owner to postgres;
 
 revoke execute on function public.lh_create_event(jsonb)
   from public, anon, authenticated;
 revoke execute on function public.lh_correct_event(jsonb)
+  from public, anon, authenticated;
+revoke execute on function public.lh_tombstone_event(jsonb)
   from public, anon, authenticated;
 revoke execute on function public.lh_public_live_share_game(text)
   from public, anon, authenticated;
@@ -506,6 +555,7 @@ revoke all on function lh_trust_private.lh_public_live_share_game_impl(text)
 
 grant execute on function public.lh_create_event(jsonb) to authenticated;
 grant execute on function public.lh_correct_event(jsonb) to authenticated;
+grant execute on function public.lh_tombstone_event(jsonb) to authenticated;
 grant execute on function public.lh_public_live_share_game(text) to anon, authenticated;
 
 comment on function lh_trust_private.lh_public_event_semantic(jsonb) is
@@ -518,6 +568,8 @@ comment on function public.lh_create_event(jsonb) is
   'Creates only complete canonical ordinary events after uniform scope authorization and raw-request replay.';
 comment on function public.lh_correct_event(jsonb) is
   'Corrects only canonical ordinary evidence after uniform scope authorization and raw-request replay.';
+comment on function public.lh_tombstone_event(jsonb) is
+  'Tombstones events only after uniform scope authorization and raw-request replay.';
 comment on function public.lh_public_live_share_game(text) is
   'Returns minimum-necessary game data and canonical ordinary events only.';
 

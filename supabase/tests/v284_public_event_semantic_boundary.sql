@@ -3,7 +3,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select extensions.plan(41);
+select extensions.plan(45);
 
 select extensions.ok(
   not has_function_privilege(
@@ -586,6 +586,58 @@ select extensions.is(
   ) ->> 'code',
   'unauthorized_scope',
   'cross-scope tombstoned event state is not disclosed'
+);
+select extensions.is(
+  public.lh_tombstone_event(
+    '{
+      "client_operation_id":"v284-boundary-unauthorized-tombstone-active",
+      "event_id":"v284-boundary-goal",
+      "game_id":"v284-boundary-game",
+      "base_server_event_version":1,
+      "tombstone_reason":"Synthetic authorization probe"
+    }'::jsonb
+  ) ->> 'code',
+  'unauthorized_scope',
+  'cross-scope tombstone does not disclose active event state'
+);
+select extensions.is(
+  public.lh_tombstone_event(
+    '{
+      "client_operation_id":"v284-boundary-unauthorized-tombstone-missing",
+      "event_id":"v284-boundary-missing",
+      "game_id":"v284-boundary-game",
+      "base_server_event_version":1,
+      "tombstone_reason":"Synthetic authorization probe"
+    }'::jsonb
+  ) ->> 'code',
+  'unauthorized_scope',
+  'cross-scope tombstone does not disclose missing event state'
+);
+select extensions.is(
+  public.lh_tombstone_event(
+    '{
+      "client_operation_id":"v284-boundary-unauthorized-tombstone-tombstoned",
+      "event_id":"v284-boundary-tombstoned",
+      "game_id":"v284-boundary-game",
+      "base_server_event_version":2,
+      "tombstone_reason":"Synthetic authorization probe"
+    }'::jsonb
+  ) ->> 'code',
+  'unauthorized_scope',
+  'cross-scope tombstone does not disclose tombstoned event state'
+);
+select extensions.is(
+  public.lh_tombstone_event(
+    '{
+      "client_operation_id":"v284-boundary-unauthorized-tombstone-unknown-game",
+      "event_id":"v284-boundary-missing",
+      "game_id":"v284-boundary-unknown-game",
+      "base_server_event_version":1,
+      "tombstone_reason":"Synthetic authorization probe"
+    }'::jsonb
+  ) ->> 'code',
+  'unauthorized_scope',
+  'cross-scope tombstone returns the same result for an unknown game'
 );
 select pg_catalog.set_config(
   'request.jwt.claims',

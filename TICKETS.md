@@ -312,6 +312,11 @@ appear through public Live Share.
 - Hardened all public fields, game-period/date bounds, uniform pre-lookup
   authorization responses, raw pre-migration replay, and zero-public-event
   recap handling after independent adversarial review.
+- Hardened create, correction, and tombstone scope checks uniformly before
+  replay or event-state lookup. Attempted pre-upgrade create/correction payloads
+  now make one exact raw retry after scope establishment so the server can
+  resolve lost responses; never-accepted private payloads are cleared only
+  after authoritative rejection.
 - Added a fail-closed rollback, pgTAP, browser reproduction, stale/offline/import
   coverage, family recap boundary, selected private CSV boundary, and release
   manifest/preflight support.
@@ -321,20 +326,23 @@ appear through public Live Share.
 - Blank database reset with the corrective migration: passed.
 - Production-shaped seven-migration baseline plus one corrective migration:
   passed.
-- `supabase/tests/v284_public_event_semantic_boundary.sql`: 41/41 passed,
-  including poisoned fields, authorization oracles, and pre-migration retries.
+- `supabase/tests/v284_public_event_semantic_boundary.sql`: 45/45 passed on
+  both database shapes, including poisoned fields, create/correct/tombstone
+  authorization oracles, and pre-migration retries.
 - `tools/test_public_event_semantic_boundary.mjs`: passed.
-- Signed-in browser disclosure reproduction: 72/72 passed with the public
-  payload remaining exactly two ordinary events and no hosted requests.
+- Signed-in browser disclosure reproduction: 73/73 passed with lost-response
+  create/correction replay, never-accepted rejection, the public payload
+  remaining exactly two ordinary events, and no hosted requests.
 - Tracked-time browser suite: 33/33 passed with focused service-worker
   lifecycle isolation.
 - Complete application and release regression: 33/33 groups passed.
 - Canonical v284 local release verification: all 17 gates passed, including
   both database shapes, two 41-test disclosure pgTAP runs, rollback behavior,
   lint, 33/33 regression groups, and cleanup.
-- Initial independent review found four actionable gaps; all four are fixed
-  locally. Full regression, CI rerun, independent re-review, merge, and
-  production rollout remain required before `DONE`.
+- Initial independent review found four actionable gaps; the first re-review
+  confirmed those fixes and found two additional tombstone/retry gaps. All six
+  are now fixed locally. Full regression, CI rerun, clean exact-SHA independent
+  re-review, merge, and production rollout remain required before `DONE`.
 
 #### Risks and rollback
 

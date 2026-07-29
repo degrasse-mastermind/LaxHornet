@@ -113,8 +113,10 @@ are not in the ordinary vocabulary.
 - `public-event-semantics.js` is the single closed browser vocabulary.
 - New, imported, offline, corrected, reconciled, and retrying private/unknown
   events cannot create or correct ordinary Event Pipeline records.
-- Stale private pending operations are suppressed while accepted receipts and
-  local evidence are retained.
+- Attempted pre-upgrade private/noncanonical create and correction payloads make
+  one exact raw retry after scope establishment so immutable server receipts
+  can resolve a lost response. Never-accepted payloads are suppressed only
+  after the server rejects them; accepted receipts and local evidence remain.
 - If an already-published ordinary event is corrected out of the public
   vocabulary, its public record is tombstoned instead of converted to a private
   semantic.
@@ -144,7 +146,8 @@ The migration:
   search paths;
 - revokes direct helper execution from browser roles;
 - returns one uniform authorization result before replay, event lookup, or
-  semantic classification, avoiding cross-scope existence/lifecycle oracles;
+  semantic classification across create, correction, and tombstone, avoiding
+  cross-scope existence/lifecycle oracles;
 - replays the original immutable request hash before new semantic validation;
 - requires exact canonical create/correction evidence across every public
   field and bounds period/timestamp values to the registered game;
@@ -162,10 +165,13 @@ rewritten.
 - blank-database migration reset: passed;
 - production-shaped seven-migration reset, corrective `migration up`, and exact
   one-pending/one-applied transition: passed;
-- pgTAP semantic boundary: 41/41 passed, including poisoned-field, differential
-  authorization-oracle, and pre-migration replay probes;
+- pgTAP semantic boundary: 45/45 passed on both database shapes, including
+  poisoned-field, differential create/correct/tombstone authorization-oracle,
+  and pre-migration replay probes;
 - focused JavaScript semantic contracts: passed;
-- signed-in browser failure reproduction and disclosure suite: 72/72 passed;
+- signed-in browser failure reproduction and disclosure suite: 73/73 passed,
+  including lost-response create/correction replay and never-accepted private
+  retry rejection;
 - former failure remained exactly two public ordinary events after private
   alias reconciliation attempts;
 - public browser DOM excluded the aliases and stale cached private payload;
@@ -174,15 +180,17 @@ rewritten.
 - browser suite contacted no hosted Supabase project and reported no console or
   page errors;
 - first independent review found four adversarial gaps in field validation,
-  authorization ordering, recap zero-count handling, and retry hashing; all
-  four are corrected on the branch and await independent re-review;
+  authorization ordering, recap zero-count handling, and retry hashing; the
+  first re-review confirmed those fixes and found tombstone ordering and
+  end-to-end legacy retry gaps. All six are corrected on the branch and await a
+  clean exact-SHA independent re-review;
 - tracked-time browser suite: 33/33 passed after isolating service-worker
   lifecycle behavior from the focused UI harness;
 - complete application and release regression: 33/33 groups passed;
 - canonical v284 local release verification: all 17 gates passed, including
   blank and production-shaped database paths, rollback behavior, database
-  lint, both 41-test disclosure pgTAP runs, full regression, and
-  disposable-environment cleanup.
+  lint, both disclosure pgTAP runs, full regression, and disposable-environment
+  cleanup. This complete verifier must be rerun after the latest hardening.
 
 Independent PR review, merge identity, production migration, deployment, final
 smoke, cleanup, and retained-history disposition are recorded in this directory
