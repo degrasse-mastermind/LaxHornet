@@ -429,6 +429,12 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   assert.match(source, /http:tracker:\$\{response\.status\(\)\}:\$\{url\.host\}\$\{url\.pathname\}/);
   assert.match(source, /http:viewer:\$\{response\.status\(\)\}:\$\{url\.host\}\$\{url\.pathname\}/);
   assert.doesNotMatch(source, /http:(?:tracker|viewer):[\s\S]*url\.search/);
+  assert.match(source, /if \(ok && pending === 0\) return attempt;/);
+  assert.match(source, /window\.setTimeout\(resolve, attempt \* 250\)/);
+  assert.match(
+    source,
+    /retry\.attempts >= 1 && retry\.attempts <= 6 && retry\.pending === 0/,
+  );
   assert.match(
     source,
     /\{ statType: "legacy_shift_alias", tracked: false, reason: "", pending: 0 \}[\s\S]*\{ statType: "goal", tracked: false, reason: "", pending: 0 \}/,
