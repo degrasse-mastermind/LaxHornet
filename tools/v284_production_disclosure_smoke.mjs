@@ -390,14 +390,15 @@ async function verifyHostedReconciliation(context) {
     viewport: { width: 390, height: 844 },
     serviceWorkers: "block",
   });
-  const network = [];
+  const trackerNetwork = [];
+  const viewerNetwork = [];
   const diagnostics = [];
   try {
     const page = await trackerContext.newPage();
     page.on("request", (request_) => {
       const url = new URL(request_.url());
       if (url.host.endsWith(".supabase.co")) {
-        network.push({ method: request_.method(), host: url.host, path: url.pathname });
+        trackerNetwork.push({ method: request_.method(), host: url.host, path: url.pathname });
       }
     });
     page.on("console", (message) => {
@@ -747,7 +748,7 @@ async function verifyHostedReconciliation(context) {
     viewer.on("request", (request_) => {
       const url = new URL(request_.url());
       if (url.host.endsWith(".supabase.co")) {
-        network.push({ method: request_.method(), host: url.host, path: url.pathname });
+        viewerNetwork.push({ method: request_.method(), host: url.host, path: url.pathname });
       }
     });
     await viewer.goto(
@@ -767,7 +768,9 @@ async function verifyHostedReconciliation(context) {
       /Legacy Participation Alias|Private Legacy Alias|unknown_future_event|Player In at 12:34|SYNTHETIC_PRIVATE/i,
       "hosted Live Share DOM disclosed forbidden semantics",
     );
-    const viewerApi = network.filter((item) => item.host === `${PRODUCTION_PROJECT_REF}.supabase.co`);
+    const viewerApi = viewerNetwork.filter(
+      (item) => item.host === `${PRODUCTION_PROJECT_REF}.supabase.co`,
+    );
     assert.ok(
       viewerApi.some((item) => item.path === "/rest/v1/rpc/lh_public_live_share_game"),
       "hosted viewer did not use the public-safe RPC",
@@ -795,6 +798,7 @@ async function verifyHostedReconciliation(context) {
       viewer: { status: viewerState.status, eventCount: viewerState.eventCount },
       network: {
         publicSafeRpcObserved: true,
+        signedInRequestCount: trackerNetwork.length,
         legacyGamesOrEventsRequests: viewerApi.filter((item) =>
           /^\/rest\/v1\/(?:games|events)(?:\/|$)/.test(item.path)).length,
       },

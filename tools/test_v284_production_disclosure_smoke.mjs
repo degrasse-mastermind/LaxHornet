@@ -416,6 +416,11 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   assert.match(source, /unsupported_event_semantics/);
   assert.match(source, /invalid_public_event_evidence/);
   assert.match(source, /expectedCode/);
+  assert.match(source, /const trackerNetwork = \[\];\s+const viewerNetwork = \[\];/);
+  assert.match(source, /trackerNetwork\.push\(/);
+  assert.match(source, /viewerNetwork\.push\(/);
+  assert.match(source, /const viewerApi = viewerNetwork\.filter\(/);
+  assert.doesNotMatch(source, /const viewerApi = network\.filter\(/);
   assert.match(
     source,
     /\{ statType: "legacy_shift_alias", tracked: false, reason: "", pending: 0 \}[\s\S]*\{ statType: "goal", tracked: false, reason: "", pending: 0 \}/,
