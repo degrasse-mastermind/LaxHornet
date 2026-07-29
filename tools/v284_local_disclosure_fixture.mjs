@@ -778,7 +778,8 @@ export async function createPrivateAndPublicEvidence(context) {
       fieldZone: "Offensive end",
     },
   ];
-  for (const event of context.createOrdinaryEvents === false ? [] : ordinaryEvents) {
+  const createdOrdinaryEvents = context.createOrdinaryEvents === false ? [] : ordinaryEvents;
+  for (const event of createdOrdinaryEvents) {
     const created = await acceptedRpc(apiUrl, publishableKey, "lh_create_event", {
       p_operation: {
         client_operation_id: `${fixture.runId}-create-${event.id}`,
@@ -927,13 +928,25 @@ commit;
     revokedCode,
     unknownCode: randomBytes(18).toString("hex").toUpperCase(),
     trackedOperationCount: 8,
+    expectedPublicEvents: createdOrdinaryEvents.map((event) => ({
+      category: event.category,
+      event_id: event.id,
+      field_zone: event.fieldZone,
+      occurred_at: event.occurredAt,
+      period: "Q1",
+      point_value: event.pointValue,
+      stat_label: event.statLabel,
+      stat_type: event.statType,
+    })),
   };
 }
 
-export function assertPublicPayload(payload) {
+export function assertPublicPayload(payload, expectedEvents) {
   assert.ok(payload?.game && Array.isArray(payload.events), "public payload missing");
+  assert.ok(Array.isArray(expectedEvents), "exact expected public events are required");
   assert.deepEqual(sortedKeys(payload.game), allowedGameKeys, "public game allowlist mismatch");
-  assert.equal(payload.events.length, 2, "public ordinary event count mismatch");
+  assert.equal(payload.events.length, expectedEvents.length, "public ordinary event count mismatch");
+  assert.equal(expectedEvents.length, 2, "fixture must expect exactly two public ordinary events");
   const observedTypes = new Set();
   payload.events.forEach((event) => {
     assert.deepEqual(sortedKeys(event), allowedEventKeys, "public event allowlist mismatch");
@@ -952,6 +965,11 @@ export function assertPublicPayload(payload) {
     observedTypes.add(event.stat_type);
   });
   assert.deepEqual(observedTypes, new Set(expectedFixturePublicSemantics.keys()), "public semantic set mismatch");
+  assert.deepEqual(
+    [...payload.events].sort((left, right) => left.event_id.localeCompare(right.event_id)),
+    [...expectedEvents].sort((left, right) => left.event_id.localeCompare(right.event_id)),
+    "public payload differs from the exact expected fixture events",
+  );
   const serialized = JSON.stringify(payload).toLowerCase();
   const forbiddenMatches = FORBIDDEN_DISCLOSURE_TERMS.filter((term) => serialized.includes(term));
   assert.deepEqual(forbiddenMatches, [], "public payload exposed tracked-time fields");
@@ -970,7 +988,7 @@ export async function verifyApiDisclosure(context, evidence) {
     p_share_code: evidence.shareCode,
   });
   assert.equal(publicRead.status, 200);
-  const payload = assertPublicPayload(publicRead.body);
+  const payload = assertPublicPayload(publicRead.body, evidence.expectedPublicEvents);
 
   const neutral = [];
   for (const [kind, code] of [

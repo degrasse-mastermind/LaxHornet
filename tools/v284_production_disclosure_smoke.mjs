@@ -19,7 +19,6 @@ import {
   makeLifecycleRecords,
   removeMutableFixtureSql,
   request,
-  revokeFixtureGrantsSql,
   rpc,
   seedSql,
   signIn,
@@ -283,6 +282,68 @@ end
 $production_guard$;
 `;
   return seedSql(fixture, adminId, coachId, lifecycle).replace("begin;\ndo $guard$", `begin;\n${guard}\ndo $guard$`);
+}
+
+function revokeFixtureGrantsSafelySql(context) {
+  return `
+begin;
+insert into public.lh_grant_lifecycle_events(
+  id, grant_id, sequence, event_type, actor_user_id,
+  actor_grant_id, related_grant_id, reason, occurred_at
+)
+select
+  ${sqlLiteral(`${context.fixture.runId}-coach-revoked`)},
+  grant_row.id,
+  coalesce((
+    select max(existing.sequence)
+    from public.lh_grant_lifecycle_events existing
+    where existing.grant_id = grant_row.id
+  ), 0) + 1,
+  'revoked',
+  ${sqlLiteral(context.adminId)}::uuid,
+  ${sqlLiteral(context.fixture.ids.adminGrant)},
+  null,
+  'v284 synthetic production fixture cleanup',
+  now()
+from public.lh_access_grants grant_row
+where grant_row.id = ${sqlLiteral(context.fixture.ids.coachGrant)}
+  and not exists (
+    select 1
+    from public.lh_grant_lifecycle_events existing
+    where existing.grant_id = grant_row.id
+      and existing.event_type in ('revoked', 'expired')
+  )
+on conflict (id) do nothing;
+
+insert into public.lh_grant_lifecycle_events(
+  id, grant_id, sequence, event_type, actor_user_id,
+  actor_grant_id, related_grant_id, reason, occurred_at
+)
+select
+  ${sqlLiteral(`${context.fixture.runId}-admin-revoked`)},
+  grant_row.id,
+  coalesce((
+    select max(existing.sequence)
+    from public.lh_grant_lifecycle_events existing
+    where existing.grant_id = grant_row.id
+  ), 0) + 1,
+  'revoked',
+  ${sqlLiteral(context.adminId)}::uuid,
+  ${sqlLiteral(context.fixture.ids.adminGrant)},
+  null,
+  'v284 synthetic production fixture cleanup',
+  now()
+from public.lh_access_grants grant_row
+where grant_row.id = ${sqlLiteral(context.fixture.ids.adminGrant)}
+  and not exists (
+    select 1
+    from public.lh_grant_lifecycle_events existing
+    where existing.grant_id = grant_row.id
+      and existing.event_type in ('revoked', 'expired')
+  )
+on conflict (id) do nothing;
+commit;
+`;
 }
 
 async function verifyHostedReconciliation(context) {
@@ -597,7 +658,30 @@ async function verifyHostedReconciliation(context) {
       { p_share_code: context.disclosure.shareCode },
     );
     assert.equal(finalPublic.status, 200, "final public payload request failed");
-    const payload = assertPublicPayload(finalPublic.body);
+    const expectedPublicEvents = [
+      {
+        category: "Effort / IQ",
+        event_id: initial.eventIds[0],
+        field_zone: "Defensive end",
+        occurred_at: "2026-07-28T12:00:00.000Z",
+        period: "Q1",
+        point_value: 2,
+        stat_label: "Ground Ball",
+        stat_type: "groundBall",
+      },
+      {
+        category: "Offense",
+        event_id: initial.eventIds[1],
+        field_zone: "Offensive end",
+        occurred_at: "2026-07-28T12:01:00.000Z",
+        period: "Q1",
+        point_value: 3,
+        stat_label: "Assist",
+        stat_type: "assist",
+      },
+    ];
+    context.disclosure.expectedPublicEvents = expectedPublicEvents;
+    const payload = assertPublicPayload(finalPublic.body, expectedPublicEvents);
     const ids = finalPublic.body.events.map((event) => event.event_id).sort();
     assert.deepEqual(ids, [...initial.eventIds].sort(), "former failure changed the exact public timeline");
 
@@ -734,7 +818,7 @@ async function closeActiveParticipation(context) {
     },
     context.coachSession.access_token,
   );
-  return { code: result.code, trackedOperationCount: 10 };
+  return { code: result.code, trackedOperationCount: 9 };
 }
 
 async function exerciseClockFormats(context) {
@@ -964,12 +1048,10 @@ where game_id in (${sqlLiteral(context.fixture.ids.game)}, ${sqlLiteral(context.
 returning game_id;
 `);
   });
-  if (context.seedComplete && !context.grantsRevoked) {
-    await attempt(async () => {
-      databaseQuery(revokeFixtureGrantsSql(context.fixture, context.adminId));
-      context.grantsRevoked = true;
-    });
-  }
+  await attempt(async () => {
+    databaseQuery(revokeFixtureGrantsSafelySql(context));
+    context.grantsRevoked = true;
+  });
   await attempt(() => deleteAuthUsers(context));
   await attempt(async () => {
     databaseQuery(removeMutableFixtureSql(context.fixture, context.adminId, context.coachId));
@@ -1008,7 +1090,6 @@ export async function runProductionDisclosureSmoke(argv = process.argv.slice(2))
     serviceRoleKey: keys.serviceRole,
     fixture,
     halvesGameId: `${fixture.runId}-halves-game`,
-    seedComplete: false,
     grantsRevoked: false,
     createOrdinaryEvents: false,
     databaseQuery: async (sql) => databaseQuery(sql),
@@ -1035,7 +1116,6 @@ export async function runProductionDisclosureSmoke(argv = process.argv.slice(2))
     );
     const lifecycle = makeLifecycleRecords(fixture, context.adminId, context.coachId);
     databaseQuery(productionSeedSql(fixture, context.adminId, context.coachId, lifecycle));
-    context.seedComplete = true;
     databaseQuery(`
 insert into public.lh_game_scopes(
   game_id, team_id, roster_player_id, opponent_snapshot, game_date_snapshot,

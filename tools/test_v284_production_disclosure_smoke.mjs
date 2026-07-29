@@ -224,8 +224,13 @@ rejects(
 );
 
 test("accepts exact canonical public fixture semantics", () => {
-  assert.equal(assertPublicPayload(validPublicPayload).eventCount, 2);
+  assert.equal(assertPublicPayload(validPublicPayload, validPublicPayload.events).eventCount, 2);
 });
+rejects(
+  "rejects a missing exact expected public timeline",
+  () => assertPublicPayload(validPublicPayload),
+  /exact expected public events are required/,
+);
 for (const [name, eventOverride, pattern] of [
   ["rejects a private public-payload type", { stat_type: "player_in" }, /noncanonical public stat type/],
   ["rejects an unknown public-payload type", { stat_type: "future_event" }, /noncanonical public stat type/],
@@ -238,14 +243,37 @@ for (const [name, eventOverride, pattern] of [
 ]) {
   rejects(
     name,
-    () => assertPublicPayload({
-      ...validPublicPayload,
-      events: [
-        { ...validPublicPayload.events[0], ...eventOverride },
-        validPublicPayload.events[1],
-      ],
-    }),
+    () => assertPublicPayload(
+      {
+        ...validPublicPayload,
+        events: [
+          { ...validPublicPayload.events[0], ...eventOverride },
+          validPublicPayload.events[1],
+        ],
+      },
+      validPublicPayload.events,
+    ),
     pattern,
+  );
+}
+for (const [name, eventOverride] of [
+  ["rejects the wrong canonical period", { period: "Q2" }],
+  ["rejects the wrong canonical field zone", { field_zone: "Sideline" }],
+  ["rejects the wrong canonical timestamp", { occurred_at: "2026-07-28T12:00:01.000Z" }],
+]) {
+  rejects(
+    name,
+    () => assertPublicPayload(
+      {
+        ...validPublicPayload,
+        events: [
+          { ...validPublicPayload.events[0], ...eventOverride },
+          validPublicPayload.events[1],
+        ],
+      },
+      validPublicPayload.events,
+    ),
+    /exact expected fixture events/,
   );
 }
 
@@ -280,17 +308,13 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   assert.match(source, /revokeTokens/);
   assert.match(source, /deleteAuthUsers/);
   assert.match(source, /removeMutableFixtureSql/);
+  assert.match(source, /revokeFixtureGrantsSafelySql/);
+  assert.doesNotMatch(source, /if\s*\(\s*context\.seedComplete/);
+  assert.match(source, /trackedOperationCount:\s*9/);
   assert.match(source, /unsupported_event_semantics/);
   assert.match(source, /Legacy Participation Alias/);
   assert.match(source, /Player In at 12:34/);
   assert.doesNotMatch(source, /supabase\s+db\s+push|migration\s+repair|functions\s+deploy/i);
-  const baseSeed = source.indexOf("databaseQuery(productionSeedSql(");
-  const cleanupArmed = source.indexOf("context.seedComplete = true", baseSeed);
-  const halvesSeed = source.indexOf("insert into public.lh_game_scopes(", baseSeed);
-  assert.ok(
-    baseSeed >= 0 && cleanupArmed > baseSeed && halvesSeed > cleanupArmed,
-    "cleanup must be armed immediately after the first committed seed transaction",
-  );
 });
 
 const failures = results.filter((item) => item.status === "FAIL");
