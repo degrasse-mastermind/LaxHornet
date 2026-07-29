@@ -550,6 +550,14 @@ async function verifyHostedReconciliation(context) {
       ended: true,
       reviewRendered: true,
     }, "hosted ordinary game journey failed");
+    const savedGameModalClose = page.locator('[data-action="close-saved-game"]');
+    assert.equal(await savedGameModalClose.count(), 1, "saved-game summary modal was not rendered");
+    await savedGameModalClose.click();
+    await page.evaluate((gameId) => {
+      state.activeGame = state.games.find((game) => game.id === gameId);
+      state.screen = "live";
+      render();
+    }, context.fixture.ids.game);
 
     const correction = await page.evaluate(async (eventId) => {
       const event = state.activeGame.events.find((item) => item.id === eventId);
