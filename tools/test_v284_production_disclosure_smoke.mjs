@@ -393,7 +393,18 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
       && finalAuthorityProof > authDatabaseFallback,
     "cleanup must close participation and remove mutable rows before exact Auth fallback and proof",
   );
-  assert.match(source, /auth_user\.id = target\.user_id\s+and auth_user\.email = target\.email/);
+  assert.match(
+    source,
+    /delete from auth\.sessions session[\s\S]*auth_user\.id = target\.user_id\s+and auth_user\.email = target\.email\s+and session\.user_id = auth_user\.id/,
+  );
+  assert.match(
+    source,
+    /delete from auth\.refresh_tokens token[\s\S]*auth_user\.id = target\.user_id\s+and auth_user\.email = target\.email\s+and token\.user_id = auth_user\.id::text/,
+  );
+  assert.match(
+    source,
+    /else \{\s*await deleteAuthUsers\(context\);\s*deleteAuthUsersDatabaseFallback\(context\);\s*assertSyntheticAuthCleanup\(syntheticAuthCleanupCounts\(context\)\);\s*\}/,
+  );
   assert.match(source, /unsupported_event_semantics/);
   assert.match(source, /invalid_public_event_evidence/);
   assert.match(source, /expectedCode/);

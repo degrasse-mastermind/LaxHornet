@@ -1099,12 +1099,16 @@ insert into v284_synthetic_auth_cleanup_target(user_id, email) values
   ${values};
 
 delete from auth.sessions session
-using v284_synthetic_auth_cleanup_target target
-where session.user_id = target.user_id;
+using v284_synthetic_auth_cleanup_target target, auth.users auth_user
+where auth_user.id = target.user_id
+  and auth_user.email = target.email
+  and session.user_id = auth_user.id;
 
 delete from auth.refresh_tokens token
-using v284_synthetic_auth_cleanup_target target
-where token.user_id = target.user_id::text;
+using v284_synthetic_auth_cleanup_target target, auth.users auth_user
+where auth_user.id = target.user_id
+  and auth_user.email = target.email
+  and token.user_id = auth_user.id::text;
 
 delete from auth.users auth_user
 using v284_synthetic_auth_cleanup_target target
@@ -1112,6 +1116,54 @@ where auth_user.id = target.user_id
   and auth_user.email = target.email;
 commit;
 `);
+}
+
+function syntheticAuthCleanupCounts(context) {
+  const targets = [
+    [context.adminId, context.fixture?.adminEmail],
+    [context.coachId, context.fixture?.coachEmail],
+  ].filter(([userId, email]) => userId && email);
+  if (!targets.length) return { authUsers: 0, authSessions: 0, refreshTokens: 0 };
+  const values = targets
+    .map(([userId, email]) => `(${sqlLiteral(userId)}::uuid, ${sqlLiteral(email)})`)
+    .join(",\n    ");
+  return queryResult(`
+with targets(user_id, email) as (
+  values
+    ${values}
+)
+select json_build_object(
+  'authUsers', (
+    select count(*)::integer
+    from auth.users auth_user
+    join targets target
+      on auth_user.id = target.user_id
+     and auth_user.email = target.email
+  ),
+  'authSessions', (
+    select count(*)::integer
+    from auth.sessions session
+    join auth.users auth_user on auth_user.id = session.user_id
+    join targets target
+      on auth_user.id = target.user_id
+     and auth_user.email = target.email
+  ),
+  'refreshTokens', (
+    select count(*)::integer
+    from auth.refresh_tokens token
+    join auth.users auth_user on auth_user.id::text = token.user_id
+    join targets target
+      on auth_user.id = target.user_id
+     and auth_user.email = target.email
+  )
+) result;
+`);
+}
+
+function assertSyntheticAuthCleanup(proof) {
+  assert.equal(proof.authUsers, 0, "synthetic Auth users survived partial cleanup");
+  assert.equal(proof.authSessions, 0, "synthetic Auth sessions survived partial cleanup");
+  assert.equal(proof.refreshTokens, 0, "synthetic refresh tokens survived partial cleanup");
 }
 
 async function oldAuthorityProof(context) {
@@ -1379,7 +1431,11 @@ commit;
   } finally {
     try {
       if (context.adminId && context.coachId) cleanupProof = await cleanup(context);
-      else await deleteAuthUsers(context);
+      else {
+        await deleteAuthUsers(context);
+        deleteAuthUsersDatabaseFallback(context);
+        assertSyntheticAuthCleanup(syntheticAuthCleanupCounts(context));
+      }
     } catch (cleanupError) {
       throw new Error(`PRODUCTION CLEANUP FAILED: ${cleanupError.message}`, { cause: cleanupError });
     }
