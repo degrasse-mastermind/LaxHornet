@@ -52,7 +52,7 @@ revoke all on function lh_trust_private.lh_public_event_semantic(jsonb)
 create or replace function lh_trust_private.lh_public_event_evidence(p_evidence jsonb)
 returns jsonb
 language plpgsql
-immutable
+stable
 security invoker
 set search_path = ''
 as $$
