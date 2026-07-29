@@ -1,0 +1,150 @@
+name: Allowlisted GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      deployment_ref:
+        description: Existing allowlisted main commit to redeploy for rollback
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: laxhornet-pages-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build allowlisted Pages artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: read
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
+
+    steps:
+      - name: Check out exact deployment source
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.deployment_ref || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify approved main ancestry
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_sha="$(git rev-parse HEAD)"
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$source_sha" origin/main
+          if [[ "${{ github.event_name }}" == "push" && "$source_sha" != "$GITHUB_SHA" ]]; then
+            echo "Push deployment source differs from the triggering commit." >&2
+            exit 1
+          fi
+          echo "sha=$source_sha" >> "$GITHUB_OUTPUT"
+          echo "Deploying source commit: $source_sha"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Verify Pages source and custom-domain gate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/verify_pages_settings.mjs
+
+      - name: Validate release identity
+        run: node tools/validate_release_manifest.mjs
+
+      - name: Run deployment safety contracts
+        run: node tools/test_pages_deployment.mjs
+
+      - name: Build allowlisted artifact
+        run: node tools/build_pages_artifact.mjs --source-sha=${{ steps.source.outputs.sha }}
+
+      - name: Validate allowlisted artifact
+        run: node tools/validate_pages_artifact.mjs
+
+      - name: Record deployment manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .pages-artifact-metadata/pages-deployment-manifest.json
+          {
+            echo "## LaxHornet Pages artifact"
+            echo
+            echo "- Source SHA: \`${{ steps.source.outputs.sha }}\`"
+            echo "- Artifact path: \`.pages-artifact\`"
+            echo "- Manifest: \`.pages-artifact-metadata/pages-deployment-manifest.json\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload deployment manifest evidence
+        uses: actions/upload-artifact@v6
+        with:
+          name: pages-deployment-manifest-${{ steps.source.outputs.sha }}
+          path: .pages-artifact-metadata/pages-deployment-manifest.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload allowlisted Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .pages-artifact
+          retention-days: 30
+
+  deploy:
+    name: Deploy allowlisted artifact
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  verify:
+    name: Verify Pages production boundary
+    needs:
+      - build
+      - deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pages: read
+
+    steps:
+      - name: Check out exact deployed source
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.build.outputs.source_sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Verify Pages source, custom domain, HTTPS, and release marker
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/verify_pages_settings.mjs --production

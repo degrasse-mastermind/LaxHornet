@@ -78,12 +78,27 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
 
 ## Deployment and release control
 
-- Static deployment uses GitHub Pages from the `main` branch repository root.
+- Static production deployment uses the custom `Allowlisted GitHub Pages`
+  workflow. It constructs `.pages-artifact` from the all-files-explicit
+  `release/pages-deployment-allowlist.json`, validates hashes, references,
+  secrets, symlinks, path traversal, custom-domain identity, and exact output
+  membership, then uploads only that generated directory.
+- The workflow fails closed unless Pages uses Actions and the custom domain,
+  HTTPS enforcement, approved certificate, and v284 production marker remain
+  intact before and after deployment.
+- Repository-root and `/docs` branch publishing are prohibited. Internal
+  tools, documentation, SQL, tests, release controls, and review evidence are
+  not production assets.
 - Custom domain: `laxhornet.mybranford.com`.
 - Release coordination includes `version.json`, service-worker/cache markers, script query versions, and `release/laxhornet-release-manifest.json`.
 - Current repository and production release marker is `v284`. Public Live Share is active through the corrected public-safe RPC at deployed SHA `effca6952e647b7424f96675f390fc80d5c42368`.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
+- The v284 cache marker remains unchanged. The updated service worker purges
+  previously cached non-allowlisted same-origin paths during activation and
+  no longer caches unknown paths. A same-release replacement worker activates
+  immediately when the existing v284 cache proves an older v284 worker is
+  already installed.
 
 ## Local development
 
@@ -110,6 +125,10 @@ node tools/test_game_scope_capabilities.mjs
 node tools/test_tracked_playing_time_service.mjs
 node tools/test_tracked_playing_time_foundation.mjs
 node tools/test_public_event_semantic_boundary.mjs
+node tools/test_pages_deployment.mjs
+node tools/build_pages_artifact.mjs
+node tools/validate_pages_artifact.mjs
+node tools/test_pages_artifact_browser.cjs
 supabase test db --local supabase/tests/tracked_playing_time_foundation.sql
 supabase test db --local supabase/tests/v284_public_event_semantic_boundary.sql
 ```

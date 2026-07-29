@@ -6,4 +6,6 @@ qa/
 !.env.example
 supabase/.temp/
 supabase/.branches/
+.pages-artifact/
+.pages-artifact-metadata/
 node_modules/
