@@ -160,6 +160,40 @@ export function isOldPrivateAuthorityRejected(result) {
     );
 }
 
+export function unresolvedParticipationStarts(rows = [], periodFormat = "quarters") {
+  const periods = periodFormat === "halves"
+    ? ["H1", "H2", "OT"]
+    : ["Q1", "Q2", "Q3", "Q4", "OT"];
+  const ordered = [...rows].sort((left, right) => {
+    const leftPeriod = periods.indexOf(left.period);
+    const rightPeriod = periods.indexOf(right.period);
+    if (leftPeriod !== rightPeriod) {
+      return (leftPeriod < 0 ? Number.MAX_SAFE_INTEGER : leftPeriod)
+        - (rightPeriod < 0 ? Number.MAX_SAFE_INTEGER : rightPeriod);
+    }
+    const clockDifference = Number(right.game_clock_seconds) - Number(left.game_clock_seconds);
+    if (clockDifference) return clockDifference;
+    const occurredDifference = Date.parse(left.occurred_at || left.client_created_at)
+      - Date.parse(right.occurred_at || right.client_created_at);
+    if (occurredDifference) return occurredDifference;
+    return String(left.client_operation_id).localeCompare(String(right.client_operation_id));
+  });
+  const activeByPlayer = new Map();
+  for (const operation of ordered) {
+    const playerId = String(operation.player_id || "");
+    if (!playerId || !periods.includes(operation.period)) continue;
+    if (operation.operation_kind === "player_in") {
+      if (!activeByPlayer.has(playerId)) activeByPlayer.set(playerId, operation);
+      continue;
+    }
+    if (operation.operation_kind !== "player_out") continue;
+    const active = activeByPlayer.get(playerId);
+    if (!active) continue;
+    activeByPlayer.delete(playerId);
+  }
+  return [...activeByPlayer.values()];
+}
+
 function configProjectId() {
   const source = fs.readFileSync(path.join(root, "supabase", "config.toml"), "utf8");
   const match = source.match(/^project_id\s*=\s*"([^"]+)"/m);
@@ -938,29 +972,42 @@ returning token_id;
   return { rpcAccepted, directFallbackVerified: true, publicTokenNeutral: true };
 }
 
+function participationResolverRows(context) {
+  return databaseQuery(`
+select
+  effective.player_id,
+  effective.operation_kind,
+  effective.period,
+  effective.game_clock_seconds,
+  effective.occurred_at,
+  effective.client_created_at,
+  effective.client_operation_id,
+  scope.period_format_snapshot as period_format,
+  clock.clock_seconds_remaining
+from public.lh_effective_participation_operations effective
+join public.lh_game_scopes scope on scope.game_id = effective.game_id
+left join public.lh_game_clock_states clock on clock.game_id = effective.game_id
+where effective.game_id = ${sqlLiteral(context.fixture.ids.game)}
+  and effective.operation_kind in ('player_in', 'player_out');
+`);
+}
+
 async function closeResidualParticipation(context) {
   if (!context.coachSession) return [];
-  const active = databaseQuery(`
-with latest_by_player as (
-  select distinct on (effective.player_id)
-    effective.player_id,
-    effective.operation_kind,
-    clock.current_period,
-    clock.clock_seconds_remaining
-  from public.lh_effective_participation_operations effective
-  join public.lh_game_clock_states clock on clock.game_id = effective.game_id
-  where effective.game_id = ${sqlLiteral(context.fixture.ids.game)}
-    and effective.operation_kind in ('player_in', 'player_out')
-  order by effective.player_id, effective.created_at desc, effective.revision_sequence desc
-)
-select player_id, current_period, clock_seconds_remaining
-from latest_by_player
-where operation_kind = 'player_in'
-order by player_id;
-`);
+  const rows = participationResolverRows(context);
+  const periodFormat = rows[0]?.period_format || "quarters";
+  const active = unresolvedParticipationStarts(rows, periodFormat);
   const outcomes = [];
   for (const [index, row] of active.entries()) {
     const timestamp = new Date().toISOString();
+    const closeClockSeconds = Math.min(
+      Number(row.game_clock_seconds),
+      Number(row.clock_seconds_remaining),
+    );
+    assert.ok(
+      Number.isInteger(closeClockSeconds) && closeClockSeconds >= 0,
+      "residual participation close position is invalid",
+    );
     const result = await acceptedRpc(
       context.apiUrl,
       context.publishableKey,
@@ -973,8 +1020,8 @@ order by player_id;
           game_id: context.fixture.ids.game,
           operation_kind: "player_out",
           player_id: row.player_id,
-          period: row.current_period,
-          game_clock_seconds: row.clock_seconds_remaining,
+          period: row.period,
+          game_clock_seconds: closeClockSeconds,
           occurred_at: timestamp,
           client_created_at: timestamp,
           source: "recovery",
@@ -1039,7 +1086,7 @@ async function oldAuthorityProof(context) {
 }
 
 function cleanupCounts(context) {
-  return queryResult(`
+  const counts = queryResult(`
 select json_build_object(
   'authUsers', (select count(*)::integer from auth.users where id in (${sqlLiteral(context.adminId)}::uuid, ${sqlLiteral(context.coachId)}::uuid)),
   'authSessions', (select count(*)::integer from auth.sessions where user_id in (${sqlLiteral(context.adminId)}::uuid, ${sqlLiteral(context.coachId)}::uuid)),
@@ -1067,19 +1114,6 @@ select json_build_object(
     where game_id in (${sqlLiteral(context.fixture.ids.game)}, ${sqlLiteral(context.halvesGameId)})
   ),
   'activeEventVersions', (select count(*)::integer from public.lh_event_effective_versions where game_id = ${sqlLiteral(context.fixture.ids.game)} and lifecycle_state = 'active'),
-  'activeParticipation', (
-    select count(*)::integer
-    from (
-      select distinct on (effective.player_id)
-        effective.player_id,
-        effective.operation_kind
-      from public.lh_effective_participation_operations effective
-      where effective.game_id = ${sqlLiteral(context.fixture.ids.game)}
-        and effective.operation_kind in ('player_in', 'player_out')
-      order by effective.player_id, effective.created_at desc, effective.revision_sequence desc
-    ) latest
-    where latest.operation_kind = 'player_in'
-  ),
   'pendingEventOperations', (select count(*)::integer from public.lh_event_operations where game_id = ${sqlLiteral(context.fixture.ids.game)} and outcome_class = 'pending'),
   'conflictedEventOperations', (select count(*)::integer from public.lh_event_operations where game_id = ${sqlLiteral(context.fixture.ids.game)} and outcome_class = 'conflicted'),
   'retainedEventOperations', (select count(*)::integer from public.lh_event_operations where game_id = ${sqlLiteral(context.fixture.ids.game)}),
@@ -1092,6 +1126,14 @@ select json_build_object(
   )
 ) result;
 `);
+  const resolverRows = participationResolverRows(context);
+  return {
+    ...counts,
+    activeParticipation: unresolvedParticipationStarts(
+      resolverRows,
+      resolverRows[0]?.period_format || "quarters",
+    ).length,
+  };
 }
 
 async function cleanup(context) {

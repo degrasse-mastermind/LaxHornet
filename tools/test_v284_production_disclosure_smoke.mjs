@@ -15,6 +15,7 @@ import {
   assertProductionTarget,
   isOldPrivateAuthorityRejected,
   parseApprovedToolingSha,
+  unresolvedParticipationStarts,
 } from "./v284_production_disclosure_smoke.mjs";
 
 const results = [];
@@ -294,6 +295,42 @@ for (const result of [
     assert.equal(isOldPrivateAuthorityRejected(result), false);
   });
 }
+
+test("participation cleanup follows game-clock order rather than insertion order", () => {
+  const operations = [
+    {
+      player_id: "synthetic-player",
+      operation_kind: "player_in",
+      period: "Q1",
+      game_clock_seconds: 250,
+      occurred_at: "2026-07-28T12:00:00.000Z",
+      client_operation_id: "in-active",
+    },
+  ];
+  assert.equal(unresolvedParticipationStarts(operations, "quarters").length, 1);
+  assert.equal(unresolvedParticipationStarts([
+    ...operations,
+    {
+      player_id: "synthetic-player",
+      operation_kind: "player_out",
+      period: "Q1",
+      game_clock_seconds: 600,
+      occurred_at: "2026-07-28T12:01:00.000Z",
+      client_operation_id: "out-wrong-clock",
+    },
+  ], "quarters").length, 1, "an out before the in on game time must not close the shift");
+  assert.equal(unresolvedParticipationStarts([
+    ...operations,
+    {
+      player_id: "synthetic-player",
+      operation_kind: "player_out",
+      period: "Q1",
+      game_clock_seconds: 250,
+      occurred_at: "2026-07-28T12:01:00.000Z",
+      client_operation_id: "out-same-clock-later",
+    },
+  ], "quarters").length, 0, "same-clock later recovery must close the shift");
+});
 
 test("runner contains mandatory production guards and fail-closed cleanup", () => {
   const source = fs.readFileSync(
