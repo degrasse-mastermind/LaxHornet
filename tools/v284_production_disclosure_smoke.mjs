@@ -677,8 +677,8 @@ async function verifyHostedReconciliation(context) {
         privatePublicationStates: localPrivate.map((event) => {
           const record = state.trustSpineSync.events[event.id] || {};
           return {
-            id: event.id,
             statType: event.statType,
+            tracked: Boolean(state.trustSpineSync.events[event.id]),
             reason: record.publicationSuppressedReason || "",
             pending: record.pendingOperations?.length || 0,
           };
@@ -691,15 +691,12 @@ async function verifyHostedReconciliation(context) {
     }, { fixture: context.fixture, expectedPublicIds: initial.eventIds });
     assert.equal(boundaries.synchronized, true, "final hosted reconciliation did not settle");
     assert.equal(boundaries.localPrivateCount, 4, "former-failure aliases were not retained as private local evidence");
-    assert.ok(
-      boundaries.privatePublicationStates.every((item) =>
-        item.reason === (
-          item.statType === "goal"
-            ? "invalid_public_event_evidence"
-            : "unsupported_event_semantics"
-        ) && item.pending === 0),
-      "private or unknown semantics were not fail-closed",
-    );
+    assert.deepEqual(boundaries.privatePublicationStates, [
+      { statType: "legacy_shift_alias", tracked: false, reason: "", pending: 0 },
+      { statType: "player_in", tracked: false, reason: "", pending: 0 },
+      { statType: "unknown_future_event", tracked: false, reason: "", pending: 0 },
+      { statType: "goal", tracked: false, reason: "", pending: 0 },
+    ], "fresh private or invalid events entered the ordinary Event Pipeline");
     assert.equal(boundaries.csvRetainsPrivateSemantics, true, "selected CSV lost scoped private evidence");
     assert.equal(boundaries.csvOmitsPrivateNoteByDefault, true, "selected CSV exposed private notes by default");
     assert.doesNotMatch(

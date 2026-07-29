@@ -418,8 +418,10 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   assert.match(source, /expectedCode/);
   assert.match(
     source,
-    /item\.statType === "goal"\s*\?\s*"invalid_public_event_evidence"\s*:\s*"unsupported_event_semantics"/,
+    /\{ statType: "legacy_shift_alias", tracked: false, reason: "", pending: 0 \}[\s\S]*\{ statType: "goal", tracked: false, reason: "", pending: 0 \}/,
   );
+  assert.match(source, /tracked: Boolean\(state\.trustSpineSync\.events\[event\.id\]\)/);
+  assert.match(source, /fresh private or invalid events entered the ordinary Event Pipeline/);
   const ordinaryJourneyCheck = source.indexOf("hosted ordinary game journey failed");
   const correctionCheck = source.indexOf("hosted correction did not synchronize", ordinaryJourneyCheck);
   const offlineMode = source.indexOf("await trackerContext.setOffline(true)", correctionCheck);
