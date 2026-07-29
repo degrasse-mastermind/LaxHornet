@@ -12,6 +12,8 @@ import {
 const base = "fc9c079d69757cfc2667dea7e1dfcc56524dce56";
 const releaseHead = "1cf5d9d33a7295da8248353165a696b7b81690db";
 const merge = "e2cd28a568e91232d375a8607e6376800d3a2a20";
+const incidentBase = "1221f418c1e005606d54c545148944f9ec69f132";
+const incidentHead = "2222222222222222222222222222222222222222";
 const later = "1111111111111111111111111111111111111111";
 const manifest = {
   release: "v284",
@@ -20,12 +22,14 @@ const manifest = {
   releaseHeadSha: releaseHead,
   releaseHeadTreeSha: "20341b66dad600d1ae19f4eed20b55bb61752fbc",
   approvedMergeSha: merge,
+  incidentRemediationBaseSha: incidentBase,
 };
 const ancestry = new Set([
   `${base}->${releaseHead}`,
   `${base}->${merge}`,
   `${merge}->${merge}`,
   `${merge}->${later}`,
+  `${incidentBase}->${incidentHead}`,
 ]);
 const isAncestor = (older, newer) => ancestry.has(`${older}->${newer}`);
 const isSameTree = (left, right) => left === releaseHead && right === merge;
@@ -87,6 +91,31 @@ test("preparation rejects the wrong branch", () => {
 test("preparation rejects the wrong pre-release base", () => {
   assert.equal(
     failed(preparation({ mainSha: merge }), "Pre-release main base"),
+    true,
+  );
+});
+
+test("preparation accepts the approved v284 incident-remediation branch and base", () => {
+  assert.equal(
+    allPass(preparation({
+      branch: "fix/v284-public-event-semantic-boundary",
+      headSha: incidentHead,
+      mainSha: incidentBase,
+    })),
+    true,
+  );
+});
+
+test("incident remediation rejects an unapproved main base", () => {
+  assert.equal(
+    failed(
+      preparation({
+        branch: "fix/v284-public-event-semantic-boundary",
+        headSha: incidentHead,
+        mainSha: merge,
+      }),
+      "Incident-remediation main base",
+    ),
     true,
   );
 });

@@ -4,7 +4,9 @@ const http = require("node:http");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const evidenceRoot = path.join(root, "review-evidence", "tracked-playing-time-ui");
+const evidenceRoot = process.env.LAXHORNET_TRACKED_TIME_EVIDENCE_ROOT
+  ? path.resolve(process.env.LAXHORNET_TRACKED_TIME_EVIDENCE_ROOT)
+  : path.join(root, "review-evidence", "tracked-playing-time-ui");
 const screenshotRoot = path.join(evidenceRoot, "screenshots");
 const port = Number(process.env.LAXHORNET_TRACKED_TIME_PORT || 5263);
 const baseUrl = `http://127.0.0.1:${port}`;
@@ -87,7 +89,10 @@ async function liveEventSnapshot(page) {
     executablePath: process.env.LAXHORNET_BROWSER_EXECUTABLE || "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     timeout: 15000,
   });
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    serviceWorkers: "block",
+  });
   const page = await context.newPage();
   page.setDefaultTimeout(7000);
   page.on("console", (message) => {
@@ -104,7 +109,11 @@ async function liveEventSnapshot(page) {
   try {
     console.log("STEP setup");
     await page.goto(`${baseUrl}/app.html?fresh=tracked-time-ui`, { waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(1000);
+    await page.waitForFunction(
+      () =>
+        typeof backendCapabilityState !== "undefined"
+        && backendCapabilityState.checkedAt > 0,
+    );
     const navigationState = await page.evaluate(() => {
       state.authUser = { id: "synthetic-user", email: "synthetic@example.invalid" };
       state.authUserId = "synthetic-user";

@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -34,6 +35,9 @@ const additivePaths = [
   "supabase/migrations/20260727000000_tracked_playing_time_operations.sql",
   "supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql",
   "supabase/tests/tracked_playing_time_foundation.sql",
+  "supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql",
+  "supabase/rollback/20260728193942_v284_public_event_semantic_boundary_rollback.sql",
+  "supabase/tests/v284_public_event_semantic_boundary.sql",
 ].join(",");
 
 const rootJavaScript = readdirSync(root)
@@ -49,7 +53,18 @@ const tests = [
   { name: "v284 team authorization policy", command: process.execPath, args: ["tools/test_v284_team_authorization_policy.mjs"] },
   { name: "tracked playing time UI contracts", command: process.execPath, args: ["tools/test_tracked_playing_time_ui.mjs"] },
   { name: "tracked playing time manual scenarios", command: process.execPath, args: ["tools/test_tracked_playing_time_manual_scenarios.mjs"] },
-  { name: "tracked playing time browser", command: process.execPath, args: ["tools/test_tracked_playing_time_ui_browser.cjs"] },
+  {
+    name: "tracked playing time browser",
+    command: process.execPath,
+    args: ["tools/test_tracked_playing_time_ui_browser.cjs"],
+    env: {
+      LAXHORNET_TRACKED_TIME_EVIDENCE_ROOT: path.join(
+        os.tmpdir(),
+        "laxhornet-v284-tracked-playing-time-browser",
+      ),
+    },
+  },
+  { name: "public event semantic boundary", command: process.execPath, args: ["tools/test_public_event_semantic_boundary.mjs"] },
   { name: "game scope and capability contracts", command: process.execPath, args: ["tools/test_game_scope_capabilities.mjs"] },
   { name: "v284 update release", command: process.execPath, args: ["tools/test_update_release.mjs"] },
   {
@@ -65,7 +80,17 @@ const tests = [
   { name: "release hygiene", command: process.execPath, args: ["tools/test_release_hygiene.mjs"] },
   { name: "minimum disclosure", command: process.execPath, args: ["tools/test_minimum_disclosure.mjs"] },
   { name: "secure disclosure activation", command: process.execPath, args: ["tools/test_secure_disclosure_activation.mjs"] },
-  { name: "secure disclosure browser", command: process.execPath, args: ["tools/test_secure_disclosure_activation_browser.cjs"] },
+  {
+    name: "secure disclosure browser",
+    command: process.execPath,
+    args: ["tools/test_secure_disclosure_activation_browser.cjs"],
+    env: {
+      LAXHORNET_ACTIVATION_EVIDENCE_ROOT: path.join(
+        os.tmpdir(),
+        "laxhornet-v284-secure-disclosure-browser",
+      ),
+    },
+  },
   { name: "Product Alignment source", command: process.execPath, args: ["tools/test_product_alignment_remediation.mjs"] },
   {
     name: "Product Alignment browser",
@@ -105,6 +130,7 @@ for (const test of tests) {
       ...process.env,
       LAXHORNET_RELEASE_BASE_REF: baseRef,
       LAXHORNET_ALLOWED_ADDITIVE_DB_PATHS: additivePaths,
+      ...(test.env || {}),
       ...(combinedMode
         ? {
             LAXHORNET_AUTHORIZED_DB_REF: manifest.databaseCandidate,

@@ -4,7 +4,9 @@ const http = require("node:http");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const evidenceRoot = path.join(root, "review-evidence", "event-pipeline-release-control-cleanup");
+const evidenceRoot = process.env.LAXHORNET_ACTIVATION_EVIDENCE_ROOT
+  ? path.resolve(process.env.LAXHORNET_ACTIVATION_EVIDENCE_ROOT)
+  : path.join(root, "review-evidence", "event-pipeline-release-control-cleanup");
 const browserDir = path.join(evidenceRoot, "browser");
 const releaseVersion = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8")).version;
 const releaseVersionMatch = /^v(\d+)$/.exec(releaseVersion);
@@ -29,6 +31,28 @@ const trustApi = {
   tokenGames: new Map(),
   tokenRevoked: new Set(),
 };
+const publicEventTypeTokens = new Set([
+  "goal",
+  "assist",
+  "shot",
+  "shotongoal",
+  "goaliesave",
+  "goalallowed",
+  "faceoffwin",
+  "faceoffloss",
+  "groundball",
+  "turnover",
+  "causedturnover",
+  "defensivestop",
+  "successfulclear",
+  "failedclear",
+  "hustleplay",
+  "backedupshot",
+  "smartplay",
+  "penalty",
+]);
+const isPublicEventEvidence = (evidence = {}) =>
+  publicEventTypeTokens.has(String(evidence.stat_type || "").toLowerCase().replace(/[^a-z0-9]+/g, ""));
 
 fs.mkdirSync(browserDir, { recursive: true });
 
@@ -152,7 +176,7 @@ function publicPayload() {
         point_value: 3,
         period: "Q2",
         occurred_at: "2026-07-23T12:05:00.000Z",
-        field_zone: "Defensive",
+        field_zone: "Defensive end",
       },
     ],
   };
@@ -164,7 +188,7 @@ async function installApiRoutes(page, options = {}) {
     const url = request.url();
     const pathname = new URL(url).pathname;
     const post = request.postDataJSON?.() || {};
-    localApiRequests.push({ method: request.method(), pathname });
+    localApiRequests.push({ method: request.method(), pathname, post });
     if (pathname.endsWith("/lh_release_capabilities")) {
       await route.fulfill({
         status: 200,
@@ -191,7 +215,11 @@ async function installApiRoutes(page, options = {}) {
         const gameId = trustApi.tokenGames.get(shareCode);
         const dynamicEvents = gameId
           ? [...trustApi.events.values()]
-              .filter((event) => event.gameId === gameId && event.lifecycleState === "active")
+              .filter((event) => (
+                event.gameId === gameId
+                && event.lifecycleState === "active"
+                && isPublicEventEvidence(event.evidence)
+              ))
               .sort((left, right) => left.evidence.occurred_at.localeCompare(right.evidence.occurred_at))
               .map((event) => ({ event_id: event.eventId, ...event.evidence }))
           : null;
@@ -233,6 +261,17 @@ async function installApiRoutes(page, options = {}) {
         await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(rejected) });
         return;
       }
+      if (!isPublicEventEvidence(operation.evidence) && operation.evidence?.stat_type !== "note") {
+        const rejected = {
+          outcome: "rejected",
+          code: "unsupported_event_semantics",
+          eventId: operation.event_id,
+          gameId: operation.game_id,
+        };
+        trustApi.operations.set(operationId, rejected);
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(rejected) });
+        return;
+      }
       const existing = trustApi.events.get(operation.event_id);
       const result = existing
         ? { outcome: "rejected", code: "event_id_already_used", eventId: operation.event_id, gameId: operation.game_id }
@@ -256,6 +295,21 @@ async function installApiRoutes(page, options = {}) {
       const prior = trustApi.operations.get(operationId);
       if (prior) {
         await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(prior) });
+        return;
+      }
+      if (
+        operation.changes?.stat_type
+        && !isPublicEventEvidence(operation.changes)
+        && operation.changes.stat_type !== "note"
+      ) {
+        const rejected = {
+          outcome: "rejected",
+          code: "unsupported_event_semantics",
+          eventId: operation.event_id,
+          gameId: operation.game_id,
+        };
+        trustApi.operations.set(operationId, rejected);
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(rejected) });
         return;
       }
       const existing = trustApi.events.get(operation.event_id);
@@ -440,6 +494,13 @@ async function newContext(browser, options = {}) {
 
     await securePage.goto(`${baseUrl}/app.html?fresh=v284-token`, { waitUntil: "domcontentloaded" });
     await securePage.getByRole("button", { name: "Log In" }).waitFor();
+    await securePage.waitForFunction(
+      () =>
+        typeof backendCapabilityState !== "undefined"
+        && backendCapabilityState.checkedAt > 0
+        && state.syncStatus === "Signed out",
+    );
+    await securePage.waitForTimeout(100);
     const seededTrackerState = await securePage.evaluate(() => {
       setAuthUser({ id: "synthetic-admin-user", email: "synthetic-admin@example.invalid" });
       const player = {
@@ -457,7 +518,7 @@ async function newContext(browser, options = {}) {
         teamId: "synthetic-team",
         rosterPlayerId: "synthetic-player",
         opponent: "Madison Demo",
-        date: "2026-07-23",
+        date: todayISO(),
         currentQuarter: "Q1",
         playerSnapshot: player,
         events: [],
@@ -575,6 +636,378 @@ async function newContext(browser, options = {}) {
       return state.sharedGame?.events?.map((event) => event.id) || [];
     });
     check(initialBridgeTimeline.join(",") === localTrackerEvents.join(","), "newly reconciled events appear in the secure public timeline");
+
+    trustApi.operations.set("stale-private-create", {
+      outcome: "accepted",
+      code: "created",
+      replay: true,
+      serverEventVersion: 1,
+      eventId: "synthetic-legacy-shift-alias",
+      gameId: "synthetic-secure-game",
+    });
+    trustApi.events.set("synthetic-legacy-shift-alias", {
+      eventId: "synthetic-legacy-shift-alias",
+      gameId: "synthetic-secure-game",
+      evidence: {
+        occurred_at: "2026-07-23T12:06:00.000Z",
+        period: "Q2",
+        stat_type: "legacy_shift_alias",
+        stat_label: "Legacy Participation Alias",
+        category: "Participation",
+        point_value: 0,
+      },
+      serverEventVersion: 1,
+      lifecycleState: "active",
+    });
+    trustApi.operations.set("stale-private-correction", {
+      outcome: "accepted",
+      code: "corrected",
+      replay: true,
+      serverEventVersion: 2,
+      eventId: "synthetic-legacy-correction-retry",
+      gameId: "synthetic-secure-game",
+    });
+    trustApi.events.set("synthetic-legacy-correction-retry", {
+      eventId: "synthetic-legacy-correction-retry",
+      gameId: "synthetic-secure-game",
+      evidence: {
+        occurred_at: "2026-07-23T12:06:30.000Z",
+        period: "Q2",
+        stat_type: "legacy_shift_alias",
+        stat_label: "Legacy Correction Alias",
+        category: "Participation",
+        point_value: 0,
+        field_zone: "",
+      },
+      serverEventVersion: 2,
+      lifecycleState: "active",
+    });
+
+    const privateBoundaryRpcStart = localApiRequests.length;
+    const privateBoundaryResult = await securePage.evaluate(async () => {
+      const game = state.activeGame;
+      const privateEvents = [
+        {
+          id: "synthetic-legacy-shift-alias",
+          gameId: game.id,
+          timestamp: "2026-07-23T12:06:00.000Z",
+          quarter: "Q2",
+          statType: "legacy_shift_alias",
+          statLabel: "Legacy Participation Alias",
+          category: "Participation",
+          pointValue: 0,
+          note: "private alias note",
+        },
+        {
+          id: "synthetic-legacy-correction-retry",
+          gameId: game.id,
+          timestamp: "2026-07-23T12:06:30.000Z",
+          quarter: "Q2",
+          statType: "legacy_shift_alias",
+          statLabel: "Legacy Correction Alias",
+          category: "Participation",
+          pointValue: 0,
+        },
+        {
+          id: "synthetic-legacy-never-accepted",
+          gameId: game.id,
+          timestamp: "2026-07-23T12:06:45.000Z",
+          quarter: "Q2",
+          statType: "legacy_shift_alias",
+          statLabel: "Never Accepted Alias",
+          category: "Participation",
+          pointValue: 0,
+        },
+        {
+          id: "synthetic-player-in-alias",
+          gameId: game.id,
+          timestamp: "2026-07-23T12:07:00.000Z",
+          quarter: "Q2",
+          statType: "player_in",
+          statLabel: "Private Legacy Alias",
+          category: "Participation",
+          pointValue: 0,
+        },
+        {
+          id: "synthetic-unknown-import",
+          gameId: game.id,
+          timestamp: "2026-07-23T12:08:00.000Z",
+          quarter: "Q2",
+          statType: "unknown_future_event",
+          statLabel: "Ground Ball",
+          category: "Offense",
+          pointValue: 0,
+          correctedAt: "2026-07-23T12:09:00.000Z",
+        },
+        {
+          id: "synthetic-poisoned-public-type",
+          gameId: game.id,
+          timestamp: "2026-07-23T12:08:30.000Z",
+          quarter: "Q2",
+          statType: "goal",
+          statLabel: "Goal",
+          category: "Offense",
+          pointValue: 5,
+          fieldZone: "Player In at 12:34",
+        },
+        {
+          id: "synthetic-poisoned-public-period",
+          gameId: game.id,
+          timestamp: "2026-07-23T12:08:40.000Z",
+          quarter: "H1",
+          statType: "goal",
+          statLabel: "Goal",
+          category: "Offense",
+          pointValue: 5,
+          fieldZone: "Midfield",
+        },
+        {
+          id: "synthetic-poisoned-public-time",
+          gameId: game.id,
+          timestamp: "2035-07-23T12:08:50.000Z",
+          quarter: "Q2",
+          statType: "goal",
+          statLabel: "Goal",
+          category: "Offense",
+          pointValue: 5,
+          fieldZone: "Midfield",
+        },
+      ].map((event) => normalizeEvent(event, game.id));
+      game.events.push(...privateEvents);
+      state.games = [game];
+      state.trustSpineSync.events["synthetic-legacy-shift-alias"] = {
+        accountId: String(currentUserId() || ""),
+        teamId: game.teamId,
+        rosterPlayerId: game.rosterPlayerId,
+        gameId: game.id,
+        eventId: "synthetic-legacy-shift-alias",
+        serverEventVersion: 0,
+        lifecycleState: "pending",
+        acceptedEvidence: {},
+        pendingOperations: [{
+          kind: "create",
+          clientOperationId: "stale-private-create",
+          clientCreatedAt: "2026-07-23T12:06:00.000Z",
+          eventEvidence: {
+            stat_type: "legacy_shift_alias",
+            stat_label: "Legacy Participation Alias",
+            category: "Participation",
+          },
+          rpcPayload: {
+            client_operation_id: "stale-private-create",
+            event_id: "synthetic-legacy-shift-alias",
+            game_id: game.id,
+            evidence: {
+              occurred_at: "2026-07-23T12:06:00.000Z",
+              period: "Q2",
+              stat_type: "legacy_shift_alias",
+              stat_label: "Legacy Participation Alias",
+              category: "Participation",
+              point_value: 0,
+            },
+          },
+          attempts: 2,
+          lastAttemptAt: "2026-07-23T12:10:00.000Z",
+          lastError: "stale retry",
+        }],
+        acceptedReceipts: [],
+        conflict: null,
+        lastError: "stale retry",
+        updatedAt: "2026-07-23T12:10:00.000Z",
+      };
+      state.trustSpineSync.events["synthetic-legacy-correction-retry"] = {
+        accountId: String(currentUserId() || ""),
+        teamId: game.teamId,
+        rosterPlayerId: game.rosterPlayerId,
+        gameId: game.id,
+        eventId: "synthetic-legacy-correction-retry",
+        serverEventVersion: 1,
+        lifecycleState: "active",
+        acceptedEvidence: {
+          occurred_at: "2026-07-23T12:06:30.000Z",
+          period: "Q2",
+          stat_type: "goal",
+          stat_label: "Goal",
+          category: "Offense",
+          point_value: 5,
+          field_zone: "",
+        },
+        pendingOperations: [{
+          kind: "correct",
+          clientOperationId: "stale-private-correction",
+          clientCreatedAt: "2026-07-23T12:06:31.000Z",
+          eventEvidence: {
+            stat_type: "legacy_shift_alias",
+            stat_label: "Legacy Correction Alias",
+            category: "Participation",
+            point_value: 0,
+          },
+          rpcPayload: {
+            client_operation_id: "stale-private-correction",
+            event_id: "synthetic-legacy-correction-retry",
+            game_id: game.id,
+            base_server_event_version: 1,
+            changes: {
+              stat_type: "legacy_shift_alias",
+              stat_label: "Legacy Correction Alias",
+              category: "Participation",
+              point_value: 0,
+            },
+            correction_reason: "Pre-upgrade synthetic correction",
+            client_created_at: "2026-07-23T12:06:31.000Z",
+          },
+          attempts: 1,
+          lastAttemptAt: "2026-07-23T12:10:30.000Z",
+          lastError: "response lost",
+        }],
+        acceptedReceipts: [],
+        conflict: null,
+        lastError: "response lost",
+        updatedAt: "2026-07-23T12:10:30.000Z",
+      };
+      state.trustSpineSync.events["synthetic-legacy-never-accepted"] = {
+        accountId: String(currentUserId() || ""),
+        teamId: game.teamId,
+        rosterPlayerId: game.rosterPlayerId,
+        gameId: game.id,
+        eventId: "synthetic-legacy-never-accepted",
+        serverEventVersion: 0,
+        lifecycleState: "pending",
+        acceptedEvidence: {},
+        pendingOperations: [{
+          kind: "create",
+          clientOperationId: "stale-private-never-accepted",
+          clientCreatedAt: "2026-07-23T12:06:45.000Z",
+          eventEvidence: {
+            stat_type: "legacy_shift_alias",
+            stat_label: "Never Accepted Alias",
+            category: "Participation",
+            point_value: 0,
+          },
+          rpcPayload: {
+            client_operation_id: "stale-private-never-accepted",
+            event_id: "synthetic-legacy-never-accepted",
+            game_id: game.id,
+            evidence: {
+              occurred_at: "2026-07-23T12:06:45.000Z",
+              period: "Q2",
+              stat_type: "legacy_shift_alias",
+              stat_label: "Never Accepted Alias",
+              category: "Participation",
+              point_value: 0,
+            },
+          },
+          attempts: 1,
+          lastAttemptAt: "2026-07-23T12:10:45.000Z",
+          lastError: "response lost",
+        }],
+        acceptedReceipts: [],
+        conflict: null,
+        lastError: "response lost",
+        updatedAt: "2026-07-23T12:10:45.000Z",
+      };
+
+      state.isOffline = true;
+      queueTrustSpineGameReconciliation(game);
+      const offlinePrivateRecords = privateEvents
+        .map((event) => state.trustSpineSync.events[event.id])
+        .filter(Boolean);
+      state.isOffline = false;
+      const synchronized = await reconcileTrustSpineGame(game);
+      queueTrustSpineTombstone(game, privateEvents[1], "Synthetic private tombstone probe");
+      await flushTrustSpineSync({ gameId: game.id });
+
+      const privateCsv = buildCSV({ scope: "current_game", gameId: game.id });
+      const recap = buildFamilyRecap(game, game.events, game.playerSnapshot);
+      const privateOnlyRecap = buildFamilyRecap(game, privateEvents, game.playerSnapshot);
+      state.sharedGame = normalizeGame({
+        id: game.id,
+        opponent: game.opponent,
+        events: privateEvents,
+      });
+      await loadSharedGame("SYNTHETICSECURECODE");
+      render();
+      return {
+        synchronized,
+        localPrivateCount: privateEvents.length,
+        offlinePrivateRecordCount: offlinePrivateRecords.length,
+        privateRecords: privateEvents.map((event) => state.trustSpineSync.events[event.id] || null),
+        csvRetainsPrivateLocalEvidence: privateCsv.includes("legacy_shift_alias"),
+        csvOmitsPrivateNoteByDefault: !privateCsv.includes("private alias note"),
+        recapText: recap.text,
+        privateOnlyRecapText: privateOnlyRecap.text,
+        publicIds: state.sharedGame?.events?.map((event) => event.id) || [],
+        publicBody: document.body.innerText,
+        neverAcceptedRecord:
+          state.trustSpineSync.events["synthetic-legacy-never-accepted"] || null,
+      };
+    });
+    const privateBoundaryRequests = localApiRequests.slice(privateBoundaryRpcStart);
+    check(privateBoundaryResult.localPrivateCount === 8, "private and poisoned events remain intact in local saved-game evidence");
+    check(
+      privateBoundaryResult.offlinePrivateRecordCount === 3
+        && privateBoundaryResult.privateRecords.every((record) => !record || record.pendingOperations.length === 0),
+      "offline, stale, imported, corrected, and replayed private aliases cannot remain queued for new Event Pipeline ingress",
+    );
+    check(privateBoundaryResult.synchronized === true, "private aliases do not prevent ordinary-event synchronization");
+    check(
+      [...trustApi.events.values()].filter((event) => isPublicEventEvidence(event.evidence)).length === 2,
+      "signed-in synchronization leaves the authoritative public ordinary-event count at exactly two",
+    );
+    const replayRequests = privateBoundaryRequests.filter((item) => (
+      item.pathname.endsWith("/lh_create_event")
+      || item.pathname.endsWith("/lh_correct_event")
+    ));
+    check(
+      replayRequests.length === 3
+        && replayRequests.some((item) => (
+          item.pathname.endsWith("/lh_create_event")
+          && item.post?.p_operation?.client_operation_id === "stale-private-create"
+          && item.post?.p_operation?.evidence?.stat_type === "legacy_shift_alias"
+        ))
+        && replayRequests.some((item) => (
+          item.pathname.endsWith("/lh_correct_event")
+          && item.post?.p_operation?.client_operation_id === "stale-private-correction"
+          && item.post?.p_operation?.changes?.stat_type === "legacy_shift_alias"
+        )),
+      "attempted pre-upgrade create and correction payloads reach replay-first wrappers exactly once",
+    );
+    const neverAcceptedRetryCleared = (
+      replayRequests.some((item) => (
+        item.pathname.endsWith("/lh_create_event")
+        && item.post?.p_operation?.client_operation_id === "stale-private-never-accepted"
+      ))
+        && privateBoundaryResult.neverAcceptedRecord?.pendingOperations?.length === 0
+        && trustApi.operations.get("stale-private-never-accepted")?.code === "unsupported_event_semantics"
+        && !trustApi.events.has("synthetic-legacy-never-accepted")
+    );
+    check(
+      neverAcceptedRetryCleared,
+      "a never-accepted pre-upgrade private retry is cleared only after authoritative rejection",
+    );
+    check(
+      privateBoundaryResult.publicIds.join(",") === localTrackerEvents.join(","),
+      "stale cached private payload is replaced by exactly the two approved public events",
+    );
+    check(
+      !/Legacy Participation Alias|Private Legacy Alias|unknown_future_event|Player In at 12:34/i.test(privateBoundaryResult.publicBody),
+      "Live Share browser DOM contains no private or unknown event semantics",
+    );
+    check(
+      privateBoundaryResult.csvRetainsPrivateLocalEvidence
+        && privateBoundaryResult.csvOmitsPrivateNoteByDefault,
+      "selected private CSV preserves scoped local evidence while defaulting private notes out",
+    );
+    check(
+      !/Legacy Participation Alias|Private Legacy Alias|private alias note|Player In at 12:34|3 recorded events/i.test(privateBoundaryResult.recapText),
+      "family recap excludes private participation semantics and their counts",
+    );
+    check(
+      /0 recorded events/i.test(privateBoundaryResult.privateOnlyRecapText)
+        && /not be enough recorded evidence/i.test(privateBoundaryResult.privateOnlyRecapText),
+      "private-only recap reports zero public events and cannot cross the interpretation threshold",
+    );
+
     const createReplay = await securePage.evaluate(async (primaryEventId) => {
       const game = state.activeGame;
       const event = game.events.find((item) => item.id === primaryEventId);
@@ -595,7 +1028,7 @@ async function newContext(browser, options = {}) {
     const correctionResult = await securePage.evaluate(async (primaryEventId) => {
       const game = state.activeGame;
       const event = game.events.find((item) => item.id === primaryEventId);
-      event.fieldZone = "Offensive";
+      event.fieldZone = "Offensive end";
       event.note = "private correction note";
       event.tags = ["private correction tag"];
       event.correctedAt = "2026-07-23T12:10:00.000Z";
@@ -607,7 +1040,7 @@ async function newContext(browser, options = {}) {
       };
     }, primaryEventId);
     check(correctionResult.synchronized === true, "event correction synchronizes through the approved correction RPC");
-    check(trustApi.events.get(primaryEventId)?.evidence.field_zone === "Offensive", "correction updates the secure public event evidence");
+    check(trustApi.events.get(primaryEventId)?.evidence.field_zone === "Offensive end", "correction updates the secure public event evidence");
     check(
       !("note" in (trustApi.events.get(primaryEventId)?.evidence || {})) && !("tags" in (trustApi.events.get(primaryEventId)?.evidence || {})),
       "correction keeps private notes and tags outside public evidence",
@@ -616,15 +1049,14 @@ async function newContext(browser, options = {}) {
       await loadSharedGame("SYNTHETICSECURECODE");
       return state.sharedGame?.events?.find((event) => event.id === primaryEventId)?.fieldZone || "";
     }, primaryEventId);
-    check(correctedPublicZone === "Offensive", "corrected evidence is visible through the public-safe RPC");
+    check(correctedPublicZone === "Offensive end", "corrected evidence is visible through the public-safe RPC");
 
     const staleConflict = await securePage.evaluate(async (primaryEventId) => {
       const game = state.activeGame;
       const event = game.events.find((item) => item.id === primaryEventId);
       const record = state.trustSpineSync.events[event.id];
       record.serverEventVersion = 1;
-      event.stat_label = undefined;
-      event.statLabel = "Recovered Ground Ball";
+      event.fieldZone = "Midfield";
       event.correctedAt = "2026-07-23T12:11:00.000Z";
       queueTrustSpineGameReconciliation(game);
       const synchronized = await reconcileTrustSpineGame(game);
@@ -709,7 +1141,7 @@ async function newContext(browser, options = {}) {
         teamId: "",
         rosterPlayerId: "",
         opponent: "Personal Opponent",
-        date: "2026-07-23",
+        date: todayISO(),
         currentQuarter: "Q1",
         playerSnapshot: player,
         events: [],
@@ -858,7 +1290,7 @@ async function newContext(browser, options = {}) {
         teamId: "offline-team",
         rosterPlayerId: "offline-roster-player",
         opponent: "Offline Opponent",
-        date: "2026-07-23",
+        date: todayISO(),
         currentQuarter: "Q1",
         playerSnapshot: player,
         events: [],

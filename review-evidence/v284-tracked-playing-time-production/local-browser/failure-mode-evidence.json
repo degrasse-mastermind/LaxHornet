@@ -1,0 +1,9 @@
+{
+  "missingConfigDetected": true,
+  "missingConfigBoundedMessage": true,
+  "legacyAnonymousTableFallbackBlocked": true,
+  "localTrackingAvailable": true,
+  "failedRpcBounded": true,
+  "offlineTrackingAvailable": true,
+  "secureRecoveryAfterReconnect": true
+}

@@ -27,6 +27,7 @@ const APP_ASSETS = [
   "./event-operation-service.js?v=284",
   "./next-focus-recommendation.js?v=284",
   "./tracked-playing-time-service.js?v=284",
+  "./public-event-semantics.js?v=284",
   "./app.js?v=284",
   "./manifest.json?v=284",
   "./assets/icon.svg?v=11",

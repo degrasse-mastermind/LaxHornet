@@ -117,7 +117,7 @@ test("foundation migration contract is phase-aware and immutable", () => {
     mainMigrationBlob: mainMigrationExists
       ? git("rev-parse", `origin/main:${migrationPath}`)
       : null,
-    changedMigrations: changedPaths("supabase/migrations"),
+    changedMigrations: changedPaths(migrationPath),
     changedRollback: changedPaths(rollbackPath),
     changedPublicLiveShareSql: changedPaths(...publicLiveShareSqlPaths),
     changedLegacySchemaFiles: changedPaths("supabase-schema.sql"),
@@ -267,12 +267,12 @@ test("rollback fails closed when history exists and removes only foundation obje
   assert.doesNotMatch(rollback, /drop function(?: if exists)? public\.lh_public_live_share_game/i);
 });
 
-test("release manifest identifies a review-only, unapplied package", () => {
+test("release manifest records the reviewed foundation package as production-applied", () => {
   const review = manifest.reviewDatabasePackages?.find(
     (entry) => entry.name === "tracked_playing_time_foundation",
   );
-  assert.equal(review?.status, "draft_review");
-  assert.equal(review?.productionApplied, false);
+  assert.equal(review?.status, "production_applied");
+  assert.equal(review?.productionApplied, true);
   assert.equal(review?.productionAuthorizationRequired, true);
   assert.deepEqual(
     [review.forwardMigration, review.rollbackReference, review.testSql],

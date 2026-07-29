@@ -173,16 +173,27 @@ export function evaluateReleaseIdentity({
   }
 
   if (phase === "preparation") {
-    add("Current branch", branch.startsWith(`release/${release}-`), branch || "(detached)");
+    const incidentRemediation = Boolean(
+      manifest.incidentRemediationBaseSha
+      && branch.startsWith(`fix/${release}-`),
+    );
+    const preparationBase = incidentRemediation
+      ? manifest.incidentRemediationBaseSha
+      : manifest.preReleaseBaseSha;
     add(
-      "Pre-release main base",
-      mainSha === manifest.preReleaseBaseSha,
+      "Current branch",
+      branch.startsWith(`release/${release}-`) || incidentRemediation,
+      branch || "(detached)",
+    );
+    add(
+      incidentRemediation ? "Incident-remediation main base" : "Pre-release main base",
+      mainSha === preparationBase,
       mainSha || "main unavailable",
     );
     add(
       "Release changes from approved base",
-      headSha !== manifest.preReleaseBaseSha && ancestor(manifest.preReleaseBaseSha, headSha),
-      `${manifest.preReleaseBaseSha || "(missing)"} -> ${headSha || "(missing)"}`,
+      headSha !== preparationBase && ancestor(preparationBase, headSha),
+      `${preparationBase || "(missing)"} -> ${headSha || "(missing)"}`,
     );
     return rows;
   }
@@ -232,6 +243,7 @@ export function findReleaseSurfaceFailures(rootPath, release) {
     "event-operation-service.js",
     "next-focus-recommendation.js",
     "tracked-playing-time-service.js",
+    "public-event-semantics.js",
     "app.js",
   ]) {
     if (!appHtml.includes(`${asset}?v=${release.slice(1)}`)) {
@@ -320,17 +332,22 @@ function checkRepository(results, release, phase, approvedRolloutSha) {
     manifestIdentityFailures.length ? manifestIdentityFailures.join("; ") : "base, release head, and merge SHA recorded",
   );
 
-  const migrationPath = "supabase/migrations/20260727000000_tracked_playing_time_operations.sql";
-  const reviewPackage = manifest.reviewDatabasePackages?.find(
-    (item) => item.name === "tracked_playing_time_foundation",
+  const reviewPackageHashFailures = (manifest.reviewDatabasePackages || []).flatMap((reviewPackage) =>
+    [reviewPackage.forwardMigration, reviewPackage.rollbackReference, reviewPackage.testSql]
+      .filter(Boolean)
+      .flatMap((file) => {
+        const expected = reviewPackage.sha256?.[file] || "";
+        const actual = reviewedTextSha256(path.join(root, file));
+        return actual === expected ? [] : [`${file}: ${actual}`];
+      }),
   );
-  const expectedMigrationHash = reviewPackage?.sha256?.[migrationPath] || "";
-  const actualMigrationHash = reviewedTextSha256(path.join(root, migrationPath));
   addResult(
     results,
-    "Reviewed migration checksum",
-    actualMigrationHash === expectedMigrationHash ? "PASS" : "FAIL",
-    actualMigrationHash,
+    "Reviewed database package checksums",
+    reviewPackageHashFailures.length ? "FAIL" : "PASS",
+    reviewPackageHashFailures.length
+      ? reviewPackageHashFailures.join("; ")
+      : `${manifest.reviewDatabasePackages?.length || 0} packages match the manifest`,
   );
 
   const releaseEnv = releaseEnvironment(manifest);

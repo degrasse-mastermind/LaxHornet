@@ -6,6 +6,7 @@ import { execFileSync } from "node:child_process";
 import {
   APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
   TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
+  V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS,
   validateReleaseContainmentFromEnvironment,
 } from "./release_containment.mjs";
 
@@ -129,6 +130,7 @@ if (containment.mode === "standalone" || containment.mode === "additive") {
       === JSON.stringify([
         ...APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
         ...TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
+        ...V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS,
       ].sort()),
     "combined integration contains only the approved additive and explicit review packages",
   );

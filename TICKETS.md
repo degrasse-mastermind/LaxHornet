@@ -284,6 +284,105 @@ Evidence: `review-evidence/tracked-playing-time-ui/`
 `REPO_CURRENT_STATE.md` updated: `YES`
 Remaining work: complete public-disclosure verification, deploy the exact approved `main` frontend, run production browser smoke tests, and close final release evidence.
 
+### LH-23 — v284 public-event semantic boundary incident remediation
+
+Status: `REVIEW`
+Branch: `fix/v284-public-event-semantic-boundary`
+Evidence: `review-evidence/v284-tracked-playing-time-production/`
+
+#### Goal
+
+Contain and permanently correct the confirmed v284 defect that allowed private
+legacy participation-like events to enter the ordinary Event Pipeline and
+appear through public Live Share.
+
+#### Completed scope
+
+- Aggregate production inspection found no active tokens, no non-synthetic
+  affected share, and no confirmed real/youth-data exposure.
+- Public Live Share RPC execute access was reversibly revoked from browser
+  roles while the permanent fix is reviewed.
+- Added a closed 19-type ordinary-event classification: 18 public lacrosse
+  events plus the private ordinary `note` type. Unknown, tracked-time, clock,
+  shift, participation, and legacy-alias semantics default private.
+- Applied the boundary to browser create/correct/reconcile/retry paths and to
+  database create/correct wrappers.
+- Added additive public egress filtering and canonical public labels/categories
+  without rewriting or deleting historical evidence.
+- Hardened all public fields, game-period/date bounds, uniform pre-lookup
+  authorization responses, raw pre-migration replay, and zero-public-event
+  recap handling after independent adversarial review.
+- Hardened create, correction, and tombstone scope checks uniformly before
+  replay or event-state lookup. Attempted pre-upgrade create/correction payloads
+  now make one exact raw retry after scope establishment so the server can
+  resolve lost responses; never-accepted private payloads are cleared only
+  after authoritative rejection.
+- Added a fail-closed rollback, pgTAP, browser reproduction, stale/offline/import
+  coverage, family recap boundary, selected private CSV boundary, and release
+  manifest/preflight support.
+
+#### Verification
+
+- Blank database reset with the corrective migration: passed.
+- Production-shaped seven-migration baseline plus one corrective migration:
+  passed.
+- `supabase/tests/v284_public_event_semantic_boundary.sql`: 45/45 passed on
+  both database shapes, including poisoned fields, create/correct/tombstone
+  authorization oracles, and pre-migration retries.
+- `tools/test_public_event_semantic_boundary.mjs`: passed.
+- Signed-in browser disclosure reproduction: 73/73 passed with lost-response
+  create/correction replay, never-accepted rejection, the public payload
+  remaining exactly two ordinary events, and no hosted requests.
+- Tracked-time browser suite: 33/33 passed with focused service-worker
+  lifecycle isolation.
+- Complete application and release regression: 33/33 groups passed.
+- Canonical v284 local release verification: all 17 gates passed, including
+  both database shapes, two 45-test disclosure pgTAP runs, rollback behavior,
+  lint, 33/33 regression groups, the 73/73 signed-in browser journey, and
+  cleanup at exact candidate commit `d4a30baa64134e05b01d644ccf33d8e3ba88913d`.
+- Initial independent review found four actionable gaps; the first re-review
+  confirmed those fixes and found two additional tombstone/retry gaps. All six
+  are now fixed locally and the full regression rerun is green. CI rerun, clean
+  exact-SHA independent re-review, merge, and production rollout remain
+  required before `DONE`.
+
+#### Risks and rollback
+
+- Existing private/unknown Event Pipeline evidence remains append-only and is
+  excluded non-destructively.
+- A formerly public ordinary event corrected into private semantics is
+  tombstoned from the public pipeline.
+- Recovery rollback revokes public RPC execution and intentionally does not
+  restore the vulnerable function.
+- Production rollout is database-first; the contained public RPC must not be
+  re-enabled before the corrective migration is verified.
+
+#### Completion record
+
+Commit/PR/merge/deployment: pending review gates.
+`REPO_CURRENT_STATE.md` updated: `YES`
+
+### LH-DEV-005 — Publish an allowlisted GitHub Pages artifact
+
+Status: `PROPOSED`
+
+#### Goal
+
+Replace repository-root GitHub Pages publishing with an explicitly allowlisted
+deployment artifact so source, tests, migrations, rollback material, and review
+evidence are not copied to the public static site.
+
+#### Acceptance criteria
+
+- The artifact contains only approved runtime HTML, CSS, JavaScript, manifest,
+  icons, and required static assets.
+- Release marker, service-worker paths, custom domain, offline install/update,
+  and rollback behavior remain verified.
+- CI proves that migrations, rollback SQL, tests, tooling, documentation,
+  evidence, local configuration, and secrets are absent from the artifact.
+- The deployment workflow retains least-privilege permissions and does not
+  change Supabase production state.
+
 ## Ticket template
 
 Copy this section for each implementation ticket.

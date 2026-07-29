@@ -1,0 +1,9 @@
+context-2:console:warning: Service Worker registration blocked by Playwright
+reconciliation-failure:console:warning: Service Worker registration blocked by Playwright
+reconciliation-failure:console:error: Failed to load resource: the server responded with a status of 503 (Service Unavailable)
+reconciliation-failure:console:error: Failed to load resource: the server responded with a status of 503 (Service Unavailable)
+context-4:console:warning: Service Worker registration blocked by Playwright
+context-6:console:warning: Service Worker registration blocked by Playwright
+public-rpc-failure:console:warning: Service Worker registration blocked by Playwright
+public-rpc-failure:console:error: Failed to load resource: the server responded with a status of 503 (Service Unavailable)
+update-path:console:warning: Service Worker registration blocked by Playwright

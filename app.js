@@ -5798,16 +5798,47 @@ function trustSpineOperationId(kind, gameId, eventId, value = {}) {
   return `lh-${kind}-${trustSpineHash({ gameId, eventId, value })}`;
 }
 
-function trustSpineEvidenceForEvent(event = {}) {
+function publicEventSemantic(value = {}, game = null) {
+  const evidence = canonicalEventEvidenceForGame(value, game);
+  return evidence?.publicLiveShare ? evidence : null;
+}
+
+function canonicalEventEvidence(value = {}) {
+  return window.LaxHornetPublicEventSemantics?.canonicalEvidence(value) || null;
+}
+
+function canonicalEventEvidenceForGame(value = {}, game = null) {
+  const evidence = canonicalEventEvidence(value);
+  if (!evidence) return null;
+  if (!game) return evidence;
+  const gameDate = String(game.date || game.gameDate || game.game_date || "").slice(0, 10);
+  const eventDate = evidence.occurredAt.slice(0, 10);
+  const gameDay = Date.parse(`${gameDate}T00:00:00.000Z`);
+  const eventDay = Date.parse(`${eventDate}T00:00:00.000Z`);
+  if (
+    !periodsForGame(game).includes(evidence.period)
+    || !Number.isFinite(gameDay)
+    || !Number.isFinite(eventDay)
+    || Math.abs(eventDay - gameDay) > 24 * 60 * 60 * 1000
+  ) {
+    return null;
+  }
+  return evidence;
+}
+
+function trustSpineEvidenceForEvent(event = {}, game = null) {
   const normalized = normalizeEvent(event, event.gameId || "");
+  const scopedGame = game || trustSpineGameById(normalized.gameId);
+  const evidence = canonicalEventEvidenceForGame(normalized, scopedGame);
+  if (!evidence) return null;
   return {
-    occurred_at: String(normalized.timestamp || new Date().toISOString()),
-    period: String(normalized.quarter || "Q1"),
-    stat_type: String(normalized.statType || "note"),
-    stat_label: String(normalized.statLabel || "Note"),
-    category: String(normalized.category || "Note"),
-    point_value: Number.isFinite(Number(normalized.pointValue)) ? Number(normalized.pointValue) : 0,
-    field_zone: String(normalized.fieldZone || ""),
+    occurred_at: evidence.occurredAt,
+    period: evidence.period,
+    stat_type: evidence.statType,
+    stat_label: evidence.statLabel,
+    category: evidence.category,
+    point_value: evidence.pointValue,
+    field_zone: evidence.fieldZone,
   };
 }
 
@@ -5864,6 +5895,41 @@ function trustSpinePendingOperation(record, kind) {
   return record.pendingOperations.find((operation) => operation.kind === kind);
 }
 
+function trustSpineRecordCanonicalSemantic(record = {}) {
+  const game = trustSpineGameById(record.gameId);
+  const accepted = canonicalEventEvidenceForGame(record.acceptedEvidence, game);
+  if (accepted) return accepted;
+  const create = (record.pendingOperations || []).find((operation) => operation.kind === "create");
+  return canonicalEventEvidenceForGame(
+    create?.rpcPayload?.evidence || create?.eventEvidence,
+    game,
+  );
+}
+
+function trustSpineAttemptedReplayOperation(operation = {}) {
+  return (
+    Number(operation.attempts || 0) > 0
+    && Boolean(String(operation.lastAttemptAt || "").trim())
+    && Boolean(String(operation.clientOperationId || "").trim())
+    && (
+      operation.kind === "tombstone"
+      || (operation.rpcPayload && typeof operation.rpcPayload === "object")
+    )
+  );
+}
+
+function suppressPrivateTrustSpineRecord(record) {
+  if (!record) return;
+  record.pendingOperations = (record.pendingOperations || []).filter(
+    (operation) => trustSpineAttemptedReplayOperation(operation),
+  );
+  record.conflict = null;
+  record.lastError = "";
+  record.publicationSuppressedReason = "unsupported_event_semantics";
+  record.publicationSuppressedAt = new Date().toISOString();
+  record.updatedAt = record.publicationSuppressedAt;
+}
+
 function enqueueTrustSpineOperation(record, operation) {
   if (!operation?.kind || !operation.clientOperationId) return;
   if (record.pendingOperations.some((item) => item.clientOperationId === operation.clientOperationId)) return;
@@ -5883,8 +5949,29 @@ function enqueueTrustSpineOperation(record, operation) {
 function queueTrustSpineEvent(game, event) {
   if (!SECURE_DISCLOSURE_RUNTIME_READY || !currentUserId() || !hasCanonicalTrustSpineScope(game) || !event?.id) return;
   const normalizedEvent = normalizeEvent(event, game.id);
-  const evidence = trustSpineEvidenceForEvent(normalizedEvent);
+  const evidence = trustSpineEvidenceForEvent(normalizedEvent, game);
+  const existingRecord = trustSpineState().events[normalizedEvent.id];
+  if (!evidence) {
+    if (
+      existingRecord
+      && existingRecord.serverEventVersion >= 1
+      && canonicalEventEvidenceForGame(existingRecord.acceptedEvidence, game)
+      && existingRecord.lifecycleState !== "tombstoned"
+    ) {
+      suppressPrivateTrustSpineRecord(existingRecord);
+      queueTrustSpineTombstone(
+        game,
+        normalizedEvent,
+        "Event is no longer eligible for public disclosure",
+      );
+    } else {
+      suppressPrivateTrustSpineRecord(existingRecord);
+    }
+    return;
+  }
   const record = trustSpineEventRecord(game, normalizedEvent.id);
+  delete record.publicationSuppressedReason;
+  delete record.publicationSuppressedAt;
   if (record.lifecycleState === "tombstoned") return;
 
   if (record.serverEventVersion < 1) {
@@ -5938,7 +6025,11 @@ function queueTrustSpineEvent(game, event) {
 
 function queueTrustSpineTombstone(game, event, reason = "Tracker event removed") {
   if (!SECURE_DISCLOSURE_RUNTIME_READY || !currentUserId() || !hasCanonicalTrustSpineScope(game) || !event?.id) return;
-  const record = trustSpineEventRecord(game, event.id);
+  const record = trustSpineState().events[event.id];
+  if (!record || !trustSpineRecordCanonicalSemantic(record)) {
+    suppressPrivateTrustSpineRecord(record);
+    return;
+  }
   if (record.lifecycleState === "tombstoned" || trustSpinePendingOperation(record, "tombstone")) return;
   const clientCreatedAt = new Date().toISOString();
   enqueueTrustSpineOperation(record, {
@@ -5957,10 +6048,19 @@ function queueTrustSpineTombstone(game, event, reason = "Tracker event removed")
 function queueTrustSpineGameReconciliation(game) {
   if (!SECURE_DISCLOSURE_RUNTIME_READY || !currentUserId() || !hasCanonicalTrustSpineScope(game)) return;
   const normalized = normalizeGame(game);
-  const presentEventIds = new Set(normalized.events.map((event) => event.id));
+  const presentEventIds = new Set(
+    normalized.events
+      .filter((event) => trustSpineEvidenceForEvent(event, normalized))
+      .map((event) => event.id),
+  );
   normalized.events.forEach((event) => queueTrustSpineEvent(normalized, event));
   Object.values(trustSpineState().events)
-    .filter((record) => record.gameId === normalized.id && !presentEventIds.has(record.eventId) && isDeletedEvent(record.eventId))
+    .filter((record) => (
+      record.gameId === normalized.id
+      && !presentEventIds.has(record.eventId)
+      && isDeletedEvent(record.eventId)
+      && trustSpineRecordCanonicalSemantic(record)
+    ))
     .forEach((record) => queueTrustSpineTombstone(normalized, { id: record.eventId }, "Tracker event deleted"));
   persistAll();
 }
@@ -6042,6 +6142,29 @@ function acceptTrustSpineOperation(record, operation, result) {
 }
 
 async function processTrustSpineOperation(record, operation) {
+  const attemptedReplay = trustSpineAttemptedReplayOperation(operation);
+  const semanticEvidence = operation.kind === "create"
+    ? operation.rpcPayload?.evidence || operation.eventEvidence
+    : { ...record.acceptedEvidence, ...operation.eventEvidence };
+  if (
+    operation.kind !== "tombstone"
+    && !attemptedReplay
+    && !canonicalEventEvidenceForGame(
+      semanticEvidence,
+      trustSpineGameById(record.gameId),
+    )
+  ) {
+    suppressPrivateTrustSpineRecord(record);
+    return false;
+  }
+  if (
+    operation.kind === "tombstone"
+    && !attemptedReplay
+    && !trustSpineRecordCanonicalSemantic(record)
+  ) {
+    suppressPrivateTrustSpineRecord(record);
+    return false;
+  }
   const rpcName = trustSpineRpcForOperation(operation.kind);
   const rpcPayload = trustSpinePayloadForOperation(record, operation);
   if (!rpcName || !rpcPayload) return false;
@@ -6109,7 +6232,9 @@ async function flushTrustSpineSync(options = {}) {
 function trustSpineGameSynchronizationStatus(game) {
   const syncState = trustSpineState();
   const scope = syncState.gameScopes[game.id];
-  const events = normalizeGame(game).events.filter((event) => !isDeletedEvent(event.id));
+  const events = normalizeGame(game).events.filter(
+    (event) => !isDeletedEvent(event.id) && trustSpineEvidenceForEvent(event, game),
+  );
   const records = events.map((event) => syncState.events[event.id]).filter(Boolean);
   const pending = records.some((record) => record.pendingOperations.length);
   const conflict = records.some((record) => record.conflict || record.lastError);
@@ -6119,7 +6244,9 @@ function trustSpineGameSynchronizationStatus(game) {
     && records.every((record, index) => (
       record.serverEventVersion >= 1
       && record.lifecycleState === "active"
-      && stableTrustSpineJSON(record.acceptedEvidence) === stableTrustSpineJSON(trustSpineEvidenceForEvent(events[index]))
+      && stableTrustSpineJSON(record.acceptedEvidence) === stableTrustSpineJSON(
+        trustSpineEvidenceForEvent(events[index], game),
+      )
     ))
     && !pending
     && !conflict
@@ -11317,10 +11444,13 @@ function rideHomeRecapLine(totals = {}, player = {}, intelligence = null, game =
 
 function buildFamilyRecap(game = {}, events = [], playerContext = {}, computedStats = null, intelligence = null) {
   const player = playerContext || {};
-  const totals = computedStats || calculateTotals(events || [], player);
-  const reviewIntelligence = intelligence || buildPostGameIntelligence(game, events || [], player, totals, calculateSeasonTotalsForPlayer(player));
+  const publicEvents = (events || []).filter((event) => publicEventSemantic(event, game));
+  const totals = computedStats && publicEvents.length === (events || []).length
+    ? computedStats
+    : calculateTotals(publicEvents, player);
+  const reviewIntelligence = intelligence || buildPostGameIntelligence(game, publicEvents, player, totals, calculateSeasonTotalsForPlayer(player));
   const title = `${playerFirstName(player)} ${familyRecapOpponentLabel(game)}`;
-  const eventCount = Number(totals.eventCount || events?.length || 0);
+  const eventCount = publicEvents.length;
   const topContribution = familyRecapTopContribution(totals, player);
   const statLine = familyRecapStatLine(totals, player);
   const recorded = statLine || `${eventCount} recorded event${eventCount === 1 ? "" : "s"}`;
