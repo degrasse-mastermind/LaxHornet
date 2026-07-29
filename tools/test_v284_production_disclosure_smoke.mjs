@@ -388,10 +388,22 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   assert.match(source, /invalid_public_event_evidence/);
   assert.match(source, /expectedCode/);
   const savedModalClose = source.indexOf('[data-action="close-saved-game"]');
-  const offlineGoalClick = source.indexOf("page.locator('[data-stat=\"goal\"]').click()", savedModalClose);
+  const savedModalClick = source.indexOf("await savedGameModalClose.click()", savedModalClose);
+  const restoreActiveGame = source.indexOf(
+    "state.activeGame = state.games.find((game) => game.id === gameId)",
+    savedModalClick,
+  );
+  const restoreLiveScreen = source.indexOf('state.screen = "live"', restoreActiveGame);
+  const restoreRender = source.indexOf("render()", restoreLiveScreen);
+  const offlineGoalClick = source.indexOf("page.locator('[data-stat=\"goal\"]').click()", restoreRender);
   assert.ok(
-    savedModalClose >= 0 && offlineGoalClick > savedModalClose,
-    "saved-game summary modal must close before the offline stat journey",
+    savedModalClose >= 0
+      && savedModalClick > savedModalClose
+      && restoreActiveGame > savedModalClick
+      && restoreLiveScreen > restoreActiveGame
+      && restoreRender > restoreLiveScreen
+      && offlineGoalClick > restoreRender,
+    "saved-game modal closure and live-game restoration must precede the offline stat journey",
   );
   assert.match(source, /Legacy Participation Alias/);
   assert.match(source, /Player In at 12:34/);
