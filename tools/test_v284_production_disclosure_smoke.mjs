@@ -377,13 +377,23 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   const residualClose = source.indexOf("closeResidualParticipation(context)", cleanupStart);
   const clockDelete = source.indexOf("delete from public.lh_game_clock_states", cleanupStart);
   const grantRevoke = source.indexOf("revokeFixtureGrantsSafelySql(context)", cleanupStart);
+  const mutableCleanup = source.indexOf("removeMutableFixtureSql(", cleanupStart);
+  const authDatabaseFallback = source.indexOf(
+    "deleteAuthUsersDatabaseFallback(context)",
+    mutableCleanup,
+  );
+  const finalAuthorityProof = source.indexOf("oldAuthorityProof(context)", authDatabaseFallback);
   assert.ok(
     cleanupStart >= 0
       && residualClose > cleanupStart
       && clockDelete > residualClose
-      && grantRevoke > clockDelete,
-    "residual participation must close before clock and authority teardown",
+      && grantRevoke > clockDelete
+      && mutableCleanup > grantRevoke
+      && authDatabaseFallback > mutableCleanup
+      && finalAuthorityProof > authDatabaseFallback,
+    "cleanup must close participation and remove mutable rows before exact Auth fallback and proof",
   );
+  assert.match(source, /auth_user\.id = target\.user_id\s+and auth_user\.email = target\.email/);
   assert.match(source, /unsupported_event_semantics/);
   assert.match(source, /invalid_public_event_evidence/);
   assert.match(source, /expectedCode/);

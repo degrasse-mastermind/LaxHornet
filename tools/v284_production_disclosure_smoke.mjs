@@ -1062,20 +1062,56 @@ async function closeResidualParticipation(context) {
 async function deleteAuthUsers(context) {
   if (!context.publishableKey || !context.serviceRoleKey) return;
   if (context.coachSession) {
-    const logout = await request(`${context.apiUrl}/auth/v1/logout?scope=global`, {
-      method: "POST",
-      headers: apiHeaders(context.publishableKey, context.coachSession.access_token),
-      body: {},
-    });
-    assert.ok([200, 204].includes(logout.status), "synthetic global logout failed");
+    try {
+      await request(`${context.apiUrl}/auth/v1/logout?scope=global`, {
+        method: "POST",
+        headers: apiHeaders(context.publishableKey, context.coachSession.access_token),
+        body: {},
+      });
+    } catch {}
   }
   for (const userId of [context.coachId, context.adminId].filter(Boolean)) {
-    const result = await request(`${context.apiUrl}/auth/v1/admin/users/${userId}`, {
-      method: "DELETE",
-      headers: apiHeaders(context.publishableKey, context.serviceRoleKey),
-    });
-    assert.ok([200, 204, 404].includes(result.status), "synthetic Auth user deletion failed");
+    try {
+      await request(`${context.apiUrl}/auth/v1/admin/users/${userId}`, {
+        method: "DELETE",
+        headers: apiHeaders(context.publishableKey, context.serviceRoleKey),
+      });
+    } catch {}
   }
+}
+
+function deleteAuthUsersDatabaseFallback(context) {
+  const targets = [
+    [context.adminId, context.fixture?.adminEmail],
+    [context.coachId, context.fixture?.coachEmail],
+  ].filter(([userId, email]) => userId && email);
+  if (!targets.length) return;
+  const values = targets
+    .map(([userId, email]) => `(${sqlLiteral(userId)}::uuid, ${sqlLiteral(email)})`)
+    .join(",\n  ");
+  databaseQuery(`
+begin;
+create temporary table v284_synthetic_auth_cleanup_target(
+  user_id uuid primary key,
+  email text not null
+) on commit drop;
+insert into v284_synthetic_auth_cleanup_target(user_id, email) values
+  ${values};
+
+delete from auth.sessions session
+using v284_synthetic_auth_cleanup_target target
+where session.user_id = target.user_id;
+
+delete from auth.refresh_tokens token
+using v284_synthetic_auth_cleanup_target target
+where token.user_id = target.user_id::text;
+
+delete from auth.users auth_user
+using v284_synthetic_auth_cleanup_target target
+where auth_user.id = target.user_id
+  and auth_user.email = target.email;
+commit;
+`);
 }
 
 async function oldAuthorityProof(context) {
@@ -1217,6 +1253,7 @@ delete from public.games where id = ${sqlLiteral(context.halvesGameId)};
 `);
     databaseQuery(removeMutableFixtureSql(context.fixture, context.adminId, context.coachId));
   });
+  await attempt(() => deleteAuthUsersDatabaseFallback(context));
   const authority = await oldAuthorityProof(context);
   const counts = cleanupCounts(context);
   const proof = { ...counts, ...authority, realDataTouched: false };
