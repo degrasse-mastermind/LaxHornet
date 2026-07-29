@@ -329,8 +329,9 @@ appear through public Live Share.
 - Tracked-time browser suite: 33/33 passed with focused service-worker
   lifecycle isolation.
 - Complete application and release regression: 33/33 groups passed.
-- Canonical v284 local release verification: all 15 gates passed, including
-  both database shapes, rollback behavior, lint, regression, and cleanup.
+- Canonical v284 local release verification: all 17 gates passed, including
+  both database shapes, two 41-test disclosure pgTAP runs, rollback behavior,
+  lint, 33/33 regression groups, and cleanup.
 - Initial independent review found four actionable gaps; all four are fixed
   locally. Full regression, CI rerun, independent re-review, merge, and
   production rollout remain required before `DONE`.
