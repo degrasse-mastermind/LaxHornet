@@ -440,7 +440,9 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   const offlineMode = source.indexOf("await trackerContext.setOffline(true)", correctionCheck);
   const offlineGoalClick = source.indexOf("page.locator('[data-stat=\"goal\"]').click()", offlineMode);
   const offlineRetention = source.indexOf("offline event was not retained locally", offlineGoalClick);
-  const offlineRetry = source.indexOf("hosted offline retry did not reconcile", offlineRetention);
+  const onlineWait = source.indexOf("navigator.onLine === true", offlineRetention);
+  const boundedRetry = source.indexOf("attempt <= 6", onlineWait);
+  const offlineRetry = source.indexOf("hosted offline retry did not reconcile", boundedRetry);
   const tombstoneSync = source.indexOf("hosted tombstone did not synchronize", offlineRetry);
   const tombstoneLifecycle = source.indexOf("hosted event did not become tombstoned", tombstoneSync);
   const endGameJourney = source.indexOf("endGame()", tombstoneLifecycle);
@@ -459,7 +461,9 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
       && offlineMode > correctionCheck
       && offlineGoalClick > offlineMode
       && offlineRetention > offlineGoalClick
-      && offlineRetry > offlineRetention
+      && onlineWait > offlineRetention
+      && boundedRetry > onlineWait
+      && offlineRetry > boundedRetry
       && tombstoneSync > offlineRetry
       && tombstoneLifecycle > tombstoneSync
       && endGameJourney > tombstoneLifecycle

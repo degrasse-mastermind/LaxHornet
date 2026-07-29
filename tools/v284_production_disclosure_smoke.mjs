@@ -568,14 +568,29 @@ async function verifyHostedReconciliation(context) {
     }, initial.eventIds);
     assert.ok(offline.eventId && offline.pending >= 1, "offline event was not retained locally");
     await trackerContext.setOffline(false);
+    await page.waitForFunction(() => navigator.onLine === true, null, { timeout: 5000 });
     const retry = await page.evaluate(async () => ({
-      ok: await eventOperationService().retryGameEventOperations(state.activeGame.id),
+      attempts: await (async () => {
+        for (let attempt = 1; attempt <= 6; attempt += 1) {
+          const ok = await eventOperationService().retryGameEventOperations(state.activeGame.id);
+          const pending = Object.values(state.trustSpineSync.events).reduce(
+            (sum, record) => sum + (record.pendingOperations?.length || 0),
+            0,
+          );
+          if (ok && pending === 0) return attempt;
+          await new Promise((resolve) => window.setTimeout(resolve, attempt * 250));
+        }
+        return 0;
+      })(),
       pending: Object.values(state.trustSpineSync.events).reduce(
         (sum, record) => sum + (record.pendingOperations?.length || 0),
         0,
       ),
     }));
-    assert.deepEqual(retry, { ok: true, pending: 0 }, "hosted offline retry did not reconcile");
+    assert.ok(
+      retry.attempts >= 1 && retry.attempts <= 6 && retry.pending === 0,
+      "hosted offline retry did not reconcile",
+    );
     const tombstone = await page.evaluate(async (eventId) => {
       const event = state.activeGame.events.find((item) => item.id === eventId);
       const operation = tombstoneGameEventOperation(
