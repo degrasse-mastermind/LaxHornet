@@ -401,6 +401,11 @@ async function verifyHostedReconciliation(context) {
         trackerNetwork.push({ method: request_.method(), host: url.host, path: url.pathname });
       }
     });
+    page.on("response", (response) => {
+      if (response.status() < 400) return;
+      const url = new URL(response.url());
+      diagnostics.push(`http:tracker:${response.status()}:${url.host}${url.pathname}`);
+    });
     page.on("console", (message) => {
       if (["error", "warning"].includes(message.type())
         && message.text() !== "Service Worker registration blocked by Playwright") {
@@ -750,6 +755,11 @@ async function verifyHostedReconciliation(context) {
       if (url.host.endsWith(".supabase.co")) {
         viewerNetwork.push({ method: request_.method(), host: url.host, path: url.pathname });
       }
+    });
+    viewer.on("response", (response) => {
+      if (response.status() < 400) return;
+      const url = new URL(response.url());
+      diagnostics.push(`http:viewer:${response.status()}:${url.host}${url.pathname}`);
     });
     await viewer.goto(
       `${PRODUCTION_ORIGIN}/app.html?share=${encodeURIComponent(context.disclosure.shareCode)}&fresh=v284-final-failure`,

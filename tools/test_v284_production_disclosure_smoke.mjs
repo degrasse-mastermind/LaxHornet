@@ -426,6 +426,9 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   assert.match(source, /const viewerApi = viewerNetwork;/);
   assert.doesNotMatch(source, /const viewerApi = network\.filter\(/);
   assert.doesNotMatch(source, /const viewerApi = viewerNetwork\.filter\(/);
+  assert.match(source, /http:tracker:\$\{response\.status\(\)\}:\$\{url\.host\}\$\{url\.pathname\}/);
+  assert.match(source, /http:viewer:\$\{response\.status\(\)\}:\$\{url\.host\}\$\{url\.pathname\}/);
+  assert.doesNotMatch(source, /http:(?:tracker|viewer):[\s\S]*url\.search/);
   assert.match(
     source,
     /\{ statType: "legacy_shift_alias", tracked: false, reason: "", pending: 0 \}[\s\S]*\{ statType: "goal", tracked: false, reason: "", pending: 0 \}/,
