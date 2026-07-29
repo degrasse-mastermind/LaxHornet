@@ -391,6 +391,10 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
     source,
     /item\.statType === "goal"\s*\?\s*"invalid_public_event_evidence"\s*:\s*"unsupported_event_semantics"/,
   );
+  const offlineMode = source.indexOf("await trackerContext.setOffline(true)");
+  const offlineGoalClick = source.indexOf("page.locator('[data-stat=\"goal\"]').click()", offlineMode);
+  const offlineRetry = source.indexOf("hosted offline retry did not reconcile", offlineMode);
+  const endGameJourney = source.indexOf("endGame()", offlineRetry);
   const savedModalClose = source.indexOf('[data-action="close-saved-game"]');
   const savedModalClick = source.indexOf("await savedGameModalClose.click()", savedModalClose);
   const restoreActiveGame = source.indexOf(
@@ -399,15 +403,19 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   );
   const restoreLiveScreen = source.indexOf('state.screen = "live"', restoreActiveGame);
   const restoreRender = source.indexOf("render()", restoreLiveScreen);
-  const offlineGoalClick = source.indexOf("page.locator('[data-stat=\"goal\"]').click()", restoreRender);
+  const formerFailureBoundary = source.indexOf("const boundaries =", restoreRender);
   assert.ok(
-    savedModalClose >= 0
+    offlineMode >= 0
+      && offlineGoalClick > offlineMode
+      && offlineRetry > offlineGoalClick
+      && endGameJourney > offlineRetry
+      && savedModalClose > endGameJourney
       && savedModalClick > savedModalClose
       && restoreActiveGame > savedModalClick
       && restoreLiveScreen > restoreActiveGame
       && restoreRender > restoreLiveScreen
-      && offlineGoalClick > restoreRender,
-    "saved-game modal closure and live-game restoration must precede the offline stat journey",
+      && formerFailureBoundary > restoreRender,
+    "offline recovery must precede End Game, then modal closure, restoration, and former-failure disclosure",
   );
   assert.match(source, /Legacy Participation Alias/);
   assert.match(source, /Player In at 12:34/);

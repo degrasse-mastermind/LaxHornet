@@ -522,23 +522,12 @@ async function verifyHostedReconciliation(context) {
       const undoRestoredCount = state.activeGame.events.length === beforeCount;
       updateActiveGameScore("against");
       const savedId = state.activeGame.id;
-      endGame();
-      const endPrompted = state.pendingEndGame === true;
-      confirmEndGame();
-      navigate("review");
-      const reviewRendered = document.body.innerText.includes("Game Review");
       const saved = state.games.find((game) => game.id === savedId);
-      state.activeGame = saved;
-      state.screen = "live";
-      render();
       return {
         entryAccepted: Boolean(added),
         scored,
         undoRestoredCount,
         saved: Boolean(saved?.savedAt),
-        endPrompted,
-        ended: saved?.status === "complete",
-        reviewRendered,
       };
     });
     assert.deepEqual(ordinaryJourney, {
@@ -546,18 +535,7 @@ async function verifyHostedReconciliation(context) {
       scored: true,
       undoRestoredCount: true,
       saved: true,
-      endPrompted: true,
-      ended: true,
-      reviewRendered: true,
     }, "hosted ordinary game journey failed");
-    const savedGameModalClose = page.locator('[data-action="close-saved-game"]');
-    assert.equal(await savedGameModalClose.count(), 1, "saved-game summary modal was not rendered");
-    await savedGameModalClose.click();
-    await page.evaluate((gameId) => {
-      state.activeGame = state.games.find((game) => game.id === gameId);
-      state.screen = "live";
-      render();
-    }, context.fixture.ids.game);
 
     const correction = await page.evaluate(async (eventId) => {
       const event = state.activeGame.events.find((item) => item.id === eventId);
@@ -608,6 +586,37 @@ async function verifyHostedReconciliation(context) {
     }, offline.eventId);
     assert.equal(tombstone.synchronized, true, "hosted tombstone did not synchronize");
     assert.equal(tombstone.lifecycle, "tombstoned", "hosted event did not become tombstoned");
+
+    const completedJourney = await page.evaluate(() => {
+      const savedId = state.activeGame.id;
+      endGame();
+      const endPrompted = state.pendingEndGame === true;
+      confirmEndGame();
+      navigate("review");
+      const reviewRendered = document.body.innerText.includes("Game Review");
+      const saved = state.games.find((game) => game.id === savedId);
+      state.activeGame = saved;
+      state.screen = "live";
+      render();
+      return {
+        endPrompted,
+        ended: saved?.status === "complete",
+        reviewRendered,
+      };
+    });
+    assert.deepEqual(completedJourney, {
+      endPrompted: true,
+      ended: true,
+      reviewRendered: true,
+    }, "hosted End Game and Game Review journey failed");
+    const savedGameModalClose = page.locator('[data-action="close-saved-game"]');
+    assert.equal(await savedGameModalClose.count(), 1, "saved-game summary modal was not rendered");
+    await savedGameModalClose.click();
+    await page.evaluate((gameId) => {
+      state.activeGame = state.games.find((game) => game.id === gameId);
+      state.screen = "live";
+      render();
+    }, context.fixture.ids.game);
 
     const boundaries = await page.evaluate(async ({ fixture, expectedPublicIds }) => {
       const privateEvents = [
