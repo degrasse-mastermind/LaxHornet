@@ -63,6 +63,46 @@ assert.equal(
   "Goal",
   "caller-controlled labels cannot change public semantics",
 );
+assert.deepEqual(
+  {
+    ...semantics.canonicalEvidence({
+      timestamp: "2026-07-28T12:00:00Z",
+      quarter: "q1",
+      statType: "ground_ball",
+      statLabel: "Private Alias",
+      category: "Participation",
+      pointValue: 999,
+      fieldZone: "midfield",
+    }),
+  },
+  {
+    statType: "groundBall",
+    statLabel: "Ground Ball",
+    category: "Effort / IQ",
+    pointValue: 2,
+    publicLiveShare: true,
+    occurredAt: "2026-07-28T12:00:00.000Z",
+    period: "Q1",
+    fieldZone: "Midfield",
+  },
+  "all public evidence fields resolve to one canonical representation",
+);
+for (const poisonedEvidence of [
+  { timestamp: "Player In at 12:34", quarter: "Q1", statType: "goal", fieldZone: "" },
+  { timestamp: "2026-07-28T12:00:00Z", quarter: "Shift 4", statType: "goal", fieldZone: "" },
+  {
+    timestamp: "2026-07-28T12:00:00Z",
+    quarter: "Q1",
+    statType: "goal",
+    fieldZone: "Player In at 12:34",
+  },
+]) {
+  assert.equal(
+    semantics.canonicalEvidence(poisonedEvidence),
+    null,
+    "poisoned public-type evidence defaults private",
+  );
+}
 
 const app = read("app.js");
 const appHtml = read("app.html");
@@ -75,7 +115,8 @@ assert.ok(
   "semantic resolver loads before app.js",
 );
 assert.match(worker, /\.\/public-event-semantics\.js\?v=284/);
-assert.match(app, /if \(!semantic\) return null;/);
+assert.match(app, /if \(!evidence\) return null;/);
+assert.match(app, /const eventCount = publicEvents\.length;/);
 assert.match(app, /suppressPrivateTrustSpineRecord/);
 assert.match(app, /unsupported_event_semantics/);
 assert.match(
@@ -84,8 +125,18 @@ assert.match(
 );
 assert.match(
   migration,
-  /and semantic\.value ->> 'public' = 'true';/i,
+  /and canonical\.value ->> 'public' = 'true'/i,
   "anonymous egress is fail-closed",
+);
+assert.match(
+  migration,
+  /return pg_catalog\.jsonb_build_object\(\s*'outcome', 'rejected',\s*'code', 'unauthorized_scope'/i,
+  "unauthorized wrappers return a uniform result directly",
+);
+assert.match(
+  migration,
+  /lh_replay_or_tamper\([\s\S]*lh_operation_hash\(p_operation\)[\s\S]*lh_public_event_evidence/i,
+  "raw immutable operation replay precedes new evidence validation",
 );
 assert.match(
   migration,

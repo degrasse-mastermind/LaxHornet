@@ -176,7 +176,7 @@ function publicPayload() {
         point_value: 3,
         period: "Q2",
         occurred_at: "2026-07-23T12:05:00.000Z",
-        field_zone: "Defensive",
+        field_zone: "Defensive end",
       },
     ],
   };
@@ -468,6 +468,13 @@ async function newContext(browser, options = {}) {
 
     await securePage.goto(`${baseUrl}/app.html?fresh=v284-token`, { waitUntil: "domcontentloaded" });
     await securePage.getByRole("button", { name: "Log In" }).waitFor();
+    await securePage.waitForFunction(
+      () =>
+        typeof backendCapabilityState !== "undefined"
+        && backendCapabilityState.checkedAt > 0
+        && state.syncStatus === "Signed out",
+    );
+    await securePage.waitForTimeout(100);
     const seededTrackerState = await securePage.evaluate(() => {
       setAuthUser({ id: "synthetic-admin-user", email: "synthetic-admin@example.invalid" });
       const player = {
@@ -485,7 +492,7 @@ async function newContext(browser, options = {}) {
         teamId: "synthetic-team",
         rosterPlayerId: "synthetic-player",
         opponent: "Madison Demo",
-        date: "2026-07-23",
+        date: todayISO(),
         currentQuarter: "Q1",
         playerSnapshot: player,
         events: [],
@@ -640,6 +647,39 @@ async function newContext(browser, options = {}) {
           pointValue: 0,
           correctedAt: "2026-07-23T12:09:00.000Z",
         },
+        {
+          id: "synthetic-poisoned-public-type",
+          gameId: game.id,
+          timestamp: "2026-07-23T12:08:30.000Z",
+          quarter: "Q2",
+          statType: "goal",
+          statLabel: "Goal",
+          category: "Offense",
+          pointValue: 5,
+          fieldZone: "Player In at 12:34",
+        },
+        {
+          id: "synthetic-poisoned-public-period",
+          gameId: game.id,
+          timestamp: "2026-07-23T12:08:40.000Z",
+          quarter: "H1",
+          statType: "goal",
+          statLabel: "Goal",
+          category: "Offense",
+          pointValue: 5,
+          fieldZone: "Midfield",
+        },
+        {
+          id: "synthetic-poisoned-public-time",
+          gameId: game.id,
+          timestamp: "2035-07-23T12:08:50.000Z",
+          quarter: "Q2",
+          statType: "goal",
+          statLabel: "Goal",
+          category: "Offense",
+          pointValue: 5,
+          fieldZone: "Midfield",
+        },
       ].map((event) => normalizeEvent(event, game.id));
       game.events.push(...privateEvents);
       state.games = [game];
@@ -696,6 +736,7 @@ async function newContext(browser, options = {}) {
 
       const privateCsv = buildCSV({ scope: "current_game", gameId: game.id });
       const recap = buildFamilyRecap(game, game.events, game.playerSnapshot);
+      const privateOnlyRecap = buildFamilyRecap(game, privateEvents, game.playerSnapshot);
       state.sharedGame = normalizeGame({
         id: game.id,
         opponent: game.opponent,
@@ -711,12 +752,13 @@ async function newContext(browser, options = {}) {
         csvRetainsPrivateLocalEvidence: privateCsv.includes("legacy_shift_alias"),
         csvOmitsPrivateNoteByDefault: !privateCsv.includes("private alias note"),
         recapText: recap.text,
+        privateOnlyRecapText: privateOnlyRecap.text,
         publicIds: state.sharedGame?.events?.map((event) => event.id) || [],
         publicBody: document.body.innerText,
       };
     });
     const privateBoundaryRequests = localApiRequests.slice(privateBoundaryRpcStart);
-    check(privateBoundaryResult.localPrivateCount === 3, "private aliases remain intact in local saved-game evidence");
+    check(privateBoundaryResult.localPrivateCount === 6, "private and poisoned events remain intact in local saved-game evidence");
     check(
       privateBoundaryResult.offlinePrivateRecordCount === 1
         && privateBoundaryResult.privateRecords.every((record) => !record || record.pendingOperations.length === 0),
@@ -733,7 +775,7 @@ async function newContext(browser, options = {}) {
       "stale cached private payload is replaced by exactly the two approved public events",
     );
     check(
-      !/Legacy Participation Alias|Private Legacy Alias|unknown_future_event/i.test(privateBoundaryResult.publicBody),
+      !/Legacy Participation Alias|Private Legacy Alias|unknown_future_event|Player In at 12:34/i.test(privateBoundaryResult.publicBody),
       "Live Share browser DOM contains no private or unknown event semantics",
     );
     check(
@@ -742,8 +784,13 @@ async function newContext(browser, options = {}) {
       "selected private CSV preserves scoped local evidence while defaulting private notes out",
     );
     check(
-      !/Legacy Participation Alias|Private Legacy Alias|private alias note|3 recorded events/i.test(privateBoundaryResult.recapText),
+      !/Legacy Participation Alias|Private Legacy Alias|private alias note|Player In at 12:34|3 recorded events/i.test(privateBoundaryResult.recapText),
       "family recap excludes private participation semantics and their counts",
+    );
+    check(
+      /0 recorded events/i.test(privateBoundaryResult.privateOnlyRecapText)
+        && /not be enough recorded evidence/i.test(privateBoundaryResult.privateOnlyRecapText),
+      "private-only recap reports zero public events and cannot cross the interpretation threshold",
     );
 
     const createReplay = await securePage.evaluate(async (primaryEventId) => {
@@ -766,7 +813,7 @@ async function newContext(browser, options = {}) {
     const correctionResult = await securePage.evaluate(async (primaryEventId) => {
       const game = state.activeGame;
       const event = game.events.find((item) => item.id === primaryEventId);
-      event.fieldZone = "Offensive";
+      event.fieldZone = "Offensive end";
       event.note = "private correction note";
       event.tags = ["private correction tag"];
       event.correctedAt = "2026-07-23T12:10:00.000Z";
@@ -778,7 +825,7 @@ async function newContext(browser, options = {}) {
       };
     }, primaryEventId);
     check(correctionResult.synchronized === true, "event correction synchronizes through the approved correction RPC");
-    check(trustApi.events.get(primaryEventId)?.evidence.field_zone === "Offensive", "correction updates the secure public event evidence");
+    check(trustApi.events.get(primaryEventId)?.evidence.field_zone === "Offensive end", "correction updates the secure public event evidence");
     check(
       !("note" in (trustApi.events.get(primaryEventId)?.evidence || {})) && !("tags" in (trustApi.events.get(primaryEventId)?.evidence || {})),
       "correction keeps private notes and tags outside public evidence",
@@ -787,7 +834,7 @@ async function newContext(browser, options = {}) {
       await loadSharedGame("SYNTHETICSECURECODE");
       return state.sharedGame?.events?.find((event) => event.id === primaryEventId)?.fieldZone || "";
     }, primaryEventId);
-    check(correctedPublicZone === "Offensive", "corrected evidence is visible through the public-safe RPC");
+    check(correctedPublicZone === "Offensive end", "corrected evidence is visible through the public-safe RPC");
 
     const staleConflict = await securePage.evaluate(async (primaryEventId) => {
       const game = state.activeGame;
@@ -879,7 +926,7 @@ async function newContext(browser, options = {}) {
         teamId: "",
         rosterPlayerId: "",
         opponent: "Personal Opponent",
-        date: "2026-07-23",
+        date: todayISO(),
         currentQuarter: "Q1",
         playerSnapshot: player,
         events: [],
@@ -1028,7 +1075,7 @@ async function newContext(browser, options = {}) {
         teamId: "offline-team",
         rosterPlayerId: "offline-roster-player",
         opponent: "Offline Opponent",
-        date: "2026-07-23",
+        date: todayISO(),
         currentQuarter: "Q1",
         playerSnapshot: player,
         events: [],

@@ -262,6 +262,11 @@ try {
     ["test", "db", "--local", "supabase/tests/tracked_playing_time_foundation.sql"],
   );
   runGate(
+    "blank reset public-event boundary pgTAP",
+    "supabase",
+    ["test", "db", "--local", "supabase/tests/v284_public_event_semantic_boundary.sql"],
+  );
+  runGate(
     "production-shaped six-migration reset",
     "supabase",
     ["db", "reset", "--local", "--version", "20260723040000"],
@@ -271,6 +276,11 @@ try {
     "production-shaped pgTAP",
     "supabase",
     ["test", "db", "--local", "supabase/tests/tracked_playing_time_foundation.sql"],
+  );
+  runGate(
+    "production-shaped public-event boundary pgTAP",
+    "supabase",
+    ["test", "db", "--local", "supabase/tests/v284_public_event_semantic_boundary.sql"],
   );
   runPsqlGate("empty-history rollback", rollbackSql);
   runPsqlGate("empty-history rollback scope", rollbackVerificationSql, "ROLLBACK_SCOPE_PASS");

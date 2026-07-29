@@ -99,8 +99,10 @@ default private.
 | `smartPlay` | Smart Play | Effort / IQ |
 | `penalty` | Penalty | Discipline |
 
-Known separator/case variants normalize to these canonical identities. Their
-public labels and categories are emitted from the vocabulary, not caller input.
+Known separator/case variants normalize to these canonical identities in local
+reconciliation and historical egress. New database writes must carry the exact
+canonical type, label, category, point value, period, UTC timestamp, and field
+zone; they are never re-hashed after server rewriting.
 The ordinary `note` event remains compatible with the canonical Event Pipeline
 but is classified non-public along with its private annotation. Player In/Out,
 shifts, clock/participation operations, legacy aliases, and unknown future types
@@ -117,7 +119,8 @@ are not in the ordinary vocabulary.
   vocabulary, its public record is tombstoned instead of converted to a private
   semantic.
 - Synchronization readiness is computed from eligible ordinary events only.
-- The optional family recap excludes private/unknown events and their counts.
+- The optional family recap excludes private/unknown/poisoned events and uses
+  the filtered public-event count even when it is zero.
 - Selected private CSV remains scope-checked, retains local evidence, and keeps
   private notes excluded unless explicitly selected.
 - The new module carries one closed 19-type ordinary classification: 18 public
@@ -137,14 +140,17 @@ pgTAP:
 
 The migration:
 
-- adds a private immutable semantic resolver with a fixed empty search path;
+- adds private semantic and full-evidence canonicalizers with fixed empty
+  search paths;
 - revokes direct helper execution from browser roles;
-- authorizes scope before applying semantic rejection, avoiding a cross-scope
-  classification oracle;
-- canonicalizes create/correction semantic fields;
+- returns one uniform authorization result before replay, event lookup, or
+  semantic classification, avoiding cross-scope existence/lifecycle oracles;
+- replays the original immutable request hash before new semantic validation;
+- requires exact canonical create/correction evidence across every public
+  field and bounds period/timestamp values to the registered game;
 - rejects private/unknown creates and conversions;
-- filters existing contaminated effective rows non-destructively;
-- emits canonical public type/label/category fields only;
+- filters invalid historical effective rows non-destructively;
+- canonicalizes every public output field for eligible historical rows;
 - preserves fixed-search-path security-definer wrappers and explicit grants;
 - restores public RPC access only after the safe definition is installed.
 
@@ -156,9 +162,10 @@ rewritten.
 - blank-database migration reset: passed;
 - production-shaped seven-migration reset, corrective `migration up`, and exact
   one-pending/one-applied transition: passed;
-- pgTAP semantic boundary: 23/23 passed;
+- pgTAP semantic boundary: 41/41 passed, including poisoned-field, differential
+  authorization-oracle, and pre-migration replay probes;
 - focused JavaScript semantic contracts: passed;
-- signed-in browser failure reproduction and disclosure suite: 71/71 passed;
+- signed-in browser failure reproduction and disclosure suite: 72/72 passed;
 - former failure remained exactly two public ordinary events after private
   alias reconciliation attempts;
 - public browser DOM excluded the aliases and stale cached private payload;
@@ -166,6 +173,9 @@ rewritten.
 - unknown/expired/revoked token behavior passed;
 - browser suite contacted no hosted Supabase project and reported no console or
   page errors;
+- first independent review found four adversarial gaps in field validation,
+  authorization ordering, recap zero-count handling, and retry hashing; all
+  four are corrected on the branch and await independent re-review;
 - tracked-time browser suite: 33/33 passed after isolating service-worker
   lifecycle behavior from the focused UI harness;
 - complete application and release regression: 33/33 groups passed;

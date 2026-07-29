@@ -309,6 +309,9 @@ appear through public Live Share.
   database create/correct wrappers.
 - Added additive public egress filtering and canonical public labels/categories
   without rewriting or deleting historical evidence.
+- Hardened all public fields, game-period/date bounds, uniform pre-lookup
+  authorization responses, raw pre-migration replay, and zero-public-event
+  recap handling after independent adversarial review.
 - Added a fail-closed rollback, pgTAP, browser reproduction, stale/offline/import
   coverage, family recap boundary, selected private CSV boundary, and release
   manifest/preflight support.
@@ -318,17 +321,19 @@ appear through public Live Share.
 - Blank database reset with the corrective migration: passed.
 - Production-shaped seven-migration baseline plus one corrective migration:
   passed.
-- `supabase/tests/v284_public_event_semantic_boundary.sql`: 23/23 passed.
+- `supabase/tests/v284_public_event_semantic_boundary.sql`: 41/41 passed,
+  including poisoned fields, authorization oracles, and pre-migration retries.
 - `tools/test_public_event_semantic_boundary.mjs`: passed.
-- Signed-in browser disclosure reproduction: 71/71 passed with the public
+- Signed-in browser disclosure reproduction: 72/72 passed with the public
   payload remaining exactly two ordinary events and no hosted requests.
 - Tracked-time browser suite: 33/33 passed with focused service-worker
   lifecycle isolation.
 - Complete application and release regression: 33/33 groups passed.
 - Canonical v284 local release verification: all 15 gates passed, including
   both database shapes, rollback behavior, lint, regression, and cleanup.
-- CI, independent review, merge, and production rollout remain required before
-  `DONE`.
+- Initial independent review found four actionable gaps; all four are fixed
+  locally. Full regression, CI rerun, independent re-review, merge, and
+  production rollout remain required before `DONE`.
 
 #### Risks and rollback
 
