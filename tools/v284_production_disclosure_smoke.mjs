@@ -1143,18 +1143,12 @@ select json_build_object(
   'authSessions', (
     select count(*)::integer
     from auth.sessions session
-    join auth.users auth_user on auth_user.id = session.user_id
-    join targets target
-      on auth_user.id = target.user_id
-     and auth_user.email = target.email
+    join targets target on session.user_id = target.user_id
   ),
   'refreshTokens', (
     select count(*)::integer
     from auth.refresh_tokens token
-    join auth.users auth_user on auth_user.id::text = token.user_id
-    join targets target
-      on auth_user.id = target.user_id
-     and auth_user.email = target.email
+    join targets target on token.user_id = target.user_id::text
   )
 ) result;
 `);

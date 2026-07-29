@@ -403,6 +403,14 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   );
   assert.match(
     source,
+    /'authSessions', \([\s\S]*from auth\.sessions session\s+join targets target on session\.user_id = target\.user_id/,
+  );
+  assert.match(
+    source,
+    /'refreshTokens', \([\s\S]*from auth\.refresh_tokens token\s+join targets target on token\.user_id = target\.user_id::text/,
+  );
+  assert.match(
+    source,
     /else \{\s*await deleteAuthUsers\(context\);\s*deleteAuthUsersDatabaseFallback\(context\);\s*assertSyntheticAuthCleanup\(syntheticAuthCleanupCounts\(context\)\);\s*\}/,
   );
   assert.match(source, /unsupported_event_semantics/);
