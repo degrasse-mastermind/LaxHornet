@@ -669,6 +669,7 @@ async function verifyHostedReconciliation(context) {
           const record = state.trustSpineSync.events[event.id] || {};
           return {
             id: event.id,
+            statType: event.statType,
             reason: record.publicationSuppressedReason || "",
             pending: record.pendingOperations?.length || 0,
           };
@@ -683,7 +684,11 @@ async function verifyHostedReconciliation(context) {
     assert.equal(boundaries.localPrivateCount, 4, "former-failure aliases were not retained as private local evidence");
     assert.ok(
       boundaries.privatePublicationStates.every((item) =>
-        item.reason === "unsupported_event_semantics" && item.pending === 0),
+        item.reason === (
+          item.statType === "goal"
+            ? "invalid_public_event_evidence"
+            : "unsupported_event_semantics"
+        ) && item.pending === 0),
       "private or unknown semantics were not fail-closed",
     );
     assert.equal(boundaries.csvRetainsPrivateSemantics, true, "selected CSV lost scoped private evidence");

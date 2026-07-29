@@ -387,6 +387,10 @@ test("runner contains mandatory production guards and fail-closed cleanup", () =
   assert.match(source, /unsupported_event_semantics/);
   assert.match(source, /invalid_public_event_evidence/);
   assert.match(source, /expectedCode/);
+  assert.match(
+    source,
+    /item\.statType === "goal"\s*\?\s*"invalid_public_event_evidence"\s*:\s*"unsupported_event_semantics"/,
+  );
   const savedModalClose = source.indexOf('[data-action="close-saved-game"]');
   const savedModalClick = source.indexOf("await savedGameModalClose.click()", savedModalClose);
   const restoreActiveGame = source.indexOf(
