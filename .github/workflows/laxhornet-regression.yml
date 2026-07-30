@@ -96,6 +96,9 @@ jobs:
       - name: Team members RLS remediation contracts
         run: node tools/test_team_members_rls_remediation.mjs
 
+      - name: Team members State C bindings
+        run: node tools/test_team_members_state_c.mjs
+
       - name: Game scope capability contracts
         run: node tools/test_game_scope_capabilities.mjs
 

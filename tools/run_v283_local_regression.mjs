@@ -70,6 +70,7 @@ const tests = [
   },
   { name: "public event semantic boundary", command: process.execPath, args: ["tools/test_public_event_semantic_boundary.mjs"] },
   { name: "team members RLS remediation", command: process.execPath, args: ["tools/test_team_members_rls_remediation.mjs"] },
+  { name: "team members State C bindings", command: process.execPath, args: ["tools/test_team_members_state_c.mjs"] },
   { name: "game scope and capability contracts", command: process.execPath, args: ["tools/test_game_scope_capabilities.mjs"] },
   { name: "v284 update release", command: process.execPath, args: ["tools/test_update_release.mjs"] },
   {

@@ -1,0 +1,218 @@
+{
+  "capturedAt": "2026-07-29",
+  "projectRef": "ulbmjcvnyznvmjgpstno",
+  "captureMode": "production catalog metadata only",
+  "sanitized": true,
+  "realUserDataTouched": false,
+  "productionClusterSystemIdentifier": "7642734024280108049",
+  "table": {
+    "oid": 17886,
+    "schema": "public",
+    "name": "team_members",
+    "owner": "postgres",
+    "rlsEnabled": true,
+    "forceRlsEnabled": false,
+    "exactAcl": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+    "normalizedAclEntryCount": 32,
+    "normalizedAclMd5": "76611f7aba7b5501a407d96446952895"
+  },
+  "policySet": {
+    "count": 4,
+    "orderedNormalizedMd5": "1c9c5d532c262c3b9ec850552bdf0512",
+    "policies": [
+      {
+        "name": "laxhornet delete team members",
+        "command": "DELETE",
+        "roles": [
+          "authenticated"
+        ],
+        "permissive": "PERMISSIVE",
+        "using": "((user_id = ( SELECT auth.uid() AS uid)) OR (( SELECT laxhornet_team_role(team_members.team_id) AS laxhornet_team_role) = 'admin'::text))",
+        "withCheck": "",
+        "pgGetExprUsing": "((user_id = ( SELECT auth.uid() AS uid)) OR (( SELECT laxhornet_team_role(team_members.team_id) AS laxhornet_team_role) = 'admin'::text))",
+        "pgGetExprWithCheck": "",
+        "normalizedUsing": "((user_id=(SELECTauth.uid()ASuid))OR((SELECTlaxhornet_team_role(team_members.team_id)ASlaxhornet_team_role)='admin'::text))",
+        "normalizedWithCheck": "",
+        "normalizedEntryMd5": "5b663d466b2e4f10e3b9f32d24b968fb"
+      },
+      {
+        "name": "laxhornet insert team members",
+        "command": "INSERT",
+        "roles": [
+          "authenticated"
+        ],
+        "permissive": "PERMISSIVE",
+        "using": "",
+        "withCheck": "((user_id = ( SELECT auth.uid() AS uid)) AND (role = 'admin'::text) AND ( SELECT laxhornet_can_create_team() AS laxhornet_can_create_team) AND (EXISTS ( SELECT 1 FROM teams WHERE ((teams.id = team_members.team_id) AND (teams.created_by = ( SELECT auth.uid() AS uid))))))",
+        "pgGetExprUsing": "",
+        "pgGetExprWithCheck": "((user_id = ( SELECT auth.uid() AS uid)) AND (role = 'admin'::text) AND ( SELECT laxhornet_can_create_team() AS laxhornet_can_create_team) AND (EXISTS ( SELECT 1 FROM teams WHERE ((teams.id = team_members.team_id) AND (teams.created_by = ( SELECT auth.uid() AS uid))))))",
+        "normalizedUsing": "",
+        "normalizedWithCheck": "((user_id=(SELECTauth.uid()ASuid))AND(role='admin'::text)AND(SELECTlaxhornet_can_create_team()ASlaxhornet_can_create_team)AND(EXISTS(SELECT1FROMteamsWHERE((teams.id=team_members.team_id)AND(teams.created_by=(SELECTauth.uid()ASuid))))))",
+        "normalizedEntryMd5": "41afbec61cde932584295d287b61e3e7"
+      },
+      {
+        "name": "laxhornet read team members",
+        "command": "SELECT",
+        "roles": [
+          "authenticated"
+        ],
+        "permissive": "PERMISSIVE",
+        "using": "((user_id = ( SELECT auth.uid() AS uid)) OR ( SELECT laxhornet_is_team_member(team_members.team_id) AS laxhornet_is_team_member))",
+        "withCheck": "",
+        "pgGetExprUsing": "((user_id = ( SELECT auth.uid() AS uid)) OR ( SELECT laxhornet_is_team_member(team_members.team_id) AS laxhornet_is_team_member))",
+        "pgGetExprWithCheck": "",
+        "normalizedUsing": "((user_id=(SELECTauth.uid()ASuid))OR(SELECTlaxhornet_is_team_member(team_members.team_id)ASlaxhornet_is_team_member))",
+        "normalizedWithCheck": "",
+        "normalizedEntryMd5": "884b66c34975337d3e49d25c2bcf5bda"
+      },
+      {
+        "name": "laxhornet update team members",
+        "command": "UPDATE",
+        "roles": [
+          "authenticated"
+        ],
+        "permissive": "PERMISSIVE",
+        "using": "(( SELECT laxhornet_team_role(team_members.team_id) AS laxhornet_team_role) = 'admin'::text)",
+        "withCheck": "(( SELECT laxhornet_team_role(team_members.team_id) AS laxhornet_team_role) = 'admin'::text)",
+        "pgGetExprUsing": "(( SELECT laxhornet_team_role(team_members.team_id) AS laxhornet_team_role) = 'admin'::text)",
+        "pgGetExprWithCheck": "(( SELECT laxhornet_team_role(team_members.team_id) AS laxhornet_team_role) = 'admin'::text)",
+        "normalizedUsing": "((SELECTlaxhornet_team_role(team_members.team_id)ASlaxhornet_team_role)='admin'::text)",
+        "normalizedWithCheck": "((SELECTlaxhornet_team_role(team_members.team_id)ASlaxhornet_team_role)='admin'::text)",
+        "normalizedEntryMd5": "49400540bdacd1b5ad883cb9e8d91c0d"
+      }
+    ]
+  },
+  "policyFunctionDependencies": [
+    {
+      "policy": "laxhornet delete team members",
+      "functions": [
+        "auth.uid()",
+        "public.laxhornet_team_role(text)"
+      ]
+    },
+    {
+      "policy": "laxhornet insert team members",
+      "functions": [
+        "auth.uid()",
+        "public.laxhornet_can_create_team()"
+      ]
+    },
+    {
+      "policy": "laxhornet read team members",
+      "functions": [
+        "auth.uid()",
+        "public.laxhornet_is_team_member(text)"
+      ]
+    },
+    {
+      "policy": "laxhornet update team members",
+      "functions": [
+        "public.laxhornet_team_role(text)"
+      ]
+    }
+  ],
+  "helpers": {
+    "normalizedSetSha256": "c6e861d2c426ddf7106e3787f5c7b12629f8fb6b7ab315d377d162e0a78aa341",
+    "functions": [
+      {
+        "signature": "public.laxhornet_can_create_team()",
+        "oid": 18006,
+        "owner": "postgres",
+        "securityDefiner": true,
+        "language": "sql",
+        "volatility": "v",
+        "config": [
+          "search_path=public"
+        ],
+        "normalizedSourceMd5": "c2b253cf74e691f048cf29a66ddbba76",
+        "exactAcl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+        "normalizedAclEntryCount": 3,
+        "normalizedAclMd5": "2c23155f9c6d5e4dc4d7da9fee83f183"
+      },
+      {
+        "signature": "public.laxhornet_is_platform_reviewer()",
+        "oid": 18004,
+        "owner": "postgres",
+        "securityDefiner": true,
+        "language": "sql",
+        "volatility": "v",
+        "config": [
+          "search_path=public"
+        ],
+        "normalizedSourceMd5": "f9eb8573e91bc5758f94a3b997966a4e",
+        "exactAcl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+        "normalizedAclEntryCount": 3,
+        "normalizedAclMd5": "2c23155f9c6d5e4dc4d7da9fee83f183"
+      },
+      {
+        "signature": "public.laxhornet_is_team_member(text)",
+        "oid": 18076,
+        "owner": "postgres",
+        "securityDefiner": true,
+        "language": "sql",
+        "volatility": "v",
+        "config": [
+          "search_path=public",
+          "row_security=off"
+        ],
+        "normalizedSourceMd5": "17e2d67b8cb33781debcc01d6f1578a6",
+        "exactAcl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+        "normalizedAclEntryCount": 3,
+        "normalizedAclMd5": "2c23155f9c6d5e4dc4d7da9fee83f183"
+      },
+      {
+        "signature": "public.laxhornet_team_role(text)",
+        "oid": 18077,
+        "owner": "postgres",
+        "securityDefiner": true,
+        "language": "plpgsql",
+        "volatility": "v",
+        "config": [
+          "search_path=public",
+          "row_security=off"
+        ],
+        "normalizedSourceMd5": "bd212e46e7fe3dc8057780eddf0d9240",
+        "exactAcl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+        "normalizedAclEntryCount": 3,
+        "normalizedAclMd5": "2c23155f9c6d5e4dc4d7da9fee83f183"
+      }
+    ]
+  },
+  "privateHelperSchema": {
+    "name": "lh_rls_private",
+    "exists": false
+  },
+  "migrationHistory": {
+    "remediationVersionCount": 0,
+    "orderedVersionAndName": [
+      "20260723000000|laxhornet_legacy_baseline",
+      "20260723010000|trust_spine_release_1",
+      "20260723010607|remote_schema",
+      "20260723020000|minimum_necessary_disclosure",
+      "20260723030000|fix_disclosure_audit_and_evidence_validation",
+      "20260723040000|event_pipeline_capabilities",
+      "20260727000000|tracked_playing_time_operations",
+      "20260728193942|v284_public_event_semantic_boundary"
+    ],
+    "normalizedMd5": "257d70e2d82670b2b727575d7173a537"
+  },
+  "authorizationEnvelope": {
+    "bindingFormat": "UTF-8 lines joined by LF in the listed order",
+    "bindingLines": [
+      "policySetMd5=1c9c5d532c262c3b9ec850552bdf0512",
+      "table=public.team_members|oid=17886|owner=postgres|rls=true|forceRls=false|aclCount=32|aclMd5=76611f7aba7b5501a407d96446952895",
+      "helper=public.laxhornet_can_create_team()|oid=18006|owner=postgres|securityDefiner=true|language=sql|volatility=v|config=search_path=public|sourceMd5=c2b253cf74e691f048cf29a66ddbba76|aclCount=3|aclMd5=2c23155f9c6d5e4dc4d7da9fee83f183",
+      "helper=public.laxhornet_is_platform_reviewer()|oid=18004|owner=postgres|securityDefiner=true|language=sql|volatility=v|config=search_path=public|sourceMd5=f9eb8573e91bc5758f94a3b997966a4e|aclCount=3|aclMd5=2c23155f9c6d5e4dc4d7da9fee83f183",
+      "helper=public.laxhornet_is_team_member(text)|oid=18076|owner=postgres|securityDefiner=true|language=sql|volatility=v|config=search_path=public,row_security=off|sourceMd5=17e2d67b8cb33781debcc01d6f1578a6|aclCount=3|aclMd5=2c23155f9c6d5e4dc4d7da9fee83f183",
+      "helper=public.laxhornet_team_role(text)|oid=18077|owner=postgres|securityDefiner=true|language=plpgsql|volatility=v|config=search_path=public,row_security=off|sourceMd5=bd212e46e7fe3dc8057780eddf0d9240|aclCount=3|aclMd5=2c23155f9c6d5e4dc4d7da9fee83f183",
+      "privateSchema=absent",
+      "historyMd5=257d70e2d82670b2b727575d7173a537"
+    ],
+    "sha256": "853641959fcdef2fb6c4f885576c52f460313475122879b4f8bef4cef841b358"
+  },
+  "sourceAttribution": {
+    "repositoryPath": "supabase/migrations/20260723000000_laxhornet_legacy_baseline.sql",
+    "repositoryLines": "2109-2138",
+    "classification": "canonical legacy baseline policy set with production helper hardening not represented in migration history"
+  }
+}

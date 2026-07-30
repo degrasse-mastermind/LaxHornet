@@ -59,6 +59,8 @@ The migration hashes normalized `pg_policies` metadata and accepts only:
   `75e5d59fce7de054e5f53d7d5d73f99e`.
 - State B, canonical-only drift: 4 policies, MD5
   `c4a69b0c9f9660563eb7aa8ca6e1b3b6`.
+- State C, canonical scalar-subquery baseline: 4 policies, MD5
+  `1c9c5d532c262c3b9ec850552bdf0512`.
 
 Both states require an exact match for the four policy definitions, table
 owner, RLS and FORCE RLS settings, table ACL, four authorization-helper source
@@ -68,11 +70,20 @@ cluster is bound by its PostgreSQL system identifier from the sanitized
 snapshot under `review-evidence/team-members-rls-remediation/`; a restored or
 replaced cluster therefore fails closed until it is captured and reviewed.
 
-The migration also recognizes repository/preview-only blank-chain hash
-`1c9c5d532c262c3b9ec850552bdf0512` with exact known helper and ACL profiles,
-but only when `pg_control_system()` proves that the database is not the
-captured production cluster. On the production cluster, the branch is
-unreachable and any state other than A or B aborts the transaction.
+State C was captured from production and exactly reproduced locally. Its
+definitions originate in the canonical legacy baseline migration; its
+18-case authorization matrix is identical to State B and produces no
+`42P17`. Recognition still requires the full production metadata profile.
+The exact State C fixture, per-policy hashes, helper/ACL bindings, complete
+authorization-envelope SHA-256, and matrix are under
+`review-evidence/team-members-rls-remediation/`.
+
+The same policy hash remains the expected repository/preview blank-chain
+state. On a non-production cluster, the preflight distinguishes that state
+from a production-shaped State C fixture by the exact table ACL and then
+requires the corresponding helper configuration and ACL profile. Production
+still requires the captured system identifier and exact ordered migration
+history. A hash match without the rest of the envelope fails closed.
 
 ## Final state
 
@@ -104,3 +115,4 @@ safe recovery if the forward migration cannot be retained.
    gates.
 7. Post-deployment synthetic production authorization and full v284 smoke with
    zero mutable/auth residue.
+8. State A/B/C/final 18-case comparison and exact State C convergence.
