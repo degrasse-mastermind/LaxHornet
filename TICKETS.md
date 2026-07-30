@@ -1354,7 +1354,7 @@ Draft PR: [#48](https://github.com/degrasse-mastermind/LaxHornet/pull/48)
 - The exact named read-only path is now available.
 - Pages run `30559099199` auto-deployed merge
   `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3`. Its 47-file artifact manifest
-  identifies that exact source, and all 46 served files matched it.
+  identifies that exact source, and all 47 served files matched it.
 - Production migration history now records both
   `20260730134439_durable_game_tombstones` and
   `20260730151714_durable_game_tombstone_concurrency`.
@@ -1376,6 +1376,55 @@ Draft PR: [#48](https://github.com/degrasse-mastermind/LaxHornet/pull/48)
 - R2-06 production activation remains `BLOCKED` pending provenance/authority
   reconciliation, a reviewed manifest/evidence update, a green rerun of the
   complete production preflight, and separately authorized smoke/cleanup.
+
+#### Production-state reconciliation incident
+
+- Owner classification:
+  `Unauthorized release-control deviation with apparently aligned reviewed state`.
+- Pages run `30559099199` was a normal `push` run triggered by
+  `degrasse-mastermind` on `main` at exact merge `2fcc446d...`. The workflow
+  runs on every `main` push, and the `github-pages` environment had only a
+  `main` branch rule, with no reviewer or wait-timer approval. The workflow
+  behaved as configured; the gap is a release-control design/process defect.
+- The 47-file Pages manifest has SHA-256
+  `5443857503e33f368056abc8d35c40380fdb07a28c10499d6ad3150774372489`.
+  All served files matched its per-file hashes, all tracked non-allowlisted
+  files were absent, and the reviewed PR head and merge share tree
+  `a5374b7e4c00fe91cae8de34fbcf417943305df3`.
+- Production migration history contains the complete expected sequence with
+  both R2-06 entries and no unexpected entry. Its ledger has no application
+  timestamp or actor field; no repository workflow applies production
+  migrations, and Supabase Preview cannot account for the production project.
+  Exact time, actor, route, and together-versus-separate application remain
+  unresolved.
+- Repository migration SHA-256 values are
+  `138e8edfdaa4b48747ceb63a66a0eae76f91c832b19dffa52914bdea45188900`
+  and
+  `619dbe275e50b8eef9e8b63a2dce1f850e4163e1259c05521604ffdcd3778aad`.
+  The ledger cannot prove original SQL bytes, but a disposable PostgreSQL 17
+  comparison established exact post-migration equivalence for the table,
+  columns, constraints, indexes, RLS, policy, trigger, function bodies,
+  security modes, fixed search paths, and bounded grants.
+- Tombstone count remains zero. Current aligned runtime/database state is
+  preserved because application rollback would remove client recovery and
+  hydration behavior while retaining backend tombstones. Database rollback is
+  unavailable without conclusive safety proof and separate authorization.
+- No evidence currently establishes a security, privacy, or data-loss
+  incident. This is a release-governance incident with unresolved migration
+  attribution and incomplete synthetic production verification.
+- The release manifest was not changed: changing its application source,
+  applied flags, migration sequences, or dependency gate would alter
+  production release-control behavior rather than merely document history.
+  A separate reviewed manifest-control remediation is required.
+- Production synthetic smoke remains unauthorized and incomplete. The bounded
+  future request is recorded in
+  `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_VERIFICATION_AUTHORIZATION_PLAN.md`.
+- No deployment, rollback, migration, Supabase change, Auth/data mutation,
+  private-row access, synthetic record, or release closeout occurred during
+  reconciliation.
+
+Full evidence:
+`review-evidence/r2-06-durable-game-tombstones-release/PRODUCTION_STATE_RECONCILIATION.md`.
 
 ## Ticket template
 

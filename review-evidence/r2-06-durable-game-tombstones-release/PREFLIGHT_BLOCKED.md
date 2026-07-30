@@ -401,8 +401,8 @@ completed successfully at `2026-07-30T15:56:52Z` and deployed exact source
 `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3`.
 
 The workflow artifact manifest records 47 allowlisted files and 6,255,246
-bytes. Independent public verification matched all 46 served files to that
-manifest byte-for-byte; `CNAME` is the non-served domain configuration entry.
+bytes. Independent public verification matched all 47 served files to that
+manifest byte-for-byte.
 
 This superseded the authorized application rollback source
 `44f0510d3bde18f459e78f570efd27b72dc2a989`. The resumed preflight did not
@@ -469,3 +469,60 @@ was authorized or performed.
 4. If recovery is selected, review the zero-tombstone rollback eligibility and
    reverse-order database/application procedure under separate explicit
    authorization. Do not run either rollback from this preflight task.
+
+## Reconciliation result
+
+The owner classified the observed state as:
+
+`Unauthorized release-control deviation with apparently aligned reviewed state`
+
+The detailed read-only investigation is recorded in
+`PRODUCTION_STATE_RECONCILIATION.md`, and the separately gated production-smoke
+request is recorded in `SYNTHETIC_VERIFICATION_AUTHORIZATION_PLAN.md`.
+
+Confirmed:
+
+- Pages run `30559099199` was automatically triggered by
+  `degrasse-mastermind` pushing merge `2fcc446d...` to `main`;
+- the environment required only the configured `main` branch rule and no
+  manual reviewer/wait-timer approval;
+- the workflow behaved as configured, exposing a release-governance control
+  gap rather than a failed or altered workflow execution;
+- PR head `631f48ed...` and merge `2fcc446d...` share exact tree
+  `a5374b7e4c00fe91cae8de34fbcf417943305df3`;
+- the Pages manifest and every served file match that exact source, while
+  excluded repository paths remain non-public;
+- both expected migration entries and no unexpected migration entry exist;
+- live columns, constraints, indexes, RLS, policy, trigger, normalized
+  function bodies, security modes, fixed search paths, and effective bounded
+  grants match the reviewed post-R2-06A expectation;
+- tombstone count remains zero; and
+- preserving the aligned runtime/database state is safer than removing client
+  recovery behavior through application-only rollback. Database rollback is
+  not conclusively safe and remains unavailable.
+
+Unresolved:
+
+- exact migration application timestamps;
+- migration actor, route, or external session;
+- whether the two migrations were applied together or separately; and
+- synthetic production behavior.
+
+The production migration ledger has no application timestamp or actor column.
+No repository workflow applies production migrations, and Supabase Preview is
+not production project `ulbmjcvnyznvmjgpstno`. No unsupported attribution was
+made.
+
+The release manifest remains unchanged because editing its production source,
+applied flags, sequences, or runtime dependency gate would alter release
+control rather than merely document observed history. That change requires a
+separate reviewed remediation.
+
+No security, privacy, or data-loss incident is established by current
+evidence. The release-governance incident remains open until migration
+attribution is resolved or formally recorded as unavailable and bounded
+synthetic production verification is separately authorized and completed.
+
+No deployment, rollback, migration, Supabase change, Auth/data mutation,
+synthetic record, or release closeout occurred during reconciliation. R2-06 is
+not marked production-activated or production-verified.

@@ -108,7 +108,7 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
   RLS enabled and forced, the guarded RPCs and trigger present with expected
   least-privilege access and lock-before-read ordering, and zero tombstone
   rows. Pages run `30559099199` also auto-deployed exact merge
-  `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3`; all 46 served files matched its
+  `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3`; all 47 served files matched its
   allowlisted artifact manifest. These external changes were not performed by
   the resumed preflight task and are not release closeout: the committed
   manifest still records rollback source `44f0510d3bde18f459e78f570efd27b72dc2a989`
@@ -344,10 +344,17 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
 - R2-06A closes the two repository P1 paths with shared same-game server
-  serialization and reversible client delete recovery. Production activation
-  remains blocked on green CI, exact-PR-SHA independent Level 3 review, named
-  read-only production verification, recovery readiness, and separately
-  authorized migration-first release work. Non-delete game-write
+  serialization and reversible client delete recovery. Exact-PR-SHA review and
+  merge are complete. Read-only reconciliation found exact reviewed runtime
+  `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3` and both R2-06 migrations already
+  present in production, with definition-equivalent catalog objects, expected
+  least-privilege boundaries, and zero tombstones. These changes were not
+  explicitly authorized through the tracked production-release process.
+  Classification is `Unauthorized release-control deviation with apparently
+  aligned reviewed state`; migration actor/time/route attribution remains
+  unresolved. Current state is preserved, not approved retroactively, and
+  production activation remains incomplete pending separately authorized
+  synthetic verification and reviewed manifest-control remediation. Non-delete game-write
   deduplication, field-level conflicts, signed-out namespace migration,
   cross-key transactionality, visible sync/conflict UI, and a sanitized journal
   remain open R2 work.

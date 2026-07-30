@@ -338,6 +338,46 @@ production preflight fails closed. These external changes were not performed
 or authorized by the resumed preflight task. The overall R2 gate remains open;
 do not infer activation approval from the observed state.
 
+### R2-06/R2-06A production-state reconciliation
+
+- [x] Classify the incident as
+  `Unauthorized release-control deviation with apparently aligned reviewed state`.
+- [x] Confirm Pages run `30559099199` was an automatic `push` run on `main`,
+  triggered by `degrasse-mastermind`, with no environment reviewer or
+  wait-timer approval rule.
+- [x] Confirm the workflow behaved as configured and identify the
+  merge-to-production control gap as a release-governance defect.
+- [x] Prove the reviewed PR head, merge tree, workflow manifest, 47 served
+  files, service worker, and runtime marker identify exact source
+  `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3`.
+- [x] Confirm all tracked non-allowlisted files and explicit internal probes
+  are absent from the public artifact.
+- [x] Confirm production migration history contains both expected R2-06
+  entries and no unexpected entry.
+- [x] Record migration application timestamp, actor, route, and
+  together-versus-separate attribution as unresolved because the ledger has
+  no such fields and no repository production-migration workflow exists.
+- [x] Compare the live table, constraints, indexes, RLS, policy, trigger,
+  function bodies, security/search-path settings, and grants with a disposable
+  PostgreSQL 17 database built from the reviewed migrations.
+- [x] Preserve the aligned current state without treating it as retroactively
+  authorized and without executing either rollback.
+- [x] Leave the behavior-affecting release manifest unchanged and require a
+  separate reviewed manifest-control remediation.
+- [ ] Obtain explicit production-data/Auth authorization for the bounded
+  one-owner, one-game synthetic plan.
+- [ ] Execute guarded-write, stale-delete, recovery, durable-delete, replay,
+  different-ID, stale-write, hydration, authorization, disclosure, cleanup,
+  and retained-tombstone checks.
+- [ ] Mark R2-06 production-verified only after all remaining release-control
+  and synthetic verification gates are satisfied.
+
+Evidence:
+`review-evidence/r2-06-durable-game-tombstones-release/PRODUCTION_STATE_RECONCILIATION.md`.
+
+Authorization-ready plan:
+`review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_VERIFICATION_AUTHORIZATION_PLAN.md`.
+
 # 4. Planned Engineering Sequence
 
 Do not combine these into one large Codex task. Each item requires one approved ticket, one primary implementation task, and a separate independent review when warranted.
