@@ -419,14 +419,14 @@ EXIT: 0
 
 ===== secure disclosure browser =====
 [secure-disclosure-browser +1ms] local server startup
-[secure-disclosure-browser +13ms] local server ready at http://127.0.0.1:5258
-[secure-disclosure-browser +623ms] browser launched with C:\Program Files\Google\Chrome\Application\chrome.exe
-[secure-disclosure-browser +889ms] secure viewer setup complete
-[secure-disclosure-browser +5833ms] secure disclosure assertions complete
-[secure-disclosure-browser +9993ms] update-path navigation started
-[secure-disclosure-browser +10056ms] update-path navigation complete
-[secure-disclosure-browser +10067ms] update-path signal invoked for v285
-[secure-disclosure-browser +10293ms] update-path banner visible
+[secure-disclosure-browser +9ms] local server ready at http://127.0.0.1:5258
+[secure-disclosure-browser +614ms] browser launched with C:\Program Files\Google\Chrome\Application\chrome.exe
+[secure-disclosure-browser +913ms] secure viewer setup complete
+[secure-disclosure-browser +5866ms] secure disclosure assertions complete
+[secure-disclosure-browser +11085ms] update-path navigation started
+[secure-disclosure-browser +11142ms] update-path navigation complete
+[secure-disclosure-browser +11151ms] update-path signal invoked for v285
+[secure-disclosure-browser +11305ms] update-path banner visible
 PASS: all three secure disclosure flags are active
 PASS: runtime status reports every disclosure feature true
 PASS: runtime-config executes before app.js while the event service loads without changing the diagnostic marker
@@ -438,7 +438,7 @@ PASS: secure viewer makes no ordinary games/events request
 PASS: v284 activation removes the stale v281 cache
 PASS: unknown and expired tokens remain neutral
 PASS: synthetic roster-connected game renders the real live tracker
-PASS: first live tracker button records immediately (observed 1; Ground Ball added · Q1 10:55 PM)
+PASS: first live tracker button records immediately (observed 1; Ground Ball added · Q1 11:05 PM)
 PASS: two events are recorded through the live tracking UI
 PASS: live tracker events persist locally before secure sharing
 PASS: signed-in token creation uses the approved RPC
@@ -501,8 +501,8 @@ PASS: updated client recovers secure Live Share after reconnection
 PASS: activation browser suite contacts no hosted Supabase project
 PASS: browser console and pages report no errors
 Activation browser checks passed (73/73).
-[secure-disclosure-browser +10580ms] teardown started
-[secure-disclosure-browser +10949ms] teardown complete
+[secure-disclosure-browser +11657ms] teardown started
+[secure-disclosure-browser +12103ms] teardown complete
 
 EXIT: 0
 
@@ -752,7 +752,6 @@ warning: in the working copy of 'REPO_CURRENT_STATE.md', LF will be replaced by 
 warning: in the working copy of 'TICKETS.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'docs/security/TEAM_MEMBERS_RLS_REMEDIATION.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'release/laxhornet-release-manifest.json', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'review-evidence/event-pipeline-release-control-cleanup/regression-output.txt', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'review-evidence/team-members-rls-remediation/README.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'review-evidence/team-members-rls-remediation/production-policy-snapshot.json', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'supabase/migrations/20260730004700_team_members_rls_recursion.sql', LF will be replaced by CRLF the next time Git touches it

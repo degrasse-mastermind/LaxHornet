@@ -7,7 +7,17 @@
   "productionClusterSystemIdentifier": "7642734024280108049",
   "migrationHistoryBefore": {
     "latestVersion": "20260728193942",
-    "remediationVersionCount": 0
+    "remediationVersionCount": 0,
+    "orderedVersionAndName": [
+      "20260723000000|laxhornet_legacy_baseline",
+      "20260723010000|trust_spine_release_1",
+      "20260723010607|remote_schema",
+      "20260723020000|minimum_necessary_disclosure",
+      "20260723030000|fix_disclosure_audit_and_evidence_validation",
+      "20260723040000|event_pipeline_capabilities",
+      "20260727000000|tracked_playing_time_operations",
+      "20260728193942|v284_public_event_semantic_boundary"
+    ]
   },
   "capturedDefectStateA": {
     "policyCount": 8,
@@ -71,28 +81,31 @@
     "normalizedTableAclEntryCount": 32,
     "normalizedTableAclMd5": "76611f7aba7b5501a407d96446952895",
     "tablePrivileges": {
-      "anon": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
         "SELECT",
         "TRIGGER",
         "TRUNCATE",
         "UPDATE"
       ],
-      "authenticated": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
+        "authenticated": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
         "SELECT",
         "TRIGGER",
         "TRUNCATE",
         "UPDATE"
       ],
-      "service_role": [
-        "DELETE",
-        "INSERT",
-        "REFERENCES",
+        "service_role": [
+          "DELETE",
+          "INSERT",
+          "MAINTAIN",
+          "REFERENCES",
         "SELECT",
         "TRIGGER",
         "TRUNCATE",

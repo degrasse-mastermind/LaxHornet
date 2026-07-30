@@ -201,9 +201,10 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
   authorization, rollback/reapply, blank-chain, and production-shaped gates are
   green. The preflight is bound to the captured production cluster and exact
   policy, helper-source/config/ACL, table ACL, owner, FORCE RLS, private-schema,
-  and migration-history metadata; adversarial schema, helper-body, and ACL
-  drift probes fail closed. The final DML-only ACL also removes PostgreSQL 17
-  `MAINTAIN`. This is not yet a production closeout.
+  and complete ordered migration-history metadata; adversarial schema,
+  helper-body, ACL, missing-history, and injected-history drift probes fail
+  closed. The final DML-only ACL also removes PostgreSQL 17 `MAINTAIN`. This is
+  not yet a production closeout.
 - Coordinated version and service-worker release hygiene.
 - Maintenance of GitHub Action majors and portability of the CI-selected regression checks.
 

@@ -96,7 +96,7 @@ safe recovery if the forward migration cannot be retained.
 ## Required verification
 
 1. Reproduction pgTAP: 4/4 expected `42P17` assertions.
-2. Corrected authorization pgTAP: 40/40 assertions.
+2. Corrected authorization and preflight-metadata pgTAP: 43/43 assertions.
 3. Rollback: eight policies and exact `42P17`.
 4. Reapply: canonical four policies and both pgTAP suites green.
 5. Blank migration chain and production-shaped upgrade.

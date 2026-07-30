@@ -3,7 +3,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select extensions.plan(40);
+select extensions.plan(43);
 
 select extensions.ok(
   (
@@ -155,6 +155,71 @@ select extensions.is(
   ),
   4,
   'all public authorization helpers have exact owner, config, and execute ACL'
+);
+select extensions.is(
+  (
+    select pg_catalog.array_agg(
+      history.version || '|' || history.name
+      order by history.version
+    )
+    from supabase_migrations.schema_migrations history
+    where history.version < '20260730004700'
+  ),
+  array[
+    '20260723000000|laxhornet_legacy_baseline',
+    '20260723010000|trust_spine_release_1',
+    '20260723010607|remote_schema',
+    '20260723020000|minimum_necessary_disclosure',
+    '20260723030000|fix_disclosure_audit_and_evidence_validation',
+    '20260723040000|event_pipeline_capabilities',
+    '20260727000000|tracked_playing_time_operations',
+    '20260728193942|v284_public_event_semantic_boundary'
+  ]::text[],
+  'pre-remediation migration history exactly matches the captured production ledger'
+);
+select extensions.ok(
+  array[
+    '20260723000000|laxhornet_legacy_baseline',
+    '20260723010000|trust_spine_release_1',
+    '20260723010607|remote_schema',
+    '20260723020000|minimum_necessary_disclosure',
+    '20260723030000|fix_disclosure_audit_and_evidence_validation',
+    '20260723040000|event_pipeline_capabilities',
+    '20260727000000|tracked_playing_time_operations'
+  ]::text[] is distinct from array[
+    '20260723000000|laxhornet_legacy_baseline',
+    '20260723010000|trust_spine_release_1',
+    '20260723010607|remote_schema',
+    '20260723020000|minimum_necessary_disclosure',
+    '20260723030000|fix_disclosure_audit_and_evidence_validation',
+    '20260723040000|event_pipeline_capabilities',
+    '20260727000000|tracked_playing_time_operations',
+    '20260728193942|v284_public_event_semantic_boundary'
+  ]::text[],
+  'missing earlier migration history fails the exact comparison'
+);
+select extensions.ok(
+  array[
+    '20260722000000|unexpected_lower_version',
+    '20260723000000|laxhornet_legacy_baseline',
+    '20260723010000|trust_spine_release_1',
+    '20260723010607|remote_schema',
+    '20260723020000|minimum_necessary_disclosure',
+    '20260723030000|fix_disclosure_audit_and_evidence_validation',
+    '20260723040000|event_pipeline_capabilities',
+    '20260727000000|tracked_playing_time_operations',
+    '20260728193942|v284_public_event_semantic_boundary'
+  ]::text[] is distinct from array[
+    '20260723000000|laxhornet_legacy_baseline',
+    '20260723010000|trust_spine_release_1',
+    '20260723010607|remote_schema',
+    '20260723020000|minimum_necessary_disclosure',
+    '20260723030000|fix_disclosure_audit_and_evidence_validation',
+    '20260723040000|event_pipeline_capabilities',
+    '20260727000000|tracked_playing_time_operations',
+    '20260728193942|v284_public_event_semantic_boundary'
+  ]::text[],
+  'unexpected lower-version migration history fails the exact comparison'
 );
 
 insert into auth.users(id, email)

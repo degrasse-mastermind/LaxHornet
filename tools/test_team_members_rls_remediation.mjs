@@ -13,6 +13,8 @@ const [
   reproductionTestPath,
 ] = TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS;
 const manifestPath = "release/laxhornet-release-manifest.json";
+const productionSnapshotPath =
+  "review-evidence/team-members-rls-remediation/production-policy-snapshot.json";
 const results = [];
 
 function source(file) {
@@ -43,6 +45,7 @@ const rollback = source(rollbackPath);
 const authorizationTest = source(authorizationTestPath);
 const reproductionTest = source(reproductionTestPath);
 const manifest = JSON.parse(source(manifestPath));
+const productionSnapshot = JSON.parse(source(productionSnapshotPath));
 const reviewPackage = manifest.reviewDatabasePackages?.find(
   (entry) => entry.name === "team_members_rls_recursion",
 );
@@ -81,6 +84,23 @@ test("production preflight pins helpers, ACLs, FORCE RLS, and schema absence", (
     /\{postgres=arwdDxtm\/postgres,anon=arwdDxtm\/postgres,authenticated=arwdDxtm\/postgres,service_role=arwdDxtm\/postgres\}/,
   );
   assert.match(migration, /private helper schema unexpectedly exists/);
+  for (const historyEntry of productionSnapshot.migrationHistoryBefore
+    .orderedVersionAndName) {
+    assert.match(migration, new RegExp(historyEntry.replace(/[|]/g, "\\|")));
+  }
+  assert.deepEqual(
+    productionSnapshot.sharedStartingMetadata.tablePrivileges.authenticated,
+    [
+      "DELETE",
+      "INSERT",
+      "MAINTAIN",
+      "REFERENCES",
+      "SELECT",
+      "TRIGGER",
+      "TRUNCATE",
+      "UPDATE",
+    ],
+  );
   assert.doesNotMatch(migration, /create schema if not exists lh_rls_private/i);
   assert.doesNotMatch(
     migration,
@@ -153,7 +173,7 @@ test("reproduction covers all four operations with SQLSTATE 42P17", () => {
 });
 
 test("authorization test covers the required fail-closed matrix", () => {
-  assert.match(authorizationTest, /extensions\.plan\(40\)/);
+  assert.match(authorizationTest, /extensions\.plan\(43\)/);
   for (const phrase of [
     "same-team tracker",
     "wrong team",
@@ -170,6 +190,8 @@ test("authorization test covers the required fail-closed matrix", () => {
     "service role retains explicit maintenance",
     "private helper schema has exact owner",
     "public authorization helpers have exact owner",
+    "missing earlier migration history fails",
+    "unexpected lower-version migration history fails",
   ]) {
     assert.match(authorizationTest, new RegExp(phrase, "i"));
   }

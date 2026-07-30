@@ -393,16 +393,21 @@ begin
   end if;
 
   if is_production_cluster and (
-    (
-      select count(*)
-      from supabase_migrations.schema_migrations
-      where version = '20260730004700'
-    ) <> 0
-    or (
-      select max(version)
-      from supabase_migrations.schema_migrations
-    ) <> '20260728193942'
-  ) then
+    select pg_catalog.array_agg(
+      history.version || '|' || history.name
+      order by history.version
+    )
+    from supabase_migrations.schema_migrations history
+  ) is distinct from array[
+    '20260723000000|laxhornet_legacy_baseline',
+    '20260723010000|trust_spine_release_1',
+    '20260723010607|remote_schema',
+    '20260723020000|minimum_necessary_disclosure',
+    '20260723030000|fix_disclosure_audit_and_evidence_validation',
+    '20260723040000|event_pipeline_capabilities',
+    '20260727000000|tracked_playing_time_operations',
+    '20260728193942|v284_public_event_semantic_boundary'
+  ]::text[] then
     raise exception 'TEAM_MEMBERS_RLS_PREFLIGHT_FAILED: production migration history drifted';
   end if;
 

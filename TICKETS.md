@@ -448,10 +448,10 @@ evidence are not copied to the public static site.
   limits authenticated/service-role table access to required DML, including no
   PostgreSQL 17 `MAINTAIN`.
 - Local evidence currently passes: defect reproduction 4/4, corrected
-  authorization 40/40, isolated rollback exact `42P17`, reapply from both
+  authorization/preflight metadata 43/43, isolated rollback exact `42P17`, reapply from both
   approved policy hashes, blank migration chain, production-shaped upgrade,
-  and adversarial preflight rejection of private-schema, helper-body, and table
-  ACL drift.
+  and adversarial preflight rejection of private-schema, helper-body, table
+  ACL, missing migration-history, and injected lower-version history drift.
 - Production state, full synthetic smoke, allowlisted rollback/restore proof,
   and ticket closeout remain pending the focused PR and independent review.
 
