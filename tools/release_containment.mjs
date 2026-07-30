@@ -37,6 +37,12 @@ export const TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS = Object.freeze([
   "supabase/tests/team_members_rls_recursion_reproduction.sql",
 ]);
 
+export const DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS = Object.freeze([
+  "supabase/migrations/20260730134439_durable_game_tombstones.sql",
+  "supabase/rollback/20260730134439_durable_game_tombstones_rollback.sql",
+  "supabase/tests/durable_game_tombstones.sql",
+]);
+
 export const APPROVED_HISTORICAL_PROVENANCE_PATHS = Object.freeze([
   "supabase/migrations/20260723010607_remote_schema.sql",
   "supabase/production-history/20260723010607_remote_schema.sql",

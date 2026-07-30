@@ -782,6 +782,8 @@ function loadCloudGamesHarness(initialGames = [], options = {}) {
     cloudGameHydrationGeneration: 0,
     currentUserId: () => currentAccountId,
     loadCloudTeams: async () => [],
+    fetchAuthorizedGameTombstones: async () => ({ data: [], error: null }),
+    applyAuthorizedGameTombstones: () => true,
     flushDeletedCloudRecords: async () => {},
     syncLocalGamesToCloud: async () => 0,
     processDurableSyncOperations: async () => false,
@@ -937,48 +939,69 @@ test("R2-03: a response from the prior account cannot hydrate the new namespace"
 });
 
 test(
-  "CHARACTERIZATION: stale device uploads a legacy game and event before learning of deletion",
+  "R2-06: explicit durable tombstone supersedes a stale legacy game write before processing",
   async () => {
-    const cloud = new Map();
-    const staleGame = {
-      id: "synthetic-deleted-game",
-      userId: "synthetic-account",
-      events: [
-        {
-          id: "synthetic-deleted-event",
-          gameId: "synthetic-deleted-game",
-        },
-      ],
-    };
-    const state = {
-      games: [clone(staleGame)],
-      activeGame: null,
-      deletedGameIds: [],
-      deletedEventIds: [],
-    };
-    const harness = appHarness(["syncLocalGamesToCloud"], {
-      state,
-      supabaseClient: {},
-      currentUserId: () => "synthetic-account",
-      isDeletedGame: (gameId) => state.deletedGameIds.includes(gameId),
-      gameTeamId: () => "",
-      canEditGame: () => true,
-      normalizeGame: (game) => clone(game),
-      reconcileGameEventOperations: async (game) => {
-        cloud.set(game.id, clone(game));
-        return true;
+    const api = durableSyncOperationApi();
+    let state = api.normalizeState(null, {
+      accountId: "synthetic-account",
+      deviceId: "synthetic-stale-device",
+      createId: (prefix) => `${prefix}-normalized`,
+    });
+    const attempts = [];
+    const service = api.createDurableSyncOperationService({
+      getState: () => state,
+      setState: (next) => {
+        state = next;
+      },
+      persistState: () => true,
+      currentAccountId: () => "synthetic-account",
+      isOffline: () => false,
+      createId: (prefix) => `${prefix}-created`,
+      executeOperation: async (operation) => {
+        attempts.push(operation);
+        return { outcome: "accepted" };
       },
     });
 
-    const uploaded = await harness.get("syncLocalGamesToCloud")();
-    assert.equal(uploaded, 1);
-    assert.equal(cloud.has("synthetic-deleted-game"), true);
-    assert.equal(
-      cloud.get("synthetic-deleted-game").events[0].id,
-      "synthetic-deleted-event",
+    service.queueGame({
+      accountId: "synthetic-account",
+      gameId: "synthetic-deleted-game",
+      payload: {
+        gameRow: {
+          id: "synthetic-deleted-game",
+          user_id: "synthetic-account",
+          saved_at: "2026-07-30T16:00:00.000Z",
+        },
+      },
+    });
+    service.mergeServerTombstones("synthetic-account", [{
+      gameId: "synthetic-deleted-game",
+      deletionId: "synthetic-remote-delete",
+      deviceId: "synthetic-device-a",
+      deletedAt: "2026-07-30T16:05:00.000Z",
+      createdAt: "2026-07-30T16:05:00.000Z",
+      updatedAt: "2026-07-30T16:05:00.000Z",
+    }]);
+    await service.process();
+
+    assert.equal(attempts.length, 0);
+    assert.equal(state.operations[0].state, "superseded");
+    assert.equal(service.isTombstoned("synthetic-account", "synthetic-deleted-game"), true);
+    const loadBody = extractFunction(appSource, "loadCloudGames");
+    assert.ok(
+      loadBody.indexOf("fetchAuthorizedGameTombstones")
+        < loadBody.indexOf("syncLocalGamesToCloud"),
+      "authorized tombstones must hydrate before legacy game uploads",
     );
   },
 );
+
+test("R2-06: missing game rows are not interpreted as deletion without tombstone evidence", () => {
+  const mergeBody = extractFunction(appSource, "mergeGames");
+  assert.match(mergeBody, /localGames[\s\S]*\.filter\(\(game\) => !isDeletedGame\(game\.id\)\)/);
+  assert.doesNotMatch(mergeBody, /cloudGames[\s\S]*(?:missing|absent)[\s\S]*(?:delete|remove)/i);
+  assert.match(extractFunction(appSource, "applyAuthorizedGameTombstones"), /mergeServerTombstones/);
+});
 
 test(
   "CHARACTERIZATION: RLS-invisible legacy event delete clears a device marker as if absent",
@@ -1878,7 +1901,7 @@ test("R2-01 confirmed-risk coverage manifest is complete", () => {
     durable_clock_retry: "failed tracked-clock writes",
     rejected_trust_operation_removed: "rejected outcomes remove it",
     hydration_removes_participation: "same-ID cloud hydration",
-    stale_game_or_event_resurrection: "stale device uploads",
+    stale_game_or_event_resurrection: "explicit durable tombstone supersedes",
     rls_invisible_delete_marker_clear: "RLS-invisible legacy event delete",
     generic_legacy_error_state: "durable operation failures",
     unclassified_participation_rejection: "participation rejections",

@@ -38,7 +38,7 @@ jobs:
           database_candidate="$(jq -r '.databaseCandidate' release/laxhornet-release-manifest.json)"
           pre_cutover_runtime="$(jq -r '.preCutoverRuntime' release/laxhornet-release-manifest.json)"
           cleanup_candidate="$(jq -r '.cleanupCandidate' release/laxhornet-release-manifest.json)"
-          additive_paths="supabase/migrations/20260723040000_event_pipeline_capabilities.sql,supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql,supabase/migrations/20260727000000_tracked_playing_time_operations.sql,supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql,supabase/tests/tracked_playing_time_foundation.sql,supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql,supabase/rollback/20260728193942_v284_public_event_semantic_boundary_rollback.sql,supabase/tests/v284_public_event_semantic_boundary.sql,supabase/migrations/20260730004700_team_members_rls_recursion.sql,supabase/rollback/20260730004700_team_members_rls_recursion_rollback.sql,supabase/tests/team_members_rls_recursion.sql,supabase/tests/team_members_rls_recursion_reproduction.sql"
+          additive_paths="supabase/migrations/20260723040000_event_pipeline_capabilities.sql,supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql,supabase/migrations/20260727000000_tracked_playing_time_operations.sql,supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql,supabase/tests/tracked_playing_time_foundation.sql,supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql,supabase/rollback/20260728193942_v284_public_event_semantic_boundary_rollback.sql,supabase/tests/v284_public_event_semantic_boundary.sql,supabase/migrations/20260730004700_team_members_rls_recursion.sql,supabase/rollback/20260730004700_team_members_rls_recursion_rollback.sql,supabase/tests/team_members_rls_recursion.sql,supabase/tests/team_members_rls_recursion_reproduction.sql,supabase/migrations/20260730134439_durable_game_tombstones.sql,supabase/rollback/20260730134439_durable_game_tombstones_rollback.sql,supabase/tests/durable_game_tombstones.sql"
 
           if git merge-base --is-ancestor "$database_candidate" HEAD \
             && git merge-base --is-ancestor "$cleanup_candidate" HEAD; then
@@ -78,6 +78,20 @@ jobs:
 
       - name: Run durable game and clock operation contracts
         run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_durable_sync_operations.mjs
+
+      - name: Run durable legacy game tombstone contracts
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_game_tombstones.mjs
+
+      - name: Run sync characterization contracts
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_sync_characterization.mjs
+
+      - name: Run durable legacy game tombstone migration and rollback
+        run: >-
+          docker run --rm
+          -v "${{ github.workspace }}:/app"
+          laxhornet:test
+          sh -c 'npm install --no-save --no-package-lock --ignore-scripts @electric-sql/pglite@0.5.4
+          && node tools/test_game_tombstone_migration.mjs'
 
       - name: Run sync error classification contracts
         run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_sync_error_classification.mjs

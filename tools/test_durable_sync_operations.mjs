@@ -172,9 +172,11 @@ test("R2-04 operation schema and lifecycle are explicit", () => {
     "retryable",
     "rejected",
     "conflicted",
+    "superseded",
   ]);
   assert.deepEqual({ ...api.OPERATION_TYPES }, {
     game: "legacy_game_write",
+    gameDelete: "legacy_game_delete",
     clock: "tracked_clock_write",
   });
 });

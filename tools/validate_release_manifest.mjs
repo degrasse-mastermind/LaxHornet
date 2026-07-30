@@ -8,6 +8,7 @@ import {
   APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
   APPROVED_HISTORICAL_PROVENANCE_IDENTITIES,
   APPROVED_HISTORICAL_PROVENANCE_PATHS,
+  DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS,
   TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS,
   TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
   V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS,
@@ -532,6 +533,7 @@ if (requireCombined) {
         ...TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
         ...V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS,
         ...TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS,
+        ...DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS,
       ],
       headRef: combinedRef,
     });
@@ -563,6 +565,7 @@ const allowedCleanupMigrations = new Set([
   trackedTimeReview?.forwardMigration,
   publicEventBoundaryReview?.forwardMigration,
   teamMembersRlsReview?.forwardMigration,
+  DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS[0],
 ]);
 for (const file of cleanupMigrations) {
   expect(allowedCleanupMigrations.has(file), `unknown cleanup migration detected: ${file}`);

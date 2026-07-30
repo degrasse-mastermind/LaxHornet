@@ -127,18 +127,18 @@ check("confirmation has Keep Tracking and Cancel Game actions", 'data-action="ke
 check("new tracking sessions are marked at game creation", 'origin: "new"' in submit_body and "trackingSession" in submit_body)
 check("legacy sessions default to preservation-safe existing origin", 'requestedOrigin' in function_body("normalizeTrackingSession") and '"existing"' in function_body("normalizeTrackingSession"))
 check("cancel clears active and review pointers", "state.activeGame = null" in confirm_body and "state.reviewGameId" in confirm_body)
-check("cancel uses durable game tombstone", "rememberDeletedGame(game.id)" in confirm_body)
+check("cancel persists deletion evidence before hiding the game", confirm_body.index("prepareDurableGameDeletion(game)") < confirm_body.index("state.games = state.games.filter"))
 check("cancel never completes or reviews the game", "confirmEndGame" not in confirm_body and 'status = "complete"' not in confirm_body)
-check("cancel uses RPC-only cloud deletion", 'deleteSupabaseGame(game.id, { rpcOnly: true })' in confirm_body)
+check("cancel uses the durable operation processor", "processDurableSyncOperations" in confirm_body and "deleteSupabaseGame" not in confirm_body)
 check("game deletion has no direct table delete fallback", '.from("games").delete()' not in delete_body)
-check("saved-session exit does not call cloud deletion", confirm_body.index('session?.origin !== "new"') < confirm_body.index("deleteSupabaseGame"))
+check("saved-session exit precedes durable deletion creation", confirm_body.index('session?.origin !== "new"') < confirm_body.index("prepareDurableGameDeletion"))
 check("modal is accessible", 'role="dialog"' in APP and 'aria-modal="true"' in APP and "handleDialogKeydown" in APP)
 check("Escape and Tab handling are implemented", 'event.key === "Escape"' in APP and 'event.key !== "Tab"' in APP)
 check("Keep Tracking restores focus to cancel control", "keepTrackingAfterCancelPrompt" in click_body and '[data-action="cancel-game"]' in APP)
 check("Save, End Game, and Undo controls remain", 'data-action="save-game"' in APP and 'data-action="end-game"' in APP and 'data-action="undo"' in APP)
 check("normal navigation does not invoke cancellation", "confirmCancelGame" not in function_body("navigate"))
 check("cloud merge filters deleted games", ".filter((game) => !isDeletedGame(game.id))" in function_body("mergeGames"))
-check("cloud reload flushes tombstones before merge", function_body("loadCloudGames").index("flushDeletedCloudRecords") < function_body("loadCloudGames").index("mergeGames"))
+check("cloud reload hydrates explicit tombstones before upload and merge", function_body("loadCloudGames").index("fetchAuthorizedGameTombstones") < function_body("loadCloudGames").index("syncLocalGamesToCloud") < function_body("loadCloudGames").index("mergeGames"))
 
 failed = [name for name, ok in checks if not ok]
 for name, ok in checks:

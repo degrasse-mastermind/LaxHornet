@@ -5,6 +5,7 @@ import process from "node:process";
 import { execFileSync } from "node:child_process";
 import {
   APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
+  DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS,
   TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS,
   TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
   V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS,
@@ -133,6 +134,7 @@ if (containment.mode === "standalone" || containment.mode === "additive") {
         ...TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
         ...V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS,
         ...TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS,
+        ...DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS,
       ].sort()),
     "combined integration contains only the approved additive and explicit review packages",
   );
