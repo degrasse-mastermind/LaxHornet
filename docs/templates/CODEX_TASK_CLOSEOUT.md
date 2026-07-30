@@ -1,79 +1,45 @@
 # LaxHornet Codex Task Closeout
 
-Complete this gate before renaming or archiving an implementation, review, release, or operations task.
+Use this concise closeout for completed Level 1, Level 2, and Level 3
+implementation work.
 
-## Durable result
+```text
+Ticket/task:
+Risk level:
+Branch:
+Commit:
+Draft PR:
+What changed:
+Files changed:
+Focused checks:
+Broad checks or CI:
+Known limitations:
+Production or external state changed: NO
+Next step:
+```
 
-- Ticket: `[TICKET ID OR OPERATIONS RECORD]`
-- Task title: `[CURRENT TITLE]`
-- Task ID: `[TASK ID]`
-- Disposition: `[COMPLETED / PASS / FAIL / BLOCKED / HISTORICAL]`
-- Branch/worktree: `[BRANCH AND ABSOLUTE WORKTREE]`
-- Exact HEAD or reviewed SHA: `[FULL SHA]`
-- Pull request/merge/deployment: `[REFERENCES OR NOT APPLICABLE]`
-- Durable evidence: `[REPOSITORY PATHS, PR COMMENTS, OR COMMITTED REPORTS]`
+Use `NOT APPLICABLE` where a field does not apply. If production or external
+state did change under separate explicit authorization, replace `NO` with the
+exact authorized action and its durable evidence.
 
-## Change and verification record
+The normal feature-branch push and draft pull request are recorded in their
+own fields and do not change the production-or-external-state field.
 
-- What changed or was reviewed:
-  - `[BOUNDED SUMMARY]`
-- Files changed:
-  - `[PATHS OR NONE FOR READ-ONLY WORK]`
-- Tests and checks run:
-  - `[COMMAND — RESULT]`
-- Checks not run:
-  - `[COMMAND OR GATE — REASON]`
-- Data and authorization risk:
-  - `[RESULT AND RESIDUAL RISK]`
-- Offline and synchronization risk:
-  - `[RESULT AND RESIDUAL RISK]`
-- Release, deployment, and external-state risk:
-  - `[RESULT AND RESIDUAL RISK]`
-- Cleanup:
-  - `[SYNTHETIC DATA, TEMPORARY PROCESSES, WORKTREES, OR NOT APPLICABLE]`
+## Level 3 additions when relevant
 
-## Repository state
+Add only the fields required by the critical surface:
 
-- `git status --short`: `[CLEAN OR EXACT REMAINING PATHS]`
-- Unique uncommitted work remains: `[YES/NO]`
-- `TICKETS.md` updated: `[YES/NO/NOT APPLICABLE]`
-- `REPO_CURRENT_STATE.md` updated: `[YES/NO/NOT REQUIRED]`
-- Remaining work or next authorized action:
-  - `[EXACT NEXT STEP OR NONE]`
+```text
+Security or authorization:
+Migration and rollback:
+Disclosure:
+Synthetic-data cleanup:
+Evidence package:
+Exact PR SHA reviewed:
+Independent review result:
+Release or production authorization:
+```
 
-## Rollout checklist impact
-
-Required only when the task affects the rollout roadmap.
-
-For unaffected work, omit this entire section.
-
-- Checklist file reviewed: `[YES/NO]`
-- Checklist changed: `[YES/NO]`
-- Sections or items changed:
-  - `[SECTION OR ITEM, OR NONE]`
-- Reason for each status change:
-  - `[STATUS CHANGE AND DURABLE EVIDENCE, OR NONE]`
-- Items intentionally left incomplete:
-  - `[ITEM AND OUTSTANDING GATE, OR NONE]`
-- Newly discovered blockers:
-  - `[BLOCKER, OR NONE]`
-- New roadmap item added: `[YES/NO]`
-- No item was marked complete without its required gate evidence: `[CONFIRMED/NOT CONFIRMED]`
-
-## Archive gate
-
-Archive only when every applicable statement is true:
-
-- The ticket or durable operations/review record contains the disposition.
-- Commit, PR, reviewed SHA, tests, failures, and evidence locations are recorded.
-- Failed or blocked work names the first unresolved gate and next authorized action.
-- No running process, dirty worktree, unique uncommitted edit, or synthetic cleanup obligation depends on the task.
-- A successor task, when required, has an explicit handoff and does not rely on thread history alone.
-
-If the gate passes:
-
-1. Rename the task with an accurate disposition when useful.
-2. Remove its pin unless it remains an intentional navigation entry.
-3. Archive it.
-
-If the gate does not pass, keep the task visible and record the unmet condition.
+Task renaming, pin management, and archival are optional workspace-hygiene
+actions. They are not implementation gates or part of the engineering
+definition of done.

@@ -56,14 +56,22 @@ You can also use any static file server. Serving over `http://localhost` is reco
 
 ## Project Work Control
 
-LaxHornet uses a repository-backed workflow for ChatGPT conversations and Codex tasks:
+LaxHornet uses a risk-based, repository-backed workflow:
 
-- `docs/CODEX_WORKFLOW.md` defines workbench roles, task naming, one-ticket/one-task execution, independent review, closeout, and archival.
-- `TICKETS.md` is the active implementation queue and records the Codex execution task associated with each approved ticket.
-- `docs/templates/CODEX_TASK_KICKOFF.md` starts a bounded implementation, review, release, or operations task.
-- `docs/templates/CODEX_TASK_CLOSEOUT.md` records the durable result before a task is renamed or archived.
+- `docs/CODEX_WORKFLOW.md` defines Level 1 routine, Level 2 standard, and Level
+  3 critical work, with process and testing proportional to actual risk.
+- `TICKETS.md` is used for ticketed work; routine Level 1 changes do not require
+  an entry.
+- One Codex task may carry authorized implementation through a pushed feature
+  branch and draft pull request.
+- `docs/templates/CODEX_TASK_KICKOFF.md` and
+  `docs/templates/CODEX_TASK_CLOSEOUT.md` provide concise reusable records.
 
-Thread titles, summaries, and pins help navigation, but the repository, Git history, pull requests, test evidence, and ticket completion records remain authoritative.
+Independent review is required only for Level 3 before merge. Evidence packages
+are limited to migrations, production releases, security incidents, and
+disclosure incidents. Task titles, summaries, pins, and archives are optional
+navigation hygiene; the repository, Git history, pull requests, applicable
+tests, and ticket records remain authoritative.
 
 ## GitHub Pages Deployment
 

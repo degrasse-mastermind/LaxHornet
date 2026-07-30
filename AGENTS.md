@@ -16,28 +16,33 @@
 
 ## Required orientation before work
 
-1. Read `README.md`, `REPO_CURRENT_STATE.md`, `TICKETS.md`, and `docs/CODEX_WORKFLOW.md`.
-2. Inspect `git status`, the current branch, and the actual files involved in the requested ticket.
-3. Verify existing behavior before proposing changes. Do not invent routes, tables, fields, components, scripts, or architecture.
-4. State the intended scope, affected files, risks, and verification plan before editing.
+1. Read `AGENTS.md`, the relevant ticket or task description, and only the code and documentation needed for the change.
+2. Inspect `git status`, the current branch, and the actual files involved.
+3. Classify the work as Level 1, Level 2, or Level 3 under `docs/CODEX_WORKFLOW.md`.
+4. Verify existing behavior, give a concise plan of no more than five bullets, and proceed immediately unless a Level 3 approval requirement, repository conflict, stop condition, or required scope expansion appears.
 
 ## Ticket discipline
 
-- Work on one approved ticket at a time.
+- Use the lightest process appropriate to the actual risk.
+- Level 1 work does not require a formal ticket or a task ID in `TICKETS.md`.
+- Level 2 work requires a concise ticket or PR-ready task description.
+- Level 3 work requires one approved ticket and independent exact-PR-SHA review before merge.
 - Make the smallest coherent change that satisfies the acceptance criteria.
 - Do not modify unrelated features, redesign established flows, or perform opportunistic cleanup outside the ticket.
 - Preserve existing behavior unless the ticket explicitly authorizes a change.
 - Prefer feature flags or staged activation when a change affects production data, sharing, authorization, synchronization, or release behavior.
-- Update `REPO_CURRENT_STATE.md` and the relevant entry in `TICKETS.md` after completing a feature.
+- Update `TICKETS.md` only for work that has a ticket.
+- Update `REPO_CURRENT_STATE.md` only when durable architecture, production behavior, release controls, or major verification capabilities change.
 
 ## Thread and task lifecycle
 
 - Use ChatGPT workbenches for product discussion, ticket shaping, project indexing, and status synthesis. They are not implementation records.
-- Use one Codex execution task for one approved ticket. Resume interrupted work in that task instead of creating a replacement task.
-- Record the execution task title and task ID in the ticket before implementation. Use a separate task for an explicitly independent review.
+- Level 1 work may move from request through draft pull request in one Codex task without a formal ticket.
+- Use one primary Codex task through the draft pull request for Level 2 and Level 3 implementation.
+- A separate review task is optional for Level 2 and may be used for the required independent Level 3 review.
 - Keep the actual branch, worktree, commit, pull request, tests, and durable evidence in the repository and GitHub. A thread title, pin, or summary is navigation metadata only.
-- Close out and archive a completed, failed, or blocked task only after its result, remaining work, and evidence location are recorded durably.
-- Follow the naming, kickoff, closeout, and archive rules in `docs/CODEX_WORKFLOW.md`.
+- Task naming, pin management, and archival are optional workspace hygiene, not engineering completion gates.
+- Follow the risk-based planning, testing, review, authority, and closeout rules in `docs/CODEX_WORKFLOW.md`.
 
 ## Supabase and data safety
 
@@ -56,11 +61,12 @@
 - Do not replace immediate local persistence with a network-dependent flow.
 - Preserve service-worker registration, offline caching, install behavior, update handling, and the static-hosting path structure.
 - Release markers are coordinated. Do not change `version.json`, service-worker cache names, script query versions, or `release/laxhornet-release-manifest.json` unless the ticket is explicitly a release ticket.
-- Do not deploy, push database changes, merge to `main`, or publish a release without explicit authorization.
+- For Level 1 and Level 2 work, and Level 3 implementation unless explicitly restricted, Codex may create a feature branch, edit within scope, run checks, commit, push, and open or update a draft pull request.
+- Do not merge, deploy, apply migrations, mutate production, change GitHub Pages settings, invoke write-capable external connectors, or publish a release without explicit authorization.
 
 ## Quality gates
 
-Run the smallest relevant checks during development, then broader regression checks when the change can affect shared runtime behavior.
+Run affected-surface checks rather than universal broad testing.
 
 Common commands:
 
@@ -76,16 +82,12 @@ Also:
 - Run `node --check` on changed JavaScript files.
 - Run `git diff --check` before presenting the final diff.
 - Add or update focused tests when behavior changes.
+- Use CI for broader regression by default on Level 1 and Level 2 work.
+- Run the complete local regression once after the final diff stabilizes for Level 3 work. Rerun it only when a subsequent change materially affects shared behavior.
+- Do not run unrelated database, release, disclosure, service-worker, or deployment tests for isolated UI or documentation work.
 - Do not add a production dependency without explaining why the existing stack cannot meet the requirement.
 - Report failed or unavailable checks plainly; never claim a test passed without running it.
 
 ## Review output
 
-At the end of a ticket, report:
-
-1. What changed.
-2. Files changed.
-3. Tests run and results.
-4. Data, authorization, offline, and release risks.
-5. Remaining work or unresolved questions.
-6. Whether `REPO_CURRENT_STATE.md` and `TICKETS.md` were updated.
+Use the concise closeout in `docs/templates/CODEX_TASK_CLOSEOUT.md`. Add security, migration, disclosure, cleanup, and evidence fields only for Level 3 work when relevant.

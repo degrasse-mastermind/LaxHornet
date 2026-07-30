@@ -1,66 +1,47 @@
 # LaxHornet Codex Task Kickoff
 
-Use this template when a ticket reaches `READY`. Replace every bracketed field before starting work.
+Use this lightweight kickoff when a written task record is useful. It is
+optional for Level 1, concise for Level 2, and required as part of the approved
+ticket for Level 3.
 
 ## Task record
 
-- Ticket: `[TICKET ID]`
-- Task type: `[IMPLEMENTATION / REVIEW / RELEASE / OPERATIONS]`
-- Task title: `[TITLE USING docs/CODEX_WORKFLOW.md]`
-- Task ID: `[RECORD AFTER CREATION]`
-- Discussion workbench: `[LH-00 / LH-DEV / LH-20 / OTHER]`
+- Ticket/task: `[TICKET ID OR SHORT DESCRIPTION]`
+- Risk level: `[LEVEL 1 / LEVEL 2 / LEVEL 3]`
 - Repository: `C:\Users\user\Documents\LaxHornet`
 - Starting branch/ref: `[BRANCH, COMMIT, PR HEAD, OR INSPECT FIRST]`
-- Worktree: `[SAVED CHECKOUT / ISOLATED WORKTREE / READ-ONLY REVIEW WORKTREE]`
+- Scope: `[BOUNDED OUTCOME]`
+- Explicit exclusions: `[OUT-OF-SCOPE SURFACES]`
+- Additional authority or restrictions: `[NONE OR EXACT ACTIONS]`
 
-Copy the task title and task ID into the ticket before implementation.
-
-## Authority
-
-Allowed:
-
-- `[EXACT FILE, CODE, GIT, CONNECTOR, DATABASE, DEPLOYMENT, OR REVIEW ACTIONS]`
-
-Prohibited:
-
-- `[EXPLICIT EXCLUSIONS]`
-- Any production, database, deployment, release, connector, merge, or external-write action not expressly allowed above.
+A task ID is not required for Level 1. Record one in `TICKETS.md` only when the
+ticket or team workflow needs that navigation metadata.
 
 ## Kickoff prompt
 
 ```text
-Work only on [TICKET ID] from TICKETS.md in C:\Users\user\Documents\LaxHornet.
+Implement the requested LaxHornet change.
 
-Read AGENTS.md, README.md, REPO_CURRENT_STATE.md, TICKETS.md, and docs/CODEX_WORKFLOW.md completely. Inspect the current branch, HEAD, git status, relevant files, existing behavior, and any named evidence before acting.
+Read AGENTS.md, the relevant ticket or task description, and only the files needed for this change. Classify the work as Level 1, Level 2, or Level 3 under docs/CODEX_WORKFLOW.md.
 
-This task is the primary [IMPLEMENTATION / REVIEW / RELEASE / OPERATIONS] task for the ticket. Keep all continuation, debugging, reruns, and status work in this task unless an explicit independent-review or handoff boundary requires another task.
+Give a plan of no more than five bullets, then proceed immediately unless the task triggers Level 3 approval requirements, conflicts with the repository, or requires scope expansion.
 
-Allowed authority:
-- [ALLOWED ACTIONS]
+Make the smallest coherent change. Run focused checks during implementation. Use CI for broader regression on Level 1 and Level 2 work. Run the full local regression once after the final diff stabilizes for Level 3 work.
 
-Prohibited:
-- [PROHIBITED ACTIONS]
+You may create a branch, commit, push, and open a draft PR. Do not merge, deploy, apply migrations, modify production, change release settings, or invoke write-capable external connectors without explicit authorization.
 
-Before editing or mutating external state, report:
-1. Intended scope
-2. Expected affected files or systems
-3. Data, authorization, offline, release, and external-state risks
-4. Verification plan
-5. Any conflict between the request and inspected repository state
-
-Make the smallest coherent change that satisfies the ticket. Preserve unrelated work and do not invent architecture or authority.
-
-If interrupted, resume from the verified checkout and first incomplete gate. Do not restart completed work or create a replacement task merely because context compacted, a command stalled, or a test failed.
-
-At completion, use docs/templates/CODEX_TASK_CLOSEOUT.md. Record the exact Git state, files changed, tests and results, risks, durable evidence, remaining work, and whether REPO_CURRENT_STATE.md and TICKETS.md were updated. Do not rename or archive this task until that closeout is durable.
+Finish with the concise closeout required for the risk level.
 ```
 
-## Independent review variant
+## Level 3 additions
 
-For an independent review:
+For Level 3, the approved ticket must also name:
 
-- Use a separate read-only task and isolated checkout.
-- Replace the ticket's implementation authority with the exact review boundary.
-- Name the repository, PR, exact SHA, paths, contracts, and required leading disposition.
-- Prohibit edits, commits, pushes, PR changes, merges, deployments, and external mutations.
-- Record the review task ID in the ticket without replacing the primary execution task ID.
+- The critical data, authorization, synchronization, disclosure, service
+  worker, release, production, or incident surface.
+- Required focused checks and the complete local regression entry point.
+- Rollback or recovery boundaries.
+- Any separately authorized release or production action.
+- The exact-SHA independent review gate before merge.
+- Evidence-package requirements when the work is a migration, production
+  release, security incident, or disclosure incident.

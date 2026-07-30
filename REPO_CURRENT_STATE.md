@@ -185,11 +185,27 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 
 ## Project work control
 
-- `docs/CODEX_WORKFLOW.md` governs the lifecycle of ChatGPT workbenches and Codex execution, review, release, and operations tasks.
-- One approved ticket maps to one primary Codex execution task. Interrupted work resumes in the same task; an independent review uses a separate task.
-- `TICKETS.md` records the execution task title and task ID alongside the branch and durable completion record.
-- `docs/templates/CODEX_TASK_KICKOFF.md` and `docs/templates/CODEX_TASK_CLOSEOUT.md` provide the reusable start and closeout gates.
-- A task is archived only after its outcome, remaining work, repository state, and evidence location are recorded durably. Thread titles, summaries, and pins are not implementation authority.
+- `docs/CODEX_WORKFLOW.md` defines a three-level, risk-based workflow whose
+  governing principle is to use the lightest process appropriate to the actual
+  risk.
+- Level 1 routine work needs no formal ticket or independent review. Level 2
+  uses a concise ticket or PR-ready task description. Level 3 requires an
+  approved ticket and independent exact-PR-SHA review before merge.
+- One primary Codex task may carry implementation from request through a draft
+  pull request. Creating a feature branch, committing, pushing, and opening a
+  draft pull request are authorized by default; merge, deployment, database,
+  release, production, GitHub Pages setting, and write-capable external
+  connector actions remain separately controlled.
+- Testing follows the affected surface. CI provides broad regression by
+  default for Level 1 and Level 2; Level 3 runs the complete local regression
+  once after the final diff stabilizes.
+- `TICKETS.md` is updated only for ticketed work.
+  `REPO_CURRENT_STATE.md` is updated only for durable architecture, production
+  behavior, release-control, or major verification-capability changes.
+- `docs/templates/CODEX_TASK_KICKOFF.md` and
+  `docs/templates/CODEX_TASK_CLOSEOUT.md` provide concise reusable records.
+  Task titles, pins, and archives are optional navigation hygiene, not
+  engineering completion gates.
 
 ## Current engineering constraints
 
@@ -225,9 +241,12 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 
 ## Update protocol
 
-After an approved feature is completed:
+Update this file only when durable architecture, production behavior, release
+controls, or major verification capabilities change:
 
 1. Update the affected sections above with durable facts only.
-2. Update `TICKETS.md` with status, commit/PR reference, tests, and remaining work.
-3. Do not record speculative ideas here; keep them in an open ticket or design document.
-4. Confirm the document still describes the actual code on the branch being reviewed.
+2. Update `TICKETS.md` only when the work has a ticket.
+3. Do not record speculative ideas here; keep them in an open ticket or design
+   document.
+4. Confirm the document still describes the actual code on the branch being
+   reviewed.

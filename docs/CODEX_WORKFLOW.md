@@ -1,327 +1,294 @@
 # LaxHornet Codex Workflow
 
-This is the operating procedure for using ChatGPT, Codex, Git, GitHub, and Supabase without allowing any one tool to become the undocumented source of truth.
+This is the risk-based operating procedure for using ChatGPT, Codex, Git,
+GitHub, and Supabase on LaxHornet.
 
-## Responsibility map
+> Use the lightest process appropriate to the actual risk.
 
-### ChatGPT: product architect and decision partner
+The repository, Git history, pull requests, and applicable tests remain the
+durable implementation record. ChatGPT and Codex tasks are collaboration
+surfaces, not additional approval systems.
 
-Use the LaxHornet project in ChatGPT for:
+## Start here
 
-- Product requirements and feature definition.
-- Lacrosse-domain reasoning and analytics design.
-- User flows, wireframes, disclosure decisions, and acceptance criteria.
-- Converting approved decisions into one implementation ticket.
-- Reviewing Codex reports, diffs, screenshots, and unresolved tradeoffs.
+For every change:
 
-ChatGPT project conversations do not replace committed repository documentation. Durable implementation instructions must end up in `AGENTS.md`, `REPO_CURRENT_STATE.md`, `TICKETS.md`, or a focused design document.
+1. Read `AGENTS.md`.
+2. Read the relevant ticket or task description.
+3. Inspect only the code, documentation, and current behavior needed for the
+   change.
+4. Classify the work as Level 1, Level 2, or Level 3.
+5. Give a concise plan of no more than five bullets and proceed immediately
+   unless a Level 3 approval requirement, repository conflict, stop condition,
+   or required scope expansion appears.
 
-### Codex: local implementation and verification
+Do not require a separate planning task. Do not require routine or standard
+work to wait for plan approval.
 
-Use Codex with the local repository folder for:
+## Risk classification
 
-- Inspecting the real code and Git history.
-- Planning and implementing one approved ticket.
-- Running local servers and tests.
-- Reviewing diffs and debugging failures.
-- Updating the repository documentation required by the ticket.
+When a change could fit more than one level, use the highest level triggered by
+its actual effects. Do not classify work as Level 3 merely because the
+repository is production-connected or because the changed code is important.
+Default to Level 1 or Level 2 when none of the Level 3 triggers applies.
 
-Codex may edit the working tree, but it must not deploy, merge, invoke write-capable connector actions, or mutate a remote database without explicit ticket authorization.
+### Level 1 — Routine
 
-### Git and GitHub: durable change control
+Typical Level 1 work includes:
 
-Use Git and GitHub for:
+- Copy.
+- CSS and layout.
+- Documentation.
+- Isolated visual polish.
+- Narrowly bounded bug fixes.
+- Changes with no data, authorization, synchronization, disclosure, release,
+  or production effect.
 
-- Branches, commits, diffs, pull requests, and review history.
-- Preserving the exact code and migrations associated with a change.
-- Keeping `main` releasable.
+Rules:
 
-There is no automatic synchronization that makes every local Codex edit a GitHub change. A local edit reaches GitHub only after it is intentionally committed and pushed.
+- No formal ticket is required.
+- No task ID is required in `TICKETS.md`.
+- No separate planning task is required.
+- Codex may inspect, implement, run focused checks, commit, push, and open a
+  draft pull request in one task.
+- Independent review is not required.
+- No evidence package is required.
+- Full local regression is not required unless shared runtime is affected.
+- CI may provide the broader regression gate.
 
-### Supabase: managed backend
+### Level 2 — Standard
 
-Use Supabase for:
+Typical Level 2 work includes:
 
-- PostgreSQL data and RLS.
-- Authentication.
-- Narrow RPCs and Realtime behavior.
-- Edge Functions for server-side operations that cannot safely run in the browser.
+- Bounded feature behavior.
+- Isolated calculations.
+- Local-only workflow state.
+- New factual UI components.
+- Changes spanning a small number of related runtime areas without critical
+  data or security effects.
 
-Repository work must use committed SQL, local tests, and explicit release procedures as the source of truth. Do not rely on a connector session as the record of a database change.
+Rules:
 
-## Host-managed Apps and Plugins
+- Use a concise ticket or PR-ready task description.
+- Use one primary Codex task through the draft pull request.
+- Limit the plan to five bullets or fewer.
+- Codex proceeds after its own plan unless it detects a Level 3 trigger,
+  repository conflict, stop condition, or required scope expansion.
+- Run focused tests locally.
+- Use CI for broad regression by default.
+- Independent review is optional.
+- No evidence package is required.
+- Use the concise closeout.
 
-Codex may expose connectors through a host-managed runtime such as `codex_apps`. These apps can include GitHub, Google Drive, Notion, Supabase, Vercel, Figma, Canva, Resend, and other services.
+### Level 3 — Critical
 
-These connectors are not configured or permissioned by this repository. Their availability and action permissions come from the signed-in ChatGPT account, workspace settings, installed plugins/apps, OAuth grants, and the current Codex surface.
+Level 3 applies to changes involving:
 
-For LaxHornet:
+- Storage formats or recovery.
+- Offline synchronization or conflict semantics.
+- Database schema or migrations.
+- RLS, grants, roles, authentication, or authorization.
+- Youth-data disclosure or public sharing.
+- Service-worker update semantics.
+- Release controls.
+- Production state.
+- Incident remediation.
 
-- Treat every host-managed connector as out of scope unless the active ticket explicitly authorizes it.
-- Do not infer that a connector is read-only merely because the repository says remote writes are prohibited.
-- Do not use Supabase, Vercel, Resend, GitHub write actions, or other mutation-capable connectors during ordinary feature work.
-- A ticket that authorizes a connector must name the service, target project or repository, allowed actions, prohibited actions, verification, and rollback.
-- Connector availability is optional. Ordinary LaxHornet coding must remain possible using the local repository and Git alone.
+Rules:
 
-## First-time local activation
+- Use one approved ticket.
+- Use one concise implementation plan.
+- Use one primary implementation task through the draft pull request.
+- Run focused tests during implementation.
+- Run the complete local regression once after the final diff stabilizes.
+- Rerun the complete suite only if a subsequent change materially affects
+  shared behavior.
+- Require an independent review against the exact pull-request SHA before
+  merge.
+- Authorize release or production work separately.
+- Require an evidence package only for migrations, production releases,
+  security incidents, or disclosure incidents.
 
-From PowerShell:
+## Default Git authority
+
+For Level 1 and Level 2 work, and for Level 3 implementation unless the task
+explicitly restricts it, Codex may:
+
+- Create a feature branch.
+- Edit repository files within scope.
+- Run local checks.
+- Create focused commits.
+- Push the feature branch.
+- Open or update a draft pull request.
+
+These actions are part of the ordinary request-to-draft-PR workflow and do not
+need separate approval.
+
+Codex may not by default:
+
+- Merge.
+- Deploy.
+- Apply migrations.
+- Mutate production.
+- Change GitHub Pages settings.
+- Invoke write-capable external connectors.
+- Publish a release.
+
+Those actions require explicit authorization that names the target and scope.
+Using local Git and GitHub only to push the authorized feature branch and
+create or update its draft pull request is not treated as a write-capable
+external-connector exception.
+
+## Implementation workflow
+
+### 1. Inspect and classify
+
+Inspect the current branch, `git status`, the task description, and relevant
+files. Verify existing behavior before proposing a change. Preserve unrelated
+work; use an isolated worktree when the active checkout contains work that
+must not be mixed with the request.
+
+State the risk level and give a plan of no more than five bullets. For Level 1
+and Level 2, proceed immediately. For Level 3, confirm that the ticket and
+implementation authority cover the critical surface before editing.
+
+### 2. Make the smallest coherent change
+
+Stay within the task's scope and acceptance criteria. Preserve the vanilla
+static PWA, local-first behavior, authorization boundaries, disclosure rules,
+migration provenance, and release controls wherever they are relevant.
+
+Do not introduce a production dependency without explaining why the existing
+stack cannot meet the requirement.
+
+### 3. Test the affected surface
+
+Run focused tests during implementation and always run:
 
 ```powershell
-cd C:\Users\user\Documents\LaxHornet
-git fetch origin
-git switch chore/codex-project-configuration
-git pull --ff-only
+git diff --check
 ```
 
-Open the ChatGPT desktop app, select **Codex**, and open:
+For Level 1 and Level 2, use CI for broader regression by default. Run broader
+local checks only when the change affects shared runtime behavior or the task
+specifically requires them.
 
-```text
-C:\Users\user\Documents\LaxHornet
-```
-
-Trust the project when prompted. The repository already contains the tailored `AGENTS.md`; do not run `/init`, because `/init` would only generate a generic scaffold.
-
-## Confirm the active Codex configuration
-
-Inside Codex:
-
-```text
-/status
-/model
-/reasoning
-/mcp
-```
-
-The project defaults are:
-
-- Model: the newest model currently supported for the signed-in ChatGPT account and installed Codex client.
-- Reasoning: `high`, when supported by the selected model.
-- Plan-mode reasoning: `high`, when supported by the selected model.
-- Local sandbox: `workspace-write`.
-- Approval policy: `on-request`.
-
-The repository intentionally does not set a fixed `model` value. ChatGPT-authenticated Codex model availability can differ by plan, staged rollout, client version, and workspace controls. Use `/model` to inspect and select from the options actually offered to the signed-in account. Use `/reasoning` to verify or adjust reasoning level.
-
-The `/mcp` view may report host-managed apps through `codex_apps`. That is informational; it does not make those connectors part of an approved LaxHornet ticket.
-
-To verify that repository instructions loaded, ask Codex:
-
-```text
-List the instruction and project-state files you loaded for this repository. Summarize the five most important constraints without editing anything.
-```
-
-Expected sources include:
-
-- `AGENTS.md`
-- `REPO_CURRENT_STATE.md`
-- `TICKETS.md`
-- `docs/CODEX_WORKFLOW.md`
-- `.codex/config.toml`
-
-## Thread and task lifecycle
-
-The thread system is a navigation layer around the repository workflow. It does not replace ticket, Git, review, or evidence records.
-
-### Stable workbenches
-
-Keep a small set of durable ChatGPT workbenches:
-
-| Workbench | Purpose | Must not become |
-| --- | --- | --- |
-| `LH-00 | LaxHornet Product Command Center` | Product direction, priorities, and explicit decisions | An implementation log |
-| `LH-90 | Project Chat Index` | Source classification, canonical indexing, and historical navigation | A second product backlog |
-| `LH-DEV | Active Engineering Workbench` | Ticket shaping, engineering status, blockers, and handoffs | A substitute for the active Codex task |
-| `LH-20 | Active Workbench` | Current LH-20 program discussion while that program remains active | A permanent catch-all |
-
-Pins are a convenience. Add or remove a workbench from the pinned set as priorities change without treating the pin state as project authority.
-
-### One ticket, one execution task
-
-- Create a primary Codex execution task only after the ticket is `READY`.
-- Keep implementation, debugging, reruns, and continuation in that task until the ticket reaches a terminal disposition.
-- Do not create a replacement task because work paused, context compacted, a command stalled, or a status update is needed. Resume from the verified checkout and first incomplete gate.
-- Do not reuse a completed execution task for a different ticket.
-- Create a separate task only when the work is intentionally independent, such as an exact-SHA adversarial review, a separately authorized release, or a distinct operations ticket.
-- Record the task title and task ID in `TICKETS.md` so the external conversation can be traced to the durable ticket.
-
-### Naming convention
-
-Use outcome-oriented titles:
-
-| Task type | Pattern | Example |
-| --- | --- | --- |
-| Implementation | `LH-DEV-NNN | Verb object` | `LH-DEV-005 | Remediate RLS Recursion` |
-| Product program | `LH-NN | Active Workbench` | `LH-20 | Active Workbench` |
-| Independent review | `LH-REVIEW | PR #NN — Review objective` | `LH-REVIEW | PR #30 — Public Event Boundary` |
-| Release | `LH-RELEASE | vNNN — Release objective` | `LH-RELEASE | v284 — Production Verification` |
-| Operations | `LH-OPS | Operations objective` | `LH-OPS | Project Thread Cleanup` |
-| Historical reference | `LH-ARCHIVE | Historical label` | `LH-ARCHIVE | Original Sideline Scout Build` |
-
-At closeout, append a concise disposition only when useful: `PASS`, `FAIL`, `BLOCKED`, `COMPLETED`, or `HISTORICAL`. A disposition in a title must match the durable ticket or review record.
-
-### Lifecycle
-
-1. **Shape:** discuss one outcome in the appropriate workbench.
-2. **Register:** add or update one ticket in `TICKETS.md`; move it to `READY` only when scope, exclusions, acceptance criteria, risks, and authority are explicit.
-3. **Kick off:** create or select the primary Codex task, use `docs/templates/CODEX_TASK_KICKOFF.md`, and record its title and ID in the ticket.
-4. **Execute:** let that task own the checkout or worktree, implementation, tests, and progress. Continue there after interruptions.
-5. **Review:** use a separate task when independence is required. Bind review conclusions to an exact commit or pull-request SHA.
-6. **Close out:** use `docs/templates/CODEX_TASK_CLOSEOUT.md`; update the ticket, current state when durable behavior changed, the rollout checklist only when the applicability rule below is satisfied, evidence, and GitHub references.
-7. **Archive:** rename with an accurate disposition and archive only after the durable closeout is complete. Keep tasks with active work, unique uncommitted changes, or unresolved ownership visible.
-
-### Rollout checklist applicability rule
-
-Review and update `docs/LAXHORNET_ROLLOUT_CHECKLIST.md` only when the work has an approved roadmap or engineering ticket and the outcome does at least one of the following:
-
-- Changes the status of a rollout work package, milestone, gate, blocker, release, or production state.
-- Completes, blocks, supersedes, or materially advances an existing checklist item.
-- Adds a newly approved roadmap item.
-
-Routine work with no roadmap impact, including copy, styling, documentation cleanup, isolated UI polish, and small bug fixes, does not review or update the rollout checklist, add checklist fields to its closeout, include `No rollout checklist change required.`, or update roadmap documentation.
-
-For applicable work, update completed, in-progress, blocked, or superseded checklist items when the ticket outcome affects them. Add a new work package only when it is supported by an approved ticket or product decision. Preserve unchecked future work rather than silently deleting it.
-
-Local implementation alone does not make a checklist item complete. Mark an item complete only when every applicable review, merge, verification, release, and production gate has durable repository evidence.
-
-The rollout checklist is an executive roadmap summary, not an implementation source of truth. `TICKETS.md` remains the detailed engineering queue, `REPO_CURRENT_STATE.md` remains the durable technical current-state record, Git history, pull requests, tests, and evidence remain implementation proof, and the canonical decision register remains product-governance authority.
-
-For applicable roadmap-impacting work, the required closeout sequence is:
-
-```text
-Implement ticket
--> run tests
--> review exact outcome
--> update TICKETS.md
--> update REPO_CURRENT_STATE.md when durable behavior changed
--> review and update LAXHORNET_ROLLOUT_CHECKLIST.md
--> complete Codex closeout report
--> commit/push/PR only after approval
-```
-
-### Stop rules
-
-- Do not archive a task that owns a running process, dirty worktree, unique uncommitted edits, or an unresolved production/data cleanup obligation.
-- Do not copy unfinished implementation into a new task without an explicit handoff that names the branch, worktree, HEAD, dirty state, last completed gate, first incomplete gate, and current blocker.
-- Do not treat a ChatGPT summary, Codex title, or thread preview as proof of implementation or review status.
-- Do not mark a task `PASS`, `DONE`, or `COMPLETED` merely because expected-path tests are green; use the ticket's full acceptance and review gates.
-- Do not archive a failed or blocked task until the exact failure, safety state, durable evidence, and next authorized action are recorded.
-
-### Routine hygiene
-
-Review the project task list periodically:
-
-1. Confirm every pinned task has a current navigation purpose.
-2. Confirm every `IN PROGRESS`, `BLOCKED`, or `REVIEW` ticket names its primary Codex task.
-3. Find duplicate execution tasks and designate one owner before further edits.
-4. Rename completed review/release/operations tasks with an accurate disposition.
-5. Archive only tasks that satisfy the closeout gate.
-6. Leave historical findings searchable through ticket, PR, commit, and evidence references.
-
-## Feature workflow
-
-### 1. Define the feature in ChatGPT
-
-Develop one user outcome at a time. Resolve the product purpose, current behavior, scope, exclusions, data implications, offline behavior, authorization/disclosure boundaries, and acceptance criteria.
-
-### 2. Add one ticket
-
-Add the approved work to `TICKETS.md` using the ticket template. A ticket is ready only when its acceptance criteria are observable and its exclusions are explicit.
-
-### 3. Start a dedicated branch
-
-```powershell
-git switch main
-git pull --ff-only
-git switch -c feature/lh-xxx-short-name
-```
-
-Do not implement ordinary feature work directly on `main`.
-
-### 4. Use Plan mode
-
-In Codex, toggle `/plan`, then use:
-
-```text
-Implement only [TICKET ID] from TICKETS.md.
-
-First read AGENTS.md, REPO_CURRENT_STATE.md, TICKETS.md, docs/CODEX_WORKFLOW.md, and inspect the actual relevant code. Then provide a brief implementation plan naming the expected files, risks, and tests.
-
-Stay strictly within the ticket's scope and acceptance criteria. Preserve the vanilla static PWA, offline-first behavior, authorization boundaries, disclosure rules, Supabase migration provenance, and release controls. Do not invoke host-managed connector actions, deploy, apply remote migrations, change production configuration, or merge to main unless the ticket explicitly authorizes that exact action.
-```
-
-Review the plan before implementation when it proposes data changes, authorization changes, a new dependency, a broad refactor, connector use, or release-marker changes.
-
-### 5. Implement and test locally
-
-For ordinary browser work:
-
-```powershell
-python -m http.server 5173
-```
-
-Open:
-
-```text
-http://localhost:5173/app.html
-```
-
-Use focused tests first. Run the broader regression suite when the change affects shared runtime, synchronization, authorization, disclosure, release behavior, or multiple modules:
+For Level 3, run the complete local regression once after the final diff is
+stable:
 
 ```powershell
 node tools/run_v283_local_regression.mjs
 ```
 
-Codex must report exactly which checks ran and which did not.
+Rerun the complete suite only when a later edit materially changes shared
+behavior. Do not run unrelated database, release, disclosure, service-worker,
+or deployment tests for isolated UI or documentation work.
 
-### 6. Review the diff
+Report exactly which checks ran, their results, and any relevant checks that
+were unavailable.
 
-Use `/review` or Git directly:
+### 4. Review and publish
+
+Inspect the complete diff and confirm that only intended files changed:
 
 ```powershell
-git status
+git status --short
 git diff --stat
 git diff
 git diff --check
 ```
 
-Reject unrelated cleanup, invented architecture, unexplained dependencies, untested behavior changes, production secrets, broad database access, or undeclared connector usage.
+Commit only reviewed files, push the feature branch, and open or update a draft
+pull request when within the authority above. Merge remains separately
+authorized.
 
-### 7. Commit and push intentionally
+### 5. Record only durable changes
 
-```powershell
-git add <reviewed-files>
-git commit -m "Implement LH-XXX short description"
-git push -u origin feature/lh-xxx-short-name
+- Update `TICKETS.md` only when the work has a ticket.
+- Update `REPO_CURRENT_STATE.md` only when durable architecture, production
+  behavior, release controls, or major verification capabilities change.
+- Do not create review-evidence directories for ordinary feature work.
+- Use the pull-request description, CI results, relevant screenshots, and a
+  concise ticket record as ordinary evidence.
+- Update roadmap or decision-register documents only when the approved roadmap
+  or product decision changes.
+- Review or update `docs/LAXHORNET_ROLLOUT_CHECKLIST.md` only when an approved
+  roadmap or engineering ticket changes a rollout work package, milestone,
+  gate, blocker, release, production state, or existing checklist item, or adds
+  a newly approved roadmap item.
+
+Routine work with no roadmap effect does not inspect or update the rollout
+checklist.
+
+## Review
+
+- Level 1: no independent review required.
+- Level 2: independent review optional.
+- Level 3: independent review against the exact pull-request SHA required
+  before merge.
+
+A separate review task may be used for Level 3. It is not an implementation
+gate for ordinary work.
+
+An independent Level 3 review must be read-only, name the exact SHA and
+contracts under review, and prohibit edits, commits, pushes, pull-request
+changes, merges, deployments, and external mutations.
+
+## Closeout
+
+Use the concise closeout in
+`docs/templates/CODEX_TASK_CLOSEOUT.md`:
+
+```text
+Ticket/task:
+Risk level:
+Branch:
+Commit:
+Draft PR:
+What changed:
+Files changed:
+Focused checks:
+Broad checks or CI:
+Known limitations:
+Production or external state changed: NO
+Next step:
 ```
 
-Open a pull request. Merge only after acceptance criteria and relevant tests are satisfied.
+Add security, migration, disclosure, cleanup, or evidence fields only for
+Level 3 work when relevant.
 
-### 8. Update durable state
+Task renaming, pin management, and archival are optional workspace-hygiene
+actions. They are not part of the engineering definition of done.
 
-Before the ticket is considered complete:
+## Stop conditions
 
-- Update the ticket completion record in `TICKETS.md`.
-- Update `REPO_CURRENT_STATE.md` only with durable facts that changed.
-- Keep brainstorming and abandoned options out of the current-state file.
-- Review and update `docs/LAXHORNET_ROLLOUT_CHECKLIST.md` only when the rollout checklist applicability rule is satisfied.
-- Complete `docs/templates/CODEX_TASK_CLOSEOUT.md` and archive the task only after its durable result is recorded.
+Stop and report the blocker before expanding authority when:
 
-## Database-change workflow
+- The request conflicts with inspected repository state or unrelated work
+  cannot be safely isolated.
+- The change triggers Level 3 but lacks an approved ticket or sufficient
+  implementation authority.
+- Completion requires a merge, deployment, migration application, production
+  mutation, release publication, GitHub Pages setting change, or write-capable
+  external connector action that was not explicitly authorized.
+- Required scope or product behavior is ambiguous enough that a reasonable
+  assumption would materially change the outcome.
+- A secret, real child-sensitive data, or unapproved production access would
+  be required.
 
-A database ticket must produce a reviewed timestamped migration in `supabase/migrations/`. It must not edit historical migration identity or apply changes through an ordinary connector session.
+Do not mark work complete merely because expected-path tests are green. Apply
+the acceptance criteria and gates required by its risk level.
 
-Until the separate local/development Supabase workflow is established:
+## Database, release, and production work
 
-- Codex may inspect committed SQL.
-- Codex may draft a new migration file on a feature branch.
-- Codex may run repository-contained local SQL tests that do not contact production.
-- Codex may not use a Supabase app/connector to push, repair remote history, deploy an Edge Function, apply a migration, create a branch, or change remote data.
+Database schema and migration work is Level 3. It must use reviewed,
+timestamped SQL under `supabase/migrations/` and preserve historical migration
+identity. Local validation must not contact or mutate production.
 
-Production database activation requires its own release ticket, reviewed migration sequence, verification evidence, rollback/recovery plan, and explicit authorization.
+Applying a migration, changing production data or configuration, deploying an
+Edge Function, changing GitHub Pages settings, merging, deploying, or
+publishing a release requires separate explicit authorization and the
+repository's applicable release or operations procedure.
 
-## Recommended next setup tickets
-
-1. `LH-DEV-002`: verify the existing migration sequence against a local Supabase stack without touching the linked project.
-2. `LH-DEV-003`: establish a separate non-production Supabase target with synthetic data for authorized backend testing.
-3. `LH-DEV-004`: add pull-request regression checks in GitHub Actions without changing deployment behavior.
+The project-scoped Supabase configuration is read-only. A connector session is
+never the source of truth for a database change.
