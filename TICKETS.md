@@ -433,6 +433,28 @@ evidence are not copied to the public static site.
 - Broader regression, rendered artifact QA, independent PR review, production
   deployment, internal-path exclusion, and closeout remain in progress.
 
+#### Production RLS incident remediation
+
+- The first hosted v284 smoke against the allowlisted artifact reproduced
+  SQLSTATE `42P17`: four legacy `team_members_*_team` policies queried
+  `public.team_members` from policies on that same table.
+- Production later presented the canonical four policies only, but no
+  corrective migration was recorded. This untracked drift is not accepted as
+  completion.
+- Additive migration `20260730004700_team_members_rls_recursion` is pending
+  production review/application. It accepts only the captured eight-policy
+  state or the exact canonical-only state, moves the bounded current-user role
+  lookup into `lh_rls_private`, enables FORCE RLS, removes anonymous ACLs, and
+  limits authenticated/service-role table access to required DML, including no
+  PostgreSQL 17 `MAINTAIN`.
+- Local evidence currently passes: defect reproduction 4/4, corrected
+  authorization/preflight metadata 43/43, isolated rollback exact `42P17`, reapply from both
+  approved policy hashes, blank migration chain, production-shaped upgrade,
+  and adversarial preflight rejection of private-schema, helper-body, table
+  ACL, missing migration-history, and injected lower-version history drift.
+- Production state, full synthetic smoke, allowlisted rollback/restore proof,
+  and ticket closeout remain pending the focused PR and independent review.
+
 ## Ticket template
 
 Copy this section for each implementation ticket.

@@ -30,6 +30,13 @@ export const V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS = Object.freeze([
   "supabase/tests/v284_public_event_semantic_boundary.sql",
 ]);
 
+export const TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS = Object.freeze([
+  "supabase/migrations/20260730004700_team_members_rls_recursion.sql",
+  "supabase/rollback/20260730004700_team_members_rls_recursion_rollback.sql",
+  "supabase/tests/team_members_rls_recursion.sql",
+  "supabase/tests/team_members_rls_recursion_reproduction.sql",
+]);
+
 export const APPROVED_HISTORICAL_PROVENANCE_PATHS = Object.freeze([
   "supabase/migrations/20260723010607_remote_schema.sql",
   "supabase/production-history/20260723010607_remote_schema.sql",

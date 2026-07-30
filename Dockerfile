@@ -11,7 +11,13 @@ COPY . .
 # Verify build (optional linting/validation)
 RUN npm run build 2>/dev/null || true
 
-# Stage 2: Runtime - Lean production image
+FROM base AS test
+RUN apk add --no-cache python3 git
+RUN git config --system --add safe.directory /app
+COPY --from=build /app /app
+RUN npm ci --ignore-scripts 2>/dev/null || true
+CMD ["npm", "test"]
+
 FROM node:22-alpine AS runtime
 WORKDIR /app
 

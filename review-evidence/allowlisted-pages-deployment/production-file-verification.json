@@ -1,0 +1,2299 @@
+{
+  "capturedAt": "2026-07-30T00:04:23.370Z",
+  "productionUrl": "https://laxhornet.mybranford.com/",
+  "sourceCommit": "7b85ddb6e383496652abc31f8ccd6dc1253afe2d",
+  "releaseVersion": "v284",
+  "deployedFileCount": 47,
+  "excludedTrackedFileCount": 455,
+  "deployedFiles": [
+    {
+      "path": "CNAME",
+      "status": 200,
+      "contentType": "application/octet-stream",
+      "size": 25,
+      "sha256": "80780af17db774d3d9837509fbd06569fb2cd498e5c068d082a3d038415417dc",
+      "expectedSize": 25,
+      "expectedSha256": "80780af17db774d3d9837509fbd06569fb2cd498e5c068d082a3d038415417dc"
+    },
+    {
+      "path": "LaxHornet-launch-kit.zip",
+      "status": 200,
+      "contentType": "application/x-zip-compressed",
+      "size": 1104369,
+      "sha256": "11524d3419da0d12f8157ca8f096b02f0981afb9161fe30f82a4aac8ce670e94",
+      "expectedSize": 1104369,
+      "expectedSha256": "11524d3419da0d12f8157ca8f096b02f0981afb9161fe30f82a4aac8ce670e94"
+    },
+    {
+      "path": "access-and-trust.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "size": 6708,
+      "sha256": "1ec3bca49c7be9905f3aa125515a8ba4e1a533f64bc5b17ecfc88bf9c603c2cd",
+      "expectedSize": 6708,
+      "expectedSha256": "1ec3bca49c7be9905f3aa125515a8ba4e1a533f64bc5b17ecfc88bf9c603c2cd"
+    },
+    {
+      "path": "app.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "size": 1873,
+      "sha256": "a0b10fe98fb5845d54664bb6d09438e4e732f6039fd82247783c040cc07b3151",
+      "expectedSize": 1873,
+      "expectedSha256": "a0b10fe98fb5845d54664bb6d09438e4e732f6039fd82247783c040cc07b3151"
+    },
+    {
+      "path": "app.js",
+      "status": 200,
+      "contentType": "application/javascript; charset=utf-8",
+      "size": 604014,
+      "sha256": "19c1d33c4add1c1a9b01d524f9ffb50881486f0b8776527e11aa685b7cd9b660",
+      "expectedSize": 604014,
+      "expectedSha256": "19c1d33c4add1c1a9b01d524f9ffb50881486f0b8776527e11aa685b7cd9b660"
+    },
+    {
+      "path": "assets/LHbanner.png",
+      "status": 200,
+      "contentType": "image/png",
+      "size": 87960,
+      "sha256": "7cc5d4c32ae17523287dc1fc19c7cfeca57c3e53f584be0573793b9d58857a25",
+      "expectedSize": 87960,
+      "expectedSha256": "7cc5d4c32ae17523287dc1fc19c7cfeca57c3e53f584be0573793b9d58857a25"
+    },
+    {
+      "path": "assets/LHicon.png",
+      "status": 200,
+      "contentType": "image/png",
+      "size": 1324674,
+      "sha256": "8696991a1e00cf853d50ebccc4d1140aebdbdcaf5c0df86438222ab89435fef3",
+      "expectedSize": 1324674,
+      "expectedSha256": "8696991a1e00cf853d50ebccc4d1140aebdbdcaf5c0df86438222ab89435fef3"
+    },
+    {
+      "path": "assets/club-family-recap.png",
+      "status": 200,
+      "contentType": "image/png",
+      "size": 33558,
+      "sha256": "854d6a9d30f16b3f0810dfc6b75c46fbd1ed99e4cfa532d6b9aca8d4b81a9d83",
+      "expectedSize": 33558,
+      "expectedSha256": "854d6a9d30f16b3f0810dfc6b75c46fbd1ed99e4cfa532d6b9aca8d4b81a9d83"
+    },
+    {
+      "path": "assets/club-review-insight.png",
+      "status": 200,
+      "contentType": "image/png",
+      "size": 44769,
+      "sha256": "7fe63f7166e2b2bc3a3dc0a514d02f67b1f754149546d15caf0075d61b0130b6",
+      "expectedSize": 44769,
+      "expectedSha256": "7fe63f7166e2b2bc3a3dc0a514d02f67b1f754149546d15caf0075d61b0130b6"
+    },
+    {
+      "path": "assets/club-review-start.png",
+      "status": 200,
+      "contentType": "image/png",
+      "size": 24733,
+      "sha256": "917d7524d8423fa6804f7cd469fec29623f79101c3eefd8b0ef073cfdb1d1795",
+      "expectedSize": 24733,
+      "expectedSha256": "917d7524d8423fa6804f7cd469fec29623f79101c3eefd8b0ef073cfdb1d1795"
+    },
+    {
+      "path": "assets/honeycombblack.png",
+      "status": 200,
+      "contentType": "image/png",
+      "size": 1164117,
+      "sha256": "66d87645c5ff165a01e5a48d5c6d938c194d1a67d041f5791d45a60899d1b8a5",
+      "expectedSize": 1164117,
+      "expectedSha256": "66d87645c5ff165a01e5a48d5c6d938c194d1a67d041f5791d45a60899d1b8a5"
+    },
+    {
+      "path": "assets/supabase.min.js",
+      "status": 200,
+      "contentType": "application/javascript; charset=utf-8",
+      "size": 203077,
+      "sha256": "43440174f5ee8eaa46d998b738348c4dfd433a4d302d19687f00f04b61b22ebc",
+      "expectedSize": 203077,
+      "expectedSha256": "43440174f5ee8eaa46d998b738348c4dfd433a4d302d19687f00f04b61b22ebc"
+    },
+    {
+      "path": "coach-alignment.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "size": 4441,
+      "sha256": "1d413a65ca3523920bbbc6335f603d866d7d7d54161025a11a03f28df44cb69a",
+      "expectedSize": 4441,
+      "expectedSha256": "1d413a65ca3523920bbbc6335f603d866d7d7d54161025a11a03f28df44cb69a"
+    },
+    {
+      "path": "event-operation-service.js",
+      "status": 200,
+      "contentType": "application/javascript; charset=utf-8",
+      "size": 5490,
+      "sha256": "484882dda7740f1cb2a331b3a53b0c33a0d88a08edf788d77feae29de463e119",
+      "expectedSize": 5490,
+      "expectedSha256": "484882dda7740f1cb2a331b3a53b0c33a0d88a08edf788d77feae29de463e119"
+    },
+    {
+      "path": "index.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "size": 12519,
+      "sha256": "bc721bf8057697d0ac337a86108c9df449046675eaba8511ebbcc3b087320fbc",
+      "expectedSize": 12519,
+      "expectedSha256": "bc721bf8057697d0ac337a86108c9df449046675eaba8511ebbcc3b087320fbc"
+    },
+    {
+      "path": "landing.css",
+      "status": 200,
+      "contentType": "text/css; charset=utf-8",
+      "size": 19914,
+      "sha256": "34fdee0e36a47e760e474a75946e4e8e8553d46baa9e0d195209a8a80089c8dc",
+      "expectedSize": 19914,
+      "expectedSha256": "34fdee0e36a47e760e474a75946e4e8e8553d46baa9e0d195209a8a80089c8dc"
+    },
+    {
+      "path": "launch-kit/LaxHornet-admin-launch-checklist.pdf",
+      "status": 200,
+      "contentType": "application/pdf",
+      "size": 76719,
+      "sha256": "13ec085687b8a2e4ef1caea2e2d4e99c9e2d3f4b6da746c3ed3fe3edaf007e95",
+      "expectedSize": 76719,
+      "expectedSha256": "13ec085687b8a2e4ef1caea2e2d4e99c9e2d3f4b6da746c3ed3fe3edaf007e95"
+    },
+    {
+      "path": "launch-kit/LaxHornet-overview.pdf",
+      "status": 200,
+      "contentType": "application/pdf",
+      "size": 95263,
+      "sha256": "2afd653ec815f979b63ee8a5b988fa3c25802ec4c16b7fa168991307475cb9cf",
+      "expectedSize": 95263,
+      "expectedSha256": "2afd653ec815f979b63ee8a5b988fa3c25802ec4c16b7fa168991307475cb9cf"
+    },
+    {
+      "path": "launch-kit/LaxHornet-parent-handout.pdf",
+      "status": 200,
+      "contentType": "application/pdf",
+      "size": 120036,
+      "sha256": "d2353f9e6a7b51deef510a71d8000c737500ac54f3d279986506c54a60ee9784",
+      "expectedSize": 120036,
+      "expectedSha256": "d2353f9e6a7b51deef510a71d8000c737500ac54f3d279986506c54a60ee9784"
+    },
+    {
+      "path": "launch-kit/LaxHornet-promo-demo-thumbnail.png",
+      "status": 200,
+      "contentType": "image/png",
+      "size": 108638,
+      "sha256": "3b01b8d9fe0ca55b223df674cd0b33663e99bf7256a34269f30a440176172301",
+      "expectedSize": 108638,
+      "expectedSha256": "3b01b8d9fe0ca55b223df674cd0b33663e99bf7256a34269f30a440176172301"
+    },
+    {
+      "path": "launch-kit/LaxHornet-promo-demo.mp4",
+      "status": 200,
+      "contentType": "video/mp4",
+      "size": 796103,
+      "sha256": "e36694f8d292b2d533263bf8a6f6f2d2c6a0fc5e3376b9b10781d4d06c6affb4",
+      "expectedSize": 796103,
+      "expectedSha256": "e36694f8d292b2d533263bf8a6f6f2d2c6a0fc5e3376b9b10781d4d06c6affb4"
+    },
+    {
+      "path": "launch-kit/admin-launch-checklist.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "size": 5293,
+      "sha256": "a6e9e04df295a5d64540f82cf659dbf7f3c7c33c25d8269b84b827151e72d43c",
+      "expectedSize": 5293,
+      "expectedSha256": "a6e9e04df295a5d64540f82cf659dbf7f3c7c33c25d8269b84b827151e72d43c"
+    },
+    {
+      "path": "launch-kit/invite-message.txt",
+      "status": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "size": 807,
+      "sha256": "3f0bdccd99fc7c12f65c9aaec83d193d24892ca412c16f50fb49ae6309515749",
+      "expectedSize": 807,
+      "expectedSha256": "3f0bdccd99fc7c12f65c9aaec83d193d24892ca412c16f50fb49ae6309515749"
+    },
+    {
+      "path": "launch-kit/launch-kit-readme.md",
+      "status": 200,
+      "contentType": "text/markdown; charset=utf-8",
+      "size": 2066,
+      "sha256": "14f613b0e2e9be9f22c347e096de5db47e3f47eb44518b46f2976f684fde6c2c",
+      "expectedSize": 2066,
+      "expectedSha256": "14f613b0e2e9be9f22c347e096de5db47e3f47eb44518b46f2976f684fde6c2c"
+    },
+    {
+      "path": "launch-kit/laxhornet-overview.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "size": 5514,
+      "sha256": "47dce9968adef171056c98b8337b7f700fd7191143d3bb9a4ffc2617aa60984e",
+      "expectedSize": 5514,
+      "expectedSha256": "47dce9968adef171056c98b8337b7f700fd7191143d3bb9a4ffc2617aa60984e"
+    },
+    {
+      "path": "launch-kit/laxhornet-qr.png",
+      "status": 200,
+      "contentType": "image/png",
+      "size": 2881,
+      "sha256": "86693c7f20ad58fb5fe7d3c9d68812a1734a20949de0567f0054b649e2664558",
+      "expectedSize": 2881,
+      "expectedSha256": "86693c7f20ad58fb5fe7d3c9d68812a1734a20949de0567f0054b649e2664558"
+    },
+    {
+      "path": "launch-kit/parent-email.eml",
+      "status": 200,
+      "contentType": "message/rfc822",
+      "size": 3882,
+      "sha256": "6d9fdf56616c6f4906408cff476623e0489fca05ca7139195e9ee541f412bb6a",
+      "expectedSize": 3882,
+      "expectedSha256": "6d9fdf56616c6f4906408cff476623e0489fca05ca7139195e9ee541f412bb6a"
+    },
+    {
+      "path": "launch-kit/parent-email.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "size": 5873,
+      "sha256": "a00d8c10975d44bce2888bf32d032c1000e689f4d5c473d4c09c893815540420",
+      "expectedSize": 5873,
+      "expectedSha256": "a00d8c10975d44bce2888bf32d032c1000e689f4d5c473d4c09c893815540420"
+    },
+    {
+      "path": "launch-kit/parent-handout.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "size": 7737,
+      "sha256": "6dc9eebe65f8cd6c6ca3a9d2c2d222888168e070ec8bb8dcc15c2e6d1238d034",
+      "expectedSize": 7737,
+      "expectedSha256": "6dc9eebe65f8cd6c6ca3a9d2c2d222888168e070ec8bb8dcc15c2e6d1238d034"
+    },
+    {
+      "path": "launch-kit/short-text-message.txt",
+      "status": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "size": 246,
+      "sha256": "f39122658e5a84e7ebe034f7d18a15e3abe2f471fe726a345aa501f31a6e1ac4",
+      "expectedSize": 246,
+      "expectedSha256": "f39122658e5a84e7ebe034f7d18a15e3abe2f471fe726a345aa501f31a6e1ac4"
+    },
+    {
+      "path": "launch-kit/social-captions.txt",
+      "status": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "size": 1092,
+      "sha256": "0f7b177d4a765a3a3aa9705b8856d560b8d1beb0438a82b34cb787959f4c01b9",
+      "expectedSize": 1092,
+      "expectedSha256": "0f7b177d4a765a3a3aa9705b8856d560b8d1beb0438a82b34cb787959f4c01b9"
+    },
+    {
+      "path": "launch-kit/team-chat-posts.txt",
+      "status": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "size": 1307,
+      "sha256": "e6e0ff6f6a6b83505add14e9908db0010447ea1966a0ae39dbabf4403f7dc240",
+      "expectedSize": 1307,
+      "expectedSha256": "e6e0ff6f6a6b83505add14e9908db0010447ea1966a0ae39dbabf4403f7dc240"
+    },
+    {
+      "path": "manifest.json",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "size": 438,
+      "sha256": "9a5886ef27013be2eee82b21134ca837b42098e05f8781f7563169af8af1bc20",
+      "expectedSize": 438,
+      "expectedSha256": "9a5886ef27013be2eee82b21134ca837b42098e05f8781f7563169af8af1bc20"
+    },
+    {
+      "path": "next-focus-recommendation.js",
+      "status": 200,
+      "contentType": "application/javascript; charset=utf-8",
+      "size": 19798,
+      "sha256": "e8c77e32497679fe3bfe2892ed652ef9c84ec377ac6b091db9c9f9094ff41620",
+      "expectedSize": 19798,
+      "expectedSha256": "e8c77e32497679fe3bfe2892ed652ef9c84ec377ac6b091db9c9f9094ff41620"
+    },
+    {
+      "path": "parent-experience.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "size": 3869,
+      "sha256": "0bfd8ab38c0df35dcdd29c83aebb5f862a5006fe3e2e8b3610e1badf2ac694c2",
+      "expectedSize": 3869,
+      "expectedSha256": "0bfd8ab38c0df35dcdd29c83aebb5f862a5006fe3e2e8b3610e1badf2ac694c2"
+    },
+    {
+      "path": "player-development.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "size": 5288,
+      "sha256": "7cf90b6eae879a410b7d979d894b99097a79176ab6d5b4e6bb789a281775130b",
+      "expectedSize": 5288,
+      "expectedSha256": "7cf90b6eae879a410b7d979d894b99097a79176ab6d5b4e6bb789a281775130b"
+    },
+    {
+      "path": "privacy.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "size": 32589,
+      "sha256": "36a226b306fb3ba1081cb610fe420f6253ef4520980563d04f2da2cbe578744d",
+      "expectedSize": 32589,
+      "expectedSha256": "36a226b306fb3ba1081cb610fe420f6253ef4520980563d04f2da2cbe578744d"
+    },
+    {
+      "path": "program-value.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "size": 5352,
+      "sha256": "4cddaab1ec27ccdb0452f0f60bb6350a88c92850b18f2e08350caa00c1aa1628",
+      "expectedSize": 5352,
+      "expectedSha256": "4cddaab1ec27ccdb0452f0f60bb6350a88c92850b18f2e08350caa00c1aa1628"
+    },
+    {
+      "path": "public-event-semantics.js",
+      "status": 200,
+      "contentType": "application/javascript; charset=utf-8",
+      "size": 3515,
+      "sha256": "1b950bcc28f2a245316d5caa89de694f99ab6c9ecb801929a49b7bb0141f6625",
+      "expectedSize": 3515,
+      "expectedSha256": "1b950bcc28f2a245316d5caa89de694f99ab6c9ecb801929a49b7bb0141f6625"
+    },
+    {
+      "path": "rollout-guide.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "size": 4435,
+      "sha256": "a4409a0189037f7ff9a3fe652c59f01f0a5a17ef992493baf874d5c9626540c9",
+      "expectedSize": 4435,
+      "expectedSha256": "a4409a0189037f7ff9a3fe652c59f01f0a5a17ef992493baf874d5c9626540c9"
+    },
+    {
+      "path": "runtime-config.js",
+      "status": 200,
+      "contentType": "application/javascript; charset=utf-8",
+      "size": 303,
+      "sha256": "22384b72ddea945fb0050e1a451fcc3afaa851eda7aee097500a8876a4d7c154",
+      "expectedSize": 303,
+      "expectedSha256": "22384b72ddea945fb0050e1a451fcc3afaa851eda7aee097500a8876a4d7c154"
+    },
+    {
+      "path": "service-worker.js",
+      "status": 200,
+      "contentType": "application/javascript; charset=utf-8",
+      "size": 6701,
+      "sha256": "a9c6336a4b1ae14c3a6bcd9809873d81be4e259a9c88a5360833f8e1e8b7386e",
+      "expectedSize": 6701,
+      "expectedSha256": "a9c6336a4b1ae14c3a6bcd9809873d81be4e259a9c88a5360833f8e1e8b7386e"
+    },
+    {
+      "path": "styles.css",
+      "status": 200,
+      "contentType": "text/css; charset=utf-8",
+      "size": 126431,
+      "sha256": "f909ddc4d8350716931460403c6128a1aa9a108b84947aa7d7852066a5a0cc14",
+      "expectedSize": 126431,
+      "expectedSha256": "f909ddc4d8350716931460403c6128a1aa9a108b84947aa7d7852066a5a0cc14"
+    },
+    {
+      "path": "terms.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "size": 34251,
+      "sha256": "ae319aa4766b5e2f14d6196ad46669f3c9d8025c6998fcd00e95200922c4be4c",
+      "expectedSize": 34251,
+      "expectedSha256": "ae319aa4766b5e2f14d6196ad46669f3c9d8025c6998fcd00e95200922c4be4c"
+    },
+    {
+      "path": "tracked-playing-time-service.js",
+      "status": 200,
+      "contentType": "application/javascript; charset=utf-8",
+      "size": 27143,
+      "sha256": "817626c5955f927758c4d7868d09e075145d5b050a6b03730b69150423a8544c",
+      "expectedSize": 27143,
+      "expectedSha256": "817626c5955f927758c4d7868d09e075145d5b050a6b03730b69150423a8544c"
+    },
+    {
+      "path": "tracking-framework.html",
+      "status": 200,
+      "contentType": "text/html; charset=utf-8",
+      "size": 4756,
+      "sha256": "a553bbf2ce480ea134038fee0793b84cb6696a33014beb1a85883fe91aad69af",
+      "expectedSize": 4756,
+      "expectedSha256": "a553bbf2ce480ea134038fee0793b84cb6696a33014beb1a85883fe91aad69af"
+    },
+    {
+      "path": "version.json",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8",
+      "size": 24,
+      "sha256": "af6375d110d3bfdc5d74c73acf9ecbece3e20c45f5d07483a689a2931eb2724e",
+      "expectedSize": 24,
+      "expectedSha256": "af6375d110d3bfdc5d74c73acf9ecbece3e20c45f5d07483a689a2931eb2724e"
+    }
+  ],
+  "excludedFiles": [
+    {
+      "path": ".codex/config.toml",
+      "status": 404
+    },
+    {
+      "path": ".gitattributes",
+      "status": 404
+    },
+    {
+      "path": ".github/CODEOWNERS",
+      "status": 404
+    },
+    {
+      "path": ".github/pull_request_template.md",
+      "status": 404
+    },
+    {
+      "path": ".github/workflows/laxhornet-regression.yml",
+      "status": 404
+    },
+    {
+      "path": ".github/workflows/pages-deployment.yml",
+      "status": 404
+    },
+    {
+      "path": ".gitignore",
+      "status": 404
+    },
+    {
+      "path": ".nojekyll",
+      "status": 404
+    },
+    {
+      "path": "AGENTS.md",
+      "status": 404
+    },
+    {
+      "path": "README.md",
+      "status": 404
+    },
+    {
+      "path": "REPO_CURRENT_STATE.md",
+      "status": 404
+    },
+    {
+      "path": "TICKETS.md",
+      "status": 404
+    },
+    {
+      "path": "assets/icon.svg",
+      "status": 404
+    },
+    {
+      "path": "assets/laxhornet-logo.png",
+      "status": 404
+    },
+    {
+      "path": "assets/logo-concept-1-venom-wordmark.svg",
+      "status": 404
+    },
+    {
+      "path": "assets/logo-concept-2-hornet-shield.svg",
+      "status": 404
+    },
+    {
+      "path": "assets/logo-concept-3-stinger-slash.svg",
+      "status": 404
+    },
+    {
+      "path": "assets/logo-concept-4-speed-stinger.svg",
+      "status": 404
+    },
+    {
+      "path": "assets/logo-option-1-sting-tail.svg",
+      "status": 404
+    },
+    {
+      "path": "assets/logo-option-2-sting-plate.svg",
+      "status": 404
+    },
+    {
+      "path": "assets/logo-option-3-sting-strike.svg",
+      "status": 404
+    },
+    {
+      "path": "assets/logo-option-4-sting-compact.svg",
+      "status": 404
+    },
+    {
+      "path": "docs/BRANCH_PROTECTION_RECOMMENDATIONS.md",
+      "status": 404
+    },
+    {
+      "path": "docs/CODEX_WORKFLOW.md",
+      "status": 404
+    },
+    {
+      "path": "docs/LOCAL_SUPABASE_WORKFLOW.md",
+      "status": 404
+    },
+    {
+      "path": "docs/POSSIBLE_NEXT_FOCUS_SCENARIOS.md",
+      "status": 404
+    },
+    {
+      "path": "docs/RELEASE_NOTES_V284.md",
+      "status": 404
+    },
+    {
+      "path": "docs/RELEASE_VERIFICATION_WORKFLOW.md",
+      "status": 404
+    },
+    {
+      "path": "docs/SECURE_DISCLOSURE_V282_CUTOVER.md",
+      "status": 404
+    },
+    {
+      "path": "docs/TRACKED_PLAYING_TIME_FOUNDATION.md",
+      "status": 404
+    },
+    {
+      "path": "docs/deployment/LAXHORNET_CURRENT_PAGES_EXPOSURE_AUDIT.md",
+      "status": 404
+    },
+    {
+      "path": "docs/deployment/LAXHORNET_PAGES_ARTIFACT_ROLLBACK.md",
+      "status": 404
+    },
+    {
+      "path": "docs/governance/LAXHORNET_CONVERSATION_INDEX_AND_CANONICAL_DECISION_REGISTER.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/first-proof/AUDIT_REVIEW.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/first-proof/CODEBASE_AUDIT.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/first-proof/DATA_MODEL_NOTES.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/first-proof/FEATURE_FLAG.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/first-proof/IMPLEMENTATION_SPEC.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/first-proof/OPEN_QUESTIONS.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/first-proof/PILOT_ASSUMPTIONS.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/first-proof/README.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/first-proof/ROLE_VISIBILITY_MATRIX.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/first-proof/TEST_PLAN.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/foundation-upgrade/ARCHITECTURE_PLAN.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/foundation-upgrade/BACKWARD_COMPATIBILITY.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/foundation-upgrade/DISCLOSURE_MODEL.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/foundation-upgrade/EVIDENCE_MODEL.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/foundation-upgrade/FOUNDATION_REVIEW.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/foundation-upgrade/MIGRATION_PLAN.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/foundation-upgrade/README.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/foundation-upgrade/REVIEW_STATE_MODEL.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/foundation-upgrade/ROLE_MODEL.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/foundation-upgrade/ROLLBACK_PLAN.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/foundation-upgrade/SECURITY_PLAN.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/foundation-upgrade/migrations/001_project_one_foundation_proposal.sql",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/AUTHORIZATION_CALL_GRAPH.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/CURRENT_ARCHITECTURE_INVENTORY.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/DEFERRED_SCOPE.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/EVENT_MUTATION_CALL_GRAPH.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/FINAL_DECLARATION.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/FOUNDATION_OVERBUILD_AUDIT.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/LIVE_SHARE_AND_EXPORT_DATA_FLOW.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/OFFLINE_SYNC_CURRENT_STATE.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/TRUST_SPINE_HARDENING_REPORT.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/TRUST_SPINE_MIGRATION_RUNBOOK.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/TRUST_SPINE_RLS_MATRIX.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/TRUST_SPINE_ROLLBACK_RUNBOOK.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/TRUST_SPINE_RPC_GRANT_MATRIX.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/TRUST_SPINE_SCHEMA_PROPOSAL.sql",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/TRUST_SPINE_SCOPE_REGISTRATION.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_RESULTS.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_ROLLBACK.sql",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_TESTS.sql",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/TRUST_SPINE_SYNC_STATE_MACHINE.md",
+      "status": 404
+    },
+    {
+      "path": "docs/methodnorth/trust-spine-gate/TRUST_SPINE_TEST_PLAN.md",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/01-starting-home.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/02-more-update-state.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/03-after-updates-click.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/04-after-update-now.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/05-home-v265.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/06-game-setup-empty.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/07-game-setup-filled.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/08-live-tracker-empty.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/09-live-tracker-after-10-events.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/10-end-game-modal.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/11-review-top.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/12-review-game-snapshot-story.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/13-review-development-actions-recap.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/14-review-actions-recap-talk-breakdown.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/15-review-talk-breakdown-timeline-start.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/16-review-full-breakdown-expanded.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/17-review-breakdown-expanded-viewport.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/18-review-breakdown-expanded-detail.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/19-review-breakdown-deeper.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/20-review-profile-table.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/21-review-player-profile.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/22-review-stats-table-timeline.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/23-review-timeline-edit-tools.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/24-review-family-recap-expanded.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/25-review-family-recap-expanded-lower.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/26-after-save-for-next-game.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/27-home-after-saving-focus.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/28-review-reopen-family-recap-after-save.png",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/AUDIT.md",
+      "status": 404
+    },
+    {
+      "path": "laxhornet-review-audit-jimi-win-low-impact/figma-selected-contact-sheet.png",
+      "status": 404
+    },
+    {
+      "path": "logo-options.html",
+      "status": 404
+    },
+    {
+      "path": "release/laxhornet-release-manifest.json",
+      "status": 404
+    },
+    {
+      "path": "release/pages-deployment-allowlist.json",
+      "status": 404
+    },
+    {
+      "path": "research/.gitignore",
+      "status": 404
+    },
+    {
+      "path": "research/article-notes.md",
+      "status": 404
+    },
+    {
+      "path": "research/build_research_deliverables.py",
+      "status": 404
+    },
+    {
+      "path": "research/coaching-principles.md",
+      "status": 404
+    },
+    {
+      "path": "research/conflicting-advice.md",
+      "status": 404
+    },
+    {
+      "path": "research/crawl-results.json",
+      "status": 404
+    },
+    {
+      "path": "research/crawl_changing_the_game.py",
+      "status": 404
+    },
+    {
+      "path": "research/event-sequence-analysis.md",
+      "status": 404
+    },
+    {
+      "path": "research/executive-summary.md",
+      "status": 404
+    },
+    {
+      "path": "research/feature-opportunities.md",
+      "status": 404
+    },
+    {
+      "path": "research/feedback-rulebook.md",
+      "status": 404
+    },
+    {
+      "path": "research/implementation-backlog.md",
+      "status": 404
+    },
+    {
+      "path": "research/laxhornet-event-tags.md",
+      "status": 404
+    },
+    {
+      "path": "research/laxhornet-metrics.md",
+      "status": 404
+    },
+    {
+      "path": "research/player-archetypes.md",
+      "status": 404
+    },
+    {
+      "path": "research/player-development-progressions.md",
+      "status": 404
+    },
+    {
+      "path": "research/source-inventory.md",
+      "status": 404
+    },
+    {
+      "path": "research/sources.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/LaxHornet-Trust-Spine-Release1-Hardening-7cf83f3.zip",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/LaxHornet-Trust-Spine-Release1-Hardening-7cf83f3.zip.sha256",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/allowlisted-pages-deployment/README.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/allowlisted-pages-deployment/current-exposure-http-results.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/README.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/administrative-health-sample.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/advisor-output.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/architecture-boundary.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/browser-results.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/browser/01-secure-live-share.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/browser/02-missing-config-bounded.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/browser/03-update-path.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/browser/04-managed-preview-live-share.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/browser/04-personal-game-boundary.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/capability-handshake-contract.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/cleanup-proof.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/event-operation-contract.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/export-audit-evidence.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/failure-mode-evidence.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/game-scope-decision.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/local-browser-results.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/local-network-request-inventory.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/managed-preview-cleanup-proof.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/managed-preview-export-audit.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/managed-preview-network-inventory.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/managed-preview-output.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/managed-preview-public-payload.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/managed-preview-results.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/managed-preview-token-lifecycle.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/offline-retry-proof.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/personal-game-proof.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/production-host-request-count.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/public-payload-sample.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/regression-output.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/release-manifest-example.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/remaining-legacy-dependencies.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/sanitized-network-inventory.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/script-order-proof.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/service-worker-cache-proof.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/event-pipeline-release-control-cleanup/token-lifecycle-evidence.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v1/README.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v1/after-demo-review-season-v280.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v1/after-demo-review-v280.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v1/after-demo-season-v280.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v1/after-demo-top-v280.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v1/before-demo-review-season-v279.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v1/test-results.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/DATA_FLOWS.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/FIELD_ALLOWLISTS.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/FINAL_REPORT.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/README.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/STAGING_DEPLOYMENT.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/logs/app-js-syntax.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/logs/browser-integration.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/logs/local-source-checks.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/logs/pglite-rehearsal.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/logs/regression-suite.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/logs/remote-staging-checked-in-test.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/logs/remote-staging-results.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/logs/staging-advisors.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/logs/staging-rollback-reapply-2026-07-22.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/sql/00_TRUST_SPINE_BASE_STAGING_MIGRATION.sql",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/sql/01_MINIMUM_DISCLOSURE_STAGING_MIGRATION.sql",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/sql/98_MINIMUM_DISCLOSURE_STAGING_ROLLBACK.sql",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/sql/99_TRUST_SPINE_BASE_STAGING_ROLLBACK.sql",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/tests/STAGING_DISCLOSURE_FIXTURE_TEMPLATE.sql",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/tests/run_minimum_disclosure_pglite.mjs",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/product-alignment-remediation-v2/tests/test_minimum_disclosure_remote.mjs",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/release-hygiene-v281/README.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/release-hygiene-v281/browser/01-anonymous-shared-game.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/release-hygiene-v281/browser/02-scoped-csv-export.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/release-hygiene-v281/browser/03-sensitive-backup-confirmation.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/release-hygiene-v281/browser/04-import-review.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/release-hygiene-v281/browser/05-help-disclosure-copy.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/release-hygiene-v281/browser/06-update-available.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/release-hygiene-v281/raw-test-results.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/README.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/browser-diagnostics.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/browser/01-secure-live-share.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/browser/02-missing-config-bounded.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/browser/03-update-path.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/browser/04-managed-preview-live-share.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/browser/04-personal-game-boundary.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/combined-regression-output.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/export-audit-evidence.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/failure-mode-evidence.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/local-browser-results.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/local-network-request-inventory.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/local-regression-output.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/managed-preview-cleanup-proof.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/managed-preview-export-audit.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/managed-preview-network-inventory.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/managed-preview-output.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/managed-preview-public-payload.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/managed-preview-results.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/managed-preview-token-lifecycle.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/public-payload-sample.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/script-order-proof.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/service-worker-cache-proof.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/secure-disclosure-activation-v282/token-lifecycle-evidence.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-foundation/README.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-foundation/architecture-and-clock.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-foundation/authorization-and-disclosure.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-foundation/client-service-contract.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-foundation/known-limitations.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-foundation/participation-and-rpc-contracts.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-foundation/regression-output.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-foundation/verification-results.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/README.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/browser-results.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/known-limitations.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/manual-scenarios.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/privacy-verification.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/regression-output.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/screenshots/01-mobile-clock-setup.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/screenshots/01b-mobile-clock-duration-setup.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/screenshots/02-mobile-player-in-state.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/screenshots/02b-mobile-device-only-fallback.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/screenshots/03-mobile-running-player-out-state.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/screenshots/04-mobile-paused-clock.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/screenshots/05-mobile-game-review-summary.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/screenshots/06-mobile-correction-flow.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/screenshots/07-desktop-game-review-summary.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/screenshots/08-mobile-no-data-review.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/screenshots/09-mobile-events-gated-paused-out.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/screenshots/10-mobile-events-gated-running-out.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/screenshots/11-mobile-events-gated-paused-in.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/screenshots/12-mobile-events-enabled-running-in.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/tracked-playing-time-ui/test-results.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/CODEX_FINAL_REPORT.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/EVIDENCE_INDEX.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/EXPORT_AND_LIVE_SHARE_EVIDENCE.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/LaxHornet-Trust-Spine-Release1-Evidence-e73b7b1.zip",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/LaxHornet-Trust-Spine-Release1-Evidence-e73b7b1.zip.sha256",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/ROLLBACK_PROOF.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/RUNTIME_EVIDENCE.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/STAGING_DEPLOYMENT_EVIDENCE.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/changed-files.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/commit-metadata.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/executable-staging-tests.sql",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/final-staging-migration.sql",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/implementation-files.zip",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/implementation-files/docs/methodnorth/trust-spine-gate/TRUST_SPINE_MIGRATION_RUNBOOK.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/implementation-files/docs/methodnorth/trust-spine-gate/TRUST_SPINE_RLS_MATRIX.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/implementation-files/docs/methodnorth/trust-spine-gate/TRUST_SPINE_ROLLBACK_RUNBOOK.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/implementation-files/docs/methodnorth/trust-spine-gate/TRUST_SPINE_SCHEMA_PROPOSAL.sql",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/implementation-files/docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_RESULTS.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/implementation-files/docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_ROLLBACK.sql",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/implementation-files/docs/methodnorth/trust-spine-gate/TRUST_SPINE_STAGING_TESTS.sql",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/implementation-files/docs/methodnorth/trust-spine-gate/TRUST_SPINE_TEST_PLAN.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/implementation-files/tools/test_trust_spine_release1.mjs",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/live-share-public-safe-example.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/manifest.sha256",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/rpc-definitions.sql",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/runtime-flow.zip",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/runtime-flow/docs/methodnorth/trust-spine-gate/AUTHORIZATION_CALL_GRAPH.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/runtime-flow/docs/methodnorth/trust-spine-gate/EVENT_MUTATION_CALL_GRAPH.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/runtime-flow/docs/methodnorth/trust-spine-gate/LIVE_SHARE_AND_EXPORT_DATA_FLOW.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/runtime-flow/docs/methodnorth/trust-spine-gate/OFFLINE_SYNC_CURRENT_STATE.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/runtime-flow/docs/methodnorth/trust-spine-gate/TRUST_SPINE_SYNC_STATE_MACHINE.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/sensitive-export-audit-example.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/staging-rollback.sql",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/test-results/contract-tests.log",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/test-results/extract_trust_spine_rpcs.mjs",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/test-results/git-diff-check.log",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/test-results/node-check.log",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/test-results/pglite-attempt-1-pgcrypto-failure.log",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/test-results/pglite-attempt-2-auth-permission-failure.log",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/test-results/pglite-final-pass.log",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/test-results/run_trust_spine_pglite.mjs",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/trust-spine-changed-files.zip",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-e73b7b1/trust-spine-release1.diff",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/CODEX_FINAL_REPORT.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/FILES_CHANGED.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/IMPLEMENTATION_COMMIT.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/IMPLEMENTATION_COMMIT_SHA.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/PRE_EVIDENCE_GIT_STATUS.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/README.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/REMOTE_EVIDENCE_GAPS.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/ROLLBACK_PROOF.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/SHA256SUMS.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/STAGING_ENVIRONMENT_EVIDENCE.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/docs/TRUST_SPINE_HARDENING_REPORT.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/docs/TRUST_SPINE_RPC_GRANT_MATRIX.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/docs/TRUST_SPINE_SCOPE_REGISTRATION.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/implementation.diff",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/logs/evidence-validation.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/logs/git-diff-check.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/logs/local-contract-tests.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/logs/pglite-migration-acceptance-rollback.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/logs/remote-test-exit-code.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/logs/remote-test-not-run.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/sql/TRUST_SPINE_RPC_DEFINITIONS.sql",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/sql/TRUST_SPINE_SCHEMA_PROPOSAL.sql",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/sql/TRUST_SPINE_STAGING_ROLLBACK.sql",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/tests/TRUST_SPINE_STAGING_TESTS.sql",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/tests/run_trust_spine_pglite.mjs",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/tests/test_trust_spine_release1.mjs",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/trust-spine-release1-hardening-7cf83f3/tests/test_trust_spine_remote.mjs",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-combined-release-containment-fix/DEFECT_REPRODUCTION.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-combined-release-containment-fix/README.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-combined-release-containment-fix/approved-file-identities.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-combined-release-containment-fix/before-combined-regression.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-combined-release-containment-fix/blank-database-migrations.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-combined-release-containment-fix/branch-regression.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-combined-release-containment-fix/capability-contracts.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-combined-release-containment-fix/combined-containment.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-combined-release-containment-fix/combined-manifest.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-combined-release-containment-fix/combined-regression.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-combined-release-containment-fix/combined-tree.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-combined-release-containment-fix/event-operation-contracts.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-combined-release-containment-fix/git-diff-check.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-combined-release-containment-fix/p2-disclosure-evidence.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-combined-release-containment-fix/phase-aware-containment.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-combined-release-containment-fix/secret-host-scan.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-production-ledger-provenance/README.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-production-ledger-provenance/containment-results.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-production-ledger-provenance/full-regression-output.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-production-ledger-provenance/offline-migration-verification.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-production-ledger-provenance/production-untouched.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v283-production-ledger-provenance/supabase-migration-list.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-team-authorization-gate/LH00_COMMAND_CENTER_UPDATE.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-team-authorization-gate/README.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-team-authorization-gate/authority-contract.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-team-authorization-gate/local-reproduction.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-team-authorization-gate/predicate-trace.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-team-authorization-gate/verification-results.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-tracked-playing-time-production/LH00_COMMAND_CENTER_UPDATE.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-tracked-playing-time-production/PUBLIC_DISCLOSURE_INCIDENT_REMEDIATION.md",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-tracked-playing-time-production/local-browser/browser-diagnostics.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-tracked-playing-time-production/local-browser/browser/01-secure-live-share.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-tracked-playing-time-production/local-browser/browser/02-missing-config-bounded.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-tracked-playing-time-production/local-browser/browser/03-update-path.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-tracked-playing-time-production/local-browser/browser/04-personal-game-boundary.png",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-tracked-playing-time-production/local-browser/export-audit-evidence.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-tracked-playing-time-production/local-browser/failure-mode-evidence.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-tracked-playing-time-production/local-browser/local-browser-results.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-tracked-playing-time-production/local-browser/local-network-request-inventory.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-tracked-playing-time-production/local-browser/public-payload-sample.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-tracked-playing-time-production/local-browser/script-order-proof.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-tracked-playing-time-production/local-browser/service-worker-cache-proof.txt",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-tracked-playing-time-production/local-browser/token-lifecycle-evidence.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-tracked-playing-time-production/production-smoke-results.json",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/v284-tracked-playing-time-release/README.md",
+      "status": 404
+    },
+    {
+      "path": "supabase-access-flow-audit.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase-create-team-repair.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase-delete-rpc-permissions-fix.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase-delete-team-update.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase-email-communication-setup.md",
+      "status": 404
+    },
+    {
+      "path": "supabase-game-delete-rpc-update.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase-notification-delivery-update.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase-player-claims-visibility-update.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase-player-delete-update.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase-player-removal-existing-data-cleanup.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase-player-removal-request-cleanup.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase-player-verification-reminder-update.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase-schema.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase-security-hardening.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase-team-sync-rpc.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase/PRODUCTION_CANDIDATE.md",
+      "status": 404
+    },
+    {
+      "path": "supabase/config.toml",
+      "status": 404
+    },
+    {
+      "path": "supabase/functions/_shared/email-templates.js",
+      "status": 404
+    },
+    {
+      "path": "supabase/functions/resend-webhook/index.ts",
+      "status": 404
+    },
+    {
+      "path": "supabase/functions/send-laxhornet-email-queue/index.ts",
+      "status": 404
+    },
+    {
+      "path": "supabase/migrations/20260723000000_laxhornet_legacy_baseline.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase/migrations/20260723010000_trust_spine_release_1.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase/migrations/20260723010607_remote_schema.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase/migrations/20260723020000_minimum_necessary_disclosure.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase/migrations/20260723030000_fix_disclosure_audit_and_evidence_validation.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase/migrations/20260723040000_event_pipeline_capabilities.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase/migrations/20260727000000_tracked_playing_time_operations.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase/production-history/20260723010607_remote_schema.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase/production-history/README.md",
+      "status": 404
+    },
+    {
+      "path": "supabase/rollback/20260723010000_trust_spine_release_1_rollback.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase/rollback/20260723020000_minimum_necessary_disclosure_rollback.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase/rollback/20260728193942_v284_public_event_semantic_boundary_rollback.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase/tests/tracked_playing_time_foundation.sql",
+      "status": 404
+    },
+    {
+      "path": "supabase/tests/v284_public_event_semantic_boundary.sql",
+      "status": 404
+    },
+    {
+      "path": "team-statkeeper-mockup.html",
+      "status": 404
+    },
+    {
+      "path": "tools/build_pages_artifact.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/create_promo_video.py",
+      "status": 404
+    },
+    {
+      "path": "tools/extract_trust_spine_rpcs.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/release_containment.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/release_health_report.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/run_release_preflight.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/run_release_verification.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/run_trust_spine_pglite.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/run_v282_local_regression.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/run_v283_local_regression.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_cancel_game.py",
+      "status": 404
+    },
+    {
+      "path": "tools/test_delete_rpc_permissions.py",
+      "status": 404
+    },
+    {
+      "path": "tools/test_email_sql.py",
+      "status": 404
+    },
+    {
+      "path": "tools/test_email_worker.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_event_operation_service.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_event_pipeline_secret_scan.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_game_scope_capabilities.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_minimum_disclosure.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_next_focus_recommendation.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_p2_disclosure_audit_evidence.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_pages_artifact_browser.cjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_pages_deployment.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_player_removal_request_cleanup.py",
+      "status": 404
+    },
+    {
+      "path": "tools/test_product_alignment_browser.cjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_product_alignment_remediation.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_production_ledger_provenance.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_public_event_semantic_boundary.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_release_containment_phase_aware.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_release_hygiene.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_release_hygiene_browser.cjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_release_preflight_phase_aware.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_secure_disclosure_activation.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_secure_disclosure_activation_browser.cjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_secure_disclosure_activation_preview.cjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_supabase_blank_migrations.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_tracked_playing_time_foundation.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_tracked_playing_time_manual_scenarios.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_tracked_playing_time_service.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_tracked_playing_time_ui.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_tracked_playing_time_ui_browser.cjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_trust_spine_release1.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_trust_spine_remote.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_update_release.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/test_v284_team_authorization_policy.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/validate_pages_artifact.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/validate_release_manifest.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/verify_pages_settings.mjs",
+      "status": 404
+    }
+  ],
+  "additionalProbes": [
+    {
+      "path": ".git/config",
+      "status": 404
+    },
+    {
+      "path": ".github/workflows/pages-deployment.yml",
+      "status": 404
+    },
+    {
+      "path": ".codex/config.toml",
+      "status": 404
+    },
+    {
+      "path": ".env",
+      "status": 404
+    },
+    {
+      "path": "docs/",
+      "status": 404
+    },
+    {
+      "path": "review-evidence/",
+      "status": 404
+    },
+    {
+      "path": "supabase/",
+      "status": 404
+    },
+    {
+      "path": "tools/",
+      "status": 404
+    },
+    {
+      "path": "tools/v284_local_disclosure_fixture.mjs",
+      "status": 404
+    },
+    {
+      "path": "tools/v284_production_disclosure_fixture.mjs",
+      "status": 404
+    }
+  ],
+  "realUserDataTouched": false,
+  "status": "PASS"
+}

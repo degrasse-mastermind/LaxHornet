@@ -1,0 +1,42 @@
+{
+  "capturedAt": "2026-07-30T00:24:41.9563156Z",
+  "status": "HARD_STOP",
+  "environment": "production",
+  "productionOrigin": "https://laxhornet.mybranford.com",
+  "applicationSha": "7b85ddb6e383496652abc31f8ccd6dc1253afe2d",
+  "historicalToolingSha": "0ce0f6734318b07bbf7156e91c79d05d40bd7222",
+  "syntheticAdultFixturesOnly": true,
+  "failure": {
+    "stage": "hosted ordinary event reconciliation",
+    "postgresCode": "42P17",
+    "message": "infinite recursion detected in policy for relation \"team_members\"",
+    "applicationSyncStatus": "Team setup needs attention",
+    "pendingEventOperations": 2
+  },
+  "productionPolicyDiagnosis": {
+    "table": "public.team_members",
+    "recursivePolicies": [
+      "team_members_select_team",
+      "team_members_insert_team",
+      "team_members_update_team",
+      "team_members_delete_team"
+    ],
+    "reason": "Each policy queries public.team_members from a policy on public.team_members, causing recursive RLS evaluation.",
+    "representedInCurrentMigrationTree": false
+  },
+  "cleanupVerification": {
+    "authUsers": 0,
+    "authSessions": 0,
+    "refreshTokens": 0,
+    "teams": 0,
+    "teamMembers": 0,
+    "rosterPlayers": 0,
+    "playerClaims": 0,
+    "games": 0,
+    "legacyEvents": 0,
+    "activeTokens": 0
+  },
+  "requiredRemediation": "Create, review, and explicitly authorize a production database migration that replaces or removes the four recursive legacy team_members policies, then rerun the complete synthetic v284 smoke.",
+  "realUserDataTouched": false,
+  "secretsEmitted": false
+}
