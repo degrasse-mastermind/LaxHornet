@@ -1,5 +1,55 @@
 const CACHE_NAME = "laxhornet-v284";
 const RUNTIME_CONFIG_ASSET = "./runtime-config.js?v=284";
+const PUBLIC_PATH_ALLOWLIST = new Set([
+  "/",
+  "/CNAME",
+  "/LaxHornet-launch-kit.zip",
+  "/access-and-trust.html",
+  "/app.html",
+  "/app.js",
+  "/assets/LHbanner.png",
+  "/assets/LHicon.png",
+  "/assets/club-family-recap.png",
+  "/assets/club-review-insight.png",
+  "/assets/club-review-start.png",
+  "/assets/honeycombblack.png",
+  "/assets/supabase.min.js",
+  "/coach-alignment.html",
+  "/event-operation-service.js",
+  "/index.html",
+  "/landing.css",
+  "/launch-kit/LaxHornet-admin-launch-checklist.pdf",
+  "/launch-kit/LaxHornet-overview.pdf",
+  "/launch-kit/LaxHornet-parent-handout.pdf",
+  "/launch-kit/LaxHornet-promo-demo-thumbnail.png",
+  "/launch-kit/LaxHornet-promo-demo.mp4",
+  "/launch-kit/admin-launch-checklist.html",
+  "/launch-kit/invite-message.txt",
+  "/launch-kit/launch-kit-readme.md",
+  "/launch-kit/laxhornet-overview.html",
+  "/launch-kit/laxhornet-qr.png",
+  "/launch-kit/parent-email.eml",
+  "/launch-kit/parent-email.html",
+  "/launch-kit/parent-handout.html",
+  "/launch-kit/short-text-message.txt",
+  "/launch-kit/social-captions.txt",
+  "/launch-kit/team-chat-posts.txt",
+  "/manifest.json",
+  "/next-focus-recommendation.js",
+  "/parent-experience.html",
+  "/player-development.html",
+  "/privacy.html",
+  "/program-value.html",
+  "/public-event-semantics.js",
+  "/rollout-guide.html",
+  "/runtime-config.js",
+  "/service-worker.js",
+  "/styles.css",
+  "/terms.html",
+  "/tracked-playing-time-service.js",
+  "/tracking-framework.html",
+  "/version.json",
+]);
 const APP_ASSETS = [
   "./",
   "./index.html",
@@ -13,8 +63,6 @@ const APP_ASSETS = [
   "./app.html",
   "./privacy.html",
   "./terms.html",
-  "./logo-options.html",
-  "./team-statkeeper-mockup.html",
   "./launch-kit/laxhornet-overview.html",
   "./launch-kit/parent-handout.html",
   "./launch-kit/parent-email.html",
@@ -30,37 +78,50 @@ const APP_ASSETS = [
   "./public-event-semantics.js?v=284",
   "./app.js?v=284",
   "./manifest.json?v=284",
-  "./assets/icon.svg?v=11",
   "./assets/LHicon.png?v=1",
   "./assets/LHbanner.png?v=3",
   "./assets/honeycombblack.png?v=1",
-  "./assets/laxhornet-logo.png",
   "./assets/club-review-start.png",
   "./assets/club-review-insight.png",
   "./assets/club-family-recap.png",
-  "./assets/logo-concept-1-venom-wordmark.svg",
-  "./assets/logo-concept-2-hornet-shield.svg",
-  "./assets/logo-concept-3-stinger-slash.svg",
-  "./assets/logo-concept-4-speed-stinger.svg",
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) =>
-      cache.addAll(APP_ASSETS.map((asset) => new Request(asset, { cache: "reload" }))),
-    ),
+    (async () => {
+      const replacingSameReleaseWorker = await caches.has(CACHE_NAME);
+      const cache = await caches.open(CACHE_NAME);
+      await cache.addAll(APP_ASSETS.map((asset) => new Request(asset, { cache: "reload" })));
+      if (replacingSameReleaseWorker) await self.skipWaiting();
+    })(),
   );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))),
-      ),
+    (async () => {
+      await Promise.all([
+        caches
+          .keys()
+          .then((keys) =>
+            Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))),
+          ),
+        caches.open(CACHE_NAME).then(async (cache) => {
+          const requests = await cache.keys();
+          await Promise.all(
+            requests
+              .filter((request) => {
+                const requestUrl = new URL(request.url);
+                return requestUrl.origin === self.location.origin
+                  && !PUBLIC_PATH_ALLOWLIST.has(requestUrl.pathname);
+              })
+              .map((request) => cache.delete(request)),
+          );
+        }),
+      ]);
+      await self.clients.claim();
+    })(),
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
@@ -68,6 +129,13 @@ self.addEventListener("fetch", (event) => {
 
   const requestUrl = new URL(event.request.url);
   if (requestUrl.protocol !== "http:" && requestUrl.protocol !== "https:") return;
+  const isAllowedPublicPath = requestUrl.origin === self.location.origin
+    && PUBLIC_PATH_ALLOWLIST.has(requestUrl.pathname);
+
+  if (requestUrl.origin === self.location.origin && !isAllowedPublicPath) {
+    event.respondWith(fetch(event.request, { cache: "no-store" }));
+    return;
+  }
 
   if (requestUrl.pathname.endsWith("/runtime-config.js")) {
     event.respondWith(
@@ -123,8 +191,10 @@ self.addEventListener("fetch", (event) => {
 
       return fetch(event.request, { cache: "reload" })
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          if (response.ok && isAllowedPublicPath) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
           return response;
         })
         .catch(() => caches.match("./app.html"));

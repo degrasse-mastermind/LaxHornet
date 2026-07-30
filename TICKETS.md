@@ -386,7 +386,8 @@ Evidence: `review-evidence/v284-tracked-playing-time-production/`.
 
 ### LH-DEV-005 — Publish an allowlisted GitHub Pages artifact
 
-Status: `PROPOSED`
+Status: `IN PROGRESS`
+Branch: `codex/infra-allowlisted-pages-deployment`
 
 #### Goal
 
@@ -404,6 +405,33 @@ evidence are not copied to the public static site.
   evidence, local configuration, and secrets are absent from the artifact.
 - The deployment workflow retains least-privilege permissions and does not
   change Supabase production state.
+
+#### Implemented scope
+
+- Added an all-files-explicit 47-file production allowlist. Directory-wide
+  copying is prohibited and unknown files default to excluded.
+- Added deterministic artifact build/validation tooling with exact membership,
+  SHA-256, runtime-reference, service-worker, CNAME, secret, traversal, and
+  symlink checks. The public launch-kit ZIP is entry-allowlisted, traversal and
+  symlink checked, secret scanned, and SHA-256 pinned per approved member.
+- Added focused deployment contracts and pull-request regression coverage.
+- Added a least-privilege custom Pages workflow using
+  `actions/configure-pages@v5`, `actions/upload-pages-artifact@v4`, and
+  `actions/deploy-pages@v4`.
+- Preserved the v284 marker while adding service-worker activation cleanup for
+  stale, non-allowlisted cache entries.
+- Documented the legacy exposure, custom-domain requirements, and allowlisted
+  rollback procedure.
+
+#### Verification status
+
+- Focused deployment safety contracts: `21/21` passed locally.
+- Deterministic artifact build: `47` files, `v284`, exact allowlist membership.
+- Artifact browser: service-worker registration/control, stale-cache purge,
+  same-version legacy-v284 worker upgrade, mobile app, Game Review,
+  tracked-time runtime, Live Share entry, and offline shell passed locally.
+- Broader regression, rendered artifact QA, independent PR review, production
+  deployment, internal-path exclusion, and closeout remain in progress.
 
 ## Ticket template
 
