@@ -8,6 +8,16 @@ EXIT: 0
 
 EXIT: 0
 
+===== syntax: next-focus-recommendation.js =====
+
+
+EXIT: 0
+
+===== syntax: public-event-semantics.js =====
+
+
+EXIT: 0
+
 ===== syntax: runtime-config.js =====
 
 
@@ -18,8 +28,194 @@ EXIT: 0
 
 EXIT: 0
 
+===== syntax: tracked-playing-time-service.js =====
+
+
+EXIT: 0
+
 ===== event-operation service contracts =====
 Event operation service contracts passed.
+
+EXIT: 0
+
+===== tracked playing time service contracts =====
+PASS clock starts paused at configured period duration
+PASS clock start and projection use persisted anchor state
+PASS clock pause freezes game-clock position
+PASS clock resume continues from paused position
+PASS period transition resets configured duration and pauses
+PASS halves and overtime durations are deterministic
+PASS bounded refresh recovery projects a running clock
+PASS uncertain refresh recovery freezes without inventing clock time
+PASS game-end closure captures game-clock context
+PASS participation payload uses private RPC field names
+PASS effective resolver ignores duplicate client operations
+PASS effective resolver applies correction to stable logical identity
+PASS effective resolver removes tombstoned logical event
+PASS offline operation is persisted before cloud retry
+PASS reconciliation stores a private effective snapshot
+PASS retry accepts operations idempotently without duplicating local history
+
+16/16 tracked playing time service tests passed.
+
+EXIT: 0
+
+===== tracked playing time foundation contracts =====
+PASS foundation migration contract is phase-aware and immutable
+PASS forward, rollback, and pgTAP paths are exact
+PASS clock state and append-only participation operations are distinct
+PASS effective participation resolves correction and tombstone history
+PASS all tracked-time RPCs are authenticated only
+PASS new tables use forced RLS with no direct browser grants
+PASS public Live Share contract is not redefined or expanded
+PASS private backup retains game-local tracked state while scoped CSV remains event-only
+PASS client service remains local-first and loads before the UI
+PASS rollback fails closed when history exists and removes only foundation objects
+PASS release manifest records the reviewed foundation package as production-applied
+
+11/11 tracked playing time foundation tests passed.
+
+EXIT: 0
+
+===== v284 team authorization policy =====
+V284 team authorization policy contracts passed.
+
+EXIT: 0
+
+===== tracked playing time UI contracts =====
+PASS existing game path does not invent tracked-time configuration
+PASS missing tracked-time RPCs switch the session to device-only tracking
+PASS unavailable tracked-time cloud sync does not create a data-quality issue
+PASS live tracking explains the review-build account-sync fallback
+PASS tracked live-event gate requires a running clock and on-field player
+PASS central live-event creation checks the gate before operations or score changes
+PASS blocked live stat controls are visibly and accessibly disabled
+PASS non-tracked live games bypass the event-capture gate
+PASS Game Review event creation remains outside the live-capture gate
+PASS configured game starts paused and off field
+PASS one Player In creates one effective private boundary
+PASS one Player Out completes one shift
+PASS active shift duration follows projected game clock
+PASS paused clock excludes wall-clock time from active shift
+PASS resumed clock continues from the paused checkpoint
+PASS multiple shifts calculate total average and longest
+PASS double Player In is rejected as overlap evidence
+PASS double Player Out does not create an invalid shift
+PASS period end system closure records zero clock and indicator
+PASS next period transition is paused and off field
+PASS game-end system closure completes the active shift
+PASS bounded running refresh restores one active boundary
+PASS uncertain running refresh marks Needs review
+PASS duplicate client operation is idempotent
+PASS corrected start updates duration
+PASS corrected end updates duration
+PASS tombstoned shift boundaries are removed from totals
+PASS manual shift is valid but Estimated
+PASS unmatched boundary is Needs review
+PASS fully valid live tracking is Complete
+PASS configured regulation game share is correct
+PASS game share is omitted without a reliable clock configuration
+PASS public Live Share mapper contains no tracked-time fields
+PASS tracked-time RPCs are not granted to anonymous users
+PASS selected CSV remains event-only
+PASS personal-game clock scope is preserved
+PASS team-roster clock scope is preserved
+PASS ordinary stat events remain separate from participation
+PASS existing untracked period selector remains available
+PASS existing Game Review keeps its prior sections
+PASS service worker caches the tracked-time script with the v284 release cache
+PASS tracked-time service loads before app.js
+PASS family/public recap builders do not reference tracked-time data
+PASS private full backup retains tracked state through normalized games
+
+44/44 tracked playing time UI tests passed.
+
+EXIT: 0
+
+===== tracked playing time manual scenarios =====
+PASS A. Normal rotation: 2 shifts; total 5:30; average 2:45; longest 3:00; Complete
+PASS B. Period boundary: Q1 shift closed at 0:00 for 1:30; Q2 begins off field; Complete
+PASS C. Clock pause: 1:15 run + paused wall time + 0:45 run = 2:00
+PASS D. Game-end closure: Q2 4:00 to 1:20 = 2:40; system game-end closure; Complete
+PASS E. Correction: 4:00 original becomes 3:20; Estimated; correction revision preserved
+PASS F. Refresh recovery: one deduplicated continuous 0:40 shift after bounded refresh recovery
+PASS G. No data: older game uses the exact no-data message and no inferred operations
+
+7/7 manual scenarios passed.
+
+EXIT: 0
+
+===== tracked playing time browser =====
+STEP setup
+NAV { screen: 'start', hasToggle: true }
+STEP missing backend foundation
+STEP event gate stopped and off field
+STEP event gate stopped and on field
+STEP event gate running and on field
+STEP event gate stopped and on field after pause
+STEP event gate running and off field
+STEP period end
+STEP game end
+STEP correction
+STEP no data
+STEP non-tracked compatibility
+PASS setup shows conservative opt-in
+PASS tracked-time duration fields activate
+PASS new tracked game starts visibly off field
+PASS missing tracked-time RPC falls back to device-only tracking without marking shift evidence for review
+PASS transient network errors do not disable tracked-time account sync
+PASS repeated missing-RPC reports produce one bounded console notice
+PASS stopped and off-field tracked game disables every visible performance-event control
+PASS stopped and off-field tracked game shows the exact combined instruction
+PASS score, Save, End Game, clock, and Player In controls remain enabled while events are gated
+PASS central guard blocks goal and note creation before prompts, score, event, operation, or confirmation side effects
+PASS manual score control remains usable while performance events are gated
+PASS stopped and on-field tracked game blocks Assist with the exact clock instruction
+PASS Player In changes to unmistakable on-field state
+PASS active shift timer follows running game clock (observed Playing 0:02)
+PASS running and on-field tracked game enables event controls without a warning
+PASS running and on-field event creates one event, score increment, event operation, and confirmation
+PASS Undo remains enabled after a valid performance event
+PASS Undo remains usable and rolls back the valid event and automatic score increment
+PASS running refresh restores one continuous active shift without duplicate Player In
+PASS offline pending participation operation survives refresh
+PASS fresh page session re-enables tracked-time capability detection
+PASS refresh restores the running and on-field enabled gate state
+PASS paused clock freezes active shift display
+PASS pausing mid-shift immediately blocks event creation without ending the active shift
+PASS clock resume re-enables events because the player remains on field
+PASS running and off-field tracked game blocks Ground Ball and Caused Turnover with the exact Player In instruction
+PASS period end closes the shift, opens the next period off field, and restores the combined event gate
+PASS Game Review identifies system-closed shifts
+PASS valid live and system boundaries produce Complete
+PASS correction recalculates and marks Estimated
+PASS older game renders the no-data message
+PASS non-tracked live games preserve immediate performance-event logging without clock or participation state
+PASS browser console has no errors
+
+33/33 browser checks passed.
+
+EXIT: 0
+
+===== public event semantic boundary =====
+Public event semantic boundary checks passed.
+
+EXIT: 0
+
+===== team members RLS remediation =====
+PASS bounded package paths exist
+PASS migration binds the local blank-chain hash away from production
+PASS production preflight pins helpers, ACLs, FORCE RLS, and schema absence
+PASS private helper is bounded and hardened
+PASS canonical policies do not recurse
+PASS grants and RLS are least privilege
+PASS rollback is isolated and explicitly restores the captured defect
+PASS reproduction covers all four operations with SQLSTATE 42P17
+PASS authorization test covers the required fail-closed matrix
+PASS manifest records exact reviewed hashes and phase
+PASS manifest production phase is internally consistent
+
+11/11 team_members RLS remediation tests passed.
 
 EXIT: 0
 
@@ -28,13 +224,36 @@ Game scope and backend capability contracts passed.
 
 EXIT: 0
 
-===== v283 update release =====
-Update release checks passed for v283.
+===== v284 update release =====
+Update release checks passed for v284.
 
 EXIT: 0
 
 ===== release manifest validation =====
-Release manifest valid for v283 (stacked review mode).
+Release manifest valid for v284 (combined ref HEAD).
+
+EXIT: 0
+
+===== release preflight phase-aware =====
+PASS preparation accepts the reviewed release branch and base
+PASS preparation rejects the wrong branch
+PASS preparation rejects the wrong pre-release base
+PASS preparation accepts the approved v284 incident-remediation branch and base
+PASS incident remediation rejects an unapproved main base
+PASS manifest identity drift fails closed
+PASS reviewed migration hash drift fails closed
+PASS production accepts the exact approved main merge SHA
+PASS production requires the release head to be incorporated by the merge
+PASS production requires the pre-release base to be an ancestor
+PASS production rejects main without the approved release merge
+PASS production rejects an unapproved commit after the release merge
+PASS production accepts an explicitly approved rollout SHA after correction
+PASS production rejects a feature branch even at approved files and SHA
+PASS production rejects a missing approved merge SHA
+PASS production rejects v283 marker, cache, and asset surfaces
+PASS public Live Share SQL drift changes its reviewed identity
+
+17/17 phase-aware preflight tests passed.
 
 EXIT: 0
 
@@ -51,20 +270,36 @@ PASS integration mode rejects a fifth migration
 PASS integration mode rejects edits to a canonical migration
 PASS integration mode rejects edits to a rollback file
 PASS integration mode rejects an unknown Supabase file
+PASS exact additive package passes the existing additive phase
+PASS canonical plus additive mode accepts the exact approved final tree
+PASS reviewed historical provenance extends the exact approved final tree
+PASS combined containment accepts the explicit tracked playing time review package
+PASS combined containment still rejects files outside the explicit review package
+PASS historical provenance rejects an archive mutation
+PASS historical provenance rejects executable marker SQL
+PASS historical provenance rejects an unexpected archive path
+PASS canonical plus additive mode rejects a modified canonical migration
+PASS canonical plus additive mode rejects a missing canonical migration
+PASS canonical plus additive mode rejects a modified capability migration
+PASS canonical plus additive mode rejects a modified capability rollback
+PASS canonical plus additive mode rejects an unexpected migration
+PASS canonical plus additive mode rejects unexpected rollback SQL
+PASS canonical plus additive mode rejects unexpected Supabase function code
 PASS integration mode rejects an unavailable authorized database ref
 PASS integration mode rejects a database ref absent from combined HEAD
 PASS combined mode accepts an authorized database ref from earlier review history
 PASS validation fails when origin/main and main are unavailable
+PASS historical provenance blank and production-shaped execution pass
 
-16/16 phase-aware containment tests passed.
+32/32 phase-aware containment tests passed.
 
 EXIT: 0
 
 ===== release hygiene =====
-Release hygiene checks passed (40/40).
-PASS: version manifest identifies v283
-PASS: browser runtime identifies v283
-PASS: service-worker cache identifies v283
+Release hygiene checks passed (44/44).
+PASS: version manifest identifies v284
+PASS: browser runtime identifies v284
+PASS: service-worker cache identifies v284
 PASS: publicLiveShareRpc requires deliberate true runtime configuration
 PASS: liveShareTokenRpc requires deliberate true runtime configuration
 PASS: exportAuditRpc requires deliberate true runtime configuration
@@ -73,12 +308,16 @@ PASS: legacy Live Share fallback remains pending explicit cutover
 PASS: publicLiveShareRpc is explicitly enabled by the v282 runtime artifact
 PASS: liveShareTokenRpc is explicitly enabled by the v282 runtime artifact
 PASS: exportAuditRpc is explicitly enabled by the v282 runtime artifact
-PASS: v283 runtime configuration loads before app.js
-PASS: v283 has bounded secure-disclosure configuration failure handling
+PASS: v284 runtime configuration loads before app.js
+PASS: v284 has bounded secure-disclosure configuration failure handling
 PASS: active runtime, public, and support files contain no staging project reference
 PASS: no publishable key appears outside the existing production app configuration
 PASS: app default remains scoped to the established production project
-PASS: additive cleanup contains only the approved capability migration and rollback
+PASS: combined Supabase tree matches the approved PR #9 canonical and PR #12 additive identities
+PASS: combined release adds no unapproved database files
+PASS: combined integration contains only the seven approved PR #9 canonical Supabase files
+PASS: combined integration contains only the approved additive and explicit review packages
+PASS: combined integration preserves the comment-only historical marker
 PASS: impactValueForEvent is unchanged from origin/main
 PASS: possessionRuleForEvent is unchanged from origin/main
 PASS: calculatePossessionImpact is unchanged from origin/main
@@ -106,7 +345,7 @@ PASS: terms.html retains sensitive-data caution
 EXIT: 0
 
 ===== minimum disclosure =====
-Minimum-disclosure checks passed (41/41).
+Minimum-disclosure checks passed (42/42).
 PASS: trusted Live Share is off by default
 PASS: trusted token lifecycle is off by default
 PASS: trusted export audit is off by default
@@ -143,8 +382,9 @@ PASS: mobile export/import confirmations have dedicated accessible layout
 PASS: remote suite asserts exact allowlists and ordinary-table denial
 PASS: release hygiene coordinates the service worker and version manifest
 PASS: production Supabase schema remains unchanged
-PASS: additive cleanup changes only the approved capability migration and rollback
-PASS: additive cleanup has no post-authorization database changes
+PASS: combined Supabase tree matches the approved canonical and additive file identities
+PASS: combined release contains no unapproved database files
+PASS: combined release preserves the comment-only historical marker
 PASS: public copy distinguishes staged proof from production activation
 PASS: live tracking controls remain intact
 PASS: Game Review, Season Review, and offline persistence remain present
@@ -152,7 +392,7 @@ PASS: Game Review, Season Review, and offline persistence remain present
 EXIT: 0
 
 ===== secure disclosure activation =====
-Secure-disclosure activation checks passed (20/20).
+Secure-disclosure activation checks passed (21/21).
 PASS: version manifest identifies a secure-disclosure release
 PASS: app runtime matches the version manifest
 PASS: service worker uses the release cache
@@ -172,11 +412,21 @@ PASS: missing activation configuration blocks Live Share truthfully
 PASS: missing activation configuration blocks audited exports truthfully
 PASS: anonymous Live Share has no ordinary-table fallback
 PASS: secure disclosure requires a backend capability handshake
-PASS: activation cleanup changes only the additive capability migration and rollback
+PASS: combined activation matches the approved canonical and additive database identities
+PASS: combined activation preserves the comment-only historical marker
 
 EXIT: 0
 
 ===== secure disclosure browser =====
+[secure-disclosure-browser +1ms] local server startup
+[secure-disclosure-browser +9ms] local server ready at http://127.0.0.1:5258
+[secure-disclosure-browser +614ms] browser launched with C:\Program Files\Google\Chrome\Application\chrome.exe
+[secure-disclosure-browser +913ms] secure viewer setup complete
+[secure-disclosure-browser +5866ms] secure disclosure assertions complete
+[secure-disclosure-browser +11085ms] update-path navigation started
+[secure-disclosure-browser +11142ms] update-path navigation complete
+[secure-disclosure-browser +11151ms] update-path signal invoked for v285
+[secure-disclosure-browser +11305ms] update-path banner visible
 PASS: all three secure disclosure flags are active
 PASS: runtime status reports every disclosure feature true
 PASS: runtime-config executes before app.js while the event service loads without changing the diagnostic marker
@@ -185,10 +435,10 @@ PASS: public UI contains no private note
 PASS: public UI contains no private tag
 PASS: public-safe polling repeats the RPC request
 PASS: secure viewer makes no ordinary games/events request
-PASS: v283 activation removes the stale v281 cache
+PASS: v284 activation removes the stale v281 cache
 PASS: unknown and expired tokens remain neutral
 PASS: synthetic roster-connected game renders the real live tracker
-PASS: first live tracker button records immediately (observed 1; Ground Ball added · Q1 6:17 AM)
+PASS: first live tracker button records immediately (observed 1; Ground Ball added · Q1 11:05 PM)
 PASS: two events are recorded through the live tracking UI
 PASS: live tracker events persist locally before secure sharing
 PASS: signed-in token creation uses the approved RPC
@@ -201,6 +451,17 @@ PASS: existing legacy events are reconciled before token creation
 PASS: private notes and tags never enter Trust Spine evidence
 PASS: secure events preserve chronological ordering
 PASS: newly reconciled events appear in the secure public timeline
+PASS: private and poisoned events remain intact in local saved-game evidence
+PASS: offline, stale, imported, corrected, and replayed private aliases cannot remain queued for new Event Pipeline ingress
+PASS: private aliases do not prevent ordinary-event synchronization
+PASS: signed-in synchronization leaves the authoritative public ordinary-event count at exactly two
+PASS: attempted pre-upgrade create and correction payloads reach replay-first wrappers exactly once
+PASS: a never-accepted pre-upgrade private retry is cleared only after authoritative rejection
+PASS: stale cached private payload is replaced by exactly the two approved public events
+PASS: Live Share browser DOM contains no private or unknown event semantics
+PASS: selected private CSV preserves scoped local evidence while defaulting private notes out
+PASS: family recap excludes private participation semantics and their counts
+PASS: private-only recap reports zero public events and cannot cross the interpretation threshold
 PASS: retry of the same create operation is idempotent
 PASS: event correction synchronizes through the approved correction RPC
 PASS: correction updates the secure public event evidence
@@ -238,7 +499,10 @@ PASS: delayed service-worker activation exposes a clear update action
 PASS: updated offline client continues local tracking
 PASS: updated client recovers secure Live Share after reconnection
 PASS: activation browser suite contacts no hosted Supabase project
-Activation browser checks passed (61/61).
+PASS: browser console and pages report no errors
+Activation browser checks passed (73/73).
+[secure-disclosure-browser +11657ms] teardown started
+[secure-disclosure-browser +12103ms] teardown complete
 
 EXIT: 0
 
@@ -484,7 +748,16 @@ EXIT: 0
 
 ===== git diff check =====
 
-warning: in the working copy of 'tools/test_secure_disclosure_activation_preview.cjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'REPO_CURRENT_STATE.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'TICKETS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/security/TEAM_MEMBERS_RLS_REMEDIATION.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'release/laxhornet-release-manifest.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'review-evidence/team-members-rls-remediation/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'review-evidence/team-members-rls-remediation/production-policy-snapshot.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'supabase/migrations/20260730004700_team_members_rls_recursion.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'supabase/tests/team_members_rls_recursion.sql', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'tools/test_team_members_rls_remediation.mjs', LF will be replaced by CRLF the next time Git touches it
 EXIT: 0
 
-TOTAL: 22 passed, 0 failed
+MODE: canonical_plus_additive
+TOTAL: 34 passed, 0 failed

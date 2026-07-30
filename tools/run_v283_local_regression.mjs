@@ -38,6 +38,10 @@ const additivePaths = [
   "supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql",
   "supabase/rollback/20260728193942_v284_public_event_semantic_boundary_rollback.sql",
   "supabase/tests/v284_public_event_semantic_boundary.sql",
+  "supabase/migrations/20260730004700_team_members_rls_recursion.sql",
+  "supabase/rollback/20260730004700_team_members_rls_recursion_rollback.sql",
+  "supabase/tests/team_members_rls_recursion.sql",
+  "supabase/tests/team_members_rls_recursion_reproduction.sql",
 ].join(",");
 
 const rootJavaScript = readdirSync(root)
@@ -65,6 +69,7 @@ const tests = [
     },
   },
   { name: "public event semantic boundary", command: process.execPath, args: ["tools/test_public_event_semantic_boundary.mjs"] },
+  { name: "team members RLS remediation", command: process.execPath, args: ["tools/test_team_members_rls_remediation.mjs"] },
   { name: "game scope and capability contracts", command: process.execPath, args: ["tools/test_game_scope_capabilities.mjs"] },
   { name: "v284 update release", command: process.execPath, args: ["tools/test_update_release.mjs"] },
   {
