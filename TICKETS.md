@@ -512,6 +512,65 @@ Known limitations:
 Next step: independent review of the draft pull request. Do not merge or deploy
 until separately authorized.
 
+### R2-01 — Inventory current local/cloud sync and conflict behavior
+
+Status: `REVIEW`
+
+Risk level: `LEVEL 3`
+
+Branch: `codex/r2-01-sync-inventory`
+
+Related document: `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`
+
+Goal:
+
+Create an evidence-based current-state inventory of local persistence, cloud
+reads/writes, retries, identities, ordering, deletion, authorization failures,
+conflicts, sync UI, and actual test coverage without changing behavior.
+
+In scope:
+
+- Current runtime, relevant committed SQL/RPCs, and relevant tests.
+- One architecture inventory and narrow rollout/current-state records.
+
+Out of scope:
+
+- Runtime, SQL, migration, test, workflow, release, Supabase, deployment, or
+  production changes.
+
+Acceptance criteria:
+
+- Every material risk names its classification and current file/function
+  evidence.
+- Desired behavior and follow-up tickets are separate from current behavior.
+- Unknown live-system facts remain unknown rather than inferred.
+- The R2 gate remains open pending small, ordered implementation tickets.
+
+Completion record:
+
+- Baseline: `origin/main` at
+  `fff8c3fe4f9cf285c3c092a713bef3d3f24c03e1`.
+- Prerequisites confirmed: LH-DEV-006, Lean Development Workflow v2, corrected
+  Docker CI, and reconciled rollout checklist.
+- Independently reviewed inventory PR head:
+  `554fb2923f4fd9285c34ca1b32ad6a9498fea834`.
+- Independent review disposition: `CORRECTION REQUIRED` — review was
+  performed against that exact PR head. Review is not complete; after this
+  completion-record correction is pushed, the resulting new exact PR head
+  must receive a fresh independent review.
+- Draft pull request: #41.
+- Files changed: `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`,
+  `TICKETS.md`, `docs/LAXHORNET_ROLLOUT_CHECKLIST.md`, and
+  `REPO_CURRENT_STATE.md`.
+- Checks: complete canonical local regression `36 passed, 0 failed`;
+  phase-aware containment `32/32`; Trust Spine SQL acceptance/rollback `33`
+  SQL tests with all 20 Trust Spine tables removed and legacy sentinels
+  preserved after rollback; `git diff --check`; authorized-path audit.
+- Production or external state changed: `NO`.
+- `REPO_CURRENT_STATE.md` updated: `YES` — current limitations only.
+- Remaining work: fresh independent review of the exact post-correction PR
+  head, then the proposed R2 implementation sequence.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets
