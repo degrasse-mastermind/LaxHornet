@@ -1142,17 +1142,17 @@ function storageHealthNotice(items = []) {
 
 function scheduleStorageHealthNotice(batchFailures = []) {
   const snapshot = localStorageSafety.healthSnapshot();
-  const message = storageHealthNotice(batchFailures.length ? batchFailures : snapshot);
+  const noticeItems = batchFailures.length ? batchFailures : snapshot;
+  const message = storageHealthNotice(noticeItems);
   if (!message) return;
-  const signature = batchFailures.length
-    ? `batch:${message}:${Date.now()}`
-    : snapshot
-        .filter((item) => item.status !== LOCAL_STORAGE_HEALTH.healthy)
-        .map((item) => `${item.domain}:${item.status}`)
-        .sort()
-        .join("|");
-  if (!batchFailures.length && reportedStorageHealthNotices.has(signature)) return;
-  if (!batchFailures.length) reportedStorageHealthNotices.add(signature);
+  const affectedIdentities = [...new Set(
+    noticeItems
+      .filter((item) => item.status !== LOCAL_STORAGE_HEALTH.healthy)
+      .map((item) => `${item.domain}:${item.status}`),
+  )].sort();
+  const signature = `${message}|${affectedIdentities.join("|")}`;
+  if (reportedStorageHealthNotices.has(signature)) return;
+  reportedStorageHealthNotices.add(signature);
   queueMicrotask(() => showToast(message));
 }
 

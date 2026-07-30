@@ -458,6 +458,47 @@ await test("caller-facing storage helper contracts remain synchronous and unchan
   assert.doesNotMatch(persistSource, /\breturn\b/);
 });
 
+await test("persistAll batch warnings deduplicate identical failures but allow a different identity", () => {
+  const noticeSource = appSource.slice(
+    appSource.indexOf("function storageHealthNotice"),
+    appSource.indexOf("function readStoredAccountState"),
+  );
+  const persistSource = appSource.slice(
+    appSource.indexOf("function persistAll"),
+    appSource.indexOf("function applyStoredAccountState"),
+  );
+  const toasts = [];
+  const noticeContext = {
+    LOCAL_STORAGE_HEALTH,
+    STORAGE_DOMAIN_DEFINITIONS: new Map([
+      ["games", { domain: "saved_games", critical: true }],
+      ["activeGame", { domain: "active_game", critical: true }],
+    ]),
+    localStorageSafety: { healthSnapshot: () => [] },
+    reportedStorageHealthNotices: new Set(),
+    queueMicrotask: (callback) => callback(),
+    showToast: (message) => toasts.push(message),
+  };
+  vm.createContext(noticeContext);
+  vm.runInContext(
+    `${noticeSource}
+globalThis.__scheduleStorageHealthNotice = scheduleStorageHealthNotice;`,
+    noticeContext,
+    { filename: "app.js#storage-health-notice" },
+  );
+
+  const identicalFailure = [{ domain: "saved_games", status: LOCAL_STORAGE_HEALTH.writeFailed }];
+  noticeContext.__scheduleStorageHealthNotice(identicalFailure);
+  noticeContext.__scheduleStorageHealthNotice(identicalFailure);
+  noticeContext.__scheduleStorageHealthNotice([
+    { domain: "active_game", status: LOCAL_STORAGE_HEALTH.writeFailed },
+  ]);
+
+  assert.match(persistSource, /scheduleStorageHealthNotice\(localStorageSafety\.endBatch\(\)\)/);
+  assert.equal(toasts.length, 2);
+  assert.equal(toasts[0], toasts[1]);
+});
+
 const failures = results.filter((result) => !result.ok);
 console.log(`\n${results.length - failures.length}/${results.length} local-storage safety tests passed.`);
 if (failures.length) process.exitCode = 1;
