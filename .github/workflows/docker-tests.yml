@@ -31,6 +31,27 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Resolve release-control refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          database_candidate="$(jq -r '.databaseCandidate' release/laxhornet-release-manifest.json)"
+          pre_cutover_runtime="$(jq -r '.preCutoverRuntime' release/laxhornet-release-manifest.json)"
+          cleanup_candidate="$(jq -r '.cleanupCandidate' release/laxhornet-release-manifest.json)"
+          additive_paths="supabase/migrations/20260723040000_event_pipeline_capabilities.sql,supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql,supabase/migrations/20260727000000_tracked_playing_time_operations.sql,supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql,supabase/tests/tracked_playing_time_foundation.sql,supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql,supabase/rollback/20260728193942_v284_public_event_semantic_boundary_rollback.sql,supabase/tests/v284_public_event_semantic_boundary.sql,supabase/migrations/20260730004700_team_members_rls_recursion.sql,supabase/rollback/20260730004700_team_members_rls_recursion_rollback.sql,supabase/tests/team_members_rls_recursion.sql,supabase/tests/team_members_rls_recursion_reproduction.sql"
+
+          if git merge-base --is-ancestor "$database_candidate" HEAD \
+            && git merge-base --is-ancestor "$cleanup_candidate" HEAD; then
+            release_base="$(git merge-base "$database_candidate" "$pre_cutover_runtime")"
+            echo "LAXHORNET_AUTHORIZED_DB_REF=$database_candidate" >> "$GITHUB_ENV"
+            echo "LAXHORNET_APPROVED_ADDITIVE_REF=$cleanup_candidate" >> "$GITHUB_ENV"
+          else
+            release_base="7cf58df9a43ce235fc6068bd4c50549e05906de4"
+          fi
+
+          echo "LAXHORNET_RELEASE_BASE_REF=$release_base" >> "$GITHUB_ENV"
+          echo "LAXHORNET_ALLOWED_ADDITIVE_DB_PATHS=$additive_paths" >> "$GITHUB_ENV"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -77,22 +98,54 @@ jobs:
         run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/validate_release_manifest.mjs --require-combined --combined-ref=HEAD
 
       - name: Run release hygiene checks
-        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_release_hygiene.mjs
+        run: >-
+          docker run --rm
+          -e LAXHORNET_RELEASE_BASE_REF
+          -e LAXHORNET_AUTHORIZED_DB_REF
+          -e LAXHORNET_APPROVED_ADDITIVE_REF
+          -e LAXHORNET_ALLOWED_ADDITIVE_DB_PATHS
+          -v "${{ github.workspace }}:/app"
+          laxhornet:test
+          node tools/test_release_hygiene.mjs
 
       - name: Run phase-aware release containment
         run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test npm install --no-save --no-package-lock --ignore-scripts @electric-sql/pglite@0.5.4 && node tools/test_release_containment_phase_aware.mjs
 
       - name: Run minimum disclosure contracts
-        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_minimum_disclosure.mjs
+        run: >-
+          docker run --rm
+          -e LAXHORNET_RELEASE_BASE_REF
+          -e LAXHORNET_AUTHORIZED_DB_REF
+          -e LAXHORNET_APPROVED_ADDITIVE_REF
+          -e LAXHORNET_ALLOWED_ADDITIVE_DB_PATHS
+          -v "${{ github.workspace }}:/app"
+          laxhornet:test
+          node tools/test_minimum_disclosure.mjs
 
       - name: Run secure disclosure activation contracts
-        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_secure_disclosure_activation.mjs
+        run: >-
+          docker run --rm
+          -e LAXHORNET_RELEASE_BASE_REF
+          -e LAXHORNET_AUTHORIZED_DB_REF
+          -e LAXHORNET_APPROVED_ADDITIVE_REF
+          -e LAXHORNET_ALLOWED_ADDITIVE_DB_PATHS
+          -v "${{ github.workspace }}:/app"
+          laxhornet:test
+          node tools/test_secure_disclosure_activation.mjs
 
       - name: Run product alignment contracts
         run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_product_alignment_remediation.mjs
 
       - name: Run trust spine release contracts
-        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_trust_spine_release1.mjs
+        run: >-
+          docker run --rm
+          -e LAXHORNET_RELEASE_BASE_REF
+          -e LAXHORNET_AUTHORIZED_DB_REF
+          -e LAXHORNET_APPROVED_ADDITIVE_REF
+          -e LAXHORNET_ALLOWED_ADDITIVE_DB_PATHS
+          -v "${{ github.workspace }}:/app"
+          laxhornet:test
+          node tools/test_trust_spine_release1.mjs
 
       - name: Run cancel game contracts (Python)
         run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test python tools/test_cancel_game.py
