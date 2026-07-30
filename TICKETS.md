@@ -635,8 +635,9 @@ characterization tests before R2 runtime behavior changes.
   contracts passed; tracked-time service `16/16`; tracked-time foundation
   `11/11`; tracked-time UI `44/44`; Trust Spine source contracts `18/18`;
   cancel-game `33/33`; changed JavaScript syntax; `git diff --check`.
-- CI: the focused suite is wired into `.github/workflows/laxhornet-regression.yml`;
-  remote result pending.
+- CI: implementation commit `7db9a469877378f3124608147a19737059ab328d`
+  passed both the portable GitHub Actions regression, including the new
+  `17/17` suite, and the Docker test suite.
 - Implementation commit:
   `7db9a469877378f3124608147a19737059ab328d`; draft PR #42.
 - Production or external state changed: `NO`.
