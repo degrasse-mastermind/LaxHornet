@@ -54,6 +54,17 @@ http://localhost:5173/app.html
 
 You can also use any static file server. Serving over `http://localhost` is recommended so the service worker can register during testing.
 
+## Project Work Control
+
+LaxHornet uses a repository-backed workflow for ChatGPT conversations and Codex tasks:
+
+- `docs/CODEX_WORKFLOW.md` defines workbench roles, task naming, one-ticket/one-task execution, independent review, closeout, and archival.
+- `TICKETS.md` is the active implementation queue and records the Codex execution task associated with each approved ticket.
+- `docs/templates/CODEX_TASK_KICKOFF.md` starts a bounded implementation, review, release, or operations task.
+- `docs/templates/CODEX_TASK_CLOSEOUT.md` records the durable result before a task is renamed or archived.
+
+Thread titles, summaries, and pins help navigation, but the repository, Git history, pull requests, test evidence, and ticket completion records remain authoritative.
+
 ## GitHub Pages Deployment
 
 Production is deployed by `.github/workflows/pages-deployment.yml`. The

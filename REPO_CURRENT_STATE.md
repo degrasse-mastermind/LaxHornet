@@ -165,6 +165,14 @@ node tools/run_release_verification.mjs v284
 
 A green GitHub Actions result complements but does not replace browser, mobile-device, visual, game-day, or local Supabase migration testing.
 
+## Project work control
+
+- `docs/CODEX_WORKFLOW.md` governs the lifecycle of ChatGPT workbenches and Codex execution, review, release, and operations tasks.
+- One approved ticket maps to one primary Codex execution task. Interrupted work resumes in the same task; an independent review uses a separate task.
+- `TICKETS.md` records the execution task title and task ID alongside the branch and durable completion record.
+- `docs/templates/CODEX_TASK_KICKOFF.md` and `docs/templates/CODEX_TASK_CLOSEOUT.md` provide the reusable start and closeout gates.
+- A task is archived only after its outcome, remaining work, repository state, and evidence location are recorded durably. Thread titles, summaries, and pins are not implementation authority.
+
 ## Current engineering constraints
 
 - Preserve the vanilla static PWA unless an approved architecture decision changes it.

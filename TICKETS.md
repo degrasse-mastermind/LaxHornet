@@ -443,6 +443,10 @@ Status: `PROPOSED`
 Branch: `feature/...`  
 Owner:  
 Related decision/design document:
+Discussion workbench:
+Primary Codex task title:
+Primary Codex task ID:
+Independent review task ID:
 
 #### Goal
 
@@ -500,6 +504,8 @@ Files changed:
 Tests and results:  
 `REPO_CURRENT_STATE.md` updated: `YES/NO`  
 Remaining work:
+Task disposition: `COMPLETED/PASS/FAIL/BLOCKED/HISTORICAL`
+Primary task archived: `YES/NO`
 
 ## Standard Codex execution prompt
 
@@ -508,9 +514,9 @@ Use this pattern after a ticket reaches `READY`:
 ```text
 Implement only [TICKET ID] from TICKETS.md.
 
-First read AGENTS.md, REPO_CURRENT_STATE.md, TICKETS.md, and inspect the actual relevant code. Then provide a brief implementation plan naming the expected files, risks, and tests. Do not edit until the plan is internally consistent with the repository.
+First read AGENTS.md, REPO_CURRENT_STATE.md, TICKETS.md, docs/CODEX_WORKFLOW.md, and inspect the actual relevant code. Then provide a brief implementation plan naming the expected files, risks, and tests. Do not edit until the plan is internally consistent with the repository.
 
 Stay strictly within the ticket's scope and acceptance criteria. Preserve the vanilla static PWA, offline-first behavior, authorization boundaries, disclosure rules, Supabase migration provenance, and release controls. Do not use host-managed connector actions, deploy, apply remote migrations, change production configuration, or merge to main unless the ticket explicitly authorizes that exact action.
 
-After implementation, run the smallest relevant tests, then broader regression if warranted. Update REPO_CURRENT_STATE.md and the ticket completion record with durable facts. Finish with the diff summary, tests and results, risks, and unresolved items.
+After implementation, run the smallest relevant tests, then broader regression if warranted. Update REPO_CURRENT_STATE.md and the ticket completion record with durable facts. Use docs/templates/CODEX_TASK_CLOSEOUT.md before renaming or archiving the task. Finish with the diff summary, tests and results, risks, and unresolved items.
 ```

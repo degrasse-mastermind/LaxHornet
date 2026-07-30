@@ -16,7 +16,7 @@
 
 ## Required orientation before work
 
-1. Read `README.md`, `REPO_CURRENT_STATE.md`, and `TICKETS.md`.
+1. Read `README.md`, `REPO_CURRENT_STATE.md`, `TICKETS.md`, and `docs/CODEX_WORKFLOW.md`.
 2. Inspect `git status`, the current branch, and the actual files involved in the requested ticket.
 3. Verify existing behavior before proposing changes. Do not invent routes, tables, fields, components, scripts, or architecture.
 4. State the intended scope, affected files, risks, and verification plan before editing.
@@ -29,6 +29,15 @@
 - Preserve existing behavior unless the ticket explicitly authorizes a change.
 - Prefer feature flags or staged activation when a change affects production data, sharing, authorization, synchronization, or release behavior.
 - Update `REPO_CURRENT_STATE.md` and the relevant entry in `TICKETS.md` after completing a feature.
+
+## Thread and task lifecycle
+
+- Use ChatGPT workbenches for product discussion, ticket shaping, project indexing, and status synthesis. They are not implementation records.
+- Use one Codex execution task for one approved ticket. Resume interrupted work in that task instead of creating a replacement task.
+- Record the execution task title and task ID in the ticket before implementation. Use a separate task for an explicitly independent review.
+- Keep the actual branch, worktree, commit, pull request, tests, and durable evidence in the repository and GitHub. A thread title, pin, or summary is navigation metadata only.
+- Close out and archive a completed, failed, or blocked task only after its result, remaining work, and evidence location are recorded durably.
+- Follow the naming, kickoff, closeout, and archive rules in `docs/CODEX_WORKFLOW.md`.
 
 ## Supabase and data safety
 
