@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-07-30
 Baseline branch: `main`
-Baseline commit: `a2f99f82952ac51a68a4868888e9319612bd715c`
+Baseline commit: `77f3cf4b0c86c7ce1cc44a42fafa9f3b111e9f3b`
 Current repository release marker: `v284`
 Current production marker: `v284` at reconciled R2-06A runtime/catalog state;
 synthetic verification and release closeout remain incomplete
@@ -232,6 +232,14 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   and blocked-runtime sources as incident history. The observed advancement
   lacked tracked release authorization and is not approved retroactively.
   Synthetic production verification and release closeout remain incomplete.
+- R2-06C freshly reconfirmed the 47-file production artifact, both ordered
+  migrations, definition-equivalent catalog/RLS/grant/function/trigger/lock
+  state, zero tombstones, and zero `r206-smoke-*` aggregate residue from merged
+  `main` at `77f3cf4b0c86c7ce1cc44a42fafa9f3b111e9f3b`. The canonical preflight
+  accepts runtime/database/catalog state and fails only on absent synthetic
+  authorization, behavior, and cleanup evidence. No production mutation
+  occurred. The corrected future plan requires two disposable accounts, one
+  game, zero events/tokens, and exactly one permanently retained tombstone.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The v284 cache marker remains unchanged. The updated service worker purges

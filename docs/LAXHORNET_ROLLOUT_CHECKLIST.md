@@ -386,8 +386,43 @@ infer activation approval from the observed state.
 - [ ] Mark R2-06 production-verified only after all remaining release-control
   and synthetic verification gates are satisfied.
 
+### R2-06C final preflight readiness
+
+- [x] Confirm merged `origin/main` and local HEAD are
+  `77f3cf4b0c86c7ce1cc44a42fafa9f3b111e9f3b`.
+- [x] Re-run focused manifest, preflight, containment, Pages, tombstone,
+  migration/rollback, and PostgreSQL concurrency checks.
+- [x] Reconfirm Pages run `30559099199`, all 47 allowlisted production files,
+  548 excluded tracked paths, and 10 explicit internal probes at runtime
+  `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3`.
+- [x] Reconfirm both R2-06 migrations exactly once and in order with no
+  subsequent or pending migration.
+- [x] Reconfirm the bounded table/constraint/index/RLS/policy/grant/function/
+  trigger/shared-lock catalog and zero tombstones.
+- [x] Confirm zero aggregate `r206-smoke-*` Auth/session/profile/game/event/
+  tombstone/Live-Share-token residue without enumerating private rows.
+- [x] Confirm the canonical production preflight accepts runtime/database/
+  catalog state and fails only on missing synthetic authorization, behavior,
+  and cleanup evidence.
+- [x] Correct the authorization plan to exactly two disposable accounts, one
+  game, zero events/tokens, one permanent tombstone, explicit credential and
+  cleanup controls, and no invented injected-client browser flow.
+- [x] Keep exact synthetic identifiers out of the public repository; require
+  one authorization-named private retained-identifier record and sanitized,
+  hash-bound repository evidence.
+- [x] Pass the complete canonical-plus-additive local regression (`43/43`).
+  A later documentation-only public-evidence privacy clarification did not
+  affect shared behavior and did not require a complete-suite rerun.
+- [ ] Obtain explicit production Auth/data authorization for the exact R2-06C
+  matrix.
+- [ ] Execute the separately authorized synthetic verification and cleanup.
+- [ ] Obtain separate reviewed release-closeout approval.
+
 Evidence:
 `review-evidence/r2-06-durable-game-tombstones-release/PRODUCTION_STATE_RECONCILIATION.md`.
+
+Fresh R2-06C evidence:
+`review-evidence/r2-06-durable-game-tombstones-release/FINAL_PRODUCTION_PREFLIGHT_READINESS.md`.
 
 Authorization-ready plan:
 `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_VERIFICATION_AUTHORIZATION_PLAN.md`.
