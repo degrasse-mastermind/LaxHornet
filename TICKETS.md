@@ -637,7 +637,8 @@ characterization tests before R2 runtime behavior changes.
   cancel-game `33/33`; changed JavaScript syntax; `git diff --check`.
 - CI: the focused suite is wired into `.github/workflows/laxhornet-regression.yml`;
   remote result pending.
-- Commit/PR: to be recorded after the implementation branch is pushed.
+- Implementation commit:
+  `7db9a469877378f3124608147a19737059ab328d`; draft PR #42.
 - Production or external state changed: `NO`.
 - `REPO_CURRENT_STATE.md` updated: `NOT REQUIRED` — no current-state fact was
   disproved and no runtime behavior changed.
