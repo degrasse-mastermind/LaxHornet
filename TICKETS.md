@@ -816,8 +816,9 @@ changing server contracts, authorization, tombstones, or release state.
   Product Alignment browser `64/64`, Trust Spine SQL acceptance/rollback,
   cancel-game `33/33`, delete-permission, player-removal, disclosure, and
   release-containment gates.
-- CI: `PENDING PUSH`.
-- Implementation commit and draft PR: `PENDING`.
+- CI: `PENDING` on the final documentation-closeout head.
+- Implementation commit:
+  `b0ebbbfb628377dff530805e4db9ea0daccadbeb`; draft PR #45.
 - Production or external state changed: `NO`.
 - `REPO_CURRENT_STATE.md` updated: `YES`.
 - `docs/LAXHORNET_ROLLOUT_CHECKLIST.md` updated: `YES`; permanent local IDs,
