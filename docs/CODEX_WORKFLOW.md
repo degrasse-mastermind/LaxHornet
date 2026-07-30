@@ -116,7 +116,78 @@ Expected sources include:
 - `AGENTS.md`
 - `REPO_CURRENT_STATE.md`
 - `TICKETS.md`
+- `docs/CODEX_WORKFLOW.md`
 - `.codex/config.toml`
+
+## Thread and task lifecycle
+
+The thread system is a navigation layer around the repository workflow. It does not replace ticket, Git, review, or evidence records.
+
+### Stable workbenches
+
+Keep a small set of durable ChatGPT workbenches:
+
+| Workbench | Purpose | Must not become |
+| --- | --- | --- |
+| `LH-00 | LaxHornet Product Command Center` | Product direction, priorities, and explicit decisions | An implementation log |
+| `LH-90 | Project Chat Index` | Source classification, canonical indexing, and historical navigation | A second product backlog |
+| `LH-DEV | Active Engineering Workbench` | Ticket shaping, engineering status, blockers, and handoffs | A substitute for the active Codex task |
+| `LH-20 | Active Workbench` | Current LH-20 program discussion while that program remains active | A permanent catch-all |
+
+Pins are a convenience. Add or remove a workbench from the pinned set as priorities change without treating the pin state as project authority.
+
+### One ticket, one execution task
+
+- Create a primary Codex execution task only after the ticket is `READY`.
+- Keep implementation, debugging, reruns, and continuation in that task until the ticket reaches a terminal disposition.
+- Do not create a replacement task because work paused, context compacted, a command stalled, or a status update is needed. Resume from the verified checkout and first incomplete gate.
+- Do not reuse a completed execution task for a different ticket.
+- Create a separate task only when the work is intentionally independent, such as an exact-SHA adversarial review, a separately authorized release, or a distinct operations ticket.
+- Record the task title and task ID in `TICKETS.md` so the external conversation can be traced to the durable ticket.
+
+### Naming convention
+
+Use outcome-oriented titles:
+
+| Task type | Pattern | Example |
+| --- | --- | --- |
+| Implementation | `LH-DEV-NNN | Verb object` | `LH-DEV-005 | Remediate RLS Recursion` |
+| Product program | `LH-NN | Active Workbench` | `LH-20 | Active Workbench` |
+| Independent review | `LH-REVIEW | PR #NN — Review objective` | `LH-REVIEW | PR #30 — Public Event Boundary` |
+| Release | `LH-RELEASE | vNNN — Release objective` | `LH-RELEASE | v284 — Production Verification` |
+| Operations | `LH-OPS | Operations objective` | `LH-OPS | Project Thread Cleanup` |
+| Historical reference | `LH-ARCHIVE | Historical label` | `LH-ARCHIVE | Original Sideline Scout Build` |
+
+At closeout, append a concise disposition only when useful: `PASS`, `FAIL`, `BLOCKED`, `COMPLETED`, or `HISTORICAL`. A disposition in a title must match the durable ticket or review record.
+
+### Lifecycle
+
+1. **Shape:** discuss one outcome in the appropriate workbench.
+2. **Register:** add or update one ticket in `TICKETS.md`; move it to `READY` only when scope, exclusions, acceptance criteria, risks, and authority are explicit.
+3. **Kick off:** create or select the primary Codex task, use `docs/templates/CODEX_TASK_KICKOFF.md`, and record its title and ID in the ticket.
+4. **Execute:** let that task own the checkout or worktree, implementation, tests, and progress. Continue there after interruptions.
+5. **Review:** use a separate task when independence is required. Bind review conclusions to an exact commit or pull-request SHA.
+6. **Close out:** use `docs/templates/CODEX_TASK_CLOSEOUT.md`; update the ticket, current state when durable behavior changed, evidence, and GitHub references.
+7. **Archive:** rename with an accurate disposition and archive only after the durable closeout is complete. Keep tasks with active work, unique uncommitted changes, or unresolved ownership visible.
+
+### Stop rules
+
+- Do not archive a task that owns a running process, dirty worktree, unique uncommitted edits, or an unresolved production/data cleanup obligation.
+- Do not copy unfinished implementation into a new task without an explicit handoff that names the branch, worktree, HEAD, dirty state, last completed gate, first incomplete gate, and current blocker.
+- Do not treat a ChatGPT summary, Codex title, or thread preview as proof of implementation or review status.
+- Do not mark a task `PASS`, `DONE`, or `COMPLETED` merely because expected-path tests are green; use the ticket's full acceptance and review gates.
+- Do not archive a failed or blocked task until the exact failure, safety state, durable evidence, and next authorized action are recorded.
+
+### Routine hygiene
+
+Review the project task list periodically:
+
+1. Confirm every pinned task has a current navigation purpose.
+2. Confirm every `IN PROGRESS`, `BLOCKED`, or `REVIEW` ticket names its primary Codex task.
+3. Find duplicate execution tasks and designate one owner before further edits.
+4. Rename completed review/release/operations tasks with an accurate disposition.
+5. Archive only tasks that satisfy the closeout gate.
+6. Leave historical findings searchable through ticket, PR, commit, and evidence references.
 
 ## Feature workflow
 
@@ -145,7 +216,7 @@ In Codex, toggle `/plan`, then use:
 ```text
 Implement only [TICKET ID] from TICKETS.md.
 
-First read AGENTS.md, REPO_CURRENT_STATE.md, TICKETS.md, and inspect the actual relevant code. Then provide a brief implementation plan naming the expected files, risks, and tests.
+First read AGENTS.md, REPO_CURRENT_STATE.md, TICKETS.md, docs/CODEX_WORKFLOW.md, and inspect the actual relevant code. Then provide a brief implementation plan naming the expected files, risks, and tests.
 
 Stay strictly within the ticket's scope and acceptance criteria. Preserve the vanilla static PWA, offline-first behavior, authorization boundaries, disclosure rules, Supabase migration provenance, and release controls. Do not invoke host-managed connector actions, deploy, apply remote migrations, change production configuration, or merge to main unless the ticket explicitly authorizes that exact action.
 ```
@@ -204,6 +275,7 @@ Before the ticket is considered complete:
 - Update the ticket completion record in `TICKETS.md`.
 - Update `REPO_CURRENT_STATE.md` only with durable facts that changed.
 - Keep brainstorming and abandoned options out of the current-state file.
+- Complete `docs/templates/CODEX_TASK_CLOSEOUT.md` and archive the task only after its durable result is recorded.
 
 ## Database-change workflow
 
