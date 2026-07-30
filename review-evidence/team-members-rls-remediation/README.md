@@ -27,6 +27,15 @@ credentials, private JWTs, real team/member/player rows, or youth/family data.
   service roles.
 - Complete portable local regression: 34/34 passed after the hardened
   preflight and ACL changes.
+- Production State C was captured without reading user rows and reproduced
+  exactly at policy MD5 `1c9c5d532c262c3b9ec850552bdf0512`.
+- Its complete authorization envelope is bound by SHA-256
+  `6ea7097aa5acf642dc6b7822505edec14730cb9854df3f6b4ac4fa7e9e549260`.
+- The 18-case State C matrix matched State B case for case, produced no
+  `42P17`, and converged to final policy MD5
+  `2814223218999d3d6364582d5b9e85e1`.
+- `production-state-c-snapshot.json` contains the exact sanitized capture;
+  `STATE_C_ADJUDICATION.md` records the A/B/C/final matrix and disposition.
 
 `production-policy-snapshot.json` records the sanitized metadata used by the
 fail-closed production preflight. Production application and post-deployment

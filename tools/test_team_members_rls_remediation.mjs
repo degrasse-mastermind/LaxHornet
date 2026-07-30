@@ -15,6 +15,8 @@ const [
 const manifestPath = "release/laxhornet-release-manifest.json";
 const productionSnapshotPath =
   "review-evidence/team-members-rls-remediation/production-policy-snapshot.json";
+const productionStateCSnapshotPath =
+  "review-evidence/team-members-rls-remediation/production-state-c-snapshot.json";
 const results = [];
 
 function source(file) {
@@ -46,6 +48,7 @@ const authorizationTest = source(authorizationTestPath);
 const reproductionTest = source(reproductionTestPath);
 const manifest = JSON.parse(source(manifestPath));
 const productionSnapshot = JSON.parse(source(productionSnapshotPath));
+const productionStateCSnapshot = JSON.parse(source(productionStateCSnapshotPath));
 const reviewPackage = manifest.reviewDatabasePackages?.find(
   (entry) => entry.name === "team_members_rls_recursion",
 );
@@ -56,17 +59,58 @@ test("bounded package paths exist", () => {
   }
 });
 
-test("migration binds the local blank-chain hash away from production", () => {
+test("migration recognizes State C only inside a pinned authorization envelope", () => {
   assert.match(migration, /STATE_A_CAPTURED_RECURSIVE_DEFECT/);
   assert.match(migration, /75e5d59fce7de054e5f53d7d5d73f99e/);
   assert.match(migration, /STATE_B_CANONICAL_ONLY/);
   assert.match(migration, /c4a69b0c9f9660563eb7aa8ca6e1b3b6/);
   assert.match(migration, /system_identifier = '7642734024280108049'/);
-  assert.match(migration, /elsif not is_production_cluster/);
+  assert.match(migration, /STATE_C_SCALAR_SUBSELECT_CANONICAL/);
   assert.match(migration, /NONPRODUCTION_BLANK_CHAIN_ONLY/);
   assert.match(migration, /1c9c5d532c262c3b9ec850552bdf0512/);
+  assert.match(migration, /76611f7aba7b5501a407d96446952895/);
   assert.match(migration, /production migration history drifted/);
   assert.match(migration, /policy definition drift/);
+});
+
+test("State C fixture binds exact policy and authorization metadata", () => {
+  assert.equal(
+    productionStateCSnapshot.policySet.orderedNormalizedMd5,
+    "1c9c5d532c262c3b9ec850552bdf0512",
+  );
+  assert.deepEqual(
+    productionStateCSnapshot.policySet.policies.map(
+      (policy) => policy.normalizedEntryMd5,
+    ),
+    [
+      "5b663d466b2e4f10e3b9f32d24b968fb",
+      "41afbec61cde932584295d287b61e3e7",
+      "884b66c34975337d3e49d25c2bcf5bda",
+      "49400540bdacd1b5ad883cb9e8d91c0d",
+    ],
+  );
+  assert.equal(
+    productionStateCSnapshot.table.normalizedAclMd5,
+    "76611f7aba7b5501a407d96446952895",
+  );
+  assert.equal(
+    productionStateCSnapshot.helpers.normalizedSetSha256,
+    "8008d891efa93a1bd7076ba3c39ce723ccba059fc3cf683dd6c6a60fca2eb74b",
+  );
+  assert.equal(
+    productionStateCSnapshot.migrationHistory.normalizedMd5,
+    "257d70e2d82670b2b727575d7173a537",
+  );
+  assert.equal(
+    createHash("sha256")
+      .update(
+        productionStateCSnapshot.authorizationEnvelope.bindingLines.join("\n"),
+      )
+      .digest("hex"),
+    productionStateCSnapshot.authorizationEnvelope.sha256,
+  );
+  assert.equal(productionStateCSnapshot.privateHelperSchema.exists, false);
+  assert.equal(productionStateCSnapshot.realUserDataTouched, false);
 });
 
 test("production preflight pins helpers, ACLs, FORCE RLS, and schema absence", () => {
@@ -214,6 +258,19 @@ test("manifest records exact reviewed hashes and phase", () => {
     TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS,
   );
   for (const file of TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS) {
+    assert.equal(reviewPackage.sha256?.[file], reviewedTextSha256(file), file);
+  }
+  const stateCEvidencePaths = [
+    reviewPackage.stateCFixture,
+    reviewPackage.stateCAdjudication,
+    reviewPackage.stateCTestTool,
+  ];
+  assert.deepEqual(stateCEvidencePaths, [
+    "review-evidence/team-members-rls-remediation/production-state-c-snapshot.json",
+    "review-evidence/team-members-rls-remediation/STATE_C_ADJUDICATION.md",
+    "tools/test_team_members_state_c.mjs",
+  ]);
+  for (const file of stateCEvidencePaths) {
     assert.equal(reviewPackage.sha256?.[file], reviewedTextSha256(file), file);
   }
 });

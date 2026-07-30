@@ -144,12 +144,34 @@ begin
   then
     starting_state := 'STATE_B_CANONICAL_ONLY';
     helper_profile := 'PRODUCTION_CAPTURED';
-  elsif not is_production_cluster
-    and policy_count = 4
+  elsif policy_count = 4
     and policy_hash = '1c9c5d532c262c3b9ec850552bdf0512'
   then
-    starting_state := 'NONPRODUCTION_BLANK_CHAIN_ONLY';
-    helper_profile := 'NONPRODUCTION_BLANK';
+    if is_production_cluster or (
+      select
+        count(*) = 32
+        and pg_catalog.md5(
+          pg_catalog.string_agg(
+            acl.grantee::regrole::text
+              || '|' || acl.grantor::regrole::text
+              || '|' || acl.privilege_type
+              || '|' || acl.is_grantable::text,
+            pg_catalog.chr(10)
+            order by
+              acl.grantee::regrole::text,
+              acl.privilege_type
+          )
+        ) = '76611f7aba7b5501a407d96446952895'
+      from pg_catalog.pg_class class
+      cross join lateral pg_catalog.aclexplode(class.relacl) acl
+      where class.oid = 'public.team_members'::regclass
+    ) then
+      starting_state := 'STATE_C_SCALAR_SUBSELECT_CANONICAL';
+      helper_profile := 'PRODUCTION_CAPTURED';
+    else
+      starting_state := 'NONPRODUCTION_BLANK_CHAIN_ONLY';
+      helper_profile := 'NONPRODUCTION_BLANK';
+    end if;
   else
     raise exception
       'TEAM_MEMBERS_RLS_PREFLIGHT_FAILED: policy definition drift (production %, system identifier %, count %, hash %)',
