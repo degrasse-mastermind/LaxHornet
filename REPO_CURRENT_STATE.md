@@ -192,6 +192,14 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
 - The v284 public-disclosure remediation passed its complete 33/33 regression and all 17 local release-verification gates, including 45/45 disclosure pgTAP checks on both database shapes and 73/73 signed-in browser checks. PR #30 was independently reviewed and merged. Production smoke at application SHA `effca6952e647b7424f96675f390fc80d5c42368` returned exactly two approved public events, excluded all private/unknown semantics, passed ordinary and tracked-time journeys, and proved zero active synthetic authority or mutable residue after cleanup.
+- The allowlisted Pages artifact exposed a production `team_members` RLS defect
+  during synthetic smoke: four untracked recursive policies caused SQLSTATE
+  `42P17`. Production subsequently presented only the canonical four policies
+  without a corresponding migration record. The reviewed additive remediation
+  is `20260730004700_team_members_rls_recursion`; it remains pending production
+  application and fail-closed drift reconciliation. Local reproduction,
+  authorization, rollback/reapply, blank-chain, and production-shaped gates are
+  green. This is not yet a production closeout.
 - Coordinated version and service-worker release hygiene.
 - Maintenance of GitHub Action majors and portability of the CI-selected regression checks.
 

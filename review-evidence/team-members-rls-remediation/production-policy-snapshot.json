@@ -1,0 +1,140 @@
+{
+  "capturedAt": "2026-07-29",
+  "projectRef": "ulbmjcvnyznvmjgpstno",
+  "table": "public.team_members",
+  "sanitized": true,
+  "realUserDataTouched": false,
+  "migrationHistoryBefore": {
+    "latestVersion": "20260728193942",
+    "remediationVersionCount": 0
+  },
+  "capturedDefectStateA": {
+    "policyCount": 8,
+    "normalizedPolicyMd5": "75e5d59fce7de054e5f53d7d5d73f99e",
+    "recursivePolicies": [
+      "team_members_select_team",
+      "team_members_insert_team",
+      "team_members_update_team",
+      "team_members_delete_team"
+    ],
+    "recursivePredicate": "(EXISTS(SELECT1FROMteam_membersmemberWHERE((member.team_id=team_members.team_id)AND(member.user_id=auth.uid()))))",
+    "observedSqlstate": "42P17"
+  },
+  "alreadyTightenedStateB": {
+    "policyCount": 4,
+    "normalizedPolicyMd5": "c4a69b0c9f9660563eb7aa8ca6e1b3b6",
+    "policies": [
+      {
+        "name": "laxhornet read team members",
+        "command": "SELECT",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "((user_id=auth.uid())ORlaxhornet_is_team_member(team_id))",
+        "withCheck": ""
+      },
+      {
+        "name": "laxhornet insert team members",
+        "command": "INSERT",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "",
+        "withCheck": "((user_id=auth.uid())AND(role='admin'::text)ANDlaxhornet_can_create_team()AND(EXISTS(SELECT1FROMteamsWHERE((teams.id=team_members.team_id)AND(teams.created_by=auth.uid())))))"
+      },
+      {
+        "name": "laxhornet update team members",
+        "command": "UPDATE",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "(laxhornet_team_role(team_id)='admin'::text)",
+        "withCheck": "(laxhornet_team_role(team_id)='admin'::text)"
+      },
+      {
+        "name": "laxhornet delete team members",
+        "command": "DELETE",
+        "roles": [
+          "authenticated"
+        ],
+        "qual": "((user_id=auth.uid())OR(laxhornet_team_role(team_id)='admin'::text))",
+        "withCheck": ""
+      }
+    ]
+  },
+  "sharedStartingMetadata": {
+    "owner": "postgres",
+    "rlsEnabled": true,
+    "forceRlsEnabled": false,
+    "tablePrivileges": {
+      "anon": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ]
+    },
+    "helpers": [
+      {
+        "signature": "public.laxhornet_is_team_member(text)",
+        "owner": "postgres",
+        "securityDefiner": true,
+        "config": [
+          "search_path=public",
+          "row_security=off"
+        ],
+        "executeRoles": [
+          "authenticated",
+          "postgres",
+          "service_role"
+        ]
+      },
+      {
+        "signature": "public.laxhornet_team_role(text)",
+        "owner": "postgres",
+        "securityDefiner": true,
+        "config": [
+          "search_path=public",
+          "row_security=off"
+        ],
+        "executeRoles": [
+          "authenticated",
+          "postgres",
+          "service_role"
+        ]
+      },
+      {
+        "signature": "public.laxhornet_can_create_team()",
+        "owner": "postgres",
+        "securityDefiner": true,
+        "executeRoles": [
+          "authenticated",
+          "postgres",
+          "service_role"
+        ]
+      }
+    ]
+  },
+  "productionDriftDisposition": "The recursive policies disappeared without a recorded migration. State B is accepted only if every captured policy and helper field still matches; any third state is a hard stop."
+}

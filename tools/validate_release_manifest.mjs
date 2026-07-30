@@ -8,6 +8,7 @@ import {
   APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
   APPROVED_HISTORICAL_PROVENANCE_IDENTITIES,
   APPROVED_HISTORICAL_PROVENANCE_PATHS,
+  TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS,
   TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
   V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS,
   validateHistoricalProvenance,
@@ -176,9 +177,13 @@ const trackedTimeReview = reviewPackages.find(
 const publicEventBoundaryReview = reviewPackages.find(
   (entry) => entry.name === "v284_public_event_semantic_boundary",
 );
-expect(reviewPackages.length === 2, "manifest must contain the two bounded v284 database packages");
+const teamMembersRlsReview = reviewPackages.find(
+  (entry) => entry.name === "team_members_rls_recursion",
+);
+expect(reviewPackages.length === 3, "manifest must contain the three bounded v284 database packages");
 expect(Boolean(trackedTimeReview), "tracked playing time review package must be present");
 expect(Boolean(publicEventBoundaryReview), "public event semantic boundary package must be present");
+expect(Boolean(teamMembersRlsReview), "team_members RLS remediation package must be present");
 const trackedTimeReviewPaths = trackedTimeReview
   ? [
       trackedTimeReview.forwardMigration,
@@ -241,6 +246,39 @@ for (const file of V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS) {
     expect(
       publicEventBoundaryReview?.sha256?.[file] === localHash,
       `public event semantic boundary SHA-256 is stale: ${file}`,
+    );
+  }
+}
+
+const teamMembersRlsPaths = teamMembersRlsReview
+  ? [
+      teamMembersRlsReview.forwardMigration,
+      teamMembersRlsReview.rollbackReference,
+      teamMembersRlsReview.testSql,
+      teamMembersRlsReview.reproductionTestSql,
+    ]
+  : [];
+expect(
+  JSON.stringify([...teamMembersRlsPaths].sort())
+    === JSON.stringify([...TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS].sort()),
+  "team_members RLS remediation paths must match the explicit containment allowlist",
+);
+expect(
+  ["approved_pending_production", "production_applied"].includes(teamMembersRlsReview?.status),
+  "team_members RLS remediation must record an approved pending or production-applied status",
+);
+expect(
+  teamMembersRlsReview?.productionAuthorizationRequired === true,
+  "team_members RLS remediation must require explicit production authorization",
+);
+for (const file of TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS) {
+  const absolute = path.join(root, file);
+  expect(fs.existsSync(absolute), `team_members RLS remediation file is missing: ${file}`);
+  if (fs.existsSync(absolute)) {
+    const localHash = reviewedTextSha256(fs.readFileSync(absolute));
+    expect(
+      teamMembersRlsReview?.sha256?.[file] === localHash,
+      `team_members RLS remediation SHA-256 is stale: ${file}`,
     );
   }
 }
@@ -370,6 +408,7 @@ const expectedMigrationSequence = [
   ...approvedBaseMigrationSequence,
   trackedTimeReview?.forwardMigration,
   publicEventBoundaryReview?.forwardMigration,
+  teamMembersRlsReview?.forwardMigration,
 ];
 expect(
   JSON.stringify(manifest.requiredMigrationSequence) === JSON.stringify(expectedMigrationSequence),
@@ -378,17 +417,29 @@ expect(
 expect(
   JSON.stringify(manifest.reviewMigrationSequence)
     === JSON.stringify(expectedMigrationSequence),
-  "reviewMigrationSequence must match the completed production migration sequence",
+  "reviewMigrationSequence must include the reviewed team_members remediation",
 );
+const expectedAppliedMigrationSequence = teamMembersRlsReview?.productionApplied
+  ? expectedMigrationSequence
+  : expectedMigrationSequence.slice(0, -1);
 expect(
   JSON.stringify(manifest.expectedRemoteAppliedMigrations)
-    === JSON.stringify(expectedMigrationSequence),
-  "expectedRemoteAppliedMigrations must match the eight confirmed production migrations",
+    === JSON.stringify(expectedAppliedMigrationSequence),
+  "expectedRemoteAppliedMigrations must match the confirmed production phase",
 );
+const expectedPendingMigrations = teamMembersRlsReview?.productionApplied
+  ? []
+  : [teamMembersRlsReview?.forwardMigration];
 expect(
   JSON.stringify(manifest.expectedPendingProductionMigrations)
-    === JSON.stringify([]),
-  "expectedPendingProductionMigrations must be empty after production rollout",
+    === JSON.stringify(expectedPendingMigrations),
+  "expectedPendingProductionMigrations must match the team_members remediation phase",
+);
+expect(
+  teamMembersRlsReview?.productionApplied
+    ? teamMembersRlsReview?.status === "production_applied"
+    : teamMembersRlsReview?.status === "approved_pending_production",
+  "team_members RLS package status and productionApplied flag must agree",
 );
 
 expect(
@@ -480,6 +531,7 @@ if (requireCombined) {
       allowedAdditiveDbPaths: [
         ...TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
         ...V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS,
+        ...TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS,
       ],
       headRef: combinedRef,
     });
@@ -510,6 +562,7 @@ const allowedCleanupMigrations = new Set([
   ...manifest.canonicalForwardMigrations,
   trackedTimeReview?.forwardMigration,
   publicEventBoundaryReview?.forwardMigration,
+  teamMembersRlsReview?.forwardMigration,
 ]);
 for (const file of cleanupMigrations) {
   expect(allowedCleanupMigrations.has(file), `unknown cleanup migration detected: ${file}`);

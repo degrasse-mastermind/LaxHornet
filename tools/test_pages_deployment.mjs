@@ -119,6 +119,7 @@ try {
       "docs/LOCAL_SUPABASE_WORKFLOW.md",
       "review-evidence/v284-tracked-playing-time-production/production-smoke-results.json",
       "supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql",
+      "supabase/migrations/20260730004700_team_members_rls_recursion.sql",
       "supabase/rollback/example.sql",
       "release/laxhornet-release-manifest.json",
       "REPO_CURRENT_STATE.md",

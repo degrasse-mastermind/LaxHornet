@@ -48,6 +48,22 @@
         "supabase/rollback/20260728193942_v284_public_event_semantic_boundary_rollback.sql": "3d6085cb7e686d8243639ad676043986cf28a7c586280bf1c7c342fa32ab7bf5",
         "supabase/tests/v284_public_event_semantic_boundary.sql": "5842cf58cb4c6dfe4bbcfa31fcc38b395197e2395b01c590c78ff1d13a85e9e4"
       }
+    },
+    {
+      "name": "team_members_rls_recursion",
+      "status": "approved_pending_production",
+      "forwardMigration": "supabase/migrations/20260730004700_team_members_rls_recursion.sql",
+      "rollbackReference": "supabase/rollback/20260730004700_team_members_rls_recursion_rollback.sql",
+      "testSql": "supabase/tests/team_members_rls_recursion.sql",
+      "reproductionTestSql": "supabase/tests/team_members_rls_recursion_reproduction.sql",
+      "productionApplied": false,
+      "productionAuthorizationRequired": true,
+      "sha256": {
+        "supabase/migrations/20260730004700_team_members_rls_recursion.sql": "87880505e9664cf0fa798a612f04b81f74abdcedfde996f8922cb2ce43734774",
+        "supabase/rollback/20260730004700_team_members_rls_recursion_rollback.sql": "26b92bf3ba3c74cc405d7333d906133ab926d42362a2c0400b967949bc7f5254",
+        "supabase/tests/team_members_rls_recursion.sql": "38232c6676a2e950829fde65e6e289eae77732ad8fe89362269c9a2ee0345ecc",
+        "supabase/tests/team_members_rls_recursion_reproduction.sql": "3f8232e11ed7a1843ea79d22119156b6c742f62032909d86ed505f2824a88ce3"
+      }
     }
   ],
   "productionHistoricalMigration": {
@@ -88,7 +104,8 @@
     "supabase/migrations/20260723030000_fix_disclosure_audit_and_evidence_validation.sql",
     "supabase/migrations/20260723040000_event_pipeline_capabilities.sql",
     "supabase/migrations/20260727000000_tracked_playing_time_operations.sql",
-    "supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql"
+    "supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql",
+    "supabase/migrations/20260730004700_team_members_rls_recursion.sql"
   ],
   "reviewMigrationSequence": [
     "supabase/migrations/20260723000000_laxhornet_legacy_baseline.sql",
@@ -98,7 +115,8 @@
     "supabase/migrations/20260723030000_fix_disclosure_audit_and_evidence_validation.sql",
     "supabase/migrations/20260723040000_event_pipeline_capabilities.sql",
     "supabase/migrations/20260727000000_tracked_playing_time_operations.sql",
-    "supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql"
+    "supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql",
+    "supabase/migrations/20260730004700_team_members_rls_recursion.sql"
   ],
   "expectedRemoteAppliedMigrations": [
     "supabase/migrations/20260723000000_laxhornet_legacy_baseline.sql",
@@ -110,12 +128,15 @@
     "supabase/migrations/20260727000000_tracked_playing_time_operations.sql",
     "supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql"
   ],
-  "expectedPendingProductionMigrations": [],
+  "expectedPendingProductionMigrations": [
+    "supabase/migrations/20260730004700_team_members_rls_recursion.sql"
+  ],
   "rollbackReferences": [
     "supabase/rollback/20260723010000_trust_spine_release_1_rollback.sql",
     "supabase/rollback/20260723020000_minimum_necessary_disclosure_rollback.sql",
     "supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql",
-    "supabase/rollback/20260728193942_v284_public_event_semantic_boundary_rollback.sql"
+    "supabase/rollback/20260728193942_v284_public_event_semantic_boundary_rollback.sql",
+    "supabase/rollback/20260730004700_team_members_rls_recursion_rollback.sql"
   ],
   "approvedDatabaseFileIdentities": {
     "algorithm": "sha256",
