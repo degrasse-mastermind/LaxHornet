@@ -31,6 +31,43 @@
       "evidence": null,
       "cleanupEvidence": null
     },
+    "syntheticRunner": {
+      "implemented": true,
+      "productionExecutionDefault": "disabled",
+      "entryPoint": "tools/run_r206_synthetic_verification.mjs",
+      "corePath": "tools/r206_synthetic_runner_core.mjs",
+      "productionAdapterPath": "tools/r206_synthetic_production_adapter.mjs",
+      "disposableAdapterPath": "tools/r206_synthetic_disposable_adapter.mjs",
+      "unitTestPath": "tools/test_r206_synthetic_verification.mjs",
+      "disposableTestPath": "tools/test_r206_synthetic_verification_disposable.mjs",
+      "evidenceSchemaPath": "tools/fixtures/r206-synthetic-evidence-schema.json",
+      "actionCount": 21,
+      "allowedMutationRpcs": [
+        "laxhornet_sync_game",
+        "laxhornet_delete_game_durable"
+      ],
+      "hardLimits": {
+        "authUsersCreated": 2,
+        "sessionsCreated": 3,
+        "profilesExpected": 2,
+        "gamesCreated": 1,
+        "gameUpdates": 1,
+        "eventsCreated": 0,
+        "liveShareTokensCreated": 0,
+        "acceptedDurableDeletes": 1,
+        "permanentTombstonesCreated": 1,
+        "privateIdentifierRecords": 1
+      },
+      "sha256": {
+        "tools/run_r206_synthetic_verification.mjs": "62037e33585292440936ac1300b88b51a1e068697f0cf51da0210dacbc177f84",
+        "tools/r206_synthetic_runner_core.mjs": "5afc06c493ca8dd8717e71f262cfb6ce9d0e8e628cba15ca1631103db96d52e9",
+        "tools/r206_synthetic_production_adapter.mjs": "0da1817c103907b2112904b2698ed7c8b187dab2c48496b9daf5692c14d2f81d",
+        "tools/r206_synthetic_disposable_adapter.mjs": "d639b82e25d400018d6a250010d652e2b6cf3601a1fcc7c5f70f5246d374e6d4",
+        "tools/test_r206_synthetic_verification.mjs": "16b6599a2645347a8844ab3f6a9bd4b4991798d92323cfab9412ab8a087f1565",
+        "tools/test_r206_synthetic_verification_disposable.mjs": "f308f8bdd538d3b1ce90a4ceadc3653e18f5dd0facccc649c1b84c6873c4f3a7",
+        "tools/fixtures/r206-synthetic-evidence-schema.json": "24a94c835bba25bd0796041b02555b4a351dd8c29a6350d3e50495ae21459990"
+      }
+    },
     "cleanupCompleted": false,
     "releaseCloseoutApproved": false,
     "reconciliation": {

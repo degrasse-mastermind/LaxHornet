@@ -126,6 +126,9 @@ jobs:
       - name: Release hygiene
         run: node tools/test_release_hygiene.mjs
 
+      - name: R2-06 reviewed synthetic runner contracts
+        run: node tools/test_r206_synthetic_verification.mjs
+
       - name: Allowlisted Pages deployment contracts
         run: node tools/test_pages_deployment.mjs
 
@@ -140,6 +143,9 @@ jobs:
 
       - name: Durable legacy game tombstone concurrency
         run: node tools/test_game_tombstone_concurrency.mjs
+
+      - name: R2-06 disposable synthetic verification
+        run: node tools/test_r206_synthetic_verification_disposable.mjs
 
       - name: Phase-aware release containment
         run: node tools/test_release_containment_phase_aware.mjs
