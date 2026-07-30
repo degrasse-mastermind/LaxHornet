@@ -42,6 +42,9 @@ const additivePaths = [
   "supabase/rollback/20260730004700_team_members_rls_recursion_rollback.sql",
   "supabase/tests/team_members_rls_recursion.sql",
   "supabase/tests/team_members_rls_recursion_reproduction.sql",
+  "supabase/migrations/20260730134439_durable_game_tombstones.sql",
+  "supabase/rollback/20260730134439_durable_game_tombstones_rollback.sql",
+  "supabase/tests/durable_game_tombstones.sql",
 ].join(",");
 
 const rootJavaScript = readdirSync(root)
@@ -54,6 +57,8 @@ const tests = [
   { name: "local-storage safety contracts", command: process.execPath, args: ["tools/test_local_storage_safety.mjs"] },
   { name: "event-operation service contracts", command: process.execPath, args: ["tools/test_event_operation_service.mjs"] },
   { name: "durable game and clock operation contracts", command: process.execPath, args: ["tools/test_durable_sync_operations.mjs"] },
+  { name: "durable legacy game tombstone contracts", command: process.execPath, args: ["tools/test_game_tombstones.mjs"] },
+  { name: "durable legacy game tombstone migration", command: process.execPath, args: ["tools/test_game_tombstone_migration.mjs"] },
   { name: "sync error classification contracts", command: process.execPath, args: ["tools/test_sync_error_classification.mjs"] },
   { name: "sync characterization contracts", command: process.execPath, args: ["tools/test_sync_characterization.mjs"] },
   { name: "tracked playing time service contracts", command: process.execPath, args: ["tools/test_tracked_playing_time_service.mjs"] },

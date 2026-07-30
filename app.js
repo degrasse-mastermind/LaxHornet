@@ -1118,6 +1118,22 @@ function removeStoredItem(key) {
   localStorageSafety.remove(scopedStorageKey(key));
 }
 
+function saveJSONVerified(key, value) {
+  const definition = STORAGE_DOMAIN_DEFINITIONS.get(key) || {
+    domain: key,
+    validate: () => true,
+    critical: false,
+  };
+  const result = localStorageSafety.write({
+    primaryKey: scopedStorageKey(key),
+    domain: definition.domain,
+    value,
+    validate: definition.validate,
+  });
+  if (!result?.ok) scheduleStorageHealthNotice(localStorageSafety.healthSnapshot());
+  return result?.ok === true;
+}
+
 function scopedStorageKey(key) {
   return activeStorageUserId ? `${key}.user.${activeStorageUserId}` : key;
 }
@@ -1195,6 +1211,7 @@ function readStoredAccountState(userId = activeStorageUserId) {
         schemaVersion: 1,
         deviceId: "",
         operations: [],
+        tombstones: [],
         acknowledgments: {},
       }),
       userId,
@@ -1283,6 +1300,7 @@ function normalizeDurableSyncOperationState(value = null, accountId = activeStor
       schemaVersion: 1,
       deviceId: "",
       operations: [],
+      tombstones: [],
       acknowledgments: {},
     };
   }
@@ -2738,11 +2756,69 @@ function forgetDeletedEvents(eventIds = []) {
 }
 
 function isDeletedGame(gameId) {
-  return state.deletedGameIds.includes(gameId);
+  const accountId = currentUserId();
+  return state.deletedGameIds.includes(gameId)
+    || Boolean(
+      accountId
+      && state.syncOperations?.tombstones?.some((tombstone) =>
+        tombstone.accountId === accountId && tombstone.gameId === gameId),
+    );
 }
 
 function isDeletedEvent(eventId) {
   return state.deletedEventIds.includes(eventId);
+}
+
+function hasLegacyGameCloudEvidence(gameId) {
+  const operations = state.syncOperations?.operations || [];
+  const acknowledgments = state.syncOperations?.acknowledgments || {};
+  return operations.some((operation) =>
+    operation.gameId === gameId
+    && operation.operationType === "legacy_game_write")
+    || Boolean(acknowledgments[`legacy_game_write:${gameId}`]);
+}
+
+function gameIsProvenLocalOnly(game = null) {
+  if (!game?.id || game.userId || game.user_id) return false;
+  return !hasLegacyGameCloudEvidence(game.id);
+}
+
+function prepareDurableGameDeletion(game = null, options = {}) {
+  const accountId = currentUserId();
+  const gameId = String(game?.id || options.gameId || "").trim();
+  if (!gameId) return null;
+  if (!accountId) {
+    rememberDeletedGame(gameId);
+    return saveJSONVerified(STORAGE_KEYS.deletedGames, uniqueIds(state.deletedGameIds))
+      ? { localOnly: true, gameId }
+      : null;
+  }
+  if (options.allowProvenLocalOnly !== false && gameIsProvenLocalOnly(game)) {
+    const tombstone = durableSyncService().recordLocalOnlyDeletion({
+      accountId,
+      gameId,
+      deletedAt: new Date().toISOString(),
+    });
+    return tombstone ? { localOnly: true, gameId, deletionId: tombstone.deletionId } : null;
+  }
+  const queued = durableSyncService().queueDelete({
+    accountId,
+    gameId,
+    knownGameSavedAt: game?.savedAt || game?.saved_at || null,
+    deletedAt: new Date().toISOString(),
+  });
+  return queued ? { ...queued, localOnly: false, gameId } : null;
+}
+
+function removeTombstonedGamesFromLocalState() {
+  state.games = state.games.filter((game) => !isDeletedGame(game.id));
+  if (state.activeGame && isDeletedGame(state.activeGame.id)) {
+    state.activeGame = null;
+    state.trackingSession = null;
+  }
+  if (state.reviewGameId && isDeletedGame(state.reviewGameId)) {
+    state.reviewGameId = state.games[0]?.id || null;
+  }
 }
 
 function normalizeEvent(event = {}, gameId = "") {
@@ -2908,6 +2984,7 @@ function applyStoredAccountState(userId) {
   state.reviewGameId = stored.reviewGameId;
   state.deletedGameIds = stored.deletedGameIds;
   state.deletedEventIds = stored.deletedEventIds;
+  removeTombstonedGamesFromLocalState();
   state.userProfile = null;
   state.adminRequests = [];
   state.editingEventId = null;
@@ -4186,7 +4263,12 @@ async function confirmCancelGame() {
     return;
   }
 
-  rememberDeletedGame(game.id);
+  const deletion = prepareDurableGameDeletion(game);
+  if (!deletion) {
+    state.pendingCancelGame = false;
+    showToast("Game was not deleted because deletion evidence could not be saved");
+    return;
+  }
   state.games = state.games.filter((item) => item.id !== game.id);
   state.activeGame = null;
   state.trackingSession = null;
@@ -4196,19 +4278,20 @@ async function confirmCancelGame() {
   navigate(returnScreen);
   showToast("Game canceled");
 
-  if (state.isOffline || !supabaseClient || !currentUserId()) {
+  if (deletion.localOnly || state.isOffline || !supabaseClient || !currentUserId()) {
     state.syncStatus = state.isOffline ? "Will sync when online" : "Saved on this phone";
     persistAll();
     return;
   }
 
-  const cloudDeleted = await deleteSupabaseGame(game.id, { rpcOnly: true });
-  if (cloudDeleted) {
+  await processDurableSyncOperations();
+  const tombstone = durableSyncService().tombstoneFor(currentUserId(), game.id);
+  if (tombstone?.state === "accepted") {
     state.syncStatus = "Synced";
     clearResolvedCloudDeleteError();
     persistAll();
-  } else if (!state.cloudError) {
-    reportCloudDeleteNeedsUpdate("game");
+  } else {
+    state.syncStatus = durableSyncStatus() || "Sync waiting to retry";
   }
 }
 
@@ -4270,7 +4353,12 @@ async function confirmDeleteGame(id) {
     showToast("View-only team access");
     return;
   }
-  rememberDeletedGame(id);
+  const deletion = prepareDurableGameDeletion(game);
+  if (!deletion) {
+    state.pendingDeleteGameId = "";
+    showToast("Game was not deleted because deletion evidence could not be saved");
+    return;
+  }
   (game.events || []).forEach((event) => rememberDeletedEvent(event.id));
   state.games = state.games.filter((item) => item.id !== id);
   if (state.activeGame?.id === id) {
@@ -4286,13 +4374,18 @@ async function confirmDeleteGame(id) {
   persistAll();
   render();
   showToast("Game deleted");
-  const cloudDeleted = await deleteSupabaseGame(id);
-  if (cloudDeleted) {
+  if (!deletion.localOnly && supabaseClient && currentUserId() && !state.isOffline) {
+    await processDurableSyncOperations();
+  }
+  const tombstone = currentUserId()
+    ? durableSyncService().tombstoneFor(currentUserId(), id)
+    : null;
+  if (deletion.localOnly || tombstone?.state === "accepted") {
     forgetDeletedEvents((game.events || []).map((event) => event.id));
     state.syncStatus = "Synced";
     clearResolvedCloudDeleteError();
-  } else if (supabaseClient && currentUserId() && !state.cloudError) {
-    reportCloudDeleteNeedsUpdate("game");
+  } else {
+    state.syncStatus = durableSyncStatus() || "Sync waiting to retry";
   }
   persistAll();
   render();
@@ -5361,6 +5454,58 @@ function cloudGameHydrationIsCurrent(generation, userId) {
     && userId === currentUserId();
 }
 
+function gameTombstoneFromSupabaseRow(row = {}) {
+  return {
+    gameId: row.game_id,
+    accountId: currentUserId(),
+    deletionId: row.deletion_id,
+    deviceId: row.device_id || "",
+    deletedAt: row.deleted_at,
+    knownGameSavedAt: row.known_game_saved_at || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    state: "accepted",
+    lastError: null,
+    receipt: {
+      code: "authorized_server_tombstone",
+      acknowledgment: "tombstone_hydration",
+      serverRevision: null,
+      serverTimestamp: row.deleted_at,
+    },
+  };
+}
+
+async function fetchAuthorizedGameTombstones() {
+  if (!supabaseClient || !currentUserId()) return { data: [], error: null };
+  return supabaseClient
+    .from("legacy_game_tombstones")
+    .select(
+      "game_id,deletion_id,device_id,deleted_at,known_game_saved_at,created_at,updated_at",
+    )
+    .order("deleted_at", { ascending: false });
+}
+
+function applyAuthorizedGameTombstones(rows, generation, accountId) {
+  if (
+    !Array.isArray(rows)
+    || !cloudGameHydrationIsCurrent(generation, accountId)
+  ) {
+    return false;
+  }
+  durableSyncService().mergeServerTombstones(
+    accountId,
+    rows.map(gameTombstoneFromSupabaseRow),
+  );
+  const tombstonedIds = new Set(rows.map((row) => String(row.game_id || "")).filter(Boolean));
+  if (tombstonedIds.size) {
+    state.deletedGameIds = uniqueIds(state.deletedGameIds)
+      .filter((gameId) => !tombstonedIds.has(gameId));
+  }
+  removeTombstonedGamesFromLocalState();
+  persistAll();
+  return true;
+}
+
 function teamFromSupabaseRows(memberRow = {}) {
   const team = memberRow.teams || memberRow.team || memberRow;
   return normalizeTeam({
@@ -5654,7 +5799,22 @@ async function loadCloudGames(options = {}) {
   if (!supabaseClient || !hydrationUserId) return;
   const hydrationGeneration = ++cloudGameHydrationGeneration;
   await loadCloudTeams({ silent: true });
+  const tombstonePreflight = await fetchAuthorizedGameTombstones();
+  if (tombstonePreflight.error) {
+    if (cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId) && !options.silent) {
+      reportSyncError(tombstonePreflight.error);
+    }
+    return;
+  }
+  if (!applyAuthorizedGameTombstones(
+    tombstonePreflight.data || [],
+    hydrationGeneration,
+    hydrationUserId,
+  )) {
+    return;
+  }
   await flushDeletedCloudRecords({ quiet: Boolean(options.silent) });
+  await processDurableSyncOperations();
   const uploadedCount = await syncLocalGamesToCloud();
   await processDurableSyncOperations();
   const { data: ownData, error } = await supabaseClient
@@ -5685,6 +5845,12 @@ async function loadCloudGames(options = {}) {
   }
 
   if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) return;
+  const finalTombstones = await fetchAuthorizedGameTombstones();
+  if (finalTombstones.error) {
+    if (!options.silent) reportSyncError(finalTombstones.error);
+    return;
+  }
+  if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) return;
 
   const rowsById = new Map([...(ownData || []), ...teamData].map((game) => [game.id, game]));
   const cloudGames = [...rowsById.values()]
@@ -5698,6 +5864,11 @@ async function loadCloudGames(options = {}) {
     cloudGames,
     { activeGame: state.activeGame },
   ).filter(canShowGameForCurrentAccess);
+  applyAuthorizedGameTombstones(
+    finalTombstones.data || [],
+    hydrationGeneration,
+    hydrationUserId,
+  );
   mergePlayersFromGames(state.games);
   const newestCloudGame = cloudGames.find((game) => !isDeletedGame(game.id));
   if (!options.silent && newestCloudGame) {
@@ -7123,6 +7294,9 @@ function durableSyncService() {
       if (operation.operationType === types.game) {
         return performLegacyGameOperation(operation);
       }
+      if (operation.operationType === types.gameDelete) {
+        return performLegacyGameDeleteOperation(operation);
+      }
       if (operation.operationType === types.clock) {
         return performTrackedClockOperation(operation);
       }
@@ -7215,27 +7389,57 @@ async function performLegacyGameOperation(operation) {
       message: "The current account cannot edit this team game.",
     };
   }
+  const execute = (row) => supabaseClient.rpc("laxhornet_sync_game", {
+    p_operation: {
+      operation_id: operation.operationId,
+      device_id: operation.deviceId,
+      payload_revision: operation.payloadRevision,
+      game_row: row,
+    },
+  });
   let detachedMissingTeam = false;
-  let { error, skipped, httpStatus } = await upsertWithOptionalColumns("games", gameRow, [
-    "player_id",
-    "team_id",
-    "roster_player_id",
-    "period_format",
-  ]);
+  let {
+    data,
+    error,
+    status: httpStatus,
+  } = await execute(gameRow);
   if (error && isTeamForeignKeyError(error)) {
     gameRow = detachTeamFromSupabaseRows(gameRow);
     detachedMissingTeam = true;
-    ({ error, skipped, httpStatus } = await upsertWithOptionalColumns("games", gameRow, [
-      "player_id",
-      "team_id",
-      "roster_player_id",
-      "period_format",
-    ]));
+    ({
+      data,
+      error,
+      status: httpStatus,
+    } = await execute(gameRow));
   }
   if (error) {
     return durableSyncFailure(
       { error, httpStatus },
       { source: "legacy_game_upsert" },
+    );
+  }
+  if (data?.outcome === "conflicted") {
+    return {
+      outcome: "conflicted",
+      category: window.LaxHornetDurableSyncOperations.FAILURE_CATEGORIES.conflict,
+      code: data.code || "game_deleted",
+      message: "The saved game conflicts with durable deletion evidence.",
+      receipt: {
+        code: data.code || "game_deleted",
+        acknowledgment: data.acknowledgment || "durable_tombstone",
+        serverRevision: null,
+        serverTimestamp: data.deletedAt || null,
+      },
+    };
+  }
+  if (data?.outcome !== "accepted") {
+    return durableSyncFailure(
+      {
+        outcome: "rejected",
+        code: data?.code || "legacy_game_write_rejected",
+        httpStatus,
+      },
+      { source: "legacy_game_rpc" },
     );
   }
 
@@ -7244,12 +7448,89 @@ async function performLegacyGameOperation(operation) {
     receipt: {
       code: detachedMissingTeam
         ? "legacy_upsert_without_team_link"
-        : skipped.length
-          ? "legacy_upsert_optional_columns_skipped"
-          : "legacy_upsert_succeeded",
-      acknowledgment: "postgrest_request_success",
+        : data.code || "legacy_upsert_succeeded",
+      acknowledgment: data.acknowledgment || "durable_game_write_response",
       serverRevision: null,
-      serverTimestamp: null,
+      serverTimestamp: data.savedAt || null,
+    },
+  };
+}
+
+async function performLegacyGameDeleteOperation(operation) {
+  const deletion = operation.payload?.deletion;
+  if (
+    !deletion
+    || deletion.game_id !== operation.gameId
+    || deletion.account_id !== operation.accountId
+    || deletion.deletion_id !== operation.operationId
+  ) {
+    return {
+      outcome: "rejected",
+      code: "invalid_game_delete_operation",
+      message: "The saved game deletion operation is incomplete.",
+    };
+  }
+  const {
+    data,
+    error,
+    status: httpStatus,
+  } = await supabaseClient.rpc("laxhornet_delete_game_durable", {
+    p_deletion: deletion,
+  });
+  if (error) {
+    return durableSyncFailure(
+      { error, httpStatus },
+      { source: "legacy_game_delete_rpc" },
+    );
+  }
+  if (data?.outcome === "conflicted") {
+    return {
+      outcome: "conflicted",
+      category: window.LaxHornetDurableSyncOperations.FAILURE_CATEGORIES.conflict,
+      code: data.code || "game_delete_conflict",
+      message: "The saved game deletion conflicts with newer server evidence.",
+      receipt: {
+        code: data.code || "game_delete_conflict",
+        acknowledgment: data.acknowledgment || "durable_delete_conflict",
+        serverRevision: null,
+        serverTimestamp: data.deletedAt || data.serverSavedAt || null,
+      },
+    };
+  }
+  if (data?.outcome !== "accepted") {
+    return durableSyncFailure(
+      {
+        outcome: "rejected",
+        code: data?.code || "game_delete_rejected",
+        httpStatus,
+      },
+      { source: "legacy_game_delete_rpc" },
+    );
+  }
+  if (
+    data.deletionId !== operation.operationId
+    || data.gameId !== operation.gameId
+  ) {
+    return {
+      outcome: "conflicted",
+      category: window.LaxHornetDurableSyncOperations.FAILURE_CATEGORIES.conflict,
+      code: "game_delete_acknowledgment_mismatch",
+      message: "The server deletion acknowledgment does not match the saved operation.",
+      receipt: {
+        code: "game_delete_acknowledgment_mismatch",
+        acknowledgment: "durable_delete_identity_mismatch",
+        serverRevision: null,
+        serverTimestamp: data.deletedAt || null,
+      },
+    };
+  }
+  return {
+    outcome: "accepted",
+    receipt: {
+      code: data.code || "game_deleted",
+      acknowledgment: data.acknowledgment || "durable_delete_response",
+      serverRevision: null,
+      serverTimestamp: data.deletedAt || null,
     },
   };
 }
@@ -7578,18 +7859,23 @@ async function deleteSupabaseEvent(eventId, options = {}) {
 }
 
 async function deleteSupabaseGame(gameId, options = {}) {
-  if (!supabaseClient || !gameId) return;
-  const rpcResult = await supabaseClient.rpc("laxhornet_delete_game", { p_game_id: gameId });
-  if (!rpcResult.error || isCloudDeleteNotFoundError(rpcResult.error, "game")) {
+  if (!supabaseClient || !gameId || !currentUserId()) return false;
+  const deletion = prepareDurableGameDeletion(null, {
+    gameId,
+    allowProvenLocalOnly: false,
+  });
+  if (!deletion) return false;
+  if (state.isOffline) return false;
+  await processDurableSyncOperations();
+  const tombstone = durableSyncService().tombstoneFor(currentUserId(), gameId);
+  if (tombstone?.state === "accepted") {
     forgetDeletedGame(gameId);
     clearResolvedCloudDeleteError();
     return true;
   }
-  if (!isMissingRpcError(rpcResult.error)) {
-    reportCloudDeleteError("game", rpcResult.error);
-    return false;
+  if (!options.quiet && ["rejected", "conflicted"].includes(tombstone?.state)) {
+    state.cloudError = tombstone.lastError?.message || "Game deletion needs attention";
   }
-  if (!options.quiet) reportCloudDeleteNeedsUpdate("game");
   return false;
 }
 

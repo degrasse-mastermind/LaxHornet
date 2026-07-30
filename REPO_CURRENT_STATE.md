@@ -67,6 +67,32 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
   safe `sourceCode`. It does not persist original server messages, response
   bodies, request payloads, headers, tokens, stack traces, or private names.
   Rejected/conflicted records receive no ordinary retry time.
+- R2-06 extends that same private account-scoped storage domain with permanent
+  local game tombstones and `legacy_game_delete` operations. Deletion intent is
+  persisted before a game is hidden; retry, refresh, reconnect, and repeated
+  processing retain one deletion/operation ID. Proven never-cloud-visible games
+  avoid unnecessary server work, while ambiguous visibility receives a durable
+  delete operation.
+- Creating a game delete supersedes and retains older same-game write records.
+  Delete work runs before writes, and an older in-flight write acknowledgment
+  cannot clear the tombstone. Accepted delete receipts are persisted before the
+  operation is compacted; rejected and conflicted evidence remains recoverable.
+- The proposed R2-06 migration adds private durable legacy-game tombstones,
+  guarded game writes, and one transactional deletion RPC. A tombstone survives
+  physical game-row removal and permanently reserves the game ID. Same-ID
+  deletion replay is deterministic; a different deletion identity conflicts;
+  an older delete conflicts with a server game whose `saved_at` is newer than
+  the client's known value. The migration is repository-only and is not active
+  in any Supabase environment.
+- Cloud loading fetches authorized tombstones before queued upload, uses the
+  current account/request-generation guard for each response, then rechecks
+  tombstones before final game merge. Explicit tombstones suppress games in
+  either response order. Missing, filtered, unauthorized, or partially returned
+  rows are never inferred to be deleted.
+- Tombstones are authenticated and RLS-scoped to existing owner, reviewer, or
+  player-tracking authority. Anonymous and public access is absent. Tombstone
+  and queue metadata remains excluded from Live Share, recap, CSV, analytics,
+  normal export, private game backup, URLs, and public logs.
 - Known offline state creates no request or attempt increment. Losing the
   active session rejects eligible work in the loaded account namespace before
   switching namespaces. Explicit sign-in or manual sync can recover only that
@@ -79,8 +105,9 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
   evidence remains intact, including scores, event score context, embedded
   tracked-time state, pending/recovery state, and unknown local metadata.
   `loadCloudGames` also rejects responses from superseded request generations
-  or a prior account. This does not add durable game-field versions,
-  tombstones, or conflict UI, so the R2 gate remains open.
+  or a prior account. R2-06 adds explicit game tombstones, but durable
+  field-level versions and conflict UI remain absent, so the R2 gate remains
+  open.
 - R2-04 does not add server operation IDs or server deduplication to legacy
   PostgREST game upserts. Their accepted receipt proves a successful request,
   not server-side exactly-once execution after an ambiguous lost response.
@@ -89,7 +116,8 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
 - Canonical team-event RPCs have durable client operation IDs, server event
   versions, replay protection, conflicts, and permanent tombstones. Those
   guarantees do not currently extend to legacy game fields, tracked clock
-  writes, account-scope transitions, or cross-device legacy deletion.
+  writes, or account-scope transitions. R2-06 independently covers
+  cross-device legacy game deletion without modifying Trust Spine.
 - `main` contains the reviewed Tracked Playing Time foundation from merged PR #24 and the opt-in Phase 1 UI from merged PR #25.
 - The v284 frontend is deployed through the allowlisted Pages workflow. The
   completed rollback/restore proof restored approved source SHA

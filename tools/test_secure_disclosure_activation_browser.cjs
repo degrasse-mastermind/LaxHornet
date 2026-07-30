@@ -238,6 +238,24 @@ async function installApiRoutes(page, options = {}) {
       }
       return;
     }
+    if (pathname.endsWith("/laxhornet_sync_game")) {
+      const operation = post.p_operation || {};
+      const game = operation.game_row || {};
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          outcome: "accepted",
+          code: "legacy_game_write_accepted",
+          acknowledgment: "guarded_game_upsert",
+          operationId: operation.operation_id,
+          payloadRevision: operation.payload_revision,
+          gameId: game.id,
+          savedAt: game.saved_at || null,
+        }),
+      });
+      return;
+    }
     if (pathname.endsWith("/lh_register_game_scope")) {
       trustApi.scopes.add(String(post.p_game_id || ""));
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ outcome: "accepted", code: "game_scope_registered" }) });

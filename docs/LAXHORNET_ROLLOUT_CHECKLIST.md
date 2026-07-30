@@ -228,6 +228,51 @@ Visible sync states, a sanitized user journal, tombstones, signed-out namespace
 migration, server-side legacy-game deduplication, field-level conflicts, and
 the overall R2 gate remain incomplete.
 
+## R2-06 — Durable Legacy-Game Tombstones
+
+**Status:** [~] Ready for independent review
+**Risk level:** Level 3 — Critical deletion, synchronization, persistence, database, and authorization behavior
+**Codex task:** `Implement R2-06 — Add Durable Tombstones and Prevent Stale-Device Resurrection`
+**Task ID:** `019fb341-0d54-7b82-8a14-e5bb6f8d811e`
+**Branch:** `feature/r2-06-durable-game-tombstones`
+**Starting point:** R2-05 merge `44f0510d3bde18f459e78f570efd27b72dc2a989`
+**Draft pull request:** #47
+**Implementation commit:** `de4de33e46f23dac3f9f6c52b02946ac8236fa62`
+
+### Implemented boundary
+
+- [x] Dedicated private `legacy_game_tombstones` rows survive physical game deletion and permanently reserve the game ID.
+- [x] `legacy_game_delete` uses one permanent deletion/operation ID across retry, refresh, reconnect, and repeated processing.
+- [x] Deletion intent is stored before local removal; persistence failure does not pretend success.
+- [x] Proven local-only games avoid server work; ambiguous cloud visibility creates durable deletion protection.
+- [x] Older queued writes become retained `superseded` evidence, and older in-flight acknowledgments cannot clear a newer tombstone.
+- [x] The guarded server write path and trigger deterministically reject a write for a tombstoned game ID.
+- [x] Durable server deletion is account-bound, authorization-checked, transactional, idempotent for the same deletion ID, and conflicting for a different ID or newer game timestamp.
+- [x] Hydration obtains explicit authorized tombstones before upload and rechecks them before merge with account/generation guards.
+- [x] Missing or RLS-invisible rows are never interpreted as deletion evidence.
+- [x] Tombstone, queue, receipt, revision, and error metadata remains private and outside disclosures and backups.
+- [x] Trust Spine event operations and tombstones remain separate and unchanged.
+- [x] Migration, rollback refusal after retained evidence, synthetic pgTAP, local behavioral validation, and CI wiring are included without applying any migration.
+
+### Verification and current gate
+
+- [x] Focused tombstone contracts passed `29/29`, including delete-receipt identity, two-device, and both response-order journeys.
+- [x] Isolated migration/rollback behavior passed `11/11`.
+- [x] Durable operations passed `29/29`; R2-05 classification passed `22/22`; sync characterization passed `30/30`.
+- [x] Local-storage safety passed `28/28`; cancel/delete coverage passed `33/33`; delete permissions passed `17/17`.
+- [x] Event Pipeline and Trust Spine focused contracts passed.
+- [x] Final canonical-plus-additive regression passed `41/41` on the stabilized runtime and migration diff.
+- [x] Final draft-PR Docker, portable regression, Supabase Preview, and Vercel checks passed.
+- [ ] Exact final PR head requires independent Level 3 review before merge.
+- [ ] Apply the migration only in a separately authorized release/production task.
+
+The tombstone implementation item below remains open until exact-SHA
+independent review is recorded. Field-level game conflicts, server-side
+deduplication of non-delete writes, signed-out namespace migration, cross-key
+transactionality, visible sync states, a sanitized journal, production
+migration drift, production RLS verification, and the overall R2 gate remain
+incomplete.
+
 # 4. Planned Engineering Sequence
 
 Do not combine these into one large Codex task. Each item requires one approved ticket, one primary implementation task, and a separate independent review when warranted.
@@ -251,7 +296,8 @@ Do not combine these into one large Codex task. Each item requires one approved 
   cloud-omitted local evidence and rejects superseded or prior-account
   responses; durable field versions and explicit conflicts remain later R2
   work.
-- [ ] Define tombstone-versus-stale-update behavior.
+- [ ] Define tombstone-versus-stale-update behavior (`R2-06` implementation and
+  local validation complete; exact-SHA independent Level 3 review remains).
 - [x] Separate authorization failures from retryable network failures for the
   R2-05 durable legacy-game/tracked-clock boundary. Trust Spine and
   participation behavior remain under their existing contracts.
@@ -267,6 +313,8 @@ Do not combine these into one large Codex task. Each item requires one approved 
   durability only; legacy game writes still lack server-side deduplication.
 - [x] Keep production mutation and release out of the R2-04 feature ticket.
 - [x] Keep production mutation and release out of the R2-05 feature ticket.
+- [x] Keep production mutation, migration application, and release out of the
+  R2-06 feature ticket.
 
 **Gate to advance:** No silent local overwrite; offline operations replay exactly once where server contracts support it; conflicts are detectable and unresolved evidence remains recoverable.
 

@@ -948,6 +948,136 @@ inside the error record.
   exact final draft-PR head after all corrections are pushed. Do not merge or
   deploy from this task.
 
+### R2-06 — Add durable tombstones and prevent stale-device resurrection
+
+Status: `REVIEW`
+
+Risk level: `LEVEL 3`
+
+Branch: `feature/r2-06-durable-game-tombstones`
+
+Execution task: `Implement R2-06 — Add Durable Tombstones and Prevent Stale-Device Resurrection`
+(`019fb341-0d54-7b82-8a14-e5bb6f8d811e`)
+
+Related document: `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`
+
+#### Selected model and recreation policy
+
+- A dedicated private `legacy_game_tombstones` table retains one durable row
+  per deleted legacy game after the corresponding `games` row is physically
+  removed. This is safer than adding soft-delete fields to the wide legacy
+  game row: authorization evidence survives removal without retaining or
+  exposing a partially deleted game payload, and existing game/public
+  projections do not need new deleted-row filtering.
+- Policy A applies: a tombstoned game ID is permanent and cannot be reused.
+  Product recreation creates a new game ID. There is no restoration RPC, UI,
+  or implicit restore through an ordinary upsert.
+- Auth-user identifiers are retained as UUID scope evidence without
+  `auth.users` foreign keys so the tombstone cannot block account lifecycle.
+  Team and roster references may become null under their existing deletion
+  behavior, while the permanent game-ID guard remains.
+
+#### Local operation and ordering contract
+
+- `laxhornet.syncOperations.v1` now contains private account-scoped tombstones
+  plus a `legacy_game_delete` operation. The deletion ID is also the permanent
+  operation ID. Its stored fields are the account, game, device, deletion
+  timestamp, known game `saved_at`, creation/update timestamps, payload hash
+  and revision, attempt metadata, lifecycle state, bounded error, and receipt.
+- Local deletion intent and its operation are written in one storage-domain
+  update before the game is hidden. A persistence failure leaves the game
+  visible. Delete work is asynchronous; retry, refresh, reconnect, and
+  repeated processing retain the same deletion ID.
+- A proven local-only game uses a retained accepted local tombstone and no
+  server request. Proof requires no cloud row identity/evidence and no accepted
+  or unresolved cloud-write record. Ambiguous visibility creates durable
+  server delete protection.
+- Creating a delete marks older same-game writes `superseded`; they are
+  retained as non-processing evidence. Delete work is selected before writes.
+  An older in-flight write response remains superseded and cannot acknowledge
+  away, compact, or clear the tombstone.
+- The server rejects an older delete if the current game `saved_at` is newer
+  than the deleting client's known timestamp. Once accepted, the tombstone
+  permanently wins for that game ID. Same deletion-ID replay is accepted and
+  identified as replay; a different deletion ID conflicts.
+
+#### Server, authorization, and hydration contract
+
+- Migration `20260730134439_durable_game_tombstones.sql` adds the tombstone
+  table, constraints, indexes, RLS/FORCE RLS, minimum grants, a non-exposed
+  write-guard trigger, guarded `laxhornet_sync_game(jsonb)`, and transactional
+  `laxhornet_delete_game_durable(jsonb)`. The legacy delete RPC is retained but
+  now creates durable evidence. Direct authenticated table deletion is
+  revoked.
+- The durable delete RPC serializes competing deletes for one game ID, checks
+  the signed-in account and the existing owner/reviewer/player-tracking scope,
+  inserts the tombstone and removes the game in one transaction, and returns a
+  deterministic accepted/replayed/conflicted/rejected result. It does not add
+  a role or broaden Team Admin authority.
+- Authenticated clients can select only tombstones already within their
+  existing owner, platform-reviewer, or player-tracking scope. Anonymous and
+  public access is absent; direct client insert, update, and delete are absent.
+- Cloud loading retrieves and merges authorized tombstones before any queued
+  game upload, applies account and request-generation guards, hydrates games,
+  then rechecks tombstones before the final merge. Either response order ends
+  deleted. A tombstone-read failure aborts upload/merge rather than guessing.
+  A missing or RLS-invisible game row alone is never deletion evidence.
+- Tombstones, deletion IDs, queue state, errors, revisions, and receipts stay
+  out of Live Share, public payloads, family recap, CSV, analytics, ordinary
+  exports, URLs, logs, and private game backups.
+
+#### Migration, rollback, and verification
+
+- Rollback guidance is
+  `supabase/rollback/20260730134439_durable_game_tombstones_rollback.sql`.
+  Before activation it reverses the empty additive schema. After any tombstone
+  exists it refuses destructive reversal: application rollback must retain the
+  table, trigger, guarded writes, and legacy delete wrapper so old or rolled
+  back clients cannot resurrect a deleted game.
+- Synthetic pgTAP coverage is
+  `supabase/tests/durable_game_tombstones.sql`; isolated PGlite behavioral
+  validation covers authorization, replay, conflict, RLS invisibility,
+  write-guard behavior, and rollback refusal/success. The migration has not
+  been applied to a Supabase project.
+- Focused tombstone assertions pass `29/29`; isolated migration/rollback
+  assertions pass `11/11`; durable operations pass `29/29`; sync
+  characterization passes `30/30`; R2-05 classification passes `22/22`;
+  local-storage safety passes `28/28`; cancel/delete static coverage passes
+  `33/33`; delete-RPC permissions pass `17/17`; Event Pipeline and Trust Spine
+  focused contracts pass.
+- Characterization now treats stale-device resurrection prevention and
+  explicit tombstone hydration as desired behavior. Missing-row inference,
+  field-level game conflicts, server-side non-delete write deduplication,
+  signed-out namespace migration, cross-key transactionality, visible states,
+  sanitized journal, production migration drift, and production RLS
+  verification remain unresolved.
+
+#### Acceptance and completion record
+
+- Baseline: `origin/main` at
+  `44f0510d3bde18f459e78f570efd27b72dc2a989`, including merged R2-01 through
+  R2-05.
+- Implementation commit:
+  `de4de33e46f23dac3f9f6c52b02946ac8236fa62`.
+- Draft pull request: #47.
+- Complete local regression: canonical-plus-additive `41 passed, 0 failed`.
+- Changed JavaScript syntax and `git diff --check`: passed.
+- Final-head Docker, portable regression, Supabase Preview, and Vercel checks
+  passed. Independent exact-PR-SHA Level 3 review remains required before
+  merge.
+- Production verification still requires a separately authorized
+  nonproduction/production rollout task after migration review. Historical
+  games hard-deleted before this migration have no trustworthy server-side
+  ownership row from which this feature can synthesize a tombstone; the client
+  correctly treats that absence as unknown rather than deletion.
+- Production or external state changed: `NO`.
+- `REPO_CURRENT_STATE.md` updated: `YES`.
+- `docs/LAXHORNET_ROLLOUT_CHECKLIST.md` updated: `YES`; the R2 tombstone gate
+  remains incomplete until exact-SHA independent review, and production
+  application remains separately incomplete.
+- Review status: `NOT COMPLETE`. Do not merge, deploy, or apply the migration
+  from this task.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

@@ -142,6 +142,7 @@
   const SCHEMA_VERSION = 1;
   const OPERATION_TYPES = Object.freeze({
     game: "legacy_game_write",
+    gameDelete: "legacy_game_delete",
     clock: "tracked_clock_write",
   });
   const OPERATION_STATES = Object.freeze([
@@ -151,6 +152,7 @@
     "retryable",
     "rejected",
     "conflicted",
+    "superseded",
   ]);
   const RETRY_BASE_MS = 2000;
   const RETRY_MAX_MS = 5 * 60 * 1000;
@@ -311,12 +313,43 @@
     if (Array.isArray(value)) return value.every(isObject);
     if (!isObject(value)) return false;
     if (!Array.isArray(value.operations) || !value.operations.every(isObject)) return false;
+    if (value.tombstones !== undefined && (!Array.isArray(value.tombstones) || !value.tombstones.every(isObject))) {
+      return false;
+    }
     if (value.schemaVersion !== undefined) {
       const version = Number(value.schemaVersion);
       if (!Number.isInteger(version) || version < 1) return false;
     }
     if (value.acknowledgments !== undefined && !isObject(value.acknowledgments)) return false;
     return true;
+  }
+
+  function normalizedTombstone(value, options = {}) {
+    if (!isObject(value)) return null;
+    const gameId = String(value.gameId || value.game_id || "").trim();
+    const accountId = String(value.accountId || value.account_id || options.accountId || "").trim();
+    const deletionId = String(value.deletionId || value.deletion_id || "").trim();
+    if (!gameId || !accountId || !deletionId) return null;
+    const createdAt = isoTimestamp(value.createdAt || value.created_at || options.now());
+    const updatedAt = isoTimestamp(value.updatedAt || value.updated_at || createdAt);
+    const state = ["pending", "accepted", "retryable", "rejected", "conflicted"].includes(value.state)
+      ? value.state
+      : "accepted";
+    return {
+      gameId,
+      accountId,
+      deletionId,
+      deviceId: String(value.deviceId || value.device_id || options.deviceId || "").trim(),
+      deletedAt: isoTimestamp(value.deletedAt || value.deleted_at || createdAt),
+      knownGameSavedAt: value.knownGameSavedAt || value.known_game_saved_at
+        ? isoTimestamp(value.knownGameSavedAt || value.known_game_saved_at)
+        : null,
+      createdAt,
+      updatedAt,
+      state,
+      lastError: normalizedError(value.lastError || value.last_error, { classifiedAt: updatedAt }),
+      receipt: normalizedReceipt(value.receipt),
+    };
   }
 
   function normalizedOperation(operation, options = {}) {
@@ -435,11 +468,18 @@
           now,
         }))
         .filter(Boolean),
+      tombstones: (Array.isArray(source.tombstones) ? source.tombstones : [])
+        .map((tombstone) => normalizedTombstone(tombstone, {
+          accountId: options.accountId,
+          deviceId,
+          now,
+        }))
+        .filter(Boolean),
       acknowledgments: trimAcknowledgments(source.acknowledgments),
     };
     normalized.operations = normalized.operations.filter((operation) => {
       if (operation.state !== "accepted") return true;
-      const key = operation.operationType === OPERATION_TYPES.game
+      const key = [OPERATION_TYPES.game, OPERATION_TYPES.gameDelete].includes(operation.operationType)
         ? `${operation.operationType}:${operation.gameId}`
         : `${operation.operationType}:${operation.gameId}:${operation.payloadHash}`;
       return normalized.acknowledgments[key]?.payloadHash !== operation.payloadHash;
@@ -494,11 +534,16 @@
       || /^stale_.*_revision$/.test(code)
       || code.includes("revision_conflict")
       || code.includes("clock_acknowledgment_mismatch")
+      || code === "game_deleted"
+      || code === "game_already_deleted"
+      || code === "newer_game_revision"
+      || /laxhornet_game_deleted|durable tombstone|game already deleted/i.test(text)
       || httpStatus === 409
     ) {
       category = FAILURE_CATEGORIES.conflict;
     } else if (
       httpStatus === 401
+      || code === "authentication_required"
       || /^pgrst30[1-3]$/.test(code)
       || /authsessionmissing|authinvalidjwt|missing_session|session_missing|expired_session|session_expired|invalid_(?:access_)?token|token_(?:expired|revoked)|jwt_(?:expired|invalid)|bad_jwt|refresh_token_not_found/.test(code)
       || /missing session|session (?:is )?(?:missing|expired)|jwt (?:has )?expired|invalid or revoked access token|invalid jwt/i.test(text)
@@ -609,9 +654,46 @@
     }
 
     function acknowledgmentKey(operationType, gameId, hash) {
-      return operationType === OPERATION_TYPES.game
+      return [OPERATION_TYPES.game, OPERATION_TYPES.gameDelete].includes(operationType)
         ? `${operationType}:${gameId}`
         : `${operationType}:${gameId}:${hash}`;
+    }
+
+    function tombstoneFor(accountId, gameId) {
+      const state = supportedState();
+      if (!state || !accountId || !gameId) return null;
+      return state.tombstones.find((tombstone) =>
+        tombstone.accountId === accountId && tombstone.gameId === gameId) || null;
+    }
+
+    function isTombstoned(accountId, gameId) {
+      return Boolean(tombstoneFor(accountId, gameId));
+    }
+
+    function supersedeGameWrites(next, accountId, gameId, timestamp) {
+      next.operations = next.operations.map((operation) => {
+        if (
+          operation.accountId !== accountId
+          || operation.gameId !== gameId
+          || operation.operationType !== OPERATION_TYPES.game
+          || operation.state === "accepted"
+        ) {
+          return operation;
+        }
+        return {
+          ...operation,
+          state: "superseded",
+          updatedAt: timestamp,
+          nextAttemptAt: null,
+          lastError: null,
+          receipt: {
+            code: "superseded_by_delete",
+            acknowledgment: "local_delete_intent",
+            serverRevision: null,
+            serverTimestamp: timestamp,
+          },
+        };
+      });
     }
 
     function isAcknowledged(operationType, gameId, payload) {
@@ -627,6 +709,13 @@
       const state = supportedState();
       const accountId = String(options.accountId || currentAccountId() || "").trim();
       if (!state || !accountId || !gameId || !isObject(payload)) return null;
+      if (
+        operationType === OPERATION_TYPES.game
+        && state.tombstones.some((tombstone) =>
+          tombstone.accountId === accountId && tombstone.gameId === gameId)
+      ) {
+        return null;
+      }
       const hash = payloadHash(payload);
       if (isAcknowledged(operationType, gameId, payload)) {
         return { operationId: "", payloadHash: hash, alreadyAccepted: true };
@@ -716,12 +805,195 @@
       });
     }
 
+    function queueDelete({
+      accountId,
+      gameId,
+      knownGameSavedAt = null,
+      deletedAt = null,
+    }) {
+      const state = supportedState();
+      const scopedAccountId = String(accountId || currentAccountId() || "").trim();
+      const scopedGameId = String(gameId || "").trim();
+      if (!state || !scopedAccountId || !scopedGameId) return null;
+      const existing = state.tombstones.find((tombstone) =>
+        tombstone.accountId === scopedAccountId && tombstone.gameId === scopedGameId);
+      if (existing) {
+        const operation = state.operations.find((candidate) =>
+          candidate.operationType === OPERATION_TYPES.gameDelete
+          && candidate.accountId === scopedAccountId
+          && candidate.gameId === scopedGameId);
+        return {
+          operationId: operation?.operationId || existing.deletionId,
+          deletionId: existing.deletionId,
+          alreadyAccepted: existing.state === "accepted",
+          state: existing.state,
+        };
+      }
+
+      const timestamp = isoTimestamp(deletedAt || now());
+      const deletionId = createId("game-delete");
+      const payload = {
+        deletion: {
+          game_id: scopedGameId,
+          account_id: scopedAccountId,
+          deletion_id: deletionId,
+          device_id: state.deviceId,
+          deleted_at: timestamp,
+          known_game_saved_at: knownGameSavedAt ? isoTimestamp(knownGameSavedAt) : null,
+        },
+      };
+      const hash = payloadHash(payload);
+      const next = copy(state);
+      next.tombstones.push({
+        gameId: scopedGameId,
+        accountId: scopedAccountId,
+        deletionId,
+        deviceId: state.deviceId,
+        deletedAt: timestamp,
+        knownGameSavedAt: knownGameSavedAt ? isoTimestamp(knownGameSavedAt) : null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        state: "pending",
+        lastError: null,
+        receipt: null,
+      });
+      supersedeGameWrites(next, scopedAccountId, scopedGameId, timestamp);
+      next.operations.push({
+        operationId: deletionId,
+        operationType: OPERATION_TYPES.gameDelete,
+        accountId: scopedAccountId,
+        gameId: scopedGameId,
+        deviceId: state.deviceId,
+        coalescingKey: `${OPERATION_TYPES.gameDelete}:${scopedGameId}`,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        attemptCount: 0,
+        lastAttemptAt: null,
+        nextAttemptAt: null,
+        state: "pending",
+        payload,
+        payloadHash: hash,
+        payloadRevision: 1,
+        baseRevision: null,
+        lastError: null,
+        receipt: null,
+      });
+      if (!replaceAndPersist(next, state)) return null;
+      return {
+        operationId: deletionId,
+        deletionId,
+        alreadyAccepted: false,
+        state: "pending",
+      };
+    }
+
+    function recordLocalOnlyDeletion({
+      accountId,
+      gameId,
+      deletedAt = null,
+    }) {
+      const state = supportedState();
+      const scopedAccountId = String(accountId || currentAccountId() || "").trim();
+      const scopedGameId = String(gameId || "").trim();
+      if (!state || !scopedAccountId || !scopedGameId) return null;
+      const existing = state.tombstones.find((tombstone) =>
+        tombstone.accountId === scopedAccountId && tombstone.gameId === scopedGameId);
+      if (existing) return copy(existing);
+      const timestamp = isoTimestamp(deletedAt || now());
+      const next = copy(state);
+      const tombstone = {
+        gameId: scopedGameId,
+        accountId: scopedAccountId,
+        deletionId: createId("local-game-delete"),
+        deviceId: state.deviceId,
+        deletedAt: timestamp,
+        knownGameSavedAt: null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        state: "accepted",
+        lastError: null,
+        receipt: {
+          code: "local_only_game_deleted",
+          acknowledgment: "proven_never_cloud_visible",
+          serverRevision: null,
+          serverTimestamp: null,
+        },
+      };
+      next.tombstones.push(tombstone);
+      supersedeGameWrites(next, scopedAccountId, scopedGameId, timestamp);
+      return replaceAndPersist(next, state) ? tombstone : null;
+    }
+
+    function mergeServerTombstones(accountId, values = []) {
+      const state = supportedState();
+      const scopedAccountId = String(accountId || "").trim();
+      if (!state || !scopedAccountId || !Array.isArray(values)) return 0;
+      const timestamp = isoTimestamp(now());
+      const next = copy(state);
+      let changed = 0;
+      for (const value of values) {
+        const incoming = normalizedTombstone(
+          { ...value, accountId: scopedAccountId, state: "accepted" },
+          { accountId: scopedAccountId, deviceId: state.deviceId, now },
+        );
+        if (!incoming || incoming.accountId !== scopedAccountId) continue;
+        const index = next.tombstones.findIndex((tombstone) =>
+          tombstone.accountId === scopedAccountId && tombstone.gameId === incoming.gameId);
+        if (
+          index >= 0
+          && next.tombstones[index].deletionId === incoming.deletionId
+          && next.tombstones[index].state === "accepted"
+          && next.tombstones[index].updatedAt === incoming.updatedAt
+        ) {
+          continue;
+        }
+        if (index >= 0) next.tombstones[index] = incoming;
+        else next.tombstones.push(incoming);
+        supersedeGameWrites(next, scopedAccountId, incoming.gameId, timestamp);
+        next.operations = next.operations.map((operation) => {
+          if (
+            operation.operationType !== OPERATION_TYPES.gameDelete
+            || operation.accountId !== scopedAccountId
+            || operation.gameId !== incoming.gameId
+            || operation.operationId === incoming.deletionId
+          ) {
+            return operation;
+          }
+          return {
+            ...operation,
+            state: "conflicted",
+            updatedAt: timestamp,
+            nextAttemptAt: null,
+            lastError: normalizedError({
+              category: FAILURE_CATEGORIES.conflict,
+              code: "game_already_deleted",
+              source: "tombstone_hydration",
+            }, { classifiedAt: timestamp }),
+            receipt: {
+              code: "game_already_deleted",
+              acknowledgment: "authorized_tombstone",
+              serverRevision: null,
+              serverTimestamp: incoming.deletedAt,
+            },
+          };
+        });
+        changed += 1;
+      }
+      if (!changed) return 0;
+      return replaceAndPersist(next, state) ? changed : 0;
+    }
+
     function eligibleOperation(state, accountId, timestamp) {
       const operations = state.operations
         .filter((operation) => operation.accountId === accountId)
         .sort((left, right) => {
           if (left.operationType !== right.operationType) {
-            return left.operationType === OPERATION_TYPES.game ? -1 : 1;
+            const priority = {
+              [OPERATION_TYPES.gameDelete]: 0,
+              [OPERATION_TYPES.game]: 1,
+              [OPERATION_TYPES.clock]: 2,
+            };
+            return priority[left.operationType] - priority[right.operationType];
           }
           if (left.operationType === OPERATION_TYPES.clock) {
             const revisionDifference = Number(left.baseRevision ?? -1)
@@ -797,6 +1069,21 @@
           ? normalizedReceipt(failure.receipt)
           : operation.receipt,
       };
+      if (operation.operationType === OPERATION_TYPES.gameDelete) {
+        const tombstoneIndex = next.tombstones.findIndex((tombstone) =>
+          tombstone.accountId === operation.accountId
+          && tombstone.gameId === operation.gameId
+          && tombstone.deletionId === operation.operationId);
+        if (tombstoneIndex >= 0) {
+          next.tombstones[tombstoneIndex] = {
+            ...next.tombstones[tombstoneIndex],
+            state: outcome,
+            updatedAt: timestamp,
+            lastError: next.operations[index].lastError,
+            receipt: next.operations[index].receipt,
+          };
+        }
+      }
       return replaceAndPersist(next, state);
     }
 
@@ -823,6 +1110,25 @@
           receipt: failure.outcome === "conflicted"
             ? normalizedReceipt(failure.receipt)
             : operation.receipt,
+        };
+      });
+      next.tombstones = next.tombstones.map((tombstone) => {
+        const operation = next.operations.find((candidate) =>
+          candidate.operationType === OPERATION_TYPES.gameDelete
+          && candidate.operationId === tombstone.deletionId
+          && candidate.accountId === tombstone.accountId
+          && candidate.gameId === tombstone.gameId);
+        if (!operation || operation.accountId !== accountId || !states.includes(
+          state.operations.find((candidate) => candidate.operationId === operation.operationId)?.state,
+        )) {
+          return tombstone;
+        }
+        return {
+          ...tombstone,
+          state: failure.outcome,
+          updatedAt: timestamp,
+          lastError: operation.lastError,
+          receipt: operation.receipt,
         };
       });
       if (!changed) return 0;
@@ -863,6 +1169,21 @@
           lastError: null,
         };
       });
+      next.tombstones = next.tombstones.map((tombstone) => {
+        const operation = next.operations.find((candidate) =>
+          candidate.operationType === OPERATION_TYPES.gameDelete
+          && candidate.operationId === tombstone.deletionId);
+        return operation
+          && operation.accountId === accountId
+          && operation.state === "pending"
+          ? {
+              ...tombstone,
+              state: "pending",
+              updatedAt: timestamp,
+              lastError: null,
+            }
+          : tombstone;
+      });
       if (!changed) return 0;
       return replaceAndPersist(next, state) ? changed : 0;
     }
@@ -895,16 +1216,39 @@
       next.acknowledgments = trimAcknowledgments(next.acknowledgments);
       const payloadStillCurrent = current.payloadHash === attempted.payloadHash
         && current.payloadRevision === attempted.payloadRevision;
+      const deletionDominatesWrite = attempted.operationType === OPERATION_TYPES.game
+        && next.tombstones.some((tombstone) =>
+          tombstone.accountId === attempted.accountId
+          && tombstone.gameId === attempted.gameId);
       next.operations[index] = {
         ...current,
-        state: payloadStillCurrent ? "accepted" : "pending",
+        state: deletionDominatesWrite
+          ? "superseded"
+          : payloadStillCurrent
+            ? "accepted"
+            : "pending",
         updatedAt: timestamp,
         nextAttemptAt: null,
         lastError: null,
         receipt: receipt.receipt,
       };
+      if (attempted.operationType === OPERATION_TYPES.gameDelete) {
+        const tombstoneIndex = next.tombstones.findIndex((tombstone) =>
+          tombstone.accountId === attempted.accountId
+          && tombstone.gameId === attempted.gameId
+          && tombstone.deletionId === attempted.operationId);
+        if (tombstoneIndex >= 0) {
+          next.tombstones[tombstoneIndex] = {
+            ...next.tombstones[tombstoneIndex],
+            state: "accepted",
+            updatedAt: timestamp,
+            lastError: null,
+            receipt: receipt.receipt,
+          };
+        }
+      }
       if (!replaceAndPersist(next, state)) return false;
-      if (!payloadStillCurrent) return false;
+      if (!payloadStillCurrent || deletionDominatesWrite) return false;
 
       const acceptedState = supportedState();
       const compacted = copy(acceptedState);
@@ -983,14 +1327,19 @@
       const state = supportedState();
       return Boolean(state?.operations.some((operation) =>
         operation.accountId === accountId
-        && operation.state !== "accepted"));
+        && !["accepted", "superseded"].includes(operation.state)));
     }
 
     return Object.freeze({
       queueGame,
+      queueDelete,
+      recordLocalOnlyDeletion,
       queueClock,
       process,
       isAcknowledged,
+      isTombstoned,
+      tombstoneFor,
+      mergeServerTombstones,
       hasUnresolved,
       rejectAuthentication,
       recoverAuthentication,
