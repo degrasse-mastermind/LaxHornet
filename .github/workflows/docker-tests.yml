@@ -1,0 +1,106 @@
+name: LaxHornet Docker Test Suite
+
+on:
+  pull_request:
+    paths:
+      - '**.js'
+      - '**.mjs'
+      - '**.py'
+      - 'tools/**'
+      - 'supabase/**'
+      - '.github/workflows/docker-tests.yml'
+      - 'Dockerfile'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-test:
+    name: Docker-based test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: test
+          push: false
+          load: true
+          tags: laxhornet:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run root JavaScript syntax checks
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/app" \
+            laxhornet:test \
+            sh -c 'find . -maxdepth 1 -type f -name "*.js" -print0 | sort -z | while IFS= read -r -d "" file; do echo "==> node --check $file" && node --check "$file"; done'
+
+      - name: Run event operation service contracts
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_event_operation_service.mjs
+
+      - name: Run tracked playing time service contracts
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_tracked_playing_time_service.mjs
+
+      - name: Run tracked playing time foundation contracts
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_tracked_playing_time_foundation.mjs
+
+      - name: Run tracked playing time UI contracts
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_tracked_playing_time_ui.mjs
+
+      - name: Run tracked playing time manual scenarios
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_tracked_playing_time_manual_scenarios.mjs
+
+      - name: Run game scope capability contracts
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_game_scope_capabilities.mjs
+
+      - name: Run update release contract
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_update_release.mjs
+
+      - name: Run release manifest validation
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/validate_release_manifest.mjs --require-combined --combined-ref=HEAD
+
+      - name: Run release hygiene checks
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_release_hygiene.mjs
+
+      - name: Run phase-aware release containment
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test npm install --no-save --no-package-lock --ignore-scripts @electric-sql/pglite@0.5.4 && node tools/test_release_containment_phase_aware.mjs
+
+      - name: Run minimum disclosure contracts
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_minimum_disclosure.mjs
+
+      - name: Run secure disclosure activation contracts
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_secure_disclosure_activation.mjs
+
+      - name: Run product alignment contracts
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_product_alignment_remediation.mjs
+
+      - name: Run trust spine release contracts
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_trust_spine_release1.mjs
+
+      - name: Run cancel game contracts (Python)
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test python tools/test_cancel_game.py
+
+      - name: Run delete permission contracts (Python)
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test python tools/test_delete_rpc_permissions.py
+
+      - name: Run player-removal cleanup contracts (Python)
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test python tools/test_player_removal_request_cleanup.py
+
+      - name: Run event pipeline secret scan
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_event_pipeline_secret_scan.mjs
+
