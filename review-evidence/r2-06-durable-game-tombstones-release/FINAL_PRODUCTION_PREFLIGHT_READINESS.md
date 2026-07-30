@@ -53,7 +53,10 @@ returned or enumerated.
 - Disposable PostgreSQL concurrency: `8/8`.
 - Production-phase canonical preflight: every row passed except the intentional
   R2-06 closeout-readiness gate.
-- Complete canonical-plus-additive regression: `43/43`.
+- Complete canonical-plus-additive regression: `43/43`. A subsequent
+  documentation-only clarification kept exact identifiers out of the public
+  repository; it did not affect shared behavior, so the complete suite was not
+  rerun.
 - `git diff --check`: pass before and after documentation changes.
 
 ## Production runtime and Pages boundary

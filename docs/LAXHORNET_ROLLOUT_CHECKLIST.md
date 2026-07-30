@@ -410,8 +410,9 @@ infer activation approval from the observed state.
 - [x] Keep exact synthetic identifiers out of the public repository; require
   one authorization-named private retained-identifier record and sanitized,
   hash-bound repository evidence.
-- [x] Pass the complete final canonical-plus-additive local regression
-  (`43/43`) after the documentation diff stabilized.
+- [x] Pass the complete canonical-plus-additive local regression (`43/43`).
+  A later documentation-only public-evidence privacy clarification did not
+  affect shared behavior and did not require a complete-suite rerun.
 - [ ] Obtain explicit production Auth/data authorization for the exact R2-06C
   matrix.
 - [ ] Execute the separately authorized synthetic verification and cleanup.

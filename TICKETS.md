@@ -1521,7 +1521,9 @@ Starting point:
 - The production-phase canonical preflight passed every runtime/database/
   catalog row and failed only `R2-06 release closeout readiness` with the exact
   messages that authorization, behavior, and cleanup evidence are absent.
-- The complete final canonical-plus-additive local regression passed `43/43`.
+- The complete canonical-plus-additive local regression passed `43/43`. A
+  later documentation-only public-evidence privacy clarification did not
+  affect shared behavior and did not require a complete-suite rerun.
 
 #### Authorization-ready correction
 
