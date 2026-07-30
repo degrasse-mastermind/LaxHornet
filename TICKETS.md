@@ -512,6 +512,54 @@ Known limitations:
 Next step: independent review of the draft pull request. Do not merge or deploy
 until separately authorized.
 
+### R2-01 — Inventory current local/cloud sync and conflict behavior
+
+Status: `IN PROGRESS`
+
+Risk level: `LEVEL 3`
+
+Branch: `codex/r2-01-sync-inventory`
+
+Related document: `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`
+
+Goal:
+
+Create an evidence-based current-state inventory of local persistence, cloud
+reads/writes, retries, identities, ordering, deletion, authorization failures,
+conflicts, sync UI, and actual test coverage without changing behavior.
+
+In scope:
+
+- Current runtime, relevant committed SQL/RPCs, and relevant tests.
+- One architecture inventory and narrow rollout/current-state records.
+
+Out of scope:
+
+- Runtime, SQL, migration, test, workflow, release, Supabase, deployment, or
+  production changes.
+
+Acceptance criteria:
+
+- Every material risk names its classification and current file/function
+  evidence.
+- Desired behavior and follow-up tickets are separate from current behavior.
+- Unknown live-system facts remain unknown rather than inferred.
+- The R2 gate remains open pending small, ordered implementation tickets.
+
+Completion record:
+
+- Baseline: `origin/main` at
+  `fff8c3fe4f9cf285c3c092a713bef3d3f24c03e1`.
+- Prerequisites confirmed: LH-DEV-006, Lean Development Workflow v2, corrected
+  Docker CI, and reconciled rollout checklist.
+- Commit/PR: pending closeout.
+- Files changed: pending closeout.
+- Checks: pending closeout.
+- Production or external state changed: `NO`.
+- `REPO_CURRENT_STATE.md` updated: `YES` — current limitations only.
+- Remaining work: independent exact-PR-SHA review, then the proposed R2
+  implementation sequence.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

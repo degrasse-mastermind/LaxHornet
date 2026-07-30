@@ -42,6 +42,14 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
   are preserved and write-blocked rather than downgraded.
 - Supabase synchronization is optional and must not block core game-day tracking.
 - Runtime includes local delete markers and event-operation capabilities.
+- R2-01 documents that ordinary `games`/`events` hydration is cloud-wins for a
+  matching game ID and does not preserve all richer local-only fields,
+  including embedded tracked-time state and event score context. The current
+  sync model therefore does not yet meet the conflict-safe R2 gate.
+- Canonical team-event RPCs have durable client operation IDs, server event
+  versions, replay protection, conflicts, and permanent tombstones. Those
+  guarantees do not currently extend to legacy game fields, tracked clock
+  writes, account-scope transitions, or cross-device legacy deletion.
 - `main` contains the reviewed Tracked Playing Time foundation from merged PR #24 and the opt-in Phase 1 UI from merged PR #25.
 - The v284 frontend is deployed through the allowlisted Pages workflow. The
   completed rollback/restore proof restored approved source SHA

@@ -124,7 +124,8 @@ Do not combine these into one large Codex task. Each item requires one approved 
 
 ## R2 — Conflict-Safe Offline Synchronization
 
-- [ ] Inspect current local/cloud merge behavior again after LH-DEV-006.
+- [x] Inspect current local/cloud merge behavior again after LH-DEV-006
+  (`R2-01`; `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`).
 - [ ] Define permanent client operation IDs.
 - [ ] Define queued-operation states.
 - [ ] Define idempotent replay.
