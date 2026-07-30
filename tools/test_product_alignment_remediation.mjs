@@ -78,7 +78,8 @@ expect(
 );
 expect(
   app.includes("window.navigator.onLine === false")
-    && app.includes("localStorage.setItem(scopedStorageKey(key), JSON.stringify(value))")
+    && app.includes("localStorageSafety.write({")
+    && app.includes("primaryKey: scopedStorageKey(key)")
     && app.includes("function persistAll()"),
   "offline/local persistence paths remain present",
 );

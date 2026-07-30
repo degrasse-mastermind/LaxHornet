@@ -36,6 +36,10 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
 ## Local-first storage and synchronization
 
 - `localStorage` remains the immediate source for offline game tracking and user-facing continuity.
+- Local storage domains use schema-version `1` safety sidecars for metadata,
+  staging, one validated backup, and one bounded quarantine value while
+  preserving existing primary keys and payload shapes. Future-schema domains
+  are preserved and write-blocked rather than downgraded.
 - Supabase synchronization is optional and must not block core game-day tracking.
 - Runtime includes local delete markers and event-operation capabilities.
 - `main` contains the reviewed Tracked Playing Time foundation from merged PR #24 and the opt-in Phase 1 UI from merged PR #25.

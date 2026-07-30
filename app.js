@@ -23,6 +23,391 @@ const STORAGE_KEYS = {
   trustSpineSync: "laxhornet.trustSpineSync.v1",
 };
 
+// LOCAL_STORAGE_SAFETY_CORE_START
+const LOCAL_STORAGE_SCHEMA_VERSION = 1;
+const LOCAL_STORAGE_SUPPORT_SUFFIXES = Object.freeze({
+  metadata: ".safety.meta",
+  staging: ".safety.staging",
+  backup: ".safety.backup",
+  quarantine: ".safety.quarantine",
+});
+const LOCAL_STORAGE_HEALTH = Object.freeze({
+  healthy: "healthy",
+  legacyUpgraded: "legacy_upgraded",
+  backupRecovered: "backup_recovered",
+  defaulted: "defaulted",
+  writeFailed: "write_failed",
+  migrationFailed: "migration_failed",
+  unsupportedFuture: "unsupported_future",
+});
+const LOCAL_STORAGE_MIGRATIONS = Object.freeze({
+  0: (value) => value,
+});
+
+function isStorageObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function storageSupportKeys(primaryKey) {
+  return Object.fromEntries(
+    Object.entries(LOCAL_STORAGE_SUPPORT_SUFFIXES).map(([name, suffix]) => [name, `${primaryKey}${suffix}`]),
+  );
+}
+
+function createLocalStorageSafety(options = {}) {
+  const storage = options.storage;
+  const currentVersion = Number(options.currentVersion || LOCAL_STORAGE_SCHEMA_VERSION);
+  const migrations = options.migrations || LOCAL_STORAGE_MIGRATIONS;
+  const now = typeof options.now === "function" ? options.now : () => new Date().toISOString();
+  const healthByKey = new Map();
+  const notableHealthByKey = new Map();
+  const writeBlockedKeys = new Set();
+  const quarantinedKeys = new Set();
+  let batchFailures = [];
+
+  function record(primaryKey, domain, status, detail = "") {
+    const result = Object.freeze({
+      domain: String(domain || "unknown"),
+      status,
+      detail: String(detail || ""),
+    });
+    healthByKey.set(primaryKey, result);
+    if (status !== LOCAL_STORAGE_HEALTH.healthy) notableHealthByKey.set(primaryKey, result);
+    if (
+      [
+        LOCAL_STORAGE_HEALTH.writeFailed,
+        LOCAL_STORAGE_HEALTH.migrationFailed,
+        LOCAL_STORAGE_HEALTH.unsupportedFuture,
+      ].includes(status)
+    ) {
+      batchFailures.push(result);
+    }
+    return result;
+  }
+
+  function validateParsed(value, validate) {
+    try {
+      return typeof validate !== "function" || validate(value) === true;
+    } catch {
+      return false;
+    }
+  }
+
+  function parseValidated(raw, validate) {
+    if (raw === null) return { ok: false, missing: true, value: null };
+    try {
+      const value = JSON.parse(raw);
+      return validateParsed(value, validate)
+        ? { ok: true, missing: false, value }
+        : { ok: false, missing: false, value: null, reason: "wrong_structural_type" };
+    } catch {
+      return { ok: false, missing: false, value: null, reason: "malformed_json" };
+    }
+  }
+
+  function readMetadata(primaryKey) {
+    let raw;
+    try {
+      raw = storage.getItem(storageSupportKeys(primaryKey).metadata);
+    } catch {
+      return { raw: null, version: 0, valid: false, unavailable: true };
+    }
+    if (raw === null) return { raw: null, version: 0, valid: true };
+    try {
+      const value = JSON.parse(raw);
+      const version = Number(value?.schemaVersion);
+      if (!isStorageObject(value) || !Number.isInteger(version) || version < 0) {
+        return { raw, version: 0, valid: false };
+      }
+      return { raw, version, valid: true };
+    } catch {
+      return { raw, version: 0, valid: false };
+    }
+  }
+
+  function writeMetadata(primaryKey, domain, previousRaw = null) {
+    const metadataKey = storageSupportKeys(primaryKey).metadata;
+    const raw = JSON.stringify({
+      schemaVersion: currentVersion,
+      domain: String(domain || "unknown"),
+      updatedAt: now(),
+    });
+    try {
+      storage.setItem(metadataKey, raw);
+      const verified = storage.getItem(metadataKey);
+      const parsed = verified === null ? null : JSON.parse(verified);
+      if (verified !== raw || parsed?.schemaVersion !== currentVersion) throw new Error("metadata_verification_failed");
+      return true;
+    } catch {
+      try {
+        if (previousRaw === null) storage.removeItem(metadataKey);
+        else storage.setItem(metadataKey, previousRaw);
+      } catch {
+        // The primary value remains the authoritative recovery source.
+      }
+      return false;
+    }
+  }
+
+  function migrateValue(value, fromVersion) {
+    let migrated = value;
+    let version = fromVersion;
+    while (version < currentVersion) {
+      const migrate = migrations[version];
+      if (typeof migrate !== "function") throw new Error(`missing_migration_${version}`);
+      migrated = migrate(migrated);
+      version += 1;
+    }
+    return migrated;
+  }
+
+  function quarantinePrimary(primaryKey, raw, reason) {
+    const quarantineKey = storageSupportKeys(primaryKey).quarantine;
+    const quarantineRaw = JSON.stringify({
+      capturedAt: now(),
+      reason: String(reason || "unreadable"),
+      raw,
+    });
+    try {
+      storage.setItem(quarantineKey, quarantineRaw);
+      const verified = storage.getItem(quarantineKey);
+      const parsed = verified === null ? null : JSON.parse(verified);
+      if (verified !== quarantineRaw || parsed?.raw !== raw) throw new Error("quarantine_verification_failed");
+      quarantinedKeys.add(primaryKey);
+      return true;
+    } catch {
+      writeBlockedKeys.add(primaryKey);
+      return false;
+    }
+  }
+
+  function restorePrimary(primaryKey, previousRaw) {
+    try {
+      if (previousRaw === null) storage.removeItem(primaryKey);
+      else storage.setItem(primaryKey, previousRaw);
+      return storage.getItem(primaryKey) === previousRaw;
+    } catch {
+      return false;
+    }
+  }
+
+  function write({ primaryKey, domain, value, validate }) {
+    const currentMetadata = readMetadata(primaryKey);
+    if (currentMetadata.valid && currentMetadata.version > currentVersion) {
+      writeBlockedKeys.add(primaryKey);
+      record(primaryKey, domain, LOCAL_STORAGE_HEALTH.unsupportedFuture, "future_version");
+      return { ok: false, status: LOCAL_STORAGE_HEALTH.unsupportedFuture };
+    }
+    if (currentMetadata.unavailable) {
+      record(primaryKey, domain, LOCAL_STORAGE_HEALTH.writeFailed, "metadata_unavailable");
+      return { ok: false, status: LOCAL_STORAGE_HEALTH.writeFailed };
+    }
+    if (writeBlockedKeys.has(primaryKey)) {
+      const existing = healthByKey.get(primaryKey);
+      const status = [LOCAL_STORAGE_HEALTH.unsupportedFuture, LOCAL_STORAGE_HEALTH.migrationFailed].includes(existing?.status)
+        ? existing.status
+        : LOCAL_STORAGE_HEALTH.writeFailed;
+      record(primaryKey, domain, status, "write_blocked");
+      return { ok: false, status };
+    }
+
+    let serialized;
+    try {
+      serialized = JSON.stringify(value);
+      const parsed = JSON.parse(serialized);
+      if (!validateParsed(parsed, validate)) throw new Error("serialized_value_invalid");
+    } catch {
+      record(primaryKey, domain, LOCAL_STORAGE_HEALTH.writeFailed, "serialization_failed");
+      return { ok: false, status: LOCAL_STORAGE_HEALTH.writeFailed };
+    }
+
+    const keys = storageSupportKeys(primaryKey);
+    let previousPrimaryRaw;
+    let previousMetadataRaw;
+    try {
+      previousPrimaryRaw = storage.getItem(primaryKey);
+      previousMetadataRaw = storage.getItem(keys.metadata);
+    } catch {
+      record(primaryKey, domain, LOCAL_STORAGE_HEALTH.writeFailed, "storage_unavailable");
+      return { ok: false, status: LOCAL_STORAGE_HEALTH.writeFailed };
+    }
+    const previousPrimary = parseValidated(previousPrimaryRaw, validate);
+
+    if (!previousPrimary.ok && !previousPrimary.missing && !quarantinedKeys.has(primaryKey)) {
+      if (!quarantinePrimary(primaryKey, previousPrimaryRaw, previousPrimary.reason)) {
+        record(primaryKey, domain, LOCAL_STORAGE_HEALTH.writeFailed, "quarantine_failed");
+        return { ok: false, status: LOCAL_STORAGE_HEALTH.writeFailed };
+      }
+    }
+
+    try {
+      storage.setItem(keys.staging, serialized);
+      const stagedRaw = storage.getItem(keys.staging);
+      const staged = parseValidated(stagedRaw, validate);
+      if (stagedRaw !== serialized || !staged.ok) throw new Error("staging_verification_failed");
+
+      if (previousPrimary.ok) {
+        storage.setItem(keys.backup, previousPrimaryRaw);
+        const backupRaw = storage.getItem(keys.backup);
+        const backup = parseValidated(backupRaw, validate);
+        if (backupRaw !== previousPrimaryRaw || !backup.ok) throw new Error("backup_verification_failed");
+      }
+
+      storage.setItem(primaryKey, stagedRaw);
+      const promotedRaw = storage.getItem(primaryKey);
+      const promoted = parseValidated(promotedRaw, validate);
+      if (promotedRaw !== stagedRaw || !promoted.ok) throw new Error("promotion_verification_failed");
+
+      if (!writeMetadata(primaryKey, domain, previousMetadataRaw)) throw new Error("metadata_write_failed");
+      storage.removeItem(keys.staging);
+      if (storage.getItem(keys.staging) !== null) throw new Error("staging_cleanup_failed");
+      record(primaryKey, domain, LOCAL_STORAGE_HEALTH.healthy);
+      return { ok: true, status: LOCAL_STORAGE_HEALTH.healthy };
+    } catch (error) {
+      restorePrimary(primaryKey, previousPrimaryRaw);
+      try {
+        if (previousMetadataRaw === null) storage.removeItem(keys.metadata);
+        else storage.setItem(keys.metadata, previousMetadataRaw);
+      } catch {
+        // Backup and quarantine remain available even when metadata restoration fails.
+      }
+      record(primaryKey, domain, LOCAL_STORAGE_HEALTH.writeFailed, error?.message || "write_failed");
+      return { ok: false, status: LOCAL_STORAGE_HEALTH.writeFailed };
+    }
+  }
+
+  function read({ primaryKey, domain, fallback, validate }) {
+    let raw;
+    try {
+      raw = storage.getItem(primaryKey);
+    } catch {
+      writeBlockedKeys.add(primaryKey);
+      record(primaryKey, domain, LOCAL_STORAGE_HEALTH.defaulted, "storage_unavailable");
+      return { value: fallback, status: LOCAL_STORAGE_HEALTH.defaulted };
+    }
+    if (raw === null) {
+      record(primaryKey, domain, LOCAL_STORAGE_HEALTH.healthy, "missing");
+      return { value: fallback, status: LOCAL_STORAGE_HEALTH.healthy };
+    }
+
+    const metadata = readMetadata(primaryKey);
+    if (metadata.valid && metadata.version > currentVersion) {
+      writeBlockedKeys.add(primaryKey);
+      let parsed = fallback;
+      try {
+        const candidate = JSON.parse(raw);
+        if (validateParsed(candidate, validate)) parsed = candidate;
+      } catch {
+        // The future primary and metadata remain untouched even when this client cannot interpret them.
+      }
+      record(primaryKey, domain, LOCAL_STORAGE_HEALTH.unsupportedFuture, "future_version");
+      return { value: parsed, status: LOCAL_STORAGE_HEALTH.unsupportedFuture };
+    }
+
+    const primary = parseValidated(raw, validate);
+    if (primary.ok) {
+      if (!metadata.valid || metadata.version < currentVersion) {
+        try {
+          const migrated = migrateValue(primary.value, metadata.version);
+          if (!validateParsed(migrated, validate)) throw new Error("migration_result_invalid");
+          if (!writeMetadata(primaryKey, domain, metadata.raw)) throw new Error("migration_metadata_failed");
+          record(primaryKey, domain, LOCAL_STORAGE_HEALTH.legacyUpgraded);
+          return { value: migrated, status: LOCAL_STORAGE_HEALTH.legacyUpgraded };
+        } catch {
+          writeBlockedKeys.add(primaryKey);
+          record(primaryKey, domain, LOCAL_STORAGE_HEALTH.migrationFailed, "migration_failed");
+          return { value: primary.value, status: LOCAL_STORAGE_HEALTH.migrationFailed };
+        }
+      }
+
+      record(primaryKey, domain, LOCAL_STORAGE_HEALTH.healthy);
+      return { value: primary.value, status: LOCAL_STORAGE_HEALTH.healthy };
+    }
+
+    const quarantineReady = quarantinePrimary(primaryKey, raw, primary.reason);
+    let backupRaw;
+    try {
+      backupRaw = storage.getItem(storageSupportKeys(primaryKey).backup);
+    } catch {
+      writeBlockedKeys.add(primaryKey);
+      record(primaryKey, domain, LOCAL_STORAGE_HEALTH.defaulted, "backup_unavailable");
+      return { value: fallback, status: LOCAL_STORAGE_HEALTH.defaulted };
+    }
+    const backup = parseValidated(backupRaw, validate);
+    if (backup.ok) {
+      if (quarantineReady) {
+        const recovered = write({ primaryKey, domain, value: backup.value, validate });
+        if (!recovered.ok) writeBlockedKeys.add(primaryKey);
+      }
+      record(primaryKey, domain, LOCAL_STORAGE_HEALTH.backupRecovered);
+      return { value: backup.value, status: LOCAL_STORAGE_HEALTH.backupRecovered };
+    }
+
+    if (!quarantineReady) writeBlockedKeys.add(primaryKey);
+    record(primaryKey, domain, LOCAL_STORAGE_HEALTH.defaulted, backupRaw === null ? "backup_missing" : "backup_invalid");
+    return { value: fallback, status: LOCAL_STORAGE_HEALTH.defaulted };
+  }
+
+  function remove(primaryKey) {
+    const keys = storageSupportKeys(primaryKey);
+    [primaryKey, keys.metadata, keys.staging, keys.backup, keys.quarantine].forEach((key) => storage.removeItem(key));
+    healthByKey.delete(primaryKey);
+    notableHealthByKey.delete(primaryKey);
+    writeBlockedKeys.delete(primaryKey);
+    quarantinedKeys.delete(primaryKey);
+  }
+
+  function beginBatch() {
+    batchFailures = [];
+  }
+
+  function endBatch() {
+    return batchFailures.slice();
+  }
+
+  function healthSnapshot() {
+    const keys = new Set([...healthByKey.keys(), ...notableHealthByKey.keys()]);
+    return [...keys].map((key) => ({ ...(notableHealthByKey.get(key) || healthByKey.get(key)) }));
+  }
+
+  return Object.freeze({
+    read,
+    write,
+    remove,
+    beginBatch,
+    endBatch,
+    healthSnapshot,
+  });
+}
+// LOCAL_STORAGE_SAFETY_CORE_END
+
+const isStorageString = (value) => typeof value === "string";
+const isStorageNullableString = (value) => value === null || isStorageString(value);
+const isStorageNullableObject = (value) => value === null || isStorageObject(value);
+const isStorageObjectArray = (value) => Array.isArray(value) && value.every(isStorageObject);
+const isStorageStringArray = (value) => Array.isArray(value) && value.every(isStorageString);
+const STORAGE_DOMAIN_DEFINITIONS = new Map([
+  [STORAGE_KEYS.games, { domain: "saved_games", validate: isStorageObjectArray, critical: true }],
+  [STORAGE_KEYS.activeGame, { domain: "active_game", validate: isStorageNullableObject, critical: true }],
+  [STORAGE_KEYS.deletedGames, { domain: "deleted_games", validate: isStorageStringArray, critical: true }],
+  [STORAGE_KEYS.deletedEvents, { domain: "deleted_events", validate: isStorageStringArray, critical: true }],
+  [STORAGE_KEYS.player, { domain: "player", validate: isStorageObject, critical: false }],
+  [STORAGE_KEYS.players, { domain: "players", validate: isStorageObjectArray, critical: false }],
+  [STORAGE_KEYS.activePlayerId, { domain: "active_player_id", validate: isStorageString, critical: false }],
+  [STORAGE_KEYS.teams, { domain: "teams", validate: isStorageObjectArray, critical: false }],
+  [STORAGE_KEYS.rosterPlayers, { domain: "roster_players", validate: isStorageObjectArray, critical: false }],
+  [STORAGE_KEYS.activeTeamId, { domain: "active_team_id", validate: isStorageString, critical: false }],
+  [STORAGE_KEYS.teamAccessRequests, { domain: "team_access_requests", validate: isStorageObjectArray, critical: false }],
+  [STORAGE_KEYS.playerClaims, { domain: "player_claims", validate: isStorageObjectArray, critical: false }],
+  [STORAGE_KEYS.removedPlayerAccess, { domain: "removed_player_access", validate: isStorageObjectArray, critical: false }],
+  [STORAGE_KEYS.adminViewMode, { domain: "admin_view_mode", validate: isStorageString, critical: false }],
+  [STORAGE_KEYS.onboardingIntent, { domain: "onboarding_intent", validate: isStorageString, critical: false }],
+  [STORAGE_KEYS.nextGameFocus, { domain: "next_game_focus", validate: isStorageNullableObject, critical: false }],
+  [STORAGE_KEYS.trustSpineSync, { domain: "event_operation_state", validate: isStorageNullableObject, critical: true }],
+  [STORAGE_KEYS.trackingSession, { domain: "tracking_session", validate: isStorageNullableObject, critical: true }],
+  [STORAGE_KEYS.reviewGameId, { domain: "review_game_id", validate: isStorageNullableString, critical: false }],
+]);
+
 const RUNTIME_CONFIG = window.LAXHORNET_RUNTIME_CONFIG || {};
 const SUPABASE_CONFIG = {
   url: RUNTIME_CONFIG.supabaseUrl || "https://ulbmjcvnyznvmjgpstno.supabase.co",
@@ -601,6 +986,8 @@ let backendCapabilityState = {
 };
 let lastSyncErrorAt = 0;
 let activeStorageUserId = "";
+const localStorageSafety = createLocalStorageSafety({ storage: localStorage });
+const reportedStorageHealthNotices = new Set();
 let waitingServiceWorker = null;
 let reloadingForUpdate = false;
 let serviceWorkerRegistration = null;
@@ -692,24 +1079,81 @@ mergePlayersFromGames([state.activeGame, ...state.games].filter(Boolean));
 persistAll();
 
 function loadJSON(key, fallback) {
-  try {
-    const raw = localStorage.getItem(scopedStorageKey(key));
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
+  const definition = STORAGE_DOMAIN_DEFINITIONS.get(key) || {
+    domain: key,
+    validate: () => true,
+    critical: false,
+  };
+  return localStorageSafety.read({
+    primaryKey: scopedStorageKey(key),
+    domain: definition.domain,
+    fallback,
+    validate: definition.validate,
+  }).value;
 }
 
 function saveJSON(key, value) {
-  localStorage.setItem(scopedStorageKey(key), JSON.stringify(value));
+  const definition = STORAGE_DOMAIN_DEFINITIONS.get(key) || {
+    domain: key,
+    validate: () => true,
+    critical: false,
+  };
+  localStorageSafety.write({
+    primaryKey: scopedStorageKey(key),
+    domain: definition.domain,
+    value,
+    validate: definition.validate,
+  });
 }
 
 function removeStoredItem(key) {
-  localStorage.removeItem(scopedStorageKey(key));
+  localStorageSafety.remove(scopedStorageKey(key));
 }
 
 function scopedStorageKey(key) {
   return activeStorageUserId ? `${key}.user.${activeStorageUserId}` : key;
+}
+
+function storageHealthNotice(items = []) {
+  const criticalDomains = new Set(
+    [...STORAGE_DOMAIN_DEFINITIONS.values()]
+      .filter((definition) => definition.critical)
+      .map((definition) => definition.domain),
+  );
+  const relevant = items.filter((item) => criticalDomains.has(item.domain));
+  if (!relevant.length) return "";
+  if (relevant.some((item) => item.status === LOCAL_STORAGE_HEALTH.writeFailed)) {
+    return "LaxHornet could not save this change on this device. Your previous local data remains unchanged.";
+  }
+  if (relevant.some((item) => item.status === LOCAL_STORAGE_HEALTH.unsupportedFuture)) {
+    return "Some local data was created by a newer LaxHornet version. It was left unchanged and cannot be edited here.";
+  }
+  if (relevant.some((item) => item.status === LOCAL_STORAGE_HEALTH.migrationFailed)) {
+    return "Some local data could not be updated safely. It was left unchanged on this device.";
+  }
+  if (relevant.some((item) => item.status === LOCAL_STORAGE_HEALTH.backupRecovered)) {
+    return "LaxHornet recovered your local game data from a safe copy.";
+  }
+  if (relevant.some((item) => item.status === LOCAL_STORAGE_HEALTH.defaulted)) {
+    return "Some local game data could not be opened. The original was kept on this device for recovery.";
+  }
+  return "";
+}
+
+function scheduleStorageHealthNotice(batchFailures = []) {
+  const snapshot = localStorageSafety.healthSnapshot();
+  const message = storageHealthNotice(batchFailures.length ? batchFailures : snapshot);
+  if (!message) return;
+  const signature = batchFailures.length
+    ? `batch:${message}:${Date.now()}`
+    : snapshot
+        .filter((item) => item.status !== LOCAL_STORAGE_HEALTH.healthy)
+        .map((item) => `${item.domain}:${item.status}`)
+        .sort()
+        .join("|");
+  if (!batchFailures.length && reportedStorageHealthNotices.has(signature)) return;
+  if (!batchFailures.length) reportedStorageHealthNotices.add(signature);
+  queueMicrotask(() => showToast(message));
 }
 
 function readStoredAccountState(userId = activeStorageUserId) {
@@ -920,21 +1364,28 @@ function nextGameFocusStorageKey(player = state?.player) {
 }
 
 function loadScopedNextGameFocus(player = state.player) {
-  try {
-    return normalizeNextGameFocus(JSON.parse(localStorage.getItem(nextGameFocusStorageKey(player)) || "null"));
-  } catch {
-    return normalizeNextGameFocus(null);
-  }
+  const stored = localStorageSafety.read({
+    primaryKey: nextGameFocusStorageKey(player),
+    domain: "scoped_next_game_focus",
+    fallback: null,
+    validate: isStorageNullableObject,
+  }).value;
+  return normalizeNextGameFocus(stored);
 }
 
 function saveScopedNextGameFocus(focus, player = state.player) {
   const normalized = normalizeNextGameFocus(focus);
   const key = nextGameFocusStorageKey(player);
   if (!normalized.text) {
-    localStorage.removeItem(key);
+    localStorageSafety.remove(key);
     return normalized;
   }
-  localStorage.setItem(key, JSON.stringify(normalized));
+  localStorageSafety.write({
+    primaryKey: key,
+    domain: "scoped_next_game_focus",
+    value: normalized,
+    validate: isStorageObject,
+  });
   return normalized;
 }
 
@@ -2361,6 +2812,7 @@ function normalizeGame(game = {}, fallbackPlayer = null) {
 }
 
 function persistAll() {
+  localStorageSafety.beginBatch();
   recoverAdminTeamContext();
   pruneLocalOnlyCloudState();
   mergeRosterPlayersIntoPlayers();
@@ -2396,6 +2848,7 @@ function persistAll() {
     removeStoredItem(STORAGE_KEYS.trackingSession);
   }
   saveJSON(STORAGE_KEYS.reviewGameId, state.reviewGameId);
+  scheduleStorageHealthNotice(localStorageSafety.endBatch());
 }
 
 function applyStoredAccountState(userId) {
@@ -4132,8 +4585,17 @@ function importedGameIsAuthorized(game) {
   return Boolean(rosterPlayerId && canTrackRosterPlayer(teamId, rosterPlayerId));
 }
 
+function validateImportedGameRecord(game) {
+  if (!isStorageObject(game)) throw new Error("Invalid game record");
+  if (game.events !== undefined && !isStorageObjectArray(game.events)) throw new Error("Invalid game events");
+  if (game.trackedPlayingTime !== undefined && !isStorageObject(game.trackedPlayingTime)) {
+    throw new Error("Invalid tracked playing time");
+  }
+  return game;
+}
+
 function sanitizeImportedGame(game) {
-  const normalized = normalizeGame(game);
+  const normalized = normalizeGame(validateImportedGameRecord(game));
   return normalizeGame({
     ...normalized,
     userId: currentUserId() || "",
@@ -6962,29 +7424,32 @@ function familyRecapFocusStorageKey(game = {}, player = state.player) {
 
 function loadFamilyRecapFocus(game = {}, player = state.player) {
   if (!game?.id) return "";
-  try {
-    const saved = JSON.parse(localStorage.getItem(familyRecapFocusStorageKey(game, player)) || "null");
-    return String(saved?.focusText || "").trim();
-  } catch {
-    return "";
-  }
+  const saved = localStorageSafety.read({
+    primaryKey: familyRecapFocusStorageKey(game, player),
+    domain: "family_recap_focus",
+    fallback: null,
+    validate: isStorageNullableObject,
+  }).value;
+  return String(saved?.focusText || "").trim();
 }
 
 function saveFamilyRecapFocus(game = {}, player = state.player, focusText = "") {
   const text = String(focusText || "").trim();
   if (!game?.id || !text) return "";
   const normalized = normalizePlayer(player || {});
-  localStorage.setItem(
-    familyRecapFocusStorageKey(game, player),
-    JSON.stringify({
+  localStorageSafety.write({
+    primaryKey: familyRecapFocusStorageKey(game, player),
+    domain: "family_recap_focus",
+    value: {
       focusText: text,
       gameId: game.id,
       teamId: normalized.teamId || gameTeamId(game) || "",
       rosterPlayerId: normalized.rosterPlayerId || gameRosterPlayerId(game) || "",
       playerId: normalized.id || "",
       updatedAt: new Date().toISOString(),
-    }),
-  );
+    },
+    validate: isStorageObject,
+  });
   return text;
 }
 
