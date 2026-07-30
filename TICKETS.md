@@ -711,7 +711,8 @@ storage boundaries.
   tracked-time foundation `11/11`; tracked-time UI `44/44`; tracked-time
   manual scenarios `7/7`; cancel-game `33/33`; changed JavaScript syntax.
 - Complete local regression: canonical-plus-additive `37 passed, 0 failed`.
-- CI: pending draft pull request.
+- CI: portable regression and Docker test suite passed on the pushed
+  implementation-and-record branch before independent-review handoff.
 - Implementation commit:
   `aec4e30ef12e3dcc1c633d1e0a1d118f549857b9`.
 - Production or external state changed: `NO`.
