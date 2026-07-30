@@ -1328,7 +1328,11 @@ Draft PR: [#48](https://github.com/degrasse-mastermind/LaxHornet/pull/48)
   ordering (`8/8`).
 - Full canonical-plus-additive regression passed `42/42` against committed
   head `4ba897370cc5b60c3cba0903dc2283e336778775`.
-- Draft-PR CI: pending on PR #48.
+- Draft-PR CI passed on PR #48 implementation/evidence head
+  `69182e48578af59ba6df1c0623cb5646f9e7f3df`: portable regression run
+  `30558552058`, Docker run `30558553453`, Supabase Preview, and Vercel
+  Preview all completed successfully. Both GitHub workflows include the
+  release-containment gate.
 - The two blocked P1 findings are now desired behavior assertions. Unresolved
   characterization remains for non-delete game-write server deduplication,
   field-level conflicts, signed-out namespace migration, cross-key

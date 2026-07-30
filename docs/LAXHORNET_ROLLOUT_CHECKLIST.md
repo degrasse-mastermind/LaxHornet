@@ -315,7 +315,9 @@ incomplete.
   contracts while retaining the other unresolved R2 evidence.
 - [x] Pass the complete local canonical-plus-additive regression (`42/42`) on
   the committed implementation head.
-- [ ] Confirm all required draft-PR CI checks pass.
+- [x] Confirm portable regression (`30558552058`), Docker
+  (`30558553453`), Supabase Preview, Vercel Preview, and embedded
+  release-containment checks pass on PR #48.
 - [ ] Obtain a fresh independent Level 3 review bound to the exact final PR
   head SHA.
 - [ ] Mark R2-06A complete only after both CI and that exact-SHA review pass.

@@ -362,9 +362,15 @@ Local remediation verification passed:
 - `20/20` release-preflight checks; and
 - `42/42` complete canonical-plus-additive regression groups.
 
+PR #48 CI passed on candidate head
+`69182e48578af59ba6df1c0623cb5646f9e7f3df`: portable regression run
+`30558552058`, Docker run `30558553453`, Supabase Preview, and Vercel Preview
+all completed successfully. The portable and Docker workflows each included
+their release-containment checks.
+
 This follow-up does not mark the blocked release ready. PR #48 still requires
-green final-head CI and a fresh independent Level 3 review bound to its exact
-final SHA. Production application runtime remains on rollback source
+a fresh independent Level 3 review bound to its exact final SHA. Production
+application runtime remains on rollback source
 `44f0510d3bde18f459e78f570efd27b72dc2a989`. R2-06 and R2-06A remain unapplied
 and production activation still requires the named read-only verification,
 recovery readiness, and separate explicit migration-first authorization.
