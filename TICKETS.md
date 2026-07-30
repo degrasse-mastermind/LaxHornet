@@ -579,6 +579,13 @@ Commit/PR:
 Files changed:  
 Tests and results:  
 `REPO_CURRENT_STATE.md` updated: `YES/NO`  
+
+For tickets that do not affect rollout status, record `NOT APPLICABLE` for all rollout checklist fields below.
+
+Rollout checklist reviewed: YES/NO/NOT APPLICABLE
+Rollout checklist updated: YES/NO/NOT APPLICABLE
+Checklist sections affected:
+Checklist status changes:
 Remaining work:
 Task disposition: `COMPLETED/PASS/FAIL/BLOCKED/HISTORICAL`
 Primary task archived: `YES/NO`
@@ -594,5 +601,9 @@ First read AGENTS.md, REPO_CURRENT_STATE.md, TICKETS.md, docs/CODEX_WORKFLOW.md,
 
 Stay strictly within the ticket's scope and acceptance criteria. Preserve the vanilla static PWA, offline-first behavior, authorization boundaries, disclosure rules, Supabase migration provenance, and release controls. Do not use host-managed connector actions, deploy, apply remote migrations, change production configuration, or merge to main unless the ticket explicitly authorizes that exact action.
 
-After implementation, run the smallest relevant tests, then broader regression if warranted. Update REPO_CURRENT_STATE.md and the ticket completion record with durable facts. Use docs/templates/CODEX_TASK_CLOSEOUT.md before renaming or archiving the task. Finish with the diff summary, tests and results, risks, and unresolved items.
+After implementation, run the smallest relevant tests, then broader regression if warranted. Update REPO_CURRENT_STATE.md and the ticket completion record with durable facts.
+
+At closeout, inspect docs/LAXHORNET_ROLLOUT_CHECKLIST.md only when the work has an approved roadmap or engineering ticket and changes a rollout work package, milestone, gate, blocker, release, production state, or existing checklist item, or adds a newly approved roadmap item. Update it only with durable facts supported by the ticket outcome. Leave items incomplete while required review, merge, release, or production-verification gates remain pending, and report applicable checklist changes in the final response. For routine work with no roadmap impact, omit the rollout-checklist closeout section and record the ticket-template fields as `NOT APPLICABLE`.
+
+Use docs/templates/CODEX_TASK_CLOSEOUT.md before renaming or archiving the task. Finish with the diff summary, tests and results, risks, and unresolved items.
 ```

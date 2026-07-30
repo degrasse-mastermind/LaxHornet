@@ -41,6 +41,25 @@ Complete this gate before renaming or archiving an implementation, review, relea
 - Remaining work or next authorized action:
   - `[EXACT NEXT STEP OR NONE]`
 
+## Rollout checklist impact
+
+Required only when the task affects the rollout roadmap.
+
+For unaffected work, omit this entire section.
+
+- Checklist file reviewed: `[YES/NO]`
+- Checklist changed: `[YES/NO]`
+- Sections or items changed:
+  - `[SECTION OR ITEM, OR NONE]`
+- Reason for each status change:
+  - `[STATUS CHANGE AND DURABLE EVIDENCE, OR NONE]`
+- Items intentionally left incomplete:
+  - `[ITEM AND OUTSTANDING GATE, OR NONE]`
+- Newly discovered blockers:
+  - `[BLOCKER, OR NONE]`
+- New roadmap item added: `[YES/NO]`
+- No item was marked complete without its required gate evidence: `[CONFIRMED/NOT CONFIRMED]`
+
 ## Archive gate
 
 Archive only when every applicable statement is true:

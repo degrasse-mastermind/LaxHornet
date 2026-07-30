@@ -167,8 +167,37 @@ At closeout, append a concise disposition only when useful: `PASS`, `FAIL`, `BLO
 3. **Kick off:** create or select the primary Codex task, use `docs/templates/CODEX_TASK_KICKOFF.md`, and record its title and ID in the ticket.
 4. **Execute:** let that task own the checkout or worktree, implementation, tests, and progress. Continue there after interruptions.
 5. **Review:** use a separate task when independence is required. Bind review conclusions to an exact commit or pull-request SHA.
-6. **Close out:** use `docs/templates/CODEX_TASK_CLOSEOUT.md`; update the ticket, current state when durable behavior changed, evidence, and GitHub references.
+6. **Close out:** use `docs/templates/CODEX_TASK_CLOSEOUT.md`; update the ticket, current state when durable behavior changed, the rollout checklist only when the applicability rule below is satisfied, evidence, and GitHub references.
 7. **Archive:** rename with an accurate disposition and archive only after the durable closeout is complete. Keep tasks with active work, unique uncommitted changes, or unresolved ownership visible.
+
+### Rollout checklist applicability rule
+
+Review and update `docs/LAXHORNET_ROLLOUT_CHECKLIST.md` only when the work has an approved roadmap or engineering ticket and the outcome does at least one of the following:
+
+- Changes the status of a rollout work package, milestone, gate, blocker, release, or production state.
+- Completes, blocks, supersedes, or materially advances an existing checklist item.
+- Adds a newly approved roadmap item.
+
+Routine work with no roadmap impact, including copy, styling, documentation cleanup, isolated UI polish, and small bug fixes, does not review or update the rollout checklist, add checklist fields to its closeout, include `No rollout checklist change required.`, or update roadmap documentation.
+
+For applicable work, update completed, in-progress, blocked, or superseded checklist items when the ticket outcome affects them. Add a new work package only when it is supported by an approved ticket or product decision. Preserve unchecked future work rather than silently deleting it.
+
+Local implementation alone does not make a checklist item complete. Mark an item complete only when every applicable review, merge, verification, release, and production gate has durable repository evidence.
+
+The rollout checklist is an executive roadmap summary, not an implementation source of truth. `TICKETS.md` remains the detailed engineering queue, `REPO_CURRENT_STATE.md` remains the durable technical current-state record, Git history, pull requests, tests, and evidence remain implementation proof, and the canonical decision register remains product-governance authority.
+
+For applicable roadmap-impacting work, the required closeout sequence is:
+
+```text
+Implement ticket
+-> run tests
+-> review exact outcome
+-> update TICKETS.md
+-> update REPO_CURRENT_STATE.md when durable behavior changed
+-> review and update LAXHORNET_ROLLOUT_CHECKLIST.md
+-> complete Codex closeout report
+-> commit/push/PR only after approval
+```
 
 ### Stop rules
 
@@ -275,6 +304,7 @@ Before the ticket is considered complete:
 - Update the ticket completion record in `TICKETS.md`.
 - Update `REPO_CURRENT_STATE.md` only with durable facts that changed.
 - Keep brainstorming and abandoned options out of the current-state file.
+- Review and update `docs/LAXHORNET_ROLLOUT_CHECKLIST.md` only when the rollout checklist applicability rule is satisfied.
 - Complete `docs/templates/CODEX_TASK_CLOSEOUT.md` and archive the task only after its durable result is recorded.
 
 ## Database-change workflow
