@@ -236,8 +236,8 @@ the overall R2 gate remain incomplete.
 **Task ID:** `019fb341-0d54-7b82-8a14-e5bb6f8d811e`
 **Branch:** `feature/r2-06-durable-game-tombstones`
 **Starting point:** R2-05 merge `44f0510d3bde18f459e78f570efd27b72dc2a989`
-**Draft pull request:** pending
-**Implementation commit:** pending final handoff commit
+**Draft pull request:** #47
+**Implementation commit:** `de4de33e46f23dac3f9f6c52b02946ac8236fa62`
 
 ### Implemented boundary
 
@@ -256,12 +256,12 @@ the overall R2 gate remain incomplete.
 
 ### Verification and current gate
 
-- [x] Focused tombstone contracts passed `28/28`, including two-device and both response-order journeys.
+- [x] Focused tombstone contracts passed `29/29`, including delete-receipt identity, two-device, and both response-order journeys.
 - [x] Isolated migration/rollback behavior passed `11/11`.
 - [x] Durable operations passed `29/29`; R2-05 classification passed `22/22`; sync characterization passed `30/30`.
 - [x] Local-storage safety passed `28/28`; cancel/delete coverage passed `33/33`; delete permissions passed `17/17`.
 - [x] Event Pipeline and Trust Spine focused contracts passed.
-- [ ] Final canonical-plus-additive regression must pass on the stabilized diff.
+- [x] Final canonical-plus-additive regression passed `41/41` on the stabilized runtime and migration diff.
 - [ ] Final draft-PR CI, including nonproduction migration validation, must pass.
 - [ ] Exact final PR head requires independent Level 3 review before merge.
 - [ ] Apply the migration only in a separately authorized release/production task.

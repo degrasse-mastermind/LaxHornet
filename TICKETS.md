@@ -1039,7 +1039,7 @@ Related document: `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`
   validation covers authorization, replay, conflict, RLS invisibility,
   write-guard behavior, and rollback refusal/success. The migration has not
   been applied to a Supabase project.
-- Focused tombstone assertions pass `28/28`; isolated migration/rollback
+- Focused tombstone assertions pass `29/29`; isolated migration/rollback
   assertions pass `11/11`; durable operations pass `29/29`; sync
   characterization passes `30/30`; R2-05 classification passes `22/22`;
   local-storage safety passes `28/28`; cancel/delete static coverage passes
@@ -1057,8 +1057,11 @@ Related document: `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`
 - Baseline: `origin/main` at
   `44f0510d3bde18f459e78f570efd27b72dc2a989`, including merged R2-01 through
   R2-05.
-- Implementation commit: pending final handoff commit.
-- Draft pull request: pending.
+- Implementation commit:
+  `de4de33e46f23dac3f9f6c52b02946ac8236fa62`.
+- Draft pull request: #47.
+- Complete local regression: canonical-plus-additive `41 passed, 0 failed`.
+- Changed JavaScript syntax and `git diff --check`: passed.
 - CI and independent exact-PR-SHA Level 3 review remain required before merge.
 - Production verification still requires a separately authorized
   nonproduction/production rollout task after migration review. Historical
