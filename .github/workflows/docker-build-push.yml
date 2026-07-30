@@ -40,11 +40,11 @@ jobs:
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push server image
+      - name: Build and push runtime image
         uses: docker/build-push-action@v6
         with:
           context: .
-          target: server
+          target: runtime
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
