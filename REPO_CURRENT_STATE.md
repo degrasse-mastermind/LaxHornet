@@ -240,6 +240,14 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   authorization, behavior, and cleanup evidence. No production mutation
   occurred. The corrected future plan requires two disposable accounts, one
   game, zero events/tokens, and exactly one permanently retained tombstone.
+- R2-06E adds the reviewed, disabled-by-default synthetic verification runner
+  needed to execute that matrix safely after a separate exact-SHA review and
+  production authorization. The runner has a 21-action plan, exact mutation
+  limits, Auth Admin plus two-RPC mutation allowlist, cleanup-only failure
+  state, private identifier ledger, sanitized hash-bound public evidence, and
+  a disposable PGlite integration. Disposable results are never production
+  evidence. No production connection, mutation, migration, deployment, or
+  release-closeout state change occurred during R2-06E implementation.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The v284 cache marker remains unchanged. The updated service worker purges

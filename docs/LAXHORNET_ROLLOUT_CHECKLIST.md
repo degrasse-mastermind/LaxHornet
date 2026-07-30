@@ -427,6 +427,36 @@ Fresh R2-06C evidence:
 Authorization-ready plan:
 `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_VERIFICATION_AUTHORIZATION_PLAN.md`.
 
+### R2-06E reviewed synthetic verification runner
+
+- [x] Implement a dry-run that lists the exact 21-action matrix with zero
+  credentials and zero network mutations.
+- [x] Keep production disabled by default and require a clean exact SHA,
+  explicit production flag, separate private authorization artifact, fresh
+  named read-only preflight artifact, and runtime-only credentials.
+- [x] Allow production mutation only through bounded Auth Admin operations and
+  `laxhornet_sync_game` / `laxhornet_delete_game_durable`; expose no arbitrary
+  SQL or generic table writer.
+- [x] Enforce two-user, three-session, two-profile, one-game, one-update,
+  zero-event, zero-token, one-delete, one-tombstone, and one-private-ledger
+  limits.
+- [x] Implement durable private checkpoints, cleanup-only failure handling,
+  ledger-owned cleanup, authority revocation probes, two isolated browser
+  profiles, and sanitized hash-bound public evidence.
+- [x] Add adversarial unit coverage and a disposable PGlite execution of the
+  reviewed R2-06/R2-06A behavior matrix.
+- [x] Mark all disposable output explicitly as not production evidence.
+- [x] Pass the final canonical-plus-additive local regression (`45/45`).
+- [ ] Confirm draft-PR CI passes on the exact final R2-06E head.
+- [ ] Obtain independent exact-PR-SHA Level 3 review before merge.
+- [ ] Obtain separate explicit production Auth/data/browser authorization for
+  the reviewed exact runner SHA.
+- [ ] Execute the production synthetic verification and cleanup.
+- [ ] Obtain separate reviewed release-closeout approval.
+
+Implementation evidence:
+`review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_IMPLEMENTATION.md`.
+
 # 4. Planned Engineering Sequence
 
 Do not combine these into one large Codex task. Each item requires one approved ticket, one primary implementation task, and a separate independent review when warranted.

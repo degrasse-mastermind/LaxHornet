@@ -1553,6 +1553,63 @@ Evidence:
 Next step: independent review of the documentation-only draft PR, followed by
 separate explicit authorization of the exact synthetic matrix.
 
+### R2-06E — Build a reviewed synthetic production-verification runner
+
+Status: `READY FOR INDEPENDENT REVIEW`
+
+Risk level: `LEVEL 3`
+
+Branch: `feature/r2-06e-reviewed-synthetic-runner`
+
+Starting point:
+`c0ad2057c5d55bfe2d4aff9b8cec5bec4124916d` (merged R2-06C
+documentation baseline)
+
+#### Scope
+
+- Implement a bounded runner for the reviewed 21-action R2-06 synthetic
+  verification matrix without connecting to or mutating production in this
+  task.
+- Keep production disabled by default. Require a clean exact target SHA, the
+  exact project/runtime identity, a separate private authorization artifact, a
+  fresh `supabase_production_readonly-2` preflight artifact, runtime-only
+  publishable/secret credentials, and an explicit `--allow-production` flag.
+- Permit production mutation only through Auth Admin endpoints and the two
+  reviewed RPCs: `laxhornet_sync_game(jsonb)` and
+  `laxhornet_delete_game_durable(jsonb)`. Prohibit arbitrary SQL, generic table
+  writers, real identities, team/player/event/token creation, broad cleanup,
+  and historical direct-database cleanup fallback.
+- Enforce exact hard limits: two Auth users, three sessions, two automatic
+  profiles, one game, one game update, zero events, zero Live Share tokens,
+  one accepted durable delete, one retained tombstone, and one private
+  identifier record.
+- Persist a private cleanup ledger after mutation transitions, enter
+  cleanup-only mode on partial failure, remove only ledger-owned mutable
+  objects, prove revoked application authority, and retain exactly the
+  reviewed permanent tombstone.
+- Commit only sanitized, aggregate, hash-bound public evidence. Exact
+  identifiers and credentials remain outside the repository.
+
+#### Verification
+
+- Dry-run enumerates the exact 21 actions with zero mutations and no
+  credentials.
+- Adversarial unit coverage proves disabled-by-default production, exact-ref
+  and evidence-path gates, hard limits, RPC allowlisting, state-transition
+  ordering, ledger ownership, partial-failure cleanup, evidence redaction, and
+  immutable false release-closeout state.
+- A disposable PGlite integration executes the real R2-06/R2-06A RPC
+  definitions and RLS boundaries, including stale-delete, accepted delete,
+  same-ID replay, different-ID conflict, stale-write rejection, clean-session
+  hydration ordering, authority/disclosure denial, cleanup, and one retained
+  tombstone. Its output is explicitly not production evidence.
+- CI and the complete local regression include both test surfaces.
+- The final canonical-plus-additive local regression passed `45/45`.
+- Production execution, migration, deployment, release, and release-closeout
+  approval remain out of scope. Independent exact-PR-SHA Level 3 review is
+  required before merge, and a later production run needs separate explicit
+  authorization against that reviewed SHA.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

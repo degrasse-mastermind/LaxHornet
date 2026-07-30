@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://laxhornet.mybranford.com/schemas/r206-synthetic-evidence-v1.json",
+  "title": "R2-06 sanitized synthetic verification evidence",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "status",
+    "projectAlias",
+    "runtimeSourceSha",
+    "runnerTargetRef",
+    "privateEvidenceReference",
+    "privateLedgerSha256",
+    "evidenceType"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "status": {
+      "enum": [
+        "disposable_verification_complete_not_production_evidence",
+        "verification_complete_release_closeout_review_required"
+      ]
+    },
+    "projectAlias": { "const": "production_project" },
+    "runtimeSourceSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "runnerTargetRef": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "privateEvidenceReference": {
+      "type": "string",
+      "pattern": "^r206-private-[0-9a-f]{16}$"
+    },
+    "privateLedgerSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "evidenceType": {
+      "enum": ["authorization", "operation_results", "cleanup_results"]
+    },
+    "productionExecutionDefault": { "const": "disabled" },
+    "finalCloseoutApproval": { "const": false },
+    "releaseCloseoutApproved": { "const": false }
+  },
+  "additionalProperties": true
+}

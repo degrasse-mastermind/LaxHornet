@@ -98,6 +98,8 @@ const tests = [
   { name: "release preflight phase-aware", command: process.execPath, args: ["tools/test_release_preflight_phase_aware.mjs"] },
   { name: "release containment phase-aware", command: process.execPath, args: ["tools/test_release_containment_phase_aware.mjs"] },
   { name: "release hygiene", command: process.execPath, args: ["tools/test_release_hygiene.mjs"] },
+  { name: "R2-06 reviewed synthetic runner contracts", command: process.execPath, args: ["tools/test_r206_synthetic_verification.mjs"] },
+  { name: "R2-06 disposable synthetic verification", command: process.execPath, args: ["tools/test_r206_synthetic_verification_disposable.mjs"] },
   { name: "minimum disclosure", command: process.execPath, args: ["tools/test_minimum_disclosure.mjs"] },
   { name: "secure disclosure activation", command: process.execPath, args: ["tools/test_secure_disclosure_activation.mjs"] },
   {

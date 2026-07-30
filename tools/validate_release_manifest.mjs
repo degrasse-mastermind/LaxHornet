@@ -569,6 +569,65 @@ expect(
     === (manifest.r206ReleaseControl?.releaseCloseoutApproved === true),
   "R2-06 closeout approval must agree with the complete release-control state",
 );
+const syntheticRunner = manifest.r206ReleaseControl?.syntheticRunner;
+const expectedRunnerPaths = [
+  "tools/run_r206_synthetic_verification.mjs",
+  "tools/r206_synthetic_runner_core.mjs",
+  "tools/r206_synthetic_production_adapter.mjs",
+  "tools/r206_synthetic_disposable_adapter.mjs",
+  "tools/test_r206_synthetic_verification.mjs",
+  "tools/test_r206_synthetic_verification_disposable.mjs",
+  "tools/fixtures/r206-synthetic-evidence-schema.json",
+];
+expect(syntheticRunner?.implemented === true, "R2-06 synthetic runner must be registered");
+expect(
+  syntheticRunner?.productionExecutionDefault === "disabled",
+  "R2-06 synthetic runner production execution must default to disabled",
+);
+expect(syntheticRunner?.actionCount === 21, "R2-06 synthetic runner must retain exactly 21 actions");
+expect(
+  JSON.stringify(syntheticRunner?.allowedMutationRpcs)
+    === JSON.stringify(["laxhornet_sync_game", "laxhornet_delete_game_durable"]),
+  "R2-06 synthetic runner mutation RPC allowlist changed",
+);
+expect(
+  JSON.stringify(syntheticRunner?.hardLimits) === JSON.stringify({
+    authUsersCreated: 2,
+    sessionsCreated: 3,
+    profilesExpected: 2,
+    gamesCreated: 1,
+    gameUpdates: 1,
+    eventsCreated: 0,
+    liveShareTokensCreated: 0,
+    acceptedDurableDeletes: 1,
+    permanentTombstonesCreated: 1,
+    privateIdentifierRecords: 1,
+  }),
+  "R2-06 synthetic runner hard limits changed",
+);
+for (const file of expectedRunnerPaths) {
+  const absolute = path.join(root, file);
+  expect(fs.existsSync(absolute), `R2-06 synthetic runner file is missing: ${file}`);
+  if (fs.existsSync(absolute)) {
+    const actual = createHash("sha256").update(fs.readFileSync(absolute)).digest("hex");
+    expect(
+      syntheticRunner?.sha256?.[file] === actual,
+      `R2-06 synthetic runner SHA-256 mismatch: ${file}`,
+    );
+  }
+}
+expect(
+  Object.keys(syntheticRunner?.sha256 || {}).sort().join("\n")
+    === [...expectedRunnerPaths].sort().join("\n"),
+  "R2-06 synthetic runner hash inventory changed",
+);
+expect(
+  manifest.r206ReleaseControl?.syntheticVerification?.authorized === false
+    && manifest.r206ReleaseControl?.syntheticVerification?.completed === false
+    && manifest.r206ReleaseControl?.cleanupCompleted === false
+    && manifest.r206ReleaseControl?.releaseCloseoutApproved === false,
+  "registering the R2-06 synthetic runner must not advance production verification or closeout",
+);
 expect(
   fs.existsSync(
     path.join(
