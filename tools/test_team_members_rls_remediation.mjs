@@ -300,7 +300,11 @@ test("manifest production phase is internally consistent", () => {
   if (reviewPackage.productionApplied) {
     assert.equal(reviewPackage.status, "production_applied");
     assert.equal(pending.includes(migrationPath), false);
-    assert.equal(applied.at(-1), migrationPath);
+    assert.equal(applied.includes(migrationPath), true);
+    assert.equal(
+      applied.indexOf(migrationPath),
+      manifest.requiredMigrationSequence.indexOf(migrationPath),
+    );
   } else {
     assert.equal(reviewPackage.status, "approved_pending_production");
     assert.deepEqual(pending, [migrationPath]);

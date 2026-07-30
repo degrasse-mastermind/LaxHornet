@@ -16,6 +16,7 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { evaluateR206ReleaseControl } from "./release_manifest_state.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const requireFromRoot = createRequire(path.join(root, "tools", "release-preflight.cjs"));
@@ -140,6 +141,19 @@ export function evaluateRuntimeMigrationDependency(manifest, phase) {
   return {
     status: phase === "production" && pending.length ? "FAIL" : "PASS",
     pending,
+  };
+}
+
+export function evaluateReleaseCloseoutGate(
+  manifest,
+  phase,
+  { evidenceExists = () => false } = {},
+) {
+  const releaseControl = evaluateR206ReleaseControl(manifest, { evidenceExists });
+  const blocked = phase === "production" && !releaseControl.closeoutReady;
+  return {
+    status: blocked ? "FAIL" : "PASS",
+    ...releaseControl,
   };
 }
 
@@ -369,6 +383,18 @@ function checkRepository(results, release, phase, approvedRolloutSha) {
     runtimeDependency.pending.length
       ? `runtime remains blocked until applied in order: ${runtimeDependency.pending.join(", ")}`
       : "all runtime database dependencies are recorded as applied",
+  );
+
+  const closeoutGate = evaluateReleaseCloseoutGate(manifest, phase, {
+    evidenceExists: (file) => existsSync(path.join(root, file)),
+  });
+  addResult(
+    results,
+    "R2-06 release closeout readiness",
+    closeoutGate.status,
+    closeoutGate.closeoutReady
+      ? "runtime, database, authorized synthetic verification, and cleanup evidence are complete"
+      : closeoutGate.closeoutBlockers.join("; "),
   );
 
   const releaseEnv = releaseEnvironment(manifest);

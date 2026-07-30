@@ -2,9 +2,10 @@
 
 Last reviewed: 2026-07-30
 Baseline branch: `main`
-Baseline commit: `3e952ea7226e12b38d65dd656b528a3240ee5d9a`
+Baseline commit: `a2f99f82952ac51a68a4868888e9319612bd715c`
 Current repository release marker: `v284`
-Current production marker: `v284` with remediated public Live Share and `team_members` RLS active
+Current production marker: `v284` at reconciled R2-06A runtime/catalog state;
+synthetic verification and release closeout remain incomplete
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
 
@@ -111,9 +112,9 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
   `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3`; all 47 served files matched its
   allowlisted artifact manifest. These external changes were not performed by
   the resumed preflight task and are not release closeout: the committed
-  manifest still records rollback source `44f0510d3bde18f459e78f570efd27b72dc2a989`
-  and both migrations as pending, so production state requires
-  authority/provenance reconciliation and a fresh fail-closed preflight.
+  manifest contradiction was later corrected by R2-06B without treating the
+  observed state as authorized or complete. Synthetic verification and release
+  closeout remain separately blocked.
 - Cloud loading fetches authorized tombstones before queued upload, uses the
   current account/request-generation guard for each response, then rechecks
   tombstones before final game merge. Explicit tombstones suppress games in
@@ -191,12 +192,14 @@ The release manifest records:
 - A production-applied `team_members` recursion-remediation package with exact
   State C evidence, fail-closed production identity binding, rollback/reapply
   coverage, and final authorization/ACL contracts.
-- Two review-only, unapplied durable-game packages: R2-06 tombstones followed
-  by the additive R2-06A concurrency remediation. The manifest records their
-  exact forward/rollback/pgTAP identities, dependency order, and the
-  post-activation rollback refusal. Both migrations remain pending production
-  authorization, and runtime release is fail-closed while either dependency is
-  pending.
+- Two reconciled production-present durable-game packages: R2-06 tombstones
+  followed by the additive R2-06A concurrency remediation. The manifest
+  records their exact forward/rollback/pgTAP identities, applied dependency
+  order, bounded catalog verification, and post-activation rollback refusal.
+  It also records that tracked production authorization is absent. Runtime and
+  migration presence are accepted, while release closeout remains fail-closed
+  until reviewed synthetic authorization, behavior, and cleanup evidence are
+  present.
 - Required ordering, rollback references, approved file identities, and
   production-applied expectations.
 
@@ -222,12 +225,13 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
 - Current repository and production release marker is `v284`. Public Live Share
   is active through the corrected public-safe RPC. GitHub Pages deploys only
   the explicit 47-file allowlisted artifact.
-- Production application runtime remains on the successful application-only
-  rollback source `44f0510d3bde18f459e78f570efd27b72dc2a989`. The repository
-  manifest records R2-06 source
-  `18f5157de159fa7a27b3cefb4c90f5148c3b230d` as blocked and requires
-  R2-06 then R2-06A migration activation before any corresponding runtime
-  release. Repository implementation is not production activation.
+- The reconciled production application source is
+  `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3`, from Pages run
+  `30559099199`. The manifest records R2-06 then R2-06A as present and the
+  bounded production catalog as verified, while preserving the prior rollback
+  and blocked-runtime sources as incident history. The observed advancement
+  lacked tracked release authorization and is not approved retroactively.
+  Synthetic production verification and release closeout remain incomplete.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The v284 cache marker remains unchanged. The updated service worker purges
@@ -275,7 +279,7 @@ The current broad local regression entry point is:
 node tools/run_v283_local_regression.mjs
 ```
 
-That runner covers JavaScript syntax, event-operation contracts, tracked-playing-time service and static foundation contracts, game-scope capabilities, update/release checks, release-manifest validation, containment and hygiene, minimum disclosure, secure disclosure, Product Alignment, Trust Spine contracts, SQL acceptance/rollback tests, deletion permissions, cleanup, secret scanning, and `git diff --check`.
+That runner covers JavaScript syntax, event-operation contracts, tracked-playing-time service and static foundation contracts, game-scope capabilities, update/release checks, release-manifest validation and reconciliation characterization, containment and hygiene, minimum disclosure, secure disclosure, Product Alignment, Trust Spine contracts, SQL acceptance/rollback tests, deletion permissions, cleanup, secret scanning, and `git diff --check`.
 
 Release preparation starts with the reusable preflight and uses one fail-fast local command:
 
@@ -354,8 +358,11 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
   aligned reviewed state`; migration actor/time/route attribution remains
   unresolved. Current state is preserved, not approved retroactively, and
   production activation remains incomplete pending separately authorized
-  synthetic verification and reviewed manifest-control remediation. Non-delete game-write
-  deduplication, field-level conflicts, signed-out namespace migration,
+  synthetic verification. R2-06B reconciles the machine release state without
+  retroactive approval: runtime/migration/catalog presence is accepted, while
+  synthetic authorization, behavior evidence, cleanup evidence, and closeout
+  remain false and fail closed. Non-delete game-write deduplication,
+  field-level conflicts, signed-out namespace migration,
   cross-key transactionality, visible sync/conflict UI, and a sanitized journal
   remain open R2 work.
 - The v284 public-disclosure remediation passed its complete 33/33 regression and all 17 local release-verification gates, including 45/45 disclosure pgTAP checks on both database shapes and 73/73 signed-in browser checks. PR #30 was independently reviewed and merged. Production smoke at application SHA `effca6952e647b7424f96675f390fc80d5c42368` returned exactly two approved public events, excluded all private/unknown semantics, passed ordinary and tracked-time journeys, and proved zero active synthetic authority or mutable residue after cleanup.

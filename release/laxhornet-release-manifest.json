@@ -8,7 +8,7 @@
   "incidentRemediationBaseSha": "1221f418c1e005606d54c545148944f9ec69f132",
   "incidentRemediationHeadSha": "19f3f89d1120fce167f59237e355bb7cc04394c0",
   "incidentRemediationMergeSha": "effca6952e647b7424f96675f390fc80d5c42368",
-  "productionApplicationSha": "44f0510d3bde18f459e78f570efd27b72dc2a989",
+  "productionApplicationSha": "2fcc446d5f3d06ca6d24c69bc4466a13794e02b3",
   "productionRollbackSourceSha": "44f0510d3bde18f459e78f570efd27b72dc2a989",
   "blockedRuntimeSourceSha": "18f5157de159fa7a27b3cefb4c90f5148c3b230d",
   "productionRollbackEvidence": "review-evidence/r2-06-durable-game-tombstones-release/PREFLIGHT_BLOCKED.md",
@@ -16,6 +16,34 @@
   "productionUrl": "https://laxhornet.mybranford.com",
   "productionVerifiedAt": "2026-07-30",
   "productionSmokeEvidence": "review-evidence/v284-tracked-playing-time-production/production-smoke-results.json",
+  "r206ReleaseControl": {
+    "implementationReviewed": true,
+    "runtimeDeployed": true,
+    "runtimeSourceSha": "2fcc446d5f3d06ca6d24c69bc4466a13794e02b3",
+    "pagesRunId": "30559099199",
+    "migrationsApplied": true,
+    "catalogVerified": true,
+    "catalogVerificationEvidence": "review-evidence/r2-06-durable-game-tombstones-release/PRODUCTION_STATE_RECONCILIATION.md",
+    "syntheticVerification": {
+      "authorized": false,
+      "authorizationEvidence": null,
+      "completed": false,
+      "evidence": null,
+      "cleanupEvidence": null
+    },
+    "cleanupCompleted": false,
+    "releaseCloseoutApproved": false,
+    "reconciliation": {
+      "discoveredThroughReconciliation": true,
+      "trackedReleaseAuthorizationRecorded": false,
+      "productionStatePreserved": true,
+      "retroactiveApprovalGranted": false,
+      "migrationApplicationAttribution": "unresolved",
+      "incidentClassification": "Unauthorized release-control deviation with apparently aligned reviewed state",
+      "observationEvidence": "review-evidence/r2-06-durable-game-tombstones-release/PRODUCTION_STATE_RECONCILIATION.md",
+      "manifestReconciliationEvidence": "review-evidence/r2-06-durable-game-tombstones-release/RELEASE_MANIFEST_RECONCILIATION.md"
+    }
+  },
   "databaseCandidate": "ad96e428d675fba8fac7752fd108ea06827fa0ad",
   "preCutoverRuntime": "f4ead54b44fcb5710fe4ed3eed39ab5f1694def4",
   "activationCandidate": "7cf58df9a43ce235fc6068bd4c50549e05906de4",
@@ -79,13 +107,15 @@
     },
     {
       "name": "durable_game_tombstones",
-      "status": "blocked_pending_remediation_review",
+      "status": "production_present_reconciled",
       "forwardMigration": "supabase/migrations/20260730134439_durable_game_tombstones.sql",
       "rollbackReference": "supabase/rollback/20260730134439_durable_game_tombstones_rollback.sql",
       "testSql": "supabase/tests/durable_game_tombstones.sql",
-      "productionApplied": false,
+      "productionApplied": true,
+      "productionCatalogVerified": true,
+      "productionAuthorizationRecorded": false,
       "productionAuthorizationRequired": true,
-      "blockedEvidence": "review-evidence/r2-06-durable-game-tombstones-release/PREFLIGHT_BLOCKED.md",
+      "reconciliationEvidence": "review-evidence/r2-06-durable-game-tombstones-release/PRODUCTION_STATE_RECONCILIATION.md",
       "sha256": {
         "supabase/migrations/20260730134439_durable_game_tombstones.sql": "138e8edfdaa4b48747ceb63a66a0eae76f91c832b19dffa52914bdea45188900",
         "supabase/rollback/20260730134439_durable_game_tombstones_rollback.sql": "405d0b10370cbcc90aa474f469d9841a5bc56a96453094561cb8a2386dd1545b",
@@ -94,12 +124,15 @@
     },
     {
       "name": "durable_game_tombstone_concurrency",
-      "status": "review_pending",
+      "status": "production_present_reconciled",
       "forwardMigration": "supabase/migrations/20260730151714_durable_game_tombstone_concurrency.sql",
       "rollbackReference": "supabase/rollback/20260730151714_durable_game_tombstone_concurrency_rollback.sql",
       "testSql": "supabase/tests/durable_game_tombstone_concurrency.sql",
-      "productionApplied": false,
+      "productionApplied": true,
+      "productionCatalogVerified": true,
+      "productionAuthorizationRecorded": false,
       "productionAuthorizationRequired": true,
+      "reconciliationEvidence": "review-evidence/r2-06-durable-game-tombstones-release/PRODUCTION_STATE_RECONCILIATION.md",
       "requiresMigration": "supabase/migrations/20260730134439_durable_game_tombstones.sql",
       "rollbackMode": "reverse_order_pre_activation_only",
       "sha256": {
@@ -114,6 +147,7 @@
     "supabase/migrations/20260730151714_durable_game_tombstone_concurrency.sql"
   ],
   "runtimeReleaseBlockedUntilMigrationsApplied": true,
+  "runtimeDatabaseDependenciesSatisfied": true,
   "productionHistoricalMigration": {
     "version": "20260723010607",
     "name": "remote_schema",
@@ -179,12 +213,11 @@
     "supabase/migrations/20260723040000_event_pipeline_capabilities.sql",
     "supabase/migrations/20260727000000_tracked_playing_time_operations.sql",
     "supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql",
-    "supabase/migrations/20260730004700_team_members_rls_recursion.sql"
-  ],
-  "expectedPendingProductionMigrations": [
+    "supabase/migrations/20260730004700_team_members_rls_recursion.sql",
     "supabase/migrations/20260730134439_durable_game_tombstones.sql",
     "supabase/migrations/20260730151714_durable_game_tombstone_concurrency.sql"
   ],
+  "expectedPendingProductionMigrations": [],
   "rollbackReferences": [
     "supabase/rollback/20260723010000_trust_spine_release_1_rollback.sql",
     "supabase/rollback/20260723020000_minimum_necessary_disclosure_rollback.sql",

@@ -230,7 +230,7 @@ the overall R2 gate remain incomplete.
 
 ## R2-06 — Durable Legacy-Game Tombstones
 
-**Status:** [!] Merged; superseded by R2-06A; production reconciliation required
+**Status:** [!] Merged; superseded by R2-06A; manifest reconciled; synthetic verification required
 **Risk level:** Level 3 — Critical deletion, synchronization, persistence, database, and authorization behavior
 **Codex task:** `Implement R2-06 — Add Durable Tombstones and Prevent Stale-Device Resurrection`
 **Task ID:** `019fb341-0d54-7b82-8a14-e5bb6f8d811e`
@@ -277,7 +277,7 @@ gate remain incomplete.
 
 ## R2-06A — Tombstone Concurrency and Delete-Conflict Recovery
 
-**Status:** [!] Merged; production state reconciliation required
+**Status:** [!] Merged; manifest reconciled; synthetic verification required
 **Risk level:** Level 3 — Critical deletion, synchronization, concurrency, persistence, database, and recovery behavior
 **Codex task:** `Implement R2-06A — Remediate Tombstone Concurrency and Delete-Conflict Recovery`
 **Branch:** `feature/r2-06a-tombstone-concurrency-recovery`
@@ -332,11 +332,13 @@ gate remain incomplete.
 Read-only resumed preflight found both R2-06 migrations recorded in production,
 zero tombstone rows, and the expected guarded catalog/security boundary.
 Pages run `30559099199` auto-deployed exact merge `2fcc446d...`, superseding the
-documented rollback runtime. The committed manifest still declares both
-migrations pending and records rollback source `44f0510d...`, so the canonical
-production preflight fails closed. These external changes were not performed
-or authorized by the resumed preflight task. The overall R2 gate remains open;
-do not infer activation approval from the observed state.
+documented rollback runtime. R2-06B now reconciles that runtime and both
+migrations in the manifest without recording tracked authorization or
+retroactive approval. The canonical production preflight accepts the
+runtime/database state and continues to fail closed at synthetic-verification
+closeout. These external changes were not performed or authorized by the
+resumed preflight or R2-06B tasks. The overall R2 gate remains open; do not
+infer activation approval from the observed state.
 
 ### R2-06/R2-06A production-state reconciliation
 
@@ -364,6 +366,18 @@ do not infer activation approval from the observed state.
   authorized and without executing either rollback.
 - [x] Leave the behavior-affecting release manifest unchanged and require a
   separate reviewed manifest-control remediation.
+- [x] Implement R2-06B manifest reconciliation in a separate Level 3 feature
+  branch: record the verified runtime, both applied migrations, exact reviewed
+  identities, catalog verification, and unresolved incident provenance.
+- [x] Preserve distinct false states for tracked production authorization,
+  synthetic authorization/completion, cleanup completion, and release
+  closeout approval.
+- [x] Characterize missing migration, old runtime, wrong order, hash drift,
+  evidence-free completion, and a test-fixture closeout-ready state.
+- [x] Pass focused manifest/preflight/containment/Pages/migration/concurrency
+  controls and the final complete local regression (`43/43`).
+- [ ] Confirm draft-PR CI passes on the exact final PR head.
+- [ ] Obtain exact-PR-SHA independent Level 3 review of R2-06B before merge.
 - [ ] Obtain explicit production-data/Auth authorization for the bounded
   one-owner, one-game synthetic plan.
 - [ ] Execute guarded-write, stale-delete, recovery, durable-delete, replay,

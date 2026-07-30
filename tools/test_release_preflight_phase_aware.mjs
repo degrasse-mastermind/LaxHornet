@@ -4,12 +4,20 @@ import os from "node:os";
 import path from "node:path";
 import {
   evaluateReleaseIdentity,
+  evaluateReleaseCloseoutGate,
   evaluateRuntimeMigrationDependency,
   findReleaseSurfaceFailures,
   reviewedTextSha256,
   validateManifestReleaseIdentity,
 } from "./run_release_preflight.mjs";
 
+const sourceRoot = path.resolve(import.meta.dirname, "..");
+const reconciledManifest = JSON.parse(
+  fs.readFileSync(
+    path.join(sourceRoot, "release", "laxhornet-release-manifest.json"),
+    "utf8",
+  ),
+);
 const base = "fc9c079d69757cfc2667dea7e1dfcc56524dce56";
 const releaseHead = "1cf5d9d33a7295da8248353165a696b7b81690db";
 const merge = "e2cd28a568e91232d375a8607e6376800d3a2a20";
@@ -184,6 +192,23 @@ test("production dependency gate passes only after both migrations are recorded 
   }, "production");
   assert.equal(dependency.status, "PASS");
   assert.deepEqual(dependency.pending, []);
+});
+
+test("reconciled runtime and migrations do not satisfy production closeout", () => {
+  const closeout = evaluateReleaseCloseoutGate(reconciledManifest, "production", {
+    evidenceExists: (file) => fs.existsSync(path.join(sourceRoot, file)),
+  });
+  assert.equal(closeout.runtimeDatabaseReady, true);
+  assert.equal(closeout.closeoutReady, false);
+  assert.equal(closeout.status, "FAIL");
+});
+
+test("preparation reports incomplete closeout without treating it as activation", () => {
+  const closeout = evaluateReleaseCloseoutGate(reconciledManifest, "preparation", {
+    evidenceExists: (file) => fs.existsSync(path.join(sourceRoot, file)),
+  });
+  assert.equal(closeout.closeoutReady, false);
+  assert.equal(closeout.status, "PASS");
 });
 
 test("production accepts the exact approved main merge SHA", () => {

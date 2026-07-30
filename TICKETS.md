@@ -1426,6 +1426,72 @@ Draft PR: [#48](https://github.com/degrasse-mastermind/LaxHornet/pull/48)
 Full evidence:
 `review-evidence/r2-06-durable-game-tombstones-release/PRODUCTION_STATE_RECONCILIATION.md`.
 
+### R2-06B — Reconcile the release manifest with verified production state
+
+Status: `READY FOR INDEPENDENT REVIEW`
+
+Risk level: `LEVEL 3`
+
+Branch: `feature/r2-06b-release-manifest-reconciliation`
+
+Starting point:
+`a2f99f82952ac51a68a4868888e9319612bd715c` (squash merge of PR #49)
+
+#### Reconciled release-control state
+
+- The manifest records production application source
+  `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3` and Pages run
+  `30559099199`.
+- R2-06 migration `20260730134439_durable_game_tombstones` and R2-06A
+  migration `20260730151714_durable_game_tombstone_concurrency` are recorded
+  present in the required order with no pending production migration.
+- Both packages use status `production_present_reconciled`, retain their exact
+  forward/rollback/pgTAP SHA-256 identities, and explicitly record
+  `productionAuthorizationRecorded: false`.
+- The runtime/database dependency is satisfied and the bounded catalog
+  verification is bound to
+  `PRODUCTION_STATE_RECONCILIATION.md`.
+- The machine state preserves the incident classification, discovery through
+  reconciliation, no tracked release authorization, no retroactive approval,
+  preserved production state, unresolved migration actor/time/route
+  attribution, and incomplete production verification.
+
+#### Fail-closed closeout model
+
+- Runtime deployed, migrations applied, and catalog verified are independent
+  from synthetic verification authorized, synthetic verification completed,
+  cleanup completed, and release closeout approved.
+- The canonical production preflight no longer fails because the old
+  runtime/migration snapshot is stale. It still fails the R2-06 closeout gate
+  while reviewed synthetic authorization, behavior, and cleanup evidence are
+  absent.
+- Missing migration, old runtime, wrong migration order, changed reviewed
+  identity, synthetic completion without evidence, cleanup without evidence,
+  and premature release-closeout approval remain blocked.
+- Test-only fixtures may reach closeout-ready when all required reviewed
+  evidence is supplied. They are not production evidence and do not mark this
+  release complete.
+
+#### Scope and remaining gates
+
+- No migration, rollback, or pgTAP file changed.
+- No deployment, migration application, Supabase change, Auth action,
+  production-data action, synthetic production verification, cleanup, or
+  release closeout was performed.
+- Synthetic production verification remains separately authorization-gated
+  under `SYNTHETIC_VERIFICATION_AUTHORIZATION_PLAN.md`.
+- Exact-PR-SHA independent Level 3 review remains required before merge.
+- Implementation evidence:
+  `review-evidence/r2-06-durable-game-tombstones-release/RELEASE_MANIFEST_RECONCILIATION.md`.
+- Focused verification passed: manifest reconciliation `8/8`, phase-aware
+  preflight `22/22`, phase-aware containment `33/33`, Pages deployment
+  contracts `21/21`, team-members manifest-order contract `13/13`, tombstone
+  migration/rollback `13/13`, and PostgreSQL concurrency `8/8`.
+- Complete canonical-plus-additive local regression passed `43/43` after the
+  final shared release-control diff stabilized.
+- Draft-PR CI remains required; the exact final PR head must receive
+  independent Level 3 review before merge.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

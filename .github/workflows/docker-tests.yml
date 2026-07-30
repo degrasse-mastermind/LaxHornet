@@ -117,6 +117,9 @@ jobs:
       - name: Run release manifest validation
         run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/validate_release_manifest.mjs --require-combined --combined-ref=HEAD
 
+      - name: Run release manifest reconciliation contracts
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_release_manifest_reconciliation.mjs
+
       - name: Run release hygiene checks
         run: >-
           docker run --rm

@@ -16,6 +16,11 @@ import {
   validateHistoricalProvenance,
   validateReleaseContainment,
 } from "./release_containment.mjs";
+import {
+  R206_MIGRATIONS,
+  R206_RUNTIME_SHA,
+  evaluateR206ReleaseControl,
+} from "./release_manifest_state.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const manifestPath = path.join(root, "release", "laxhornet-release-manifest.json");
@@ -95,9 +100,12 @@ expect(
   "incidentRemediationMergeSha must identify the approved PR #30 merge",
 );
 expect(
-  manifest.productionApplicationSha === manifest.productionRollbackSourceSha
-    && manifest.productionApplicationSha === "44f0510d3bde18f459e78f570efd27b72dc2a989",
-  "productionApplicationSha must identify the verified R2-05 rollback source",
+  manifest.productionApplicationSha === R206_RUNTIME_SHA,
+  "productionApplicationSha must identify the reconciled R2-06A production runtime",
+);
+expect(
+  manifest.productionRollbackSourceSha === "44f0510d3bde18f459e78f570efd27b72dc2a989",
+  "productionRollbackSourceSha must preserve the historical R2-05 rollback source",
 );
 expect(
   manifest.blockedRuntimeSourceSha === "18f5157de159fa7a27b3cefb4c90f5148c3b230d",
@@ -315,9 +323,11 @@ expect(
   "R2-06 durable tombstone paths must match the explicit containment allowlist",
 );
 expect(
-  durableGameTombstoneReview?.status === "blocked_pending_remediation_review"
-    && durableGameTombstoneReview?.productionApplied === false,
-  "R2-06 durable tombstones must remain blocked and unapplied",
+  durableGameTombstoneReview?.status === "production_present_reconciled"
+    && durableGameTombstoneReview?.productionApplied === true
+    && durableGameTombstoneReview?.productionCatalogVerified === true
+    && durableGameTombstoneReview?.productionAuthorizationRecorded === false,
+  "R2-06 durable tombstones must record reconciled presence without tracked authorization",
 );
 expect(
   durableGameTombstoneReview?.productionAuthorizationRequired === true,
@@ -348,9 +358,11 @@ expect(
   "R2-06A concurrency paths must match the explicit containment allowlist",
 );
 expect(
-  durableGameConcurrencyReview?.status === "review_pending"
-    && durableGameConcurrencyReview?.productionApplied === false,
-  "R2-06A concurrency remediation must remain review-pending and unapplied",
+  durableGameConcurrencyReview?.status === "production_present_reconciled"
+    && durableGameConcurrencyReview?.productionApplied === true
+    && durableGameConcurrencyReview?.productionCatalogVerified === true
+    && durableGameConcurrencyReview?.productionAuthorizationRecorded === false,
+  "R2-06A concurrency remediation must record reconciled presence without tracked authorization",
 );
 expect(
   durableGameConcurrencyReview?.requiresMigration
@@ -511,20 +523,16 @@ expect(
     === JSON.stringify(expectedMigrationSequence),
   "reviewMigrationSequence must include R2-06 and R2-06A in order",
 );
-const expectedAppliedMigrationSequence = expectedMigrationSequence.slice(0, -2);
+const expectedAppliedMigrationSequence = expectedMigrationSequence;
 expect(
   JSON.stringify(manifest.expectedRemoteAppliedMigrations)
     === JSON.stringify(expectedAppliedMigrationSequence),
-  "expectedRemoteAppliedMigrations must stop before unapplied R2-06/R2-06A",
+  "expectedRemoteAppliedMigrations must include reconciled R2-06 then R2-06A",
 );
-const expectedPendingMigrations = [
-  durableGameTombstoneReview?.forwardMigration,
-  durableGameConcurrencyReview?.forwardMigration,
-];
 expect(
   JSON.stringify(manifest.expectedPendingProductionMigrations)
-    === JSON.stringify(expectedPendingMigrations),
-  "expectedPendingProductionMigrations must identify R2-06 then R2-06A",
+    === JSON.stringify([]),
+  "expectedPendingProductionMigrations must be empty after reconciliation",
 );
 expect(
   teamMembersRlsReview?.productionApplied
@@ -534,12 +542,41 @@ expect(
 );
 expect(
   manifest.runtimeReleaseBlockedUntilMigrationsApplied === true,
-  "runtime release must remain blocked until required migrations are applied",
+  "runtime release must continue to fail closed when required migrations are absent",
 );
 expect(
   JSON.stringify(manifest.runtimeDatabaseDependencies)
-    === JSON.stringify(expectedPendingMigrations),
+    === JSON.stringify(R206_MIGRATIONS),
   "runtime database dependencies must require R2-06 before R2-06A",
+);
+expect(
+  manifest.runtimeDatabaseDependenciesSatisfied === true,
+  "runtime database dependencies must record the verified reconciled state",
+);
+
+const r206ReleaseControl = evaluateR206ReleaseControl(manifest, {
+  evidenceExists: (file) => fs.existsSync(path.join(root, file)),
+});
+for (const failure of r206ReleaseControl.failures) {
+  expect(false, failure);
+}
+expect(
+  r206ReleaseControl.runtimeDatabaseReady === true,
+  "R2-06 runtime, migration, and catalog reconciliation must be internally consistent",
+);
+expect(
+  r206ReleaseControl.releaseComplete
+    === (manifest.r206ReleaseControl?.releaseCloseoutApproved === true),
+  "R2-06 closeout approval must agree with the complete release-control state",
+);
+expect(
+  fs.existsSync(
+    path.join(
+      root,
+      manifest.r206ReleaseControl?.reconciliation?.manifestReconciliationEvidence || "",
+    ),
+  ),
+  "R2-06 manifest reconciliation evidence must exist",
 );
 
 expect(
@@ -693,5 +730,5 @@ if (failures.length) {
 }
 
 console.log(
-  `Release manifest valid for ${manifest.release} (${requireCombined ? `combined ref ${combinedRef}` : "production-applied manifest"}).`,
+  `Release manifest valid for ${manifest.release} (${requireCombined ? `combined ref ${combinedRef}` : "production-applied manifest"}); R2-06 runtime/catalog reconciled and closeout ${r206ReleaseControl.closeoutReady ? "ready" : "blocked"}.`,
 );
