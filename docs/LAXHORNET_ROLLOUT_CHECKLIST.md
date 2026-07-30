@@ -126,8 +126,11 @@ Do not combine these into one large Codex task. Each item requires one approved 
 
 - [x] Inspect current local/cloud merge behavior again after LH-DEV-006
   (`R2-01`; `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`).
-- [ ] Define permanent client operation IDs.
-- [ ] Define queued-operation states.
+- [x] Define permanent client operation IDs for durable legacy game and
+  tracked-clock operations (`R2-04`).
+- [x] Define queued-operation states (`pending`, `syncing`, `accepted`,
+  `retryable`, `rejected`, and `conflicted`) for those operation classes
+  (`R2-04`).
 - [ ] Define idempotent replay.
 - [x] Prevent cloud fetches from silently replacing newer local evidence
   within the current game/event hydration boundary (`R2-03`). Same-ID merge
@@ -142,7 +145,10 @@ Do not combine these into one large Codex task. Each item requires one approved 
 - [x] Preserve existing saved games and offline capture through the R2-03
   hydration merge, including tracked-time, score-context, pending/recovery,
   local metadata, and active-game evidence.
-- [ ] Keep production mutation and release out of the feature ticket.
+- [x] Preserve game and tracked-clock retry intent across refresh and reconnect
+  with account-scoped storage-safety recovery (`R2-04`). This is client
+  durability only; legacy game writes still lack server-side deduplication.
+- [x] Keep production mutation and release out of the R2-04 feature ticket.
 
 **Gate to advance:** No silent local overwrite; offline operations replay exactly once; conflicts are detectable.
 
