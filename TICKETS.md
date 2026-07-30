@@ -1492,6 +1492,65 @@ Starting point:
 - Draft-PR CI remains required; the exact final PR head must receive
   independent Level 3 review before merge.
 
+### R2-06C — Final production preflight and synthetic-verification readiness
+
+Status: `READY FOR INDEPENDENT REVIEW`
+
+Risk level: `LEVEL 3`
+
+Branch: `release/r2-06c-final-preflight-readiness`
+
+Starting point:
+`77f3cf4b0c86c7ce1cc44a42fafa9f3b111e9f3b` (R2-06B merge)
+
+#### Fresh read-only result
+
+- Local HEAD and `origin/main` matched the required R2-06B merge.
+- Pages run `30559099199` and the live 47-file artifact still identify exact
+  runtime `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3`, marker `v284`, and cache
+  `laxhornet-v284`; 548 tracked excluded paths and 10 explicit internal probes
+  remained unavailable.
+- The production migration ledger still ends with R2-06 then R2-06A exactly
+  once and in order, with no unexpected or pending migration.
+- Fresh bounded catalog inspection matched all expected columns, constraints,
+  indexes, RLS/policy, grants, function security/search paths and normalized
+  hashes, enabled trigger, and same lock-before-tombstone-read ordering.
+- Tombstone count and every aggregate `r206-smoke-*` Auth/session/profile/game/
+  event/tombstone/Live-Share-token count were zero. No private row content was
+  returned.
+- The production-phase canonical preflight passed every runtime/database/
+  catalog row and failed only `R2-06 release closeout readiness` with the exact
+  messages that authorization, behavior, and cleanup evidence are absent.
+- The complete final canonical-plus-additive local regression passed `43/43`.
+
+#### Authorization-ready correction
+
+- The corrected plan uses exactly two newly created disposable adult-safe
+  accounts so owner behavior and authenticated wrong-account denial are both
+  testable without a real or pre-existing identity.
+- The exact database scope is one personal game, zero events, zero Live Share
+  tokens or team/player records, and exactly one permanently retained
+  tombstone.
+- The plan now defines credential containment, three sequential sessions,
+  session revocation before account deletion, exact game fields and operation
+  ordering, direct-table/RPC denial, disclosure checks, mutable/Auth cleanup,
+  permanent residue, rollback limits, and every proposed mutation.
+- Because the repository is public, exact synthetic identifiers are prohibited
+  from committed evidence. The future authorization must name one
+  access-controlled private retained-identifier store; public evidence carries
+  only aggregate results, hashes, and its opaque reference.
+- RPC conflict semantics and normal clean-session hydration are included.
+  Injected client conflict recovery is not authorized because no reviewed
+  production harness exists; existing local tests remain the bounded evidence.
+- No deployment, migration, Supabase/Auth/data mutation, synthetic
+  verification, cleanup, or release closeout occurred.
+
+Evidence:
+`review-evidence/r2-06-durable-game-tombstones-release/FINAL_PRODUCTION_PREFLIGHT_READINESS.md`.
+
+Next step: independent review of the documentation-only draft PR, followed by
+separate explicit authorization of the exact synthetic matrix.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets
