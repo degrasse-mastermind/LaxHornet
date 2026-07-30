@@ -73,17 +73,37 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
   processing retain one deletion/operation ID. Proven never-cloud-visible games
   avoid unnecessary server work, while ambiguous visibility receives a durable
   delete operation.
+- R2-06A retains a validated, versioned, account-scoped delete-recovery record
+  in that same storage domain while a durable deletion is unresolved. The
+  record contains the complete private game/event snapshot, prior active-game
+  and review relationships, the deletion identity, and the pre-existing
+  individual-event deletion-marker baseline. Future recovery versions are
+  preserved and write-blocked; malformed state fails the storage validator.
 - Creating a game delete supersedes and retains older same-game write records.
   Delete work runs before writes, and an older in-flight write acknowledgment
   cannot clear the tombstone. Accepted delete receipts are persisted before the
   operation is compacted; rejected and conflicted evidence remains recoverable.
-- The proposed R2-06 migration adds private durable legacy-game tombstones,
+- Pending/retryable deletion stays hidden and recoverable without creating
+  whole-game event-delete markers. Rejected or conflicted deletion restores the
+  game, all retained non-individually-deleted events, active/review context,
+  and preserves the classified delete operation for attention without
+  automatic retry. Accepted deletion compacts recovery evidence only after its
+  durable tombstone receipt is persisted. Existing individual event deletion
+  markers and Trust Spine tombstones remain separate and unchanged.
+- The repository-only R2-06 migration adds private durable legacy-game tombstones,
   guarded game writes, and one transactional deletion RPC. A tombstone survives
   physical game-row removal and permanently reserves the game ID. Same-ID
   deletion replay is deterministic; a different deletion identity conflicts;
   an older delete conflicts with a server game whose `saved_at` is newer than
   the client's known value. The migration is repository-only and is not active
   in any Supabase environment.
+- The additive R2-06A remediation migration gives the guarded game-write RPC,
+  durable-delete RPC, and defense-in-depth trigger the same deterministic,
+  transaction-scoped advisory lock derived from the canonical game ID. The
+  lock is acquired before tombstone or game-row reads and before mutation, so
+  same-game writes/deletes serialize while unrelated game IDs remain
+  independent. The trigger is still the final guard against direct or legacy
+  writes after a tombstone exists.
 - Cloud loading fetches authorized tombstones before queued upload, uses the
   current account/request-generation guard for each response, then rechecks
   tombstones before final game merge. Explicit tombstones suppress games in
@@ -161,8 +181,14 @@ The release manifest records:
 - A production-applied `team_members` recursion-remediation package with exact
   State C evidence, fail-closed production identity binding, rollback/reapply
   coverage, and final authorization/ACL contracts.
+- Two review-only, unapplied durable-game packages: R2-06 tombstones followed
+  by the additive R2-06A concurrency remediation. The manifest records their
+  exact forward/rollback/pgTAP identities, dependency order, and the
+  post-activation rollback refusal. Both migrations remain pending production
+  authorization, and runtime release is fail-closed while either dependency is
+  pending.
 - Required ordering, rollback references, approved file identities, and
-  production-applied expectations. No v284 migration remains pending.
+  production-applied expectations.
 
 Do not rewrite, reorder, squash, rename, or silently regenerate these migration files. Any new migration must be additive, timestamped, reviewed, tested locally, and reflected in release-control documentation.
 
@@ -186,6 +212,12 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
 - Current repository and production release marker is `v284`. Public Live Share
   is active through the corrected public-safe RPC. GitHub Pages deploys only
   the explicit 47-file allowlisted artifact.
+- Production application runtime remains on the successful application-only
+  rollback source `44f0510d3bde18f459e78f570efd27b72dc2a989`. The repository
+  manifest records R2-06 source
+  `18f5157de159fa7a27b3cefb4c90f5148c3b230d` as blocked and requires
+  R2-06 then R2-06A migration activation before any corresponding runtime
+  release. Repository implementation is not production activation.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The v284 cache marker remains unchanged. The updated service worker purges
@@ -301,6 +333,14 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Live Share and export disclosure boundaries.
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
+- R2-06A closes the two repository P1 paths with shared same-game server
+  serialization and reversible client delete recovery. Production activation
+  remains blocked on green CI, exact-PR-SHA independent Level 3 review, named
+  read-only production verification, recovery readiness, and separately
+  authorized migration-first release work. Non-delete game-write
+  deduplication, field-level conflicts, signed-out namespace migration,
+  cross-key transactionality, visible sync/conflict UI, and a sanitized journal
+  remain open R2 work.
 - The v284 public-disclosure remediation passed its complete 33/33 regression and all 17 local release-verification gates, including 45/45 disclosure pgTAP checks on both database shapes and 73/73 signed-in browser checks. PR #30 was independently reviewed and merged. Production smoke at application SHA `effca6952e647b7424f96675f390fc80d5c42368` returned exactly two approved public events, excluded all private/unknown semantics, passed ordinary and tracked-time journeys, and proved zero active synthetic authority or mutable residue after cleanup.
 - The allowlisted Pages smoke exposed a production `team_members` recursion
   defect. Exact production State C was later captured, reproduced, and

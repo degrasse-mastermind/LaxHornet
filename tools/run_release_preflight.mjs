@@ -111,10 +111,13 @@ function releaseEnvironment(manifest) {
     LAXHORNET_ALLOWED_ADDITIVE_DB_PATHS: [
       "supabase/migrations/20260723040000_event_pipeline_capabilities.sql",
       "supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql",
-      "supabase/migrations/20260727000000_tracked_playing_time_operations.sql",
-      "supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql",
-      "supabase/tests/tracked_playing_time_foundation.sql",
-    ].join(","),
+      ...(manifest.reviewDatabasePackages || []).flatMap((reviewPackage) => [
+        reviewPackage.forwardMigration,
+        reviewPackage.rollbackReference,
+        reviewPackage.testSql,
+        reviewPackage.reproductionTestSql,
+      ]),
+    ].filter(Boolean).join(","),
     ...(combinedMode
       ? {
           LAXHORNET_AUTHORIZED_DB_REF: manifest.databaseCandidate,
@@ -129,6 +132,15 @@ export function reviewedTextSha256(file) {
     .replace(/\r\n/g, "\n")
     .replace(/\n/g, "\r\n");
   return createHash("sha256").update(Buffer.from(canonicalCrLf, "utf8")).digest("hex");
+}
+
+export function evaluateRuntimeMigrationDependency(manifest, phase) {
+  const pending = (manifest.runtimeDatabaseDependencies || [])
+    .filter((file) => (manifest.expectedPendingProductionMigrations || []).includes(file));
+  return {
+    status: phase === "production" && pending.length ? "FAIL" : "PASS",
+    pending,
+  };
 }
 
 export function validateManifestReleaseIdentity(manifest, release = "") {
@@ -333,8 +345,7 @@ function checkRepository(results, release, phase, approvedRolloutSha) {
   );
 
   const reviewPackageHashFailures = (manifest.reviewDatabasePackages || []).flatMap((reviewPackage) =>
-    [reviewPackage.forwardMigration, reviewPackage.rollbackReference, reviewPackage.testSql]
-      .filter(Boolean)
+    Object.keys(reviewPackage.sha256 || {})
       .flatMap((file) => {
         const expected = reviewPackage.sha256?.[file] || "";
         const actual = reviewedTextSha256(path.join(root, file));
@@ -348,6 +359,16 @@ function checkRepository(results, release, phase, approvedRolloutSha) {
     reviewPackageHashFailures.length
       ? reviewPackageHashFailures.join("; ")
       : `${manifest.reviewDatabasePackages?.length || 0} packages match the manifest`,
+  );
+
+  const runtimeDependency = evaluateRuntimeMigrationDependency(manifest, phase);
+  addResult(
+    results,
+    "Runtime migration dependency",
+    runtimeDependency.status,
+    runtimeDependency.pending.length
+      ? `runtime remains blocked until applied in order: ${runtimeDependency.pending.join(", ")}`
+      : "all runtime database dependencies are recorded as applied",
   );
 
   const releaseEnv = releaseEnvironment(manifest);

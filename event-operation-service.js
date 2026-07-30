@@ -140,6 +140,7 @@
   "use strict";
 
   const SCHEMA_VERSION = 1;
+  const DELETE_RECOVERY_VERSION = 1;
   const OPERATION_TYPES = Object.freeze({
     game: "legacy_game_write",
     gameDelete: "legacy_game_delete",
@@ -316,12 +317,85 @@
     if (value.tombstones !== undefined && (!Array.isArray(value.tombstones) || !value.tombstones.every(isObject))) {
       return false;
     }
+    if (
+      value.deleteRecoveries !== undefined
+      && (
+        !Array.isArray(value.deleteRecoveries)
+        || !value.deleteRecoveries.every(isStoredDeleteRecovery)
+      )
+    ) {
+      return false;
+    }
     if (value.schemaVersion !== undefined) {
       const version = Number(value.schemaVersion);
       if (!Number.isInteger(version) || version < 1) return false;
     }
     if (value.acknowledgments !== undefined && !isObject(value.acknowledgments)) return false;
     return true;
+  }
+
+  function isStoredDeleteRecovery(value) {
+    if (!isObject(value)) return false;
+    const version = Number(value.recoveryVersion);
+    if (!Number.isInteger(version) || version < 1) return false;
+    if (version > DELETE_RECOVERY_VERSION) return true;
+    if (
+      !String(value.accountId || "").trim()
+      || !String(value.gameId || "").trim()
+      || !String(value.deletionId || "").trim()
+      || !Number.isFinite(Date.parse(String(value.capturedAt || "")))
+      || !isObject(value.gameSnapshot)
+      || !Array.isArray(value.eventSnapshot)
+      || !value.eventSnapshot.every(isObject)
+      || !isObject(value.previousActiveGameRelationship)
+      || typeof value.previousActiveGameRelationship.wasActive !== "boolean"
+      || (
+        value.previousActiveGameRelationship.trackingSession !== null
+        && !isObject(value.previousActiveGameRelationship.trackingSession)
+      )
+      || (
+        value.previousReviewGameId !== null
+        && typeof value.previousReviewGameId !== "string"
+      )
+      || !Array.isArray(value.eventDeleteMarkerBaseline)
+      || !value.eventDeleteMarkerBaseline.every((item) => typeof item === "string")
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  function normalizedDeleteRecovery(value, options = {}) {
+    if (!isStoredDeleteRecovery(value)) return null;
+    const version = Number(value.recoveryVersion);
+    if (version > DELETE_RECOVERY_VERSION) return copy(value);
+    const accountId = String(value.accountId || options.accountId || "").trim();
+    const gameId = String(value.gameId || options.gameId || "").trim();
+    const deletionId = String(value.deletionId || options.deletionId || "").trim();
+    if (!accountId || !gameId || !deletionId) return null;
+    return {
+      recoveryVersion: DELETE_RECOVERY_VERSION,
+      accountId,
+      gameId,
+      deletionId,
+      capturedAt: isoTimestamp(value.capturedAt || options.now()),
+      gameSnapshot: copy(value.gameSnapshot),
+      eventSnapshot: copy(value.eventSnapshot),
+      previousActiveGameRelationship: {
+        wasActive: value.previousActiveGameRelationship.wasActive === true,
+        trackingSession: value.previousActiveGameRelationship.trackingSession
+          ? copy(value.previousActiveGameRelationship.trackingSession)
+          : null,
+      },
+      previousReviewGameId: value.previousReviewGameId === null
+        ? null
+        : String(value.previousReviewGameId || "").trim() || null,
+      eventDeleteMarkerBaseline: [...new Set(
+        value.eventDeleteMarkerBaseline
+          .map((item) => String(item || "").trim())
+          .filter(Boolean),
+      )],
+    };
   }
 
   function normalizedTombstone(value, options = {}) {
@@ -457,6 +531,14 @@
     if (Number.isInteger(version) && version > SCHEMA_VERSION) {
       return copy(source);
     }
+    if (
+      Array.isArray(source.deleteRecoveries)
+      && source.deleteRecoveries.some(
+        (recovery) => Number(recovery?.recoveryVersion) > DELETE_RECOVERY_VERSION,
+      )
+    ) {
+      return copy(source);
+    }
     const deviceId = String(source.deviceId || options.deviceId || createId("device")).trim();
     const normalized = {
       schemaVersion: SCHEMA_VERSION,
@@ -472,6 +554,12 @@
         .map((tombstone) => normalizedTombstone(tombstone, {
           accountId: options.accountId,
           deviceId,
+          now,
+        }))
+        .filter(Boolean),
+      deleteRecoveries: (Array.isArray(source.deleteRecoveries) ? source.deleteRecoveries : [])
+        .map((recovery) => normalizedDeleteRecovery(recovery, {
+          accountId: options.accountId,
           now,
         }))
         .filter(Boolean),
@@ -643,7 +731,12 @@
 
     function supportedState() {
       const value = getState();
-      return value?.schemaVersion === SCHEMA_VERSION ? value : null;
+      return value?.schemaVersion === SCHEMA_VERSION
+        && !value.deleteRecoveries?.some(
+          (recovery) => Number(recovery?.recoveryVersion) > DELETE_RECOVERY_VERSION,
+        )
+        ? value
+        : null;
     }
 
     function replaceAndPersist(nextState, previousState) {
@@ -668,6 +761,16 @@
 
     function isTombstoned(accountId, gameId) {
       return Boolean(tombstoneFor(accountId, gameId));
+    }
+
+    function deleteRecoveryFor(accountId, gameId, deletionId = "") {
+      const state = supportedState();
+      if (!state || !accountId || !gameId) return null;
+      const recovery = (state.deleteRecoveries || []).find((candidate) =>
+        candidate.accountId === accountId
+        && candidate.gameId === gameId
+        && (!deletionId || candidate.deletionId === deletionId));
+      return recovery ? copy(recovery) : null;
     }
 
     function supersedeGameWrites(next, accountId, gameId, timestamp) {
@@ -810,6 +913,7 @@
       gameId,
       knownGameSavedAt = null,
       deletedAt = null,
+      recoveryEvidence = null,
     }) {
       const state = supportedState();
       const scopedAccountId = String(accountId || currentAccountId() || "").trim();
@@ -832,6 +936,20 @@
 
       const timestamp = isoTimestamp(deletedAt || now());
       const deletionId = createId("game-delete");
+      const recovery = normalizedDeleteRecovery({
+        ...(isObject(recoveryEvidence) ? recoveryEvidence : {}),
+        recoveryVersion: DELETE_RECOVERY_VERSION,
+        accountId: scopedAccountId,
+        gameId: scopedGameId,
+        deletionId,
+        capturedAt: recoveryEvidence?.capturedAt || timestamp,
+      }, {
+        accountId: scopedAccountId,
+        gameId: scopedGameId,
+        deletionId,
+        now,
+      });
+      if (!recovery) return null;
       const payload = {
         deletion: {
           game_id: scopedGameId,
@@ -857,6 +975,10 @@
         lastError: null,
         receipt: null,
       });
+      next.deleteRecoveries = Array.isArray(next.deleteRecoveries)
+        ? next.deleteRecoveries
+        : [];
+      next.deleteRecoveries.push(recovery);
       supersedeGameWrites(next, scopedAccountId, scopedGameId, timestamp);
       next.operations.push({
         operationId: deletionId,
@@ -885,6 +1007,32 @@
         alreadyAccepted: false,
         state: "pending",
       };
+    }
+
+    function finalizeAcceptedDelete({
+      accountId,
+      gameId,
+      deletionId = "",
+    }) {
+      const state = supportedState();
+      const scopedAccountId = String(accountId || currentAccountId() || "").trim();
+      const scopedGameId = String(gameId || "").trim();
+      if (!state || !scopedAccountId || !scopedGameId) return null;
+      const tombstone = state.tombstones.find((candidate) =>
+        candidate.accountId === scopedAccountId
+        && candidate.gameId === scopedGameId
+        && candidate.state === "accepted"
+        && candidate.receipt);
+      if (!tombstone) return null;
+      const index = (state.deleteRecoveries || []).findIndex((candidate) =>
+        candidate.accountId === scopedAccountId
+        && candidate.gameId === scopedGameId
+        && (!deletionId || candidate.deletionId === deletionId));
+      if (index < 0) return null;
+      const recovery = copy(state.deleteRecoveries[index]);
+      const next = copy(state);
+      next.deleteRecoveries.splice(index, 1);
+      return replaceAndPersist(next, state) ? recovery : null;
     }
 
     function recordLocalOnlyDeletion({
@@ -1339,6 +1487,8 @@
       isAcknowledged,
       isTombstoned,
       tombstoneFor,
+      deleteRecoveryFor,
+      finalizeAcceptedDelete,
       mergeServerTombstones,
       hasUnresolved,
       rejectAuthentication,
@@ -1348,6 +1498,7 @@
 
   global.LaxHornetDurableSyncOperations = Object.freeze({
     SCHEMA_VERSION,
+    DELETE_RECOVERY_VERSION,
     OPERATION_TYPES,
     OPERATION_STATES,
     FAILURE_CATEGORIES,

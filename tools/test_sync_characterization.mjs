@@ -14,6 +14,15 @@ const eventOperationSource = fs.readFileSync(
   path.join(root, "event-operation-service.js"),
   "utf8",
 );
+const tombstoneConcurrencyMigrationSource = fs.readFileSync(
+  path.join(
+    root,
+    "supabase",
+    "migrations",
+    "20260730151714_durable_game_tombstone_concurrency.sql",
+  ),
+  "utf8",
+);
 const eventOperationTestSource = fs.readFileSync(
   path.join(root, "tools", "test_event_operation_service.mjs"),
   "utf8",
@@ -993,6 +1002,60 @@ test(
         < loadBody.indexOf("syncLocalGamesToCloud"),
       "authorized tombstones must hydrate before legacy game uploads",
     );
+  },
+);
+
+test(
+  "R2-06A: guarded game writes and durable deletes share one per-game transaction lock before tombstone reads",
+  () => {
+    for (const functionName of [
+      "public.laxhornet_sync_game",
+      "public.laxhornet_delete_game_durable",
+    ]) {
+      assert.match(tombstoneConcurrencyMigrationSource, new RegExp(
+        `create or replace function ${functionName.replaceAll(".", "\\.")}`,
+        "i",
+      ));
+    }
+    assert.equal(
+      (
+        tombstoneConcurrencyMigrationSource.match(
+          /hashtextextended\('laxhornet:legacy-game:' \|\| (?:incoming\.id|target_game_id|new\.id), 0\)/g,
+        ) || []
+      ).length,
+      3,
+    );
+    const writeLock = tombstoneConcurrencyMigrationSource.indexOf(
+      "hashtextextended('laxhornet:legacy-game:' || incoming.id, 0)",
+    );
+    const writeRead = tombstoneConcurrencyMigrationSource.indexOf(
+      "from public.legacy_game_tombstones",
+      writeLock,
+    );
+    const deleteLock = tombstoneConcurrencyMigrationSource.indexOf(
+      "hashtextextended('laxhornet:legacy-game:' || target_game_id, 0)",
+    );
+    const deleteRead = tombstoneConcurrencyMigrationSource.indexOf(
+      "from public.legacy_game_tombstones",
+      deleteLock,
+    );
+    assert.ok(writeLock >= 0 && writeLock < writeRead);
+    assert.ok(deleteLock >= 0 && deleteLock < deleteRead);
+  },
+);
+
+test(
+  "R2-06A: newer-revision delete conflict restores retained events without whole-game event-delete markers",
+  () => {
+    const deleteStart = appSource.indexOf("async function confirmDeleteGame");
+    const deleteEnd = appSource.indexOf("async function deleteEvent", deleteStart);
+    const deleteBody = appSource.slice(deleteStart, deleteEnd);
+    assert.doesNotMatch(deleteBody, /rememberDeletedEvent/);
+    assert.match(eventOperationSource, /deleteRecoveries/);
+    assert.match(eventOperationSource, /function finalizeAcceptedDelete/);
+    assert.match(appSource, /function restoreRejectedGameDeletion/);
+    assert.match(appSource, /eventDeleteMarkerBaseline/);
+    assert.match(appSource, /events:\s*recovery\.eventSnapshot/);
   },
 );
 

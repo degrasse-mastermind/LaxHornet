@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   evaluateReleaseIdentity,
+  evaluateRuntimeMigrationDependency,
   findReleaseSurfaceFailures,
   reviewedTextSha256,
   validateManifestReleaseIdentity,
@@ -138,6 +139,51 @@ test("reviewed migration hash drift fails closed", () => {
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("production fails closed while either runtime migration dependency is pending", () => {
+  const dependency = evaluateRuntimeMigrationDependency({
+    runtimeDatabaseDependencies: [
+      "supabase/migrations/20260729120000_durable_game_tombstones.sql",
+      "supabase/migrations/20260730151714_durable_game_tombstone_concurrency.sql",
+    ],
+    expectedPendingProductionMigrations: [
+      "supabase/migrations/20260729120000_durable_game_tombstones.sql",
+      "supabase/migrations/20260730151714_durable_game_tombstone_concurrency.sql",
+    ],
+  }, "production");
+  assert.equal(dependency.status, "FAIL");
+  assert.deepEqual(dependency.pending, [
+    "supabase/migrations/20260729120000_durable_game_tombstones.sql",
+    "supabase/migrations/20260730151714_durable_game_tombstone_concurrency.sql",
+  ]);
+});
+
+test("preparation reports pending runtime dependencies without authorizing production", () => {
+  const dependency = evaluateRuntimeMigrationDependency({
+    runtimeDatabaseDependencies: [
+      "supabase/migrations/20260729120000_durable_game_tombstones.sql",
+      "supabase/migrations/20260730151714_durable_game_tombstone_concurrency.sql",
+    ],
+    expectedPendingProductionMigrations: [
+      "supabase/migrations/20260729120000_durable_game_tombstones.sql",
+      "supabase/migrations/20260730151714_durable_game_tombstone_concurrency.sql",
+    ],
+  }, "preparation");
+  assert.equal(dependency.status, "PASS");
+  assert.equal(dependency.pending.length, 2);
+});
+
+test("production dependency gate passes only after both migrations are recorded applied", () => {
+  const dependency = evaluateRuntimeMigrationDependency({
+    runtimeDatabaseDependencies: [
+      "supabase/migrations/20260729120000_durable_game_tombstones.sql",
+      "supabase/migrations/20260730151714_durable_game_tombstone_concurrency.sql",
+    ],
+    expectedPendingProductionMigrations: [],
+  }, "production");
+  assert.equal(dependency.status, "PASS");
+  assert.deepEqual(dependency.pending, []);
 });
 
 test("production accepts the exact approved main merge SHA", () => {

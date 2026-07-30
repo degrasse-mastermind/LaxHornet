@@ -20,6 +20,77 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function extractFunction(source, functionName) {
+  const signature = `function ${functionName}`;
+  const start = source.indexOf(signature);
+  assert.notEqual(start, -1, `${functionName} was not found`);
+  const declarationStart = source.slice(Math.max(0, start - 6), start) === "async "
+    ? start - 6
+    : start;
+  const openingParenthesis = source.indexOf("(", start);
+  let parenthesisDepth = 0;
+  let closingParenthesis = -1;
+  for (let index = openingParenthesis; index < source.length; index += 1) {
+    if (source[index] === "(") parenthesisDepth += 1;
+    if (source[index] === ")") {
+      parenthesisDepth -= 1;
+      if (parenthesisDepth === 0) {
+        closingParenthesis = index;
+        break;
+      }
+    }
+  }
+  const openingBrace = source.indexOf("{", closingParenthesis);
+  let depth = 0;
+  let quote = "";
+  let escaped = false;
+  for (let index = openingBrace; index < source.length; index += 1) {
+    const character = source[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (quote) {
+      if (character === "\\") escaped = true;
+      else if (character === quote) quote = "";
+      continue;
+    }
+    if (character === "'" || character === '"' || character === "`") {
+      quote = character;
+      continue;
+    }
+    if (character === "{") depth += 1;
+    if (character === "}") {
+      depth -= 1;
+      if (depth === 0) return source.slice(declarationStart, index + 1);
+    }
+  }
+  throw new Error(`${functionName} body did not terminate`);
+}
+
+function appHarness(functionNames, globals = {}) {
+  const context = vm.createContext({
+    Date,
+    Math,
+    JSON,
+    Object,
+    Array,
+    Set,
+    Map,
+    ...globals,
+  });
+  vm.runInContext(
+    functionNames.map((name) => extractFunction(appSource, name)).join("\n"),
+    context,
+    { filename: `app.js#${functionNames.join(",")}` },
+  );
+  return {
+    get(name) {
+      return vm.runInContext(name, context);
+    },
+  };
+}
+
 function api() {
   const context = vm.createContext({
     window: {},
@@ -111,11 +182,36 @@ function gamePayload(savedAt = "2026-07-30T13:55:00.000Z") {
 }
 
 function queueDelete(subject, options = {}) {
+  const eventId = options.eventId || "event-123";
   return subject.service.queueDelete({
     accountId: options.accountId || "account-a",
     gameId: options.gameId || "game-123",
     knownGameSavedAt: options.knownGameSavedAt || "2026-07-30T13:55:00.000Z",
     deletedAt: options.deletedAt || "2026-07-30T14:00:00.000Z",
+    recoveryEvidence: options.recoveryEvidence || {
+      recoveryVersion: 1,
+      capturedAt: options.deletedAt || "2026-07-30T14:00:00.000Z",
+      gameSnapshot: {
+        id: options.gameId || "game-123",
+        opponent: "Synthetic retained opponent",
+        events: [],
+      },
+      eventSnapshot: [
+        {
+          id: eventId,
+          gameId: options.gameId || "game-123",
+          statType: "ground_ball",
+        },
+      ],
+      previousActiveGameRelationship: {
+        wasActive: Boolean(options.wasActive),
+        trackingSession: options.wasActive
+          ? { gameId: options.gameId || "game-123", origin: "existing" }
+          : null,
+      },
+      previousReviewGameId: options.previousReviewGameId || options.gameId || "game-123",
+      eventDeleteMarkerBaseline: options.eventDeleteMarkerBaseline || [],
+    },
   });
 }
 
@@ -126,6 +222,8 @@ test("1 deletion intent and operation are persisted atomically before network ex
   assert.equal(subject.attempts.length, 0);
   assert.equal(subject.persisted[0].operations[0].operationType, "legacy_game_delete");
   assert.equal(subject.persisted[0].tombstones[0].deletionId, queued.deletionId);
+  assert.equal(subject.persisted[0].deleteRecoveries[0].deletionId, queued.deletionId);
+  assert.equal(subject.persisted[0].deleteRecoveries[0].eventSnapshot[0].id, "event-123");
 });
 
 test("2 permanent deletion ID survives retry and refresh", async () => {
@@ -154,6 +252,7 @@ test("4 network failure retains retryable deletion evidence", async () => {
   await subject.service.process();
   assert.equal(subject.state.operations[0].state, "retryable");
   assert.equal(subject.state.tombstones[0].state, "retryable");
+  assert.equal(subject.state.deleteRecoveries[0].eventSnapshot[0].id, "event-123");
 });
 
 test("5 authentication failure retains rejected deletion evidence", async () => {
@@ -176,6 +275,10 @@ test("6 authorization denial retains rejected deletion evidence", async () => {
   await subject.service.process();
   assert.equal(subject.state.operations[0].state, "rejected");
   assert.equal(subject.state.tombstones[0].lastError.category, "authorization_denied");
+  assert.equal(
+    subject.service.deleteRecoveryFor("account-a", "game-123").gameSnapshot.opponent,
+    "Synthetic retained opponent",
+  );
 });
 
 test("7 delete conflict retains conflicted evidence without ordinary retry", async () => {
@@ -192,6 +295,9 @@ test("7 delete conflict retains conflicted evidence without ordinary retry", asy
   assert.equal(subject.state.operations[0].state, "conflicted");
   assert.equal(subject.state.tombstones[0].state, "conflicted");
   assert.equal(subject.attempts.length, 1);
+  assert.equal(subject.state.deleteRecoveries[0].eventSnapshot.length, 1);
+  await subject.service.process();
+  assert.equal(subject.attempts.length, 1);
 });
 
 test("8 accepted delete receipt is stored on permanent tombstone before operation compaction", async () => {
@@ -203,6 +309,14 @@ test("8 accepted delete receipt is stored on permanent tombstone before operatio
   assert.equal(subject.state.tombstones[0].deletionId, queued.deletionId);
   assert.equal(subject.state.tombstones[0].receipt.acknowledgment, "synthetic-server");
   assert.equal(subject.state.acknowledgments[`legacy_game_delete:game-123`].operationId, queued.deletionId);
+  assert.equal(subject.state.deleteRecoveries.length, 1);
+  const finalized = subject.service.finalizeAcceptedDelete({
+    accountId: "account-a",
+    gameId: "game-123",
+    deletionId: queued.deletionId,
+  });
+  assert.equal(finalized.eventSnapshot[0].id, "event-123");
+  assert.equal(subject.state.deleteRecoveries.length, 0);
 });
 
 test("8b application rejects a delete receipt whose permanent identity does not match", () => {
@@ -286,6 +400,7 @@ test("15 account A tombstone is not visible through account B service scope", ()
   }]);
   assert.equal(subject.service.isTombstoned("account-a", "game-123"), true);
   assert.equal(subject.service.isTombstoned("account-b", "game-123"), false);
+  assert.equal(subject.service.deleteRecoveryFor("account-b", "game-123"), null);
 });
 
 test("16 signed-out state processes no account tombstone operation", async () => {
@@ -334,14 +449,44 @@ test("20 ambiguous cloud visibility creates durable server deletion protection",
   assert.match(appSource, /prepareDurableGameDeletion\(null,\s*\{\s*gameId,\s*allowProvenLocalOnly: false/);
 });
 
-test("21 future-version operation and tombstone state is preserved", () => {
+test("21 future-version operation, tombstone, and recovery state is preserved and write-blocked", () => {
   const durable = api();
   const future = { schemaVersion: 2, operations: [], tombstones: [{ future: true }], acknowledgments: {} };
   assert.deepEqual(clone(durable.normalizeState(future)), future);
+  const futureRecovery = {
+    schemaVersion: 1,
+    deviceId: "future-device",
+    operations: [],
+    tombstones: [],
+    deleteRecoveries: [{ recoveryVersion: 2, future: true }],
+    acknowledgments: {},
+  };
+  const subject = harness({ initialState: futureRecovery });
+  assert.deepEqual(clone(subject.state), futureRecovery);
+  assert.equal(
+    subject.service.queueGame({
+      accountId: "account-a",
+      gameId: "future-game",
+      payload: gamePayload(),
+    }),
+    null,
+  );
 });
 
-test("22 malformed tombstone state fails structural validation for quarantine", () => {
+test("22 malformed tombstone or recovery state fails structural validation for quarantine", () => {
   assert.equal(api().isStoredState({ schemaVersion: 1, operations: [], tombstones: "bad" }), false);
+  assert.equal(api().isStoredState({
+    schemaVersion: 1,
+    operations: [],
+    tombstones: [],
+    deleteRecoveries: [{
+      recoveryVersion: 1,
+      accountId: "account-a",
+      gameId: "game-123",
+      deletionId: "delete-123",
+      capturedAt: "not-a-time",
+    }],
+  }), false);
 });
 
 test("23 public, recap, CSV, and private backup builders exclude tombstone metadata", () => {
@@ -355,8 +500,111 @@ test("23 public, recap, CSV, and private backup builders exclude tombstone metad
     const end = appSource.indexOf(endName, start);
     assert.ok(start >= 0 && end > start, `${startName} disclosure boundary was not found`);
     const body = appSource.slice(start, end);
-    assert.doesNotMatch(body, /tombstone|deletionId|syncOperations|legacy_game_delete/);
+    assert.doesNotMatch(
+      body,
+      /tombstone|deletionId|syncOperations|legacy_game_delete|deleteRecoveries|recoverySnapshot/,
+    );
   }
+});
+
+test("23b pending whole-game deletion creates no event-delete markers", () => {
+  const start = appSource.indexOf("async function confirmDeleteGame");
+  const end = appSource.indexOf("async function deleteEvent", start);
+  const body = appSource.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.doesNotMatch(body, /rememberDeletedEvent/);
+  assert.match(body, /prepareDurableGameDeletion\(game\)/);
+  assert.match(appSource, /recoveryEvidence:\s*privateDeleteRecoverySnapshot\(game\)/);
+});
+
+test("23c individual event deletion retains its separate marker path", () => {
+  const start = appSource.indexOf("async function deleteEvent");
+  const end = appSource.indexOf("function beginTagEdit", start);
+  const body = appSource.slice(start, end);
+  assert.match(body, /rememberDeletedEvent\(eventId\)/);
+  assert.match(body, /tombstoneGameEventOperation/);
+});
+
+test("23d rejected and conflicted deletes restore retained game and event evidence", () => {
+  assert.match(appSource, /function restoreRejectedGameDeletion/);
+  assert.match(appSource, /events:\s*recovery\.eventSnapshot/);
+  assert.match(appSource, /\["rejected", "conflicted"\]\.includes\(tombstone\.state\)/);
+  assert.match(appSource, /neutralizeAttemptedGameDeleteEventMarkers\(recovery\)/);
+  assert.match(appSource, /eventDeleteMarkerBaseline/);
+});
+
+test("23e refresh after newer-revision conflict restores events without reviving an individual deletion", async () => {
+  const subject = harness({
+    execute: async () => ({
+      outcome: "conflicted",
+      category: "conflict",
+      code: "newer_game_revision",
+      receipt: {
+        code: "newer_game_revision",
+        acknowledgment: "saved_at_ordering",
+        serverTimestamp: "2026-07-30T14:01:00.000Z",
+      },
+    }),
+  });
+  queueDelete(subject, {
+    wasActive: true,
+    eventDeleteMarkerBaseline: ["event-manual"],
+    recoveryEvidence: {
+      recoveryVersion: 1,
+      capturedAt: "2026-07-30T14:00:00.000Z",
+      gameSnapshot: {
+        id: "game-123",
+        opponent: "Synthetic retained opponent",
+        events: [],
+      },
+      eventSnapshot: [
+        { id: "event-keep", gameId: "game-123", statType: "ground_ball" },
+        { id: "event-manual", gameId: "game-123", statType: "turnover" },
+      ],
+      previousActiveGameRelationship: {
+        wasActive: true,
+        trackingSession: { gameId: "game-123", origin: "existing" },
+      },
+      previousReviewGameId: "game-123",
+      eventDeleteMarkerBaseline: ["event-manual"],
+    },
+  });
+  await subject.service.process();
+  const refreshed = harness({ initialState: clone(subject.state) });
+  const recovery = refreshed.service.deleteRecoveryFor("account-a", "game-123");
+  const state = {
+    games: [],
+    activeGame: null,
+    trackingSession: null,
+    reviewGameId: null,
+    deletedEventIds: ["event-keep", "event-manual"],
+  };
+  const app = appHarness(
+    [
+      "uniqueIds",
+      "neutralizeAttemptedGameDeleteEventMarkers",
+      "restoreRejectedGameDeletion",
+    ],
+    {
+      state,
+      currentUserId: () => "account-a",
+      normalizeGame: (game) => ({
+        ...clone(game),
+        events: (game.events || []).filter(
+          (event) => !state.deletedEventIds.includes(event.id),
+        ),
+      }),
+      normalizeTrackingSession: (session) => clone(session),
+    },
+  );
+  assert.equal(app.get("restoreRejectedGameDeletion")(clone(recovery)), true);
+  assert.deepEqual(state.games[0].events.map((event) => event.id), ["event-keep"]);
+  assert.deepEqual(Array.from(state.deletedEventIds), ["event-manual"]);
+  assert.equal(state.activeGame.id, "game-123");
+  assert.equal(state.trackingSession.gameId, "game-123");
+  assert.equal(state.reviewGameId, "game-123");
+  await refreshed.service.process();
+  assert.equal(refreshed.attempts.length, 0);
 });
 
 test("24 R2-03 lossless same-ID hydration contracts remain present", () => {

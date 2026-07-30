@@ -1249,6 +1249,95 @@ mutation.
 Evidence:
 `review-evidence/r2-06-durable-game-tombstones-release/PREFLIGHT_BLOCKED.md`.
 
+### R2-06A — Remediate tombstone concurrency and delete-conflict recovery
+
+Status: `IMPLEMENTED — CI AND INDEPENDENT REVIEW PENDING`
+
+Risk level: `LEVEL 3`
+
+Branch: `feature/r2-06a-tombstone-concurrency-recovery`
+
+Execution task: `Implement R2-06A — Remediate Tombstone Concurrency and
+Delete-Conflict Recovery`
+
+Starting point:
+`18f5157de159fa7a27b3cefb4c90f5148c3b230d`
+
+Commit/PR: pending publication
+
+#### Root causes and implemented contracts
+
+- P1-A root cause: the durable delete RPC serialized by game ID, but
+  `laxhornet_sync_game(jsonb)` performed its tombstone checks without the same
+  lock. A write could therefore pass its checks before tombstone insertion and
+  resume after deletion.
+- The additive R2-06A migration gives the write RPC, delete RPC, and retained
+  defense-in-depth trigger one deterministic transaction-scoped advisory-lock
+  derivation based on the canonical game ID. Each acquires it before tombstone
+  or game-row reads and before mutation. Same-game operations serialize in one
+  lock order; unrelated IDs do not share a global lock.
+- P1-B root cause: whole-game deletion called the individual-event deletion
+  marker path before the durable game-delete result was known. A
+  `newer_game_revision` conflict could retain the server game while later
+  event-flush work removed its events.
+- Pending delete intent now persists a validated, versioned, account-scoped
+  recovery record in `laxhornet.syncOperations.v1` before the UI hides the
+  game. It contains the complete game/event snapshot, prior active-game and
+  review relationships, deletion ID, capture time, and the pre-existing
+  individual-event marker baseline.
+- Pending/retryable deletion stays hidden and recoverable without whole-game
+  event markers. Rejected/conflicted deletion restores the game and retained
+  non-individually-deleted events, restores prior local relationships,
+  neutralizes only markers attributable to the attempted whole-game delete,
+  keeps the classified operation evidence, and does not auto-retry conflict.
+- Accepted deletion compacts recovery evidence only after its durable
+  tombstone receipt is persisted. Permanent game-ID reservation remains.
+  Individual event deletes, cancel-game behavior, and Trust Spine event
+  tombstones remain separate.
+- Recovery evidence is private, storage-validated, future-version preserving
+  and write-blocked, excluded from public/export/backup paths, and unavailable
+  across accounts.
+
+#### Migration and release controls
+
+- The merged R2-06 migration, rollback, and pgTAP bytes remain unchanged.
+- Additive migration
+  `supabase/migrations/20260730151714_durable_game_tombstone_concurrency.sql`
+  replaces the affected functions with the shared lock contract.
+- Its rollback restores the prior R2-06 function definitions only while no
+  tombstone exists. Once activation has produced retained evidence, rollback
+  refuses and the durable guard must remain.
+- The release manifest now registers exact R2-06 and R2-06A forward,
+  rollback, and pgTAP identities in required order. Containment and preflight
+  recognize both packages and fail production runtime release while either
+  migration dependency remains pending.
+- Production application runtime remains on rollback source
+  `44f0510d3bde18f459e78f570efd27b72dc2a989`. Neither migration is recorded
+  applied by this ticket.
+
+#### Verification and remaining gates
+
+- Focused local contracts pass for tombstone/recovery behavior (`33/33`),
+  durable operations (`29/29`), sync characterization (`32/32`), phase-aware
+  preflight (`20/20`), phase-aware containment (`33/33`), isolated migration
+  and reverse-order rollback (`13/13`), and real concurrent PostgreSQL
+  ordering (`8/8`).
+- Full canonical-plus-additive regression: pending final stabilized-diff run.
+- Draft-PR CI: pending publication.
+- The two blocked P1 findings are now desired behavior assertions. Unresolved
+  characterization remains for non-delete game-write server deduplication,
+  field-level conflicts, signed-out namespace migration, cross-key
+  transactionality, visible sync/conflict UI, sanitized journal, production
+  migration/RLS verification, and production drift.
+- R2-06A is not complete until final CI and a fresh independent Level 3 review
+  are bound to the exact PR head SHA.
+- R2-06 production activation remains blocked until the named
+  `supabase_production_readonly-2` path is available, production
+  migration/catalog state and recovery readiness are verified, and David
+  separately authorizes the migration-first release sequence.
+- No migration, Supabase change, deployment, release activation, or
+  production-data change occurred.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

@@ -1212,6 +1212,7 @@ function readStoredAccountState(userId = activeStorageUserId) {
         deviceId: "",
         operations: [],
         tombstones: [],
+        deleteRecoveries: [],
         acknowledgments: {},
       }),
       userId,
@@ -1301,6 +1302,7 @@ function normalizeDurableSyncOperationState(value = null, accountId = activeStor
       deviceId: "",
       operations: [],
       tombstones: [],
+      deleteRecoveries: [],
       acknowledgments: {},
     };
   }
@@ -1826,6 +1828,7 @@ function canTrackPlayer(player = state.player) {
 function canShowGameForCurrentAccess(game = {}) {
   const gameId = game.id || "";
   if (gameId && isDeletedGame(gameId)) return false;
+  if (gameId && hasRecoverableDeleteRejection(gameId)) return true;
 
   const teamId = gameTeamId(game);
   const rosterPlayerId = gameRosterPlayerId(game);
@@ -2761,8 +2764,25 @@ function isDeletedGame(gameId) {
     || Boolean(
       accountId
       && state.syncOperations?.tombstones?.some((tombstone) =>
-        tombstone.accountId === accountId && tombstone.gameId === gameId),
+        tombstone.accountId === accountId
+        && tombstone.gameId === gameId
+        && !["rejected", "conflicted"].includes(tombstone.state)),
     );
+}
+
+function hasRecoverableDeleteRejection(gameId) {
+  const accountId = currentUserId();
+  return Boolean(
+    accountId
+    && state.syncOperations?.tombstones?.some((tombstone) =>
+      tombstone.accountId === accountId
+      && tombstone.gameId === gameId
+      && ["rejected", "conflicted"].includes(tombstone.state))
+    && state.syncOperations?.deleteRecoveries?.some((recovery) =>
+      recovery.recoveryVersion === 1
+      && recovery.accountId === accountId
+      && recovery.gameId === gameId),
+  );
 }
 
 function isDeletedEvent(eventId) {
@@ -2781,6 +2801,31 @@ function hasLegacyGameCloudEvidence(gameId) {
 function gameIsProvenLocalOnly(game = null) {
   if (!game?.id || game.userId || game.user_id) return false;
   return !hasLegacyGameCloudEvidence(game.id);
+}
+
+function privateDeleteRecoverySnapshot(game = null) {
+  if (!game?.id) return null;
+  const normalized = normalizeGame(game);
+  const eventSnapshot = (normalized.events || []).map((event) => ({ ...event }));
+  const eventIds = new Set(eventSnapshot.map((event) => event.id));
+  return {
+    recoveryVersion: 1,
+    capturedAt: new Date().toISOString(),
+    gameSnapshot: {
+      ...normalized,
+      events: [],
+    },
+    eventSnapshot,
+    previousActiveGameRelationship: {
+      wasActive: state.activeGame?.id === normalized.id,
+      trackingSession: state.activeGame?.id === normalized.id && state.trackingSession
+        ? JSON.parse(JSON.stringify(state.trackingSession))
+        : null,
+    },
+    previousReviewGameId: state.reviewGameId || null,
+    eventDeleteMarkerBaseline: uniqueIds(state.deletedEventIds)
+      .filter((eventId) => eventIds.has(eventId)),
+  };
 }
 
 function prepareDurableGameDeletion(game = null, options = {}) {
@@ -2806,8 +2851,92 @@ function prepareDurableGameDeletion(game = null, options = {}) {
     gameId,
     knownGameSavedAt: game?.savedAt || game?.saved_at || null,
     deletedAt: new Date().toISOString(),
+    recoveryEvidence: privateDeleteRecoverySnapshot(game),
   });
   return queued ? { ...queued, localOnly: false, gameId } : null;
+}
+
+function neutralizeAttemptedGameDeleteEventMarkers(recovery = null) {
+  if (!recovery || recovery.recoveryVersion !== 1) return false;
+  const recoveredEventIds = new Set(
+    (recovery.eventSnapshot || []).map((event) => String(event?.id || "").trim()).filter(Boolean),
+  );
+  if (!recoveredEventIds.size) return false;
+  const baseline = new Set(uniqueIds(recovery.eventDeleteMarkerBaseline));
+  const before = uniqueIds(state.deletedEventIds);
+  state.deletedEventIds = before.filter(
+    (eventId) => !recoveredEventIds.has(eventId) || baseline.has(eventId),
+  );
+  return state.deletedEventIds.length !== before.length;
+}
+
+function restoreRejectedGameDeletion(recovery = null) {
+  if (
+    !recovery
+    || recovery.recoveryVersion !== 1
+    || recovery.accountId !== currentUserId()
+    || !recovery.gameId
+    || !recovery.gameSnapshot
+    || !Array.isArray(recovery.eventSnapshot)
+  ) {
+    return false;
+  }
+  neutralizeAttemptedGameDeleteEventMarkers(recovery);
+  const restored = normalizeGame({
+    ...recovery.gameSnapshot,
+    id: recovery.gameId,
+    events: recovery.eventSnapshot,
+  });
+  const existingIndex = state.games.findIndex((game) => game.id === recovery.gameId);
+  if (existingIndex >= 0) state.games[existingIndex] = restored;
+  else state.games.unshift(restored);
+  state.games.sort((left, right) =>
+    new Date(right.date || right.createdAt) - new Date(left.date || left.createdAt));
+  if (recovery.previousActiveGameRelationship?.wasActive) {
+    state.activeGame = restored;
+    state.trackingSession = recovery.previousActiveGameRelationship.trackingSession
+      ? normalizeTrackingSession(
+          recovery.previousActiveGameRelationship.trackingSession,
+          restored,
+        )
+      : null;
+  }
+  const priorReviewId = recovery.previousReviewGameId;
+  if (
+    priorReviewId
+    && (priorReviewId === restored.id || state.games.some((game) => game.id === priorReviewId))
+  ) {
+    state.reviewGameId = priorReviewId;
+  } else if (!state.reviewGameId) {
+    state.reviewGameId = restored.id;
+  }
+  return true;
+}
+
+function reconcileDurableDeleteRecoveries() {
+  const accountId = currentUserId();
+  if (!accountId || state.syncOperations?.schemaVersion !== 1) return false;
+  let changed = false;
+  for (const recovery of [...(state.syncOperations.deleteRecoveries || [])]) {
+    if (recovery.accountId !== accountId || recovery.recoveryVersion !== 1) continue;
+    const tombstone = state.syncOperations.tombstones?.find((candidate) =>
+      candidate.accountId === accountId && candidate.gameId === recovery.gameId);
+    if (!tombstone) continue;
+    if (["rejected", "conflicted"].includes(tombstone.state)) {
+      changed = restoreRejectedGameDeletion(recovery) || changed;
+      continue;
+    }
+    if (tombstone.state === "accepted" && tombstone.receipt) {
+      neutralizeAttemptedGameDeleteEventMarkers(recovery);
+      const finalized = durableSyncService().finalizeAcceptedDelete({
+        accountId,
+        gameId: recovery.gameId,
+        deletionId: recovery.deletionId,
+      });
+      changed = Boolean(finalized) || changed;
+    }
+  }
+  return changed;
 }
 
 function removeTombstonedGamesFromLocalState() {
@@ -2984,6 +3113,7 @@ function applyStoredAccountState(userId) {
   state.reviewGameId = stored.reviewGameId;
   state.deletedGameIds = stored.deletedGameIds;
   state.deletedEventIds = stored.deletedEventIds;
+  reconcileDurableDeleteRecoveries();
   removeTombstonedGamesFromLocalState();
   state.userProfile = null;
   state.adminRequests = [];
@@ -4359,7 +4489,6 @@ async function confirmDeleteGame(id) {
     showToast("Game was not deleted because deletion evidence could not be saved");
     return;
   }
-  (game.events || []).forEach((event) => rememberDeletedEvent(event.id));
   state.games = state.games.filter((item) => item.id !== id);
   if (state.activeGame?.id === id) {
     state.activeGame = null;
@@ -4373,7 +4502,7 @@ async function confirmDeleteGame(id) {
   if (state.reviewGameId === id) state.reviewGameId = state.games[0]?.id || null;
   persistAll();
   render();
-  showToast("Game deleted");
+  showToast(deletion.localOnly ? "Game deleted" : "Game deletion saved");
   if (!deletion.localOnly && supabaseClient && currentUserId() && !state.isOffline) {
     await processDurableSyncOperations();
   }
@@ -4381,9 +4510,12 @@ async function confirmDeleteGame(id) {
     ? durableSyncService().tombstoneFor(currentUserId(), id)
     : null;
   if (deletion.localOnly || tombstone?.state === "accepted") {
-    forgetDeletedEvents((game.events || []).map((event) => event.id));
     state.syncStatus = "Synced";
     clearResolvedCloudDeleteError();
+    if (!deletion.localOnly) showToast("Game deleted");
+  } else if (["rejected", "conflicted"].includes(tombstone?.state)) {
+    state.syncStatus = "Sync needs attention";
+    showToast("Game deletion needs attention. The game was restored.");
   } else {
     state.syncStatus = durableSyncStatus() || "Sync waiting to retry";
   }
@@ -5501,6 +5633,7 @@ function applyAuthorizedGameTombstones(rows, generation, accountId) {
     state.deletedGameIds = uniqueIds(state.deletedGameIds)
       .filter((gameId) => !tombstonedIds.has(gameId));
   }
+  reconcileDurableDeleteRecoveries();
   removeTombstonedGamesFromLocalState();
   persistAll();
   return true;
@@ -7334,9 +7467,11 @@ function durableSyncStatus() {
 
 async function processDurableSyncOperations() {
   const processed = await durableSyncService().process();
+  const reconciledDelete = reconcileDurableDeleteRecoveries();
   const status = durableSyncStatus();
   if (status) state.syncStatus = status;
-  return processed;
+  if (reconciledDelete) persistAll();
+  return processed || reconciledDelete;
 }
 
 function persistGameBeforeDurableQueue(game) {
