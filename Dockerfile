@@ -2,21 +2,14 @@
 # Stage 1: Builder - Only what's needed for static file preparation
 FROM node:22-alpine AS builder
 WORKDIR /build
-RUN apk add --no-cache python3 git
-# Cache layers by copying lock files first
-COPY package*.json ./
-RUN npm ci --ignore-scripts 2>/dev/null || true
 # Copy app code
 COPY . .
-# Verify build (optional linting/validation)
-RUN npm run build 2>/dev/null || true
 
-FROM base AS test
+FROM node:22-alpine AS test
+WORKDIR /app
 RUN apk add --no-cache python3 git
 RUN git config --system --add safe.directory /app
-COPY --from=build /app /app
-RUN npm ci --ignore-scripts 2>/dev/null || true
-CMD ["npm", "test"]
+COPY --from=builder /build /app
 
 FROM node:22-alpine AS runtime
 WORKDIR /app

@@ -109,7 +109,16 @@ jobs:
           node tools/test_release_hygiene.mjs
 
       - name: Run phase-aware release containment
-        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test npm install --no-save --no-package-lock --ignore-scripts @electric-sql/pglite@0.5.4 && node tools/test_release_containment_phase_aware.mjs
+        run: >-
+          docker run --rm
+          -e LAXHORNET_RELEASE_BASE_REF
+          -e LAXHORNET_AUTHORIZED_DB_REF
+          -e LAXHORNET_APPROVED_ADDITIVE_REF
+          -e LAXHORNET_ALLOWED_ADDITIVE_DB_PATHS
+          -v "${{ github.workspace }}:/app"
+          laxhornet:test
+          sh -c 'npm install --no-save --no-package-lock --ignore-scripts @electric-sql/pglite@0.5.4
+          && node tools/test_release_containment_phase_aware.mjs'
 
       - name: Run minimum disclosure contracts
         run: >-
