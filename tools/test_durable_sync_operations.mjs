@@ -397,6 +397,8 @@ test("network failure becomes retryable with bounded backoff", async () => {
   await harness.service.process();
   const [operation] = harness.state.operations;
   assert.equal(operation.state, "retryable");
+  assert.equal(operation.lastError.category, "retryable_transport");
+  assert.equal(operation.lastError.code, "retryable_transport");
   assert.equal(operation.attemptCount, 1);
   assert.equal(
     Date.parse(operation.nextAttemptAt) - Date.parse(operation.lastAttemptAt),
@@ -404,12 +406,12 @@ test("network failure becomes retryable with bounded backoff", async () => {
   );
 });
 
-test("validation or authorization failure remains rejected", async () => {
+test("authorization failure is retained as a non-retryable rejection", async () => {
   const harness = serviceHarness({
     execute: async () => ({
       outcome: "rejected",
-      code: "not_authorized",
-      message: "Synthetic authorization rejection",
+      code: "unauthorized_scope",
+      message: "Synthetic authorization rejection with private detail",
     }),
   });
   harness.service.queueGame({
@@ -419,7 +421,26 @@ test("validation or authorization failure remains rejected", async () => {
   });
   await harness.service.process();
   assert.equal(harness.state.operations[0].state, "rejected");
-  assert.equal(harness.state.operations[0].lastError.code, "not_authorized");
+  assert.equal(harness.state.operations[0].lastError.category, "authorization_denied");
+  assert.equal(harness.state.operations[0].lastError.code, "authorization_denied");
+  assert.equal(harness.state.operations[0].nextAttemptAt, null);
+  assert.equal(harness.state.operations[0].payload.gameRow.id, "synthetic-game");
+  assert.deepEqual(
+    Object.keys(harness.state.operations[0].lastError).sort(),
+    [
+      "category",
+      "classifiedAt",
+      "code",
+      "httpStatus",
+      "message",
+      "source",
+      "sourceCode",
+    ].sort(),
+  );
+  assert.doesNotMatch(
+    JSON.stringify(harness.state.operations[0].lastError),
+    /private detail/i,
+  );
 });
 
 test("revision conflict remains conflicted and is not retried", async () => {
@@ -442,11 +463,13 @@ test("revision conflict remains conflicted and is not retried", async () => {
   await harness.service.process();
   await harness.service.process();
   assert.equal(harness.state.operations[0].state, "conflicted");
+  assert.equal(harness.state.operations[0].lastError.category, "conflict");
+  assert.equal(harness.state.operations[0].lastError.code, "stale_clock_revision");
   assert.equal(harness.state.operations[0].receipt.serverRevision, 4);
   assert.equal(harness.attempts.length, 1);
 });
 
-test("offline processing does not create attempts or retry storms", async () => {
+test("offline processing becomes retryable without attempts or retry storms", async () => {
   const harness = serviceHarness({ offline: true });
   harness.service.queueClock({
     accountId: "synthetic-account-a",
@@ -459,8 +482,31 @@ test("offline processing does not create attempts or retry storms", async () => 
     harness.service.process(),
   ]);
   assert.equal(harness.attempts.length, 0);
-  assert.equal(harness.state.operations[0].state, "pending");
+  assert.equal(harness.state.operations[0].state, "retryable");
   assert.equal(harness.state.operations[0].attemptCount, 0);
+  assert.equal(harness.state.operations[0].lastAttemptAt, null);
+  assert.equal(harness.state.operations[0].nextAttemptAt, null);
+  assert.equal(harness.state.operations[0].lastError.category, "retryable_transport");
+});
+
+test("missing session rejects eligible work without incrementing attempt counters", async () => {
+  const harness = serviceHarness({ offline: true });
+  harness.service.queueGame({
+    accountId: "synthetic-account-a",
+    gameId: "synthetic-game",
+    payload: gamePayload(),
+  });
+  assert.equal(harness.service.rejectAuthentication("synthetic-account-a"), 1);
+  assert.equal(harness.service.rejectAuthentication("synthetic-account-a"), 0);
+  const [operation] = harness.state.operations;
+  assert.equal(operation.state, "rejected");
+  assert.equal(operation.attemptCount, 0);
+  assert.equal(operation.lastAttemptAt, null);
+  assert.equal(operation.nextAttemptAt, null);
+  assert.equal(operation.lastError.category, "authentication_required");
+  assert.equal(operation.lastError.code, "authentication_required");
+  await harness.service.process();
+  assert.equal(harness.attempts.length, 0);
 });
 
 test("account A queue is isolated while account B is active", async () => {
@@ -477,6 +523,64 @@ test("account A queue is isolated while account B is active", async () => {
   await second.service.process();
   assert.equal(second.attempts.length, 0);
   assert.equal(second.state.operations[0].accountId, "synthetic-account-a");
+});
+
+test("app auth transitions reject before account switch and recover only on explicit triggers", () => {
+  assert.match(
+    appSource,
+    /function setAuthUser\(user\)[\s\S]*rejectAuthentication\(state\.authUserId\)[\s\S]*applyStoredAccountState\(nextUserId\)/,
+  );
+  assert.match(
+    appSource,
+    /signInWithPassword[\s\S]*setAuthUser\([\s\S]*recoverAuthentication\(currentUserId\(\)\)/,
+  );
+  assert.match(
+    appSource,
+    /event === "SIGNED_IN"[\s\S]*recoverAuthentication\(currentUserId\(\)\)/,
+  );
+});
+
+test("fresh sign-in recovery resumes only the active account's authentication rejection", async () => {
+  const harness = serviceHarness({ offline: true });
+  harness.service.queueGame({
+    accountId: "synthetic-account-a",
+    gameId: "synthetic-game-a",
+    payload: {
+      gameRow: {
+        id: "synthetic-game-a",
+        user_id: "synthetic-account-a",
+      },
+    },
+  });
+  harness.setAccountId("synthetic-account-b");
+  harness.service.queueGame({
+    accountId: "synthetic-account-b",
+    gameId: "synthetic-game-b",
+    payload: {
+      gameRow: {
+        id: "synthetic-game-b",
+        user_id: "synthetic-account-b",
+      },
+    },
+  });
+  assert.equal(harness.service.rejectAuthentication("synthetic-account-a"), 1);
+  assert.equal(harness.service.rejectAuthentication("synthetic-account-b"), 1);
+
+  harness.setOffline(false);
+  assert.equal(harness.service.recoverAuthentication("synthetic-account-b"), 1);
+  await harness.service.process();
+  assert.equal(harness.attempts.length, 1);
+  assert.equal(harness.attempts[0].accountId, "synthetic-account-b");
+  assert.equal(
+    harness.state.operations.find((operation) =>
+      operation.accountId === "synthetic-account-a")?.state,
+    "rejected",
+  );
+  assert.equal(
+    harness.state.operations.some((operation) =>
+      operation.accountId === "synthetic-account-b"),
+    false,
+  );
 });
 
 test("accepted operation does not reappear after intentional compaction", async () => {
@@ -615,7 +719,7 @@ test("public Live Share, CSV, recap, and private backup exclude queue metadata",
     const body = appSource.slice(start, nextFunction < 0 ? appSource.length : nextFunction);
     assert.doesNotMatch(
       body,
-      /syncOperations|operationId|attemptCount|nextAttemptAt|lastError|receipt/,
+      /syncOperations|operationId|attemptCount|nextAttemptAt|lastError|receipt|httpStatus|classifiedAt|sourceCode|attentionRequired/,
       functionName,
     );
   }
@@ -633,6 +737,10 @@ test("unresolved durable work cannot be reported as Synced", () => {
   assert.match(
     appSource,
     /showToast\(\s*operationStatus\s*\|\|/,
+  );
+  assert.match(
+    appSource,
+    /function manuallySyncCloudGames\(\)[\s\S]*recoverAuthentication\(currentUserId\(\)\)/,
   );
 });
 
@@ -690,6 +798,39 @@ test("integrated game journey survives failure, refresh, replay, receipt, and cl
   );
 });
 
+test("integrated game journey retains authorization denial and never runs it under another account", async () => {
+  const first = serviceHarness({
+    execute: async () => {
+      throw new TypeError("Failed to fetch");
+    },
+  });
+  const queued = first.service.queueGame({
+    accountId: "synthetic-account-a",
+    gameId: "synthetic-game",
+    payload: gamePayload(),
+  });
+  await first.service.process();
+  assert.equal(first.state.operations[0].state, "retryable");
+  assert.equal(first.state.operations[0].operationId, queued.operationId);
+
+  first.advance(2500);
+  first.setExecute(async () => ({
+    outcome: "rejected",
+    code: "unauthorized_scope",
+  }));
+  await first.service.process();
+  assert.equal(first.state.operations[0].state, "rejected");
+  assert.equal(first.state.operations[0].lastError.category, "authorization_denied");
+  assert.equal(first.state.operations[0].operationId, queued.operationId);
+  assert.equal(first.state.operations[0].payloadRevision, 1);
+
+  first.setAccountId("synthetic-account-b");
+  await first.service.process();
+  assert.equal(first.attempts.length, 2);
+  assert.equal(first.state.operations[0].accountId, "synthetic-account-a");
+  assert.equal(first.state.operations[0].state, "rejected");
+});
+
 test("integrated clock journey survives failure, refresh, replay, revision receipt, and cleanup", async () => {
   const first = serviceHarness({
     execute: async () => ({
@@ -715,4 +856,33 @@ test("integrated clock journey survives failure, refresh, replay, revision recei
   const acknowledgment = Object.values(refreshed.state.acknowledgments)[0];
   assert.equal(acknowledgment.receipt.serverRevision, 2);
   assert.equal(acknowledgment.receipt.acknowledgment, "synthetic_receipt");
+});
+
+test("integrated clock journey retains stale revision evidence and local payload without retry", async () => {
+  const localClock = clockPayload(2);
+  const harness = serviceHarness({
+    execute: async () => ({
+      outcome: "conflicted",
+      code: "stale_clock_revision",
+      receipt: {
+        code: "stale_clock_revision",
+        serverRevision: 7,
+      },
+    }),
+  });
+  harness.service.queueClock({
+    accountId: "synthetic-account-a",
+    gameId: "synthetic-game",
+    payload: localClock,
+    baseRevision: 1,
+  });
+  await harness.service.process();
+  await harness.service.process();
+  const [operation] = harness.state.operations;
+  assert.equal(operation.state, "conflicted");
+  assert.equal(operation.baseRevision, 1);
+  assert.deepEqual(operation.payload, localClock);
+  assert.equal(operation.receipt.serverRevision, 7);
+  assert.equal(operation.nextAttemptAt, null);
+  assert.equal(harness.attempts.length, 1);
 });

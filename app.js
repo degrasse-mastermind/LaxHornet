@@ -2945,6 +2945,9 @@ function resetCloudAccountState() {
 function setAuthUser(user) {
   const nextUserId = user?.id || "";
   if (nextUserId !== state.authUserId) {
+    if (!nextUserId && state.authUserId && activeStorageUserId === state.authUserId) {
+      durableSyncService().rejectAuthentication(state.authUserId);
+    }
     if (state.authUserId && activeStorageUserId === state.authUserId) persistAll();
     state.authUserId = nextUserId;
     state.authUser = user || null;
@@ -5132,19 +5135,36 @@ async function upsertWithOptionalColumns(table, payload, optionalColumns = []) {
   const skipped = new Set();
 
   for (let attempt = 0; attempt <= optionalColumns.length; attempt += 1) {
-    const { error } = await supabaseClient.from(table).upsert(nextPayload);
-    if (!error) return { error: null, skipped: [...skipped] };
+    const { error, status, statusText } = await supabaseClient.from(table).upsert(nextPayload);
+    if (!error) {
+      return {
+        error: null,
+        skipped: [...skipped],
+        httpStatus: Number.isInteger(status) ? status : null,
+        statusText: String(statusText || ""),
+      };
+    }
 
     const missingColumn = missingSupabaseColumn(error);
     if (!optionalColumns.includes(missingColumn) || skipped.has(missingColumn)) {
-      return { error, skipped: [...skipped] };
+      return {
+        error,
+        skipped: [...skipped],
+        httpStatus: Number.isInteger(status) ? status : null,
+        statusText: String(statusText || ""),
+      };
     }
 
     skipped.add(missingColumn);
     nextPayload = removeColumnFromPayload(nextPayload, missingColumn);
   }
 
-  return { error: { message: "Could not sync Live Share data" }, skipped: [...skipped] };
+  return {
+    error: { code: "optional_column_retry_exhausted" },
+    skipped: [...skipped],
+    httpStatus: null,
+    statusText: "",
+  };
 }
 
 function cloudGameMergePolicy() {
@@ -5703,6 +5723,13 @@ async function loadCloudGames(options = {}) {
   }
 }
 
+async function manuallySyncCloudGames() {
+  if (currentUserId()) {
+    durableSyncService().recoverAuthentication(currentUserId());
+  }
+  return loadCloudGames();
+}
+
 async function syncLocalGamesToCloud() {
   if (!supabaseClient || !currentUserId()) return 0;
   const localGames = new Map();
@@ -5791,6 +5818,9 @@ async function handleAuthSubmit(formData) {
   }
 
   setAuthUser(result.data.user || result.data.session?.user || state.authUser);
+  if (state.authUser) {
+    durableSyncService().recoverAuthentication(currentUserId());
+  }
   if (state.authUser) await loadUserProfile({ silent: true });
   if (state.authUser && needsParentProfileSetup()) state.screen = "profileSetup";
   state.syncStatus = state.authUser ? "Signed in" : "Check your email to confirm your account";
@@ -7106,8 +7136,8 @@ function durableSyncService() {
   return durableSyncOperationService;
 }
 
-function durableSyncFailure(error) {
-  return window.LaxHornetDurableSyncOperations.classifyFailure(error);
+function durableSyncFailure(error, options = {}) {
+  return window.LaxHornetDurableSyncOperations.classifyFailure(error, options);
 }
 
 function durableSyncHasUnresolvedOperations(accountId = currentUserId()) {
@@ -7186,7 +7216,7 @@ async function performLegacyGameOperation(operation) {
     };
   }
   let detachedMissingTeam = false;
-  let { error, skipped } = await upsertWithOptionalColumns("games", gameRow, [
+  let { error, skipped, httpStatus } = await upsertWithOptionalColumns("games", gameRow, [
     "player_id",
     "team_id",
     "roster_player_id",
@@ -7195,7 +7225,7 @@ async function performLegacyGameOperation(operation) {
   if (error && isTeamForeignKeyError(error)) {
     gameRow = detachTeamFromSupabaseRows(gameRow);
     detachedMissingTeam = true;
-    ({ error, skipped } = await upsertWithOptionalColumns("games", gameRow, [
+    ({ error, skipped, httpStatus } = await upsertWithOptionalColumns("games", gameRow, [
       "player_id",
       "team_id",
       "roster_player_id",
@@ -7203,7 +7233,10 @@ async function performLegacyGameOperation(operation) {
     ]));
   }
   if (error) {
-    return durableSyncFailure(error);
+    return durableSyncFailure(
+      { error, httpStatus },
+      { source: "legacy_game_upsert" },
+    );
   }
 
   return {
@@ -7335,8 +7368,17 @@ async function performTrackedClockOperation(operation) {
       message: "The saved clock operation is incomplete.",
     };
   }
-  const { data, error } = await supabaseClient.rpc(rpcName, { p_clock: clockPayload });
-  if (error) return durableSyncFailure(error);
+  const {
+    data,
+    error,
+    status,
+  } = await supabaseClient.rpc(rpcName, { p_clock: clockPayload });
+  if (error) {
+    return durableSyncFailure(
+      { error, httpStatus: status },
+      { source: "tracked_clock_rpc" },
+    );
+  }
   if (data?.outcome === "conflicted") {
     return {
       outcome: "conflicted",
@@ -14753,7 +14795,7 @@ function handleClick(event) {
     if (action.dataset.action === "open-tracker-view") setAdminViewMode("tracker", { screen: "home" });
     if (action.dataset.action === "request-admin") requestUserRole("admin");
     if (action.dataset.action === "refresh-admin-requests") loadAdminRequests();
-    if (action.dataset.action === "sync-cloud-games") loadCloudGames();
+    if (action.dataset.action === "sync-cloud-games") manuallySyncCloudGames();
     if (action.dataset.action === "check-app-update") checkForAppUpdate({ manual: true });
     if (action.dataset.action === "sync-team-roster") loadCloudTeams();
     if (action.dataset.action === "refresh-release-health") {
@@ -15355,8 +15397,11 @@ async function initApp() {
     const { data } = await supabaseClient.auth.getSession();
     setAuthUser(data.session?.user || null);
     state.syncStatus = state.authUser ? "Signed in" : "Signed out";
-    supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+    supabaseClient.auth.onAuthStateChange(async (event, session) => {
       setAuthUser(session?.user || null);
+      if (event === "SIGNED_IN" && state.authUser) {
+        durableSyncService().recoverAuthentication(currentUserId());
+      }
       state.syncStatus = state.authUser ? "Signed in" : "Signed out";
       await fetchBackendCapabilities({ force: true }).catch(() => null);
       if (state.authUser) {

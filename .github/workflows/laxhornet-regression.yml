@@ -78,6 +78,9 @@ jobs:
       - name: Durable game and clock operation contracts
         run: node tools/test_durable_sync_operations.mjs
 
+      - name: Sync error classification contracts
+        run: node tools/test_sync_error_classification.mjs
+
       - name: Sync characterization contracts
         run: node tools/test_sync_characterization.mjs
 
