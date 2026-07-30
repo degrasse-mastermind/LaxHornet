@@ -134,7 +134,8 @@ Do not combine these into one large Codex task. Each item requires one approved 
 - [ ] Separate authorization failures from retryable network failures.
 - [ ] Add visible states: Saved on device, Waiting to sync, Syncing, Synced, Needs attention.
 - [ ] Add sanitized sync journal.
-- [ ] Test offline creation, reconnect, duplicate replay, refresh, revocation, and conflict.
+- [x] Test offline creation, reconnect, duplicate replay, refresh, revocation,
+  and conflict (`R2-02`; `tools/test_sync_characterization.mjs`).
 - [ ] Preserve existing saved games and offline capture.
 - [ ] Keep production mutation and release out of the feature ticket.
 

@@ -75,6 +75,9 @@ jobs:
       - name: Event operation service contracts
         run: node tools/test_event_operation_service.mjs
 
+      - name: Sync characterization contracts
+        run: node tools/test_sync_characterization.mjs
+
       - name: Tracked playing time service contracts
         run: node tools/test_tracked_playing_time_service.mjs
 
