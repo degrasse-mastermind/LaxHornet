@@ -1062,7 +1062,9 @@ Related document: `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`
 - Draft pull request: #47.
 - Complete local regression: canonical-plus-additive `41 passed, 0 failed`.
 - Changed JavaScript syntax and `git diff --check`: passed.
-- CI and independent exact-PR-SHA Level 3 review remain required before merge.
+- Final-head Docker, portable regression, Supabase Preview, and Vercel checks
+  passed. Independent exact-PR-SHA Level 3 review remains required before
+  merge.
 - Production verification still requires a separately authorized
   nonproduction/production rollout task after migration review. Historical
   games hard-deleted before this migration have no trustworthy server-side

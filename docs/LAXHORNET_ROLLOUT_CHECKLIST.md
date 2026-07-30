@@ -262,7 +262,7 @@ the overall R2 gate remain incomplete.
 - [x] Local-storage safety passed `28/28`; cancel/delete coverage passed `33/33`; delete permissions passed `17/17`.
 - [x] Event Pipeline and Trust Spine focused contracts passed.
 - [x] Final canonical-plus-additive regression passed `41/41` on the stabilized runtime and migration diff.
-- [ ] Final draft-PR CI, including nonproduction migration validation, must pass.
+- [x] Final draft-PR Docker, portable regression, Supabase Preview, and Vercel checks passed.
 - [ ] Exact final PR head requires independent Level 3 review before merge.
 - [ ] Apply the migration only in a separately authorized release/production task.
 
