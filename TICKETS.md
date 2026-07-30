@@ -1,6 +1,9 @@
 # LaxHornet Technical Tickets
 
-This file is the active, reviewable work queue for Codex. Work on one approved ticket at a time. Product brainstorming and broad planning belong in ChatGPT; only sufficiently defined implementation work belongs here.
+This file is the active, reviewable queue for work that needs a ticket. Level 1
+routine work does not require an entry. Level 2 work may use a concise ticket or
+PR-ready task description. Level 3 work requires one approved ticket. Product
+brainstorming and broad planning belong in ChatGPT.
 
 ## Status values
 
@@ -511,18 +514,20 @@ until separately authorized.
 
 ## Ticket template
 
-Copy this section for each implementation ticket.
+Use this section when a ticket is required or useful. Keep Level 2 tickets
+concise. Include the critical-surface fields for Level 3.
 
 ### LH-XXX — Descriptive title
 
-Status: `PROPOSED`  
-Branch: `feature/...`  
-Owner:  
+Status: `PROPOSED`
+
+Risk level: `LEVEL 2 / LEVEL 3`
+
+Branch: `feature/...`
+
+Owner:
+
 Related decision/design document:
-Discussion workbench:
-Primary Codex task title:
-Primary Codex task ID:
-Independent review task ID:
 
 #### Goal
 
@@ -543,10 +548,8 @@ Describe what the inspected repository does today. Cite file names and functions
 #### Requirements
 
 - Functional requirements.
-- Offline/local-first requirements.
-- Authorization and disclosure requirements.
-- Data/migration requirements.
-- Release or feature-flag requirements.
+- Add offline/local-first, authorization, disclosure, data/migration, release,
+  or feature-flag requirements only when they apply.
 
 #### Acceptance criteria
 
@@ -561,49 +564,59 @@ Describe what the inspected repository does today. Cite file names and functions
 ```powershell
 # Focused commands first
 
-# Broader regression when warranted
+# Level 1 and Level 2 use CI for broader regression by default.
+# Run once after the final diff stabilizes for Level 3:
 node tools/run_v283_local_regression.mjs
 ```
 
-#### Risks and rollback
+#### Level 3 critical surface and rollback
 
-- Data risk.
-- Authorization/privacy risk.
-- Offline/sync risk.
-- Release/cache risk.
-- Rollback or disable strategy.
+Omit this section for Level 2.
+
+- Critical surface triggered.
+- Data, authorization/privacy, offline/sync, or release/cache risk.
+- Rollback or recovery strategy.
+- Exact-PR-SHA independent review requirement.
+- Separate release or production authority, if any.
+- Evidence-package requirement when this is a migration, production release,
+  security incident, or disclosure incident.
 
 #### Completion record
 
-Commit/PR:  
-Files changed:  
-Tests and results:  
-`REPO_CURRENT_STATE.md` updated: `YES/NO`  
+Commit/PR:
 
-For tickets that do not affect rollout status, record `NOT APPLICABLE` for all rollout checklist fields below.
+Files changed:
 
-Rollout checklist reviewed: YES/NO/NOT APPLICABLE
-Rollout checklist updated: YES/NO/NOT APPLICABLE
-Checklist sections affected:
-Checklist status changes:
+Focused checks:
+
+Broad checks or CI:
+
+Known limitations:
+
+Production or external state changed:
+
+`REPO_CURRENT_STATE.md` updated: `YES/NO/NOT REQUIRED`
+
 Remaining work:
-Task disposition: `COMPLETED/PASS/FAIL/BLOCKED/HISTORICAL`
-Primary task archived: `YES/NO`
+
+Add rollout-checklist fields only when the approved ticket changes a rollout
+work package, milestone, gate, blocker, release, production state, or existing
+checklist item, or adds a newly approved roadmap item.
 
 ## Standard Codex execution prompt
 
-Use this pattern after a ticket reaches `READY`:
+Use this default prompt for Level 1, Level 2, or Level 3 implementation:
 
 ```text
-Implement only [TICKET ID] from TICKETS.md.
+Implement the requested LaxHornet change.
 
-First read AGENTS.md, REPO_CURRENT_STATE.md, TICKETS.md, docs/CODEX_WORKFLOW.md, and inspect the actual relevant code. Then provide a brief implementation plan naming the expected files, risks, and tests. Do not edit until the plan is internally consistent with the repository.
+Read AGENTS.md, the relevant ticket or task description, and only the files needed for this change. Classify the work as Level 1, Level 2, or Level 3 under docs/CODEX_WORKFLOW.md.
 
-Stay strictly within the ticket's scope and acceptance criteria. Preserve the vanilla static PWA, offline-first behavior, authorization boundaries, disclosure rules, Supabase migration provenance, and release controls. Do not use host-managed connector actions, deploy, apply remote migrations, change production configuration, or merge to main unless the ticket explicitly authorizes that exact action.
+Give a plan of no more than five bullets, then proceed immediately unless the task triggers Level 3 approval requirements, conflicts with the repository, or requires scope expansion.
 
-After implementation, run the smallest relevant tests, then broader regression if warranted. Update REPO_CURRENT_STATE.md and the ticket completion record with durable facts.
+Make the smallest coherent change. Run focused checks during implementation. Use CI for broader regression on Level 1 and Level 2 work. Run the full local regression once after the final diff stabilizes for Level 3 work.
 
-At closeout, inspect docs/LAXHORNET_ROLLOUT_CHECKLIST.md only when the work has an approved roadmap or engineering ticket and changes a rollout work package, milestone, gate, blocker, release, production state, or existing checklist item, or adds a newly approved roadmap item. Update it only with durable facts supported by the ticket outcome. Leave items incomplete while required review, merge, release, or production-verification gates remain pending, and report applicable checklist changes in the final response. For routine work with no roadmap impact, omit the rollout-checklist closeout section and record the ticket-template fields as `NOT APPLICABLE`.
+You may create a branch, commit, push, and open a draft PR. Do not merge, deploy, apply migrations, modify production, change release settings, or invoke write-capable external connectors without explicit authorization.
 
-Use docs/templates/CODEX_TASK_CLOSEOUT.md before renaming or archiving the task. Finish with the diff summary, tests and results, risks, and unresolved items.
+Finish with the concise closeout required for the risk level.
 ```
