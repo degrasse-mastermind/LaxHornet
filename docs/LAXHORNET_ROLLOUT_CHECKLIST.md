@@ -40,9 +40,11 @@ This checklist does not replace `TICKETS.md`, `REPO_CURRENT_STATE.md`, Git histo
 
 ## LH-DEV-006 — Versioned Local-Storage Safety Foundation
 
-**Status:** [~] In progress
+**Status:** [x] Complete
 **Codex task:** `LH-DEV-006 | Version Local Storage Safely`
 **Branch:** `feature/lh-dev-006-versioned-local-storage`
+**Pull request:** #36
+**Merge SHA:** `255457b3cb51b07b5526c8270bf58d773cb70509`
 
 ### Implementation
 
@@ -50,61 +52,71 @@ This checklist does not replace `TICKETS.md`, `REPO_CURRENT_STATE.md`, Git histo
 - [x] Current `main` and `origin/main` baseline confirmed.
 - [x] Ticket scope and exclusions defined.
 - [x] Implementation plan approved.
-- [ ] Storage-safety core implemented.
-- [ ] Existing primary keys and payload shapes preserved.
-- [ ] Canonical local schema version added.
-- [ ] Legacy read migration added and idempotent.
-- [ ] Account-scoped metadata sidecars added.
-- [ ] Staged-write verification added.
-- [ ] Bounded backup behavior added.
-- [ ] Bounded quarantine behavior added.
-- [ ] Future-version domains preserved and write-blocked.
-- [ ] Missing primaries prevented from restoring stale backups.
-- [ ] Intentional deletion removes primary and sidecars.
-- [ ] Storage-health notifications deduplicated.
-- [ ] Import validation hardened without changing export shapes.
-- [ ] Tracked-time and event-operation payloads preserved unchanged.
-- [ ] Public Live Share, recap, and CSV remain free of storage metadata.
+- [x] Storage-safety core implemented.
+- [x] Existing primary keys and payload shapes preserved.
+- [x] Canonical local schema version added.
+- [x] Legacy read migration added and idempotent.
+- [x] Account-scoped metadata sidecars added.
+- [x] Staged-write verification added.
+- [x] Bounded backup behavior added.
+- [x] Bounded quarantine behavior added.
+- [x] Future-version domains preserved and write-blocked.
+- [x] Missing primaries prevented from restoring stale backups.
+- [x] Intentional deletion removes primary and sidecars.
+- [x] Storage-health notifications deduplicated.
+- [x] Import validation hardened without changing export shapes.
+- [x] Tracked-time and event-operation payloads preserved unchanged.
+- [x] Public Live Share, recap, and CSV remain free of storage metadata.
 
 ### Verification
 
-- [ ] Focused storage-safety tests pass.
-- [ ] Existing event-operation tests pass.
-- [ ] Existing tracked-playing-time tests pass.
-- [ ] Existing game-scope tests pass.
-- [ ] Public event semantic-boundary tests pass.
-- [ ] Pages allowlist/deployment tests pass.
-- [ ] Import/export and disclosure checks pass.
-- [ ] Full local regression passes.
-- [ ] Local browser startup passes with normal data.
-- [ ] Malformed noncritical-domain recovery passes.
-- [ ] Saved-game backup recovery passes.
-- [ ] Future-version preservation behavior passes.
-- [ ] Active-game recovery passes.
-- [ ] Offline event capture and persistence pass.
-- [ ] Desktop and mobile console checks show no unexpected errors.
-- [ ] `git diff --check` passes.
-- [ ] Sanitized evidence package completed.
-- [ ] `TICKETS.md` updated with exact results.
-- [ ] `REPO_CURRENT_STATE.md` updated with durable facts.
+- [x] Focused storage-safety suite passed: `28/28`.
+- [x] Existing event-operation tests pass.
+- [x] Existing tracked-playing-time tests pass.
+- [x] Existing game-scope tests pass.
+- [x] Public event semantic-boundary tests pass.
+- [x] Pages allowlist/deployment tests pass.
+- [x] Import/export and disclosure checks pass.
+- [x] Complete canonical regression passed: `36/36`.
+- [x] Product Alignment storage/static contracts passed: `33/33`.
+- [x] Local browser startup passes with normal data.
+- [x] Malformed noncritical-domain recovery passes.
+- [x] Saved-game backup recovery passes.
+- [x] Future-version preservation behavior passes.
+- [x] Active-game recovery passes.
+- [x] Offline event capture and persistence pass.
+- [x] Browser smoke passed: `5/5`.
+- [x] Desktop and mobile console checks show no unexpected errors.
+- [x] `git diff --check` passes.
+- [x] `TICKETS.md` updated with implementation results.
+- [x] `REPO_CURRENT_STATE.md` updated with durable storage facts.
+
+### Known limitations
+
+- `localStorage` cannot provide a true transaction across keys; failed writes
+  restore the prior primary when possible and retain bounded staging/recovery
+  data for diagnosis.
+- A future-schema domain is preserved and write-blocked for the current
+  session; the user must open it with a compatible newer client.
 
 ### Review and change control
 
-- [ ] Codex final report returned.
-- [ ] Local diff reviewed in ChatGPT.
-- [ ] Independent review task created.
-- [ ] Independent review bound to exact commit SHA.
-- [ ] Review findings resolved in the same primary task.
-- [ ] Final focused and broad tests rerun.
-- [ ] Commit created only after approval.
-- [ ] Branch pushed only after approval.
-- [ ] Pull request opened.
-- [ ] GitHub Actions passes.
-- [ ] PR approved.
-- [ ] PR merged.
-- [ ] Ticket marked `DONE`.
-- [ ] Primary Codex task closed out and archived.
-- [ ] Separate release ticket created only if production deployment is authorized.
+- [x] Pull request #36 opened.
+- [x] Required GitHub Actions regression passed before merge.
+- [x] Pull request #36 merged at
+  `255457b3cb51b07b5526c8270bf58d773cb70509`.
+- [x] LH-DEV-006 marked complete.
+- [x] Production Pages deployment completed successfully.
+- [x] Production smoke completed successfully: existing saved games remained
+  available, active-game persistence after refresh was verified, and no
+  repeated storage warnings were observed.
+- [x] No SQL, migration, Supabase, authorization, disclosure, release-marker,
+  or public-data behavior changed.
+
+LH-DEV-006 was completed under the approved accelerated closeout. Obsolete
+process gates were superseded by Lean Development Workflow v2; the completed
+implementation, exact commit review, CI, merge, deployment, and production
+smoke provide the durable evidence.
 
 # 3. Planned Engineering Sequence
 
