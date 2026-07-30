@@ -41,6 +41,7 @@ begin
         pg_catalog.pg_get_userbyid(class.relowner) <> 'postgres'
         or not class.relrowsecurity
         or class.relforcerowsecurity
+        or (is_production_cluster and class.oid <> 17886)
       )
   ) then
     raise exception 'TEAM_MEMBERS_RLS_PREFLIGHT_FAILED: team_members owner, RLS, or FORCE RLS drifted';
@@ -148,23 +149,37 @@ begin
     and policy_hash = '1c9c5d532c262c3b9ec850552bdf0512'
   then
     if is_production_cluster or (
-      select
-        count(*) = 32
-        and pg_catalog.md5(
-          pg_catalog.string_agg(
-            acl.grantee::regrole::text
-              || '|' || acl.grantor::regrole::text
-              || '|' || acl.privilege_type
-              || '|' || acl.is_grantable::text,
-            pg_catalog.chr(10)
-            order by
-              acl.grantee::regrole::text,
-              acl.privilege_type
-          )
-        ) = '76611f7aba7b5501a407d96446952895'
-      from pg_catalog.pg_class class
-      cross join lateral pg_catalog.aclexplode(class.relacl) acl
-      where class.oid = 'public.team_members'::regclass
+      (
+        select
+          count(*) = 32
+          and pg_catalog.md5(
+            pg_catalog.string_agg(
+              acl.grantee::regrole::text
+                || '|' || acl.grantor::regrole::text
+                || '|' || acl.privilege_type
+                || '|' || acl.is_grantable::text,
+              pg_catalog.chr(10)
+              order by
+                acl.grantee::regrole::text,
+                acl.privilege_type
+            )
+          ) = '76611f7aba7b5501a407d96446952895'
+        from pg_catalog.pg_class class
+        cross join lateral pg_catalog.aclexplode(class.relacl) acl
+        where class.oid = 'public.team_members'::regclass
+      )
+      and (
+        select proc.proconfig
+        from pg_catalog.pg_proc proc
+        where proc.oid =
+          'public.laxhornet_is_team_member(text)'::regprocedure
+      ) = array['search_path=public', 'row_security=off']::text[]
+      and (
+        select proc.proconfig
+        from pg_catalog.pg_proc proc
+        where proc.oid =
+          'public.laxhornet_team_role(text)'::regprocedure
+      ) = array['search_path=public', 'row_security=off']::text[]
     ) then
       starting_state := 'STATE_C_SCALAR_SUBSELECT_CANONICAL';
       helper_profile := 'PRODUCTION_CAPTURED';
@@ -258,33 +273,56 @@ begin
       values
         (
           'public.laxhornet_can_create_team()',
+          18006::oid,
+          'sql',
+          'v',
           'c2b253cf74e691f048cf29a66ddbba76'
         ),
         (
           'public.laxhornet_is_platform_reviewer()',
+          18004::oid,
+          'sql',
+          'v',
           'f9eb8573e91bc5758f94a3b997966a4e'
         ),
         (
           'public.laxhornet_is_team_member(text)',
+          18076::oid,
+          'sql',
+          'v',
           '17e2d67b8cb33781debcc01d6f1578a6'
         ),
         (
           'public.laxhornet_team_role(text)',
+          18077::oid,
+          'plpgsql',
+          'v',
           'bd212e46e7fe3dc8057780eddf0d9240'
         )
-    ) expected(signature, source_hash)
+    ) expected(
+      signature,
+      production_oid,
+      language_name,
+      volatility,
+      source_hash
+    )
     join pg_catalog.pg_proc proc
       on proc.oid = pg_catalog.to_regprocedure(expected.signature)
     join pg_catalog.pg_language language
       on language.oid = proc.prolang
     where pg_catalog.pg_get_userbyid(proc.proowner) <> 'postgres'
       or not proc.prosecdef
-      or language.lanname not in ('sql', 'plpgsql')
+      or language.lanname <> expected.language_name
+      or proc.provolatile::text <> expected.volatility
+      or (
+        is_production_cluster
+        and proc.oid <> expected.production_oid
+      )
       or pg_catalog.md5(
         pg_catalog.replace(proc.prosrc, pg_catalog.chr(13), '')
       ) <> expected.source_hash
   ) then
-    raise exception 'TEAM_MEMBERS_RLS_PREFLIGHT_FAILED: authorization helper body, owner, language, or SECURITY DEFINER mode drifted';
+    raise exception 'TEAM_MEMBERS_RLS_PREFLIGHT_FAILED: authorization helper OID, body, owner, language, volatility, or SECURITY DEFINER mode drifted';
   end if;
 
   if helper_profile = 'PRODUCTION_CAPTURED' and exists (

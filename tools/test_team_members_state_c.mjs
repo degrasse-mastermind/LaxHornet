@@ -429,6 +429,18 @@ function prepareState(state) {
       "exact local State B policy hash",
     );
   } else if (state === "FINAL") {
+    psql("alter function public.laxhornet_team_role(text) stable;");
+    const volatilityDrift = psql(migration, { allowFailure: true });
+    assert.notEqual(
+      volatilityDrift.status,
+      0,
+      "migration accepted helper volatility drift",
+    );
+    assert.match(
+      `${volatilityDrift.stdout || ""}${volatilityDrift.stderr || ""}`,
+      /authorization helper OID, body, owner, language, volatility, or SECURITY DEFINER mode drifted/,
+    );
+    psql("alter function public.laxhornet_team_role(text) volatile;");
     run("supabase", ["migration", "up", "--local"], { timeout: 180000 });
     assert.equal(
       normalizedPolicyHash(),

@@ -95,7 +95,7 @@ test("State C fixture binds exact policy and authorization metadata", () => {
   );
   assert.equal(
     productionStateCSnapshot.helpers.normalizedSetSha256,
-    "8008d891efa93a1bd7076ba3c39ce723ccba059fc3cf683dd6c6a60fca2eb74b",
+    "c6e861d2c426ddf7106e3787f5c7b12629f8fb6b7ab315d377d162e0a78aa341",
   );
   assert.equal(
     productionStateCSnapshot.migrationHistory.normalizedMd5,
@@ -111,6 +111,25 @@ test("State C fixture binds exact policy and authorization metadata", () => {
   );
   assert.equal(productionStateCSnapshot.privateHelperSchema.exists, false);
   assert.equal(productionStateCSnapshot.realUserDataTouched, false);
+});
+
+test("production preflight pins State C relation identity and helper volatility", () => {
+  assert.match(migration, /is_production_cluster and class\.oid <> 17886/);
+  for (const helperOid of [18006, 18004, 18076, 18077]) {
+    assert.match(migration, new RegExp(`${helperOid}::oid`));
+  }
+  assert.match(migration, /language\.lanname <> expected\.language_name/);
+  assert.match(migration, /proc\.provolatile::text <> expected\.volatility/);
+  assert.match(
+    migration,
+    /is_production_cluster\s+and proc\.oid <> expected\.production_oid/,
+  );
+  for (const helper of productionStateCSnapshot.helpers.functions) {
+    assert.match(
+      productionStateCSnapshot.authorizationEnvelope.bindingLines.join("\n"),
+      new RegExp(`oid=${helper.oid}`),
+    );
+  }
 });
 
 test("production preflight pins helpers, ACLs, FORCE RLS, and schema absence", () => {

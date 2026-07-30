@@ -62,13 +62,13 @@
       "productionApplied": false,
       "productionAuthorizationRequired": true,
       "sha256": {
-        "supabase/migrations/20260730004700_team_members_rls_recursion.sql": "4756b0cfe76e8aafdc688a2426c014d6cd4c877b3a4a64169e3b094af6c9b3f4",
+        "supabase/migrations/20260730004700_team_members_rls_recursion.sql": "7c54d443166994ee7384305a33691753d205994bcd8f4f64610c0a5e61e88045",
         "supabase/rollback/20260730004700_team_members_rls_recursion_rollback.sql": "26b92bf3ba3c74cc405d7333d906133ab926d42362a2c0400b967949bc7f5254",
         "supabase/tests/team_members_rls_recursion.sql": "71f7f1fe37f6c420a968c427d934152add35db10e9294dea1552f7544dc807e8",
         "supabase/tests/team_members_rls_recursion_reproduction.sql": "3f8232e11ed7a1843ea79d22119156b6c742f62032909d86ed505f2824a88ce3",
-        "review-evidence/team-members-rls-remediation/production-state-c-snapshot.json": "199abca8f8392660ff38eb2d28d28961e87d88f8ffd6c3b63b59284bf4649b32",
-        "review-evidence/team-members-rls-remediation/STATE_C_ADJUDICATION.md": "b1068aa9812a5ebdabeba7c353ee180ad24370bed9ce8ffb003b7c23c47f4953",
-        "tools/test_team_members_state_c.mjs": "4dafe40577c03ce9ef6ea120406826fbf2186a5d34e5b5c67295db55bab066a8"
+        "review-evidence/team-members-rls-remediation/production-state-c-snapshot.json": "539427ace99fa29c05cece84c1e21a6b34ddc2a6040d220838f6aa871ece06e9",
+        "review-evidence/team-members-rls-remediation/STATE_C_ADJUDICATION.md": "2e3532e7636cdc3455869b6e72104f4a22e2ac9408dcb4aa4283155e89945d06",
+        "tools/test_team_members_state_c.mjs": "4954f9453c69c92960680444ec1db76826fc7ded2f962d8064415b86c354845d"
       }
     }
   ],

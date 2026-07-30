@@ -112,7 +112,7 @@
     }
   ],
   "helpers": {
-    "normalizedSetSha256": "8008d891efa93a1bd7076ba3c39ce723ccba059fc3cf683dd6c6a60fca2eb74b",
+    "normalizedSetSha256": "c6e861d2c426ddf7106e3787f5c7b12629f8fb6b7ab315d377d162e0a78aa341",
     "functions": [
       {
         "signature": "public.laxhornet_can_create_team()",
@@ -201,14 +201,14 @@
     "bindingLines": [
       "policySetMd5=1c9c5d532c262c3b9ec850552bdf0512",
       "table=public.team_members|oid=17886|owner=postgres|rls=true|forceRls=false|aclCount=32|aclMd5=76611f7aba7b5501a407d96446952895",
-      "helper=public.laxhornet_can_create_team()|owner=postgres|securityDefiner=true|language=sql|volatility=v|config=search_path=public|sourceMd5=c2b253cf74e691f048cf29a66ddbba76|aclCount=3|aclMd5=2c23155f9c6d5e4dc4d7da9fee83f183",
-      "helper=public.laxhornet_is_platform_reviewer()|owner=postgres|securityDefiner=true|language=sql|volatility=v|config=search_path=public|sourceMd5=f9eb8573e91bc5758f94a3b997966a4e|aclCount=3|aclMd5=2c23155f9c6d5e4dc4d7da9fee83f183",
-      "helper=public.laxhornet_is_team_member(text)|owner=postgres|securityDefiner=true|language=sql|volatility=v|config=search_path=public,row_security=off|sourceMd5=17e2d67b8cb33781debcc01d6f1578a6|aclCount=3|aclMd5=2c23155f9c6d5e4dc4d7da9fee83f183",
-      "helper=public.laxhornet_team_role(text)|owner=postgres|securityDefiner=true|language=plpgsql|volatility=v|config=search_path=public,row_security=off|sourceMd5=bd212e46e7fe3dc8057780eddf0d9240|aclCount=3|aclMd5=2c23155f9c6d5e4dc4d7da9fee83f183",
+      "helper=public.laxhornet_can_create_team()|oid=18006|owner=postgres|securityDefiner=true|language=sql|volatility=v|config=search_path=public|sourceMd5=c2b253cf74e691f048cf29a66ddbba76|aclCount=3|aclMd5=2c23155f9c6d5e4dc4d7da9fee83f183",
+      "helper=public.laxhornet_is_platform_reviewer()|oid=18004|owner=postgres|securityDefiner=true|language=sql|volatility=v|config=search_path=public|sourceMd5=f9eb8573e91bc5758f94a3b997966a4e|aclCount=3|aclMd5=2c23155f9c6d5e4dc4d7da9fee83f183",
+      "helper=public.laxhornet_is_team_member(text)|oid=18076|owner=postgres|securityDefiner=true|language=sql|volatility=v|config=search_path=public,row_security=off|sourceMd5=17e2d67b8cb33781debcc01d6f1578a6|aclCount=3|aclMd5=2c23155f9c6d5e4dc4d7da9fee83f183",
+      "helper=public.laxhornet_team_role(text)|oid=18077|owner=postgres|securityDefiner=true|language=plpgsql|volatility=v|config=search_path=public,row_security=off|sourceMd5=bd212e46e7fe3dc8057780eddf0d9240|aclCount=3|aclMd5=2c23155f9c6d5e4dc4d7da9fee83f183",
       "privateSchema=absent",
       "historyMd5=257d70e2d82670b2b727575d7173a537"
     ],
-    "sha256": "6ea7097aa5acf642dc6b7822505edec14730cb9854df3f6b4ac4fa7e9e549260"
+    "sha256": "853641959fcdef2fb6c4f885576c52f460313475122879b4f8bef4cef841b358"
   },
   "sourceAttribution": {
     "repositoryPath": "supabase/migrations/20260723000000_laxhornet_legacy_baseline.sql",

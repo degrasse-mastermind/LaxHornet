@@ -14,7 +14,7 @@ team, player, youth/family, or Auth row was inspected or changed.
 - Ordered State C policy MD5:
   `1c9c5d532c262c3b9ec850552bdf0512`.
 - Exact authorization-envelope SHA-256:
-  `6ea7097aa5acf642dc6b7822505edec14730cb9854df3f6b4ac4fa7e9e549260`.
+  `853641959fcdef2fb6c4f885576c52f460313475122879b4f8bef4cef841b358`.
 - Exact capture:
   `production-state-c-snapshot.json`.
 - Policy entry MD5 values, in policy-name order:
@@ -23,7 +23,7 @@ team, player, youth/family, or Auth row was inspected or changed.
   `884b66c34975337d3e49d25c2bcf5bda`, and
   `49400540bdacd1b5ad883cb9e8d91c0d`.
 - Helper-set SHA-256:
-  `8008d891efa93a1bd7076ba3c39ce723ccba059fc3cf683dd6c6a60fca2eb74b`.
+  `c6e861d2c426ddf7106e3787f5c7b12629f8fb6b7ab315d377d162e0a78aa341`.
 - Table ACL MD5: `76611f7aba7b5501a407d96446952895`.
 - Ordered migration-history MD5:
   `257d70e2d82670b2b727575d7173a537`.

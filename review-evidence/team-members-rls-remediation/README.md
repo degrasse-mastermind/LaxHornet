@@ -30,7 +30,7 @@ credentials, private JWTs, real team/member/player rows, or youth/family data.
 - Production State C was captured without reading user rows and reproduced
   exactly at policy MD5 `1c9c5d532c262c3b9ec850552bdf0512`.
 - Its complete authorization envelope is bound by SHA-256
-  `6ea7097aa5acf642dc6b7822505edec14730cb9854df3f6b4ac4fa7e9e549260`.
+  `853641959fcdef2fb6c4f885576c52f460313475122879b4f8bef4cef841b358`.
 - The 18-case State C matrix matched State B case for case, produced no
   `42P17`, and converged to final policy MD5
   `2814223218999d3d6364582d5b9e85e1`.
