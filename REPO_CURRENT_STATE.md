@@ -42,6 +42,19 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
   are preserved and write-blocked rather than downgraded.
 - Supabase synchronization is optional and must not block core game-day tracking.
 - Runtime includes local delete markers and event-operation capabilities.
+- R2-04 adds the account-scoped `laxhornet.syncOperations.v1` local domain for
+  legacy game writes and tracked-clock writes. Operations are persisted before
+  cloud work with permanent IDs, game/account/device scope, payload revision,
+  retry timing, explicit `pending`/`syncing`/`accepted`/`retryable`/
+  `rejected`/`conflicted` lifecycle state, bounded acknowledgments, and storage
+  safety sidecars. Startup, sign-in, reconnect, and manual cloud sync recover
+  current-account work; stale `syncing` records become replayable.
+- Outstanding legacy game writes coalesce per game while retaining their
+  operation ID and incrementing a payload revision. Clock transitions remain
+  distinct by their exact command payload and preserve stale-revision
+  conflicts. Accepted payloads are compacted only after an acknowledgment is
+  persisted; rejected and conflicted work remains local and is not reported as
+  synced.
 - R2-03 makes ordinary same-ID `games`/`events` hydration lossless at the
   current storage boundary. Explicitly projected cloud-owned values can
   update, newer supported cloud values can update conflict-sensitive fields,
@@ -50,7 +63,12 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
   tracked-time state, pending/recovery state, and unknown local metadata.
   `loadCloudGames` also rejects responses from superseded request generations
   or a prior account. This does not add durable game-field versions,
-  tombstones, queued clock writes, or conflict UI, so the R2 gate remains open.
+  tombstones, or conflict UI, so the R2 gate remains open.
+- R2-04 does not add server operation IDs or server deduplication to legacy
+  PostgREST game upserts. Their accepted receipt proves a successful request,
+  not server-side exactly-once execution after an ambiguous lost response.
+  Clock receipts retain the RPC code and returned server revision when the
+  returned clock state matches the queued payload.
 - Canonical team-event RPCs have durable client operation IDs, server event
   versions, replay protection, conflicts, and permanent tombstones. Those
   guarantees do not currently extend to legacy game fields, tracked clock

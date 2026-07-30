@@ -151,16 +151,16 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
 
 ### Approved scope
 
-- [~] Add durable local operation state for legacy game writes.
-- [~] Add durable local operation state for tracked-clock writes.
-- [~] Assign permanent client operation IDs before cloud attempts.
-- [~] Persist explicit lifecycle states: pending, syncing, accepted, retryable, rejected, and conflicted.
-- [~] Recover pending and stale-syncing work after refresh or reconnect.
-- [~] Add receipt-backed acceptance and prevent older responses from falsely acknowledging newer local changes.
-- [~] Add bounded retry metadata and prevent retry storms.
-- [~] Preserve account isolation and keep signed-out namespace migration out of scope.
-- [~] Keep queue metadata private and excluded from Live Share, recap, CSV, and public payloads.
-- [~] Preserve existing Trust Spine replay, conflict, and tombstone behavior unchanged.
+- [x] Add durable local operation state for legacy game writes.
+- [x] Add durable local operation state for tracked-clock writes.
+- [x] Assign permanent client operation IDs before cloud attempts.
+- [x] Persist explicit lifecycle states: pending, syncing, accepted, retryable, rejected, and conflicted.
+- [x] Recover pending and stale-syncing work after refresh or reconnect.
+- [x] Add receipt-backed acceptance and prevent older responses from falsely acknowledging newer local changes.
+- [x] Add bounded retry metadata and prevent retry storms.
+- [x] Preserve account isolation and keep signed-out namespace migration out of scope.
+- [x] Keep queue metadata private and excluded from Live Share, recap, CSV, and public payloads.
+- [x] Preserve existing Trust Spine replay, conflict, and tombstone behavior unchanged.
 
 ### Explicitly unchanged
 
@@ -173,7 +173,10 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
 
 ### Current gate
 
-R2-04 remains in progress until implementation, focused tests, complete regression, CI, and exact-PR-SHA independent review are complete. Local-first game-day capture must remain fast and must not wait on cloud processing.
+R2-04 implementation, focused tests, complete regression, and CI are complete.
+The work remains in progress until the exact final PR head receives independent
+Level 3 review. Local-first game-day capture remains fast and does not wait on
+cloud processing.
 
 # 4. Planned Engineering Sequence
 
@@ -181,19 +184,36 @@ Do not combine these into one large Codex task. Each item requires one approved 
 
 ## R2 — Conflict-Safe Offline Synchronization
 
-- [x] Inspect current local/cloud merge behavior after LH-DEV-006 (`R2-01`).
-- [~] Define permanent client operation IDs (`R2-04` in progress).
-- [~] Define queued-operation states (`R2-04` in progress).
-- [~] Establish durable replay for legacy game and tracked-clock operations (`R2-04` in progress). Server-side exactly-once guarantees remain limited until later server work.
-- [x] Prevent cloud fetches from silently replacing newer local evidence within the current hydration boundary (`R2-03`; PR #43; merge `5f442b9f009eda644bbdb9892a6e05092e2cb608`).
+- [x] Inspect current local/cloud merge behavior again after LH-DEV-006
+  (`R2-01`; `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`).
+- [x] Define permanent client operation IDs for durable legacy game and
+  tracked-clock operations (`R2-04`).
+- [x] Define queued-operation states (`pending`, `syncing`, `accepted`,
+  `retryable`, `rejected`, and `conflicted`) for those operation classes
+  (`R2-04`).
+- [x] Establish durable client replay for legacy game and tracked-clock
+  operations (`R2-04`). Server-side exactly-once guarantees remain incomplete
+  where existing server contracts do not accept or deduplicate the local
+  operation ID.
+- [x] Prevent cloud fetches from silently replacing newer local evidence
+  within the current game/event hydration boundary (`R2-03`; PR #43; merge
+  `5f442b9f009eda644bbdb9892a6e05092e2cb608`). Same-ID merge preserves
+  cloud-omitted local evidence and rejects superseded or prior-account
+  responses; durable field versions and explicit conflicts remain later R2
+  work.
 - [ ] Define tombstone-versus-stale-update behavior.
 - [ ] Separate authorization failures from retryable network failures.
 - [ ] Add visible states: Saved on device, Waiting to sync, Syncing, Synced, Needs attention.
 - [ ] Add sanitized sync journal.
-- [x] Test offline creation, reconnect, duplicate replay, refresh, revocation, and conflict (`R2-02`).
-- [x] Preserve existing saved games and offline capture through R2-03, including tracked-time, score context, pending/recovery state, local metadata, and active-game evidence.
-- [x] Keep production mutation and release outside completed R2-01 through R2-03 feature work.
-- [~] Keep production mutation and release outside R2-04 while implementation is in progress.
+- [x] Test offline creation, reconnect, duplicate replay, refresh, revocation,
+  and conflict (`R2-02`; `tools/test_sync_characterization.mjs`).
+- [x] Preserve existing saved games and offline capture through the R2-03
+  hydration merge, including tracked-time, score-context, pending/recovery,
+  local metadata, and active-game evidence.
+- [x] Preserve game and tracked-clock retry intent across refresh and reconnect
+  with account-scoped storage-safety recovery (`R2-04`). This is client
+  durability only; legacy game writes still lack server-side deduplication.
+- [x] Keep production mutation and release out of the R2-04 feature ticket.
 
 **Gate to advance:** No silent local overwrite; offline operations replay exactly once where server contracts support it; conflicts are detectable and unresolved evidence remains recoverable.
 

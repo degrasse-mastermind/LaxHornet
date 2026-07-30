@@ -723,6 +723,113 @@ storage boundaries.
   exact final draft-PR head after all corrections are pushed. Do not merge or
   deploy from this task.
 
+### R2-04 — Add durable game and clock operation states
+
+Status: `REVIEW`
+
+Risk level: `LEVEL 3`
+
+Branch: `feature/r2-04-durable-game-clock-operations`
+
+Execution task: `Implement R2-04 — Add Durable Game and Clock Operation States`
+(`019fb1f9-d65b-70c2-a53c-671411c6c909`)
+
+Related document: `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`
+
+#### Goal
+
+Persist every cloud-bound legacy game write and tracked-clock write as a
+recoverable current-account operation before its network attempt, without
+changing server contracts, authorization, tombstones, or release state.
+
+#### Operation contract
+
+- Storage key: `laxhornet.syncOperations.v1`, scoped by the established
+  `.user.<account-id>` account suffix and protected by the
+  `game_clock_operation_state` storage-safety domain.
+- Schema version: `1`.
+- Operation fields: `operationId`, `operationType`, `accountId`, `gameId`,
+  `deviceId`, `coalescingKey`, `createdAt`, `updatedAt`, `attemptCount`,
+  `lastAttemptAt`, `nextAttemptAt`, `state`, `payload`, `payloadHash`,
+  `payloadRevision`, `baseRevision`, `lastError`, and `receipt`.
+- Lifecycle: `pending`, `syncing`, `accepted`, `retryable`, `rejected`, and
+  `conflicted`. A stale stored `syncing` operation normalizes to immediately
+  replayable `retryable` work.
+- The domain supports structural validation, legacy-array normalization,
+  staged writes, validated backup, bounded quarantine, future-version
+  preservation/write blocking, and bounded accepted acknowledgments.
+
+#### Behavior
+
+- Legacy game writes coalesce to one outstanding `legacy_game_write` per game.
+  A later payload retains the permanent operation ID, increments
+  `payloadRevision`, and returns to `pending`; an older in-flight acceptance
+  acknowledges only its exact hash/revision and cannot clear the newer payload.
+- Tracked-clock writes use `tracked_clock_write` records. Exact duplicate
+  command payloads coalesce, while initialize/start/pause/resume/period/end or
+  other payload changes retain distinct logical operation IDs. Clock updates
+  retain their base revision and stale-revision responses remain
+  `conflicted`.
+- Game acceptance requires successful completion of the queued PostgREST
+  upsert and records a bounded request-success receipt. Clock acceptance
+  requires an accepted RPC result, a matching returned clock state, and a
+  valid returned server revision. The receipt is persisted before accepted
+  operation compaction.
+- Network, timeout, service, and rate-limit failures remain `retryable` with
+  attempt count, last-attempt time, next-attempt time, and exponential backoff
+  bounded from two seconds to five minutes. Authorization/validation-style
+  failures remain `rejected`; conflicts remain `conflicted`. Offline state
+  creates no attempt, and one processor serializes current-account work.
+- Startup, sign-in, reconnect, and manual sync process the current account
+  only. Signed-out state is not migrated into an account namespace.
+- Queue payloads, receipts, errors, and retry metadata stay outside Live Share,
+  recap, CSV, analytics, and private game export shapes. The existing Trust
+  Spine event-operation namespace and its server semantics are unchanged.
+
+#### Scope boundaries and known limitations
+
+- No SQL, migrations, RLS, grants, RPC signatures, authorization policy,
+  server deduplication, tombstones, game-field versions, conflict UI, release
+  markers, deployment, or production state changes.
+- Legacy game PostgREST upserts do not return or deduplicate the local
+  operation ID. A successful response proves request completion, but an
+  accepted response lost in transit can be replayed; R2-04 therefore does not
+  claim server-side exactly-once execution.
+- Clock RPC revisions detect stale writes, but the current RPCs likewise do
+  not accept the new local operation ID. R2-05 and later tickets still own the
+  full authorization taxonomy, field-level conflict resolution, namespace
+  migration, durable tombstones, and truthful user-facing sync/conflict UI.
+
+#### Acceptance and completion record
+
+- Baseline: `origin/main` at
+  `5f442b9f009eda644bbdb9892a6e05092e2cb608`, including merged R2-01 through
+  R2-03.
+- Focused durable-operation assertions: `24/24`, including both integrated
+  failure-refresh-replay-acknowledgment-cleanup journeys.
+- R2 sync characterization: `28/28`; the former failed-clock-without-retry and
+  refresh-loss assertions now bind to the separate durable operation domain.
+- Local-storage safety: `28/28`; tracked-time service: `16/16`; existing event
+  operation service contracts passed; changed JavaScript syntax passed.
+- Complete local regression: canonical-plus-additive `38 passed, 0 failed`,
+  including tracked-time browser `33/33`, secure-disclosure browser `73/73`,
+  Product Alignment browser `64/64`, Trust Spine SQL acceptance/rollback,
+  cancel-game `33/33`, delete-permission, player-removal, disclosure, and
+  release-containment gates.
+- CI: portable regression, Docker test suite, and Vercel preview passed on the
+  pushed branch before independent-review handoff. Supabase Preview skipped
+  because R2-04 contains no database change.
+- Implementation commit:
+  `b0ebbbfb628377dff530805e4db9ea0daccadbeb`; draft PR #45.
+- Production or external state changed: `NO`.
+- `REPO_CURRENT_STATE.md` updated: `YES`.
+- `docs/LAXHORNET_ROLLOUT_CHECKLIST.md` updated: `YES`; permanent local IDs,
+  lifecycle states, and refresh/reconnect recovery are complete only for the
+  R2-04 game/clock boundary. The overall R2 gate remains open.
+- Review status: `NOT COMPLETE`. Independent Level 3 review must inspect the
+  exact final draft-PR head after all corrections are pushed. Do not merge or
+  deploy from this task.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

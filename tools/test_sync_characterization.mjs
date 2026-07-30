@@ -765,6 +765,8 @@ function loadCloudGamesHarness(initialGames = [], options = {}) {
     loadCloudTeams: async () => [],
     flushDeletedCloudRecords: async () => {},
     syncLocalGamesToCloud: async () => 0,
+    processDurableSyncOperations: async () => false,
+    durableSyncStatus: () => "",
     teamIds: () => [],
     gameFromSupabaseRow: mapper.gameFromSupabaseRow,
     canShowGameForCurrentAccess: () => true,
@@ -1038,7 +1040,7 @@ test(
 );
 
 test(
-  "CHARACTERIZATION: failed tracked-clock write has local clock state but no durable retry operation",
+  "R2-04: failed tracked-clock writes keep local clock state and use the separate durable queue",
   async () => {
     const api = trackedPlayingTimeApi();
     const persisted = [];
@@ -1093,22 +1095,10 @@ test(
     );
 
     const reloaded = clone(persisted.at(-1));
-    const refreshedService = api.createTrackedPlayingTimeService({
-      persistLocal: () => {},
-      sendClock: async () => {
-        sendAttempts += 1;
-        return { outcome: "accepted" };
-      },
-      sendOperations: async () => ({ outcome: "accepted", results: [] }),
-      readEffectiveOperations: async () => ({
-        outcome: "accepted",
-        operations: [],
-      }),
-      canUseCloud: () => true,
-    });
-    assert.equal(typeof refreshedService.retryClockOperations, "undefined");
     assert.equal(reloaded.trackedPlayingTime.clockState.revision, 3);
-    assert.equal(sendAttempts, 1, "refresh does not automatically retry the clock");
+    assert.match(appSource, /syncOperations:\s*"laxhornet\.syncOperations\.v1"/);
+    assert.match(appSource, /sendClock:\s*syncTrackedClockPayload/);
+    assert.match(appSource, /canQueueClock:/);
   },
 );
 
@@ -1401,21 +1391,47 @@ function syncGameHarness(upsertWithOptionalColumns) {
     syncStatus: "",
   };
   const reported = [];
+  let queuedPayload = null;
+  let accepted = false;
   const harness = appHarness(["syncGameToSupabase"], {
     state,
     supabaseClient: {},
     isDeletedGame: () => false,
-    gameTeamId: () => "",
-    canEditGame: () => true,
     currentUserId: () => "synthetic-account",
-    normalizeGame: (game) => clone(game),
-    upsertWithOptionalColumns,
-    gameToSupabaseRow: (game) => clone(game),
-    isTeamForeignKeyError: () => false,
-    detachTeamFromGameForSync: (game) => game,
-    eventToSupabaseRow: (event) => clone(event),
-    detachTeamFromSupabaseRows: (rows) => rows,
-    reportSyncError: (error) => reported.push(error),
+    queueLegacyGameOperation: (game) => {
+      queuedPayload = { gameRow: clone(game) };
+      return {
+        operationId: "synthetic-game-operation",
+        alreadyAccepted: false,
+        game: clone(game),
+        payload: queuedPayload,
+      };
+    },
+    processDurableSyncOperations: async () => {
+      const result = await upsertWithOptionalColumns("games", queuedPayload.gameRow);
+      accepted = !result.error;
+      if (result.error) reported.push(result.error);
+      return accepted;
+    },
+    durableSyncService: () => ({
+      isAcknowledged: () => accepted,
+    }),
+    durableSyncStatus: () => "",
+    syncLegacyGameEvents: async (game) => {
+      const result = await upsertWithOptionalColumns("events", game.events);
+      if (result.error) {
+        reported.push(result.error);
+        return false;
+      }
+      return true;
+    },
+    window: {
+      LaxHornetDurableSyncOperations: {
+        OPERATION_TYPES: {
+          game: "legacy_game_write",
+        },
+      },
+    },
   });
   return {
     state,
@@ -1483,58 +1499,12 @@ test(
 );
 
 test(
-  "CHARACTERIZATION: refresh preserves Trust Spine pending operations but not legacy or clock attempts",
+  "R2-04: refresh preserves separate durable game and clock operations alongside Trust Spine work",
   async () => {
-    const legacyCloud = deferred();
-    const legacyGame = richerLocalGame();
-    const legacy = syncGameHarness(async () => legacyCloud.promise);
-    const legacyPromise = legacy.syncGameToSupabase(legacyGame);
-    const legacyReloadSnapshot = clone(legacyGame);
-    assert.equal(
-      Object.hasOwn(legacyReloadSnapshot, "legacySyncOperations"),
-      false,
-    );
-
-    const trackedApi = trackedPlayingTimeApi();
-    const clockCloud = deferred();
-    const clockSnapshots = [];
-    const clockGame = {
-      id: "synthetic-refresh-clock-game",
-    };
-    const clockState = trackedApi.createClockState(
-      {
-        gameId: clockGame.id,
-        playerId: "synthetic-player",
-        periodFormat: "quarters",
-        regulationPeriodDurationSeconds: 720,
-        overtimeDurationSeconds: 240,
-      },
-      Date.parse("2026-07-30T18:00:00.000Z"),
-    );
-    const clockService = trackedApi.createTrackedPlayingTimeService({
-      persistLocal: () => clockSnapshots.push(clone(clockGame)),
-      sendClock: async () => clockCloud.promise,
-      sendOperations: async () => ({ outcome: "accepted", results: [] }),
-      readEffectiveOperations: async () => ({
-        outcome: "accepted",
-        operations: [],
-      }),
-      canUseCloud: () => true,
-      reportError: () => {},
-    });
-    const clockResult = clockService.updateClock({
-      game: clockGame,
-      clockState,
-      baseRevision: 1,
-    });
-    assert.ok(clockSnapshots.at(-1).trackedPlayingTime.clockState);
-    assert.equal(
-      Object.hasOwn(
-        clockSnapshots.at(-1).trackedPlayingTime,
-        "pendingClockOperations",
-      ),
-      false,
-    );
+    assert.match(appSource, /syncOperations:\s*"laxhornet\.syncOperations\.v1"/);
+    assert.match(appSource, /queueLegacyGameOperation\(game/);
+    assert.match(appSource, /queueClock\(\{/);
+    assert.match(eventOperationSource, /storedState === "syncing" \? "retryable"/);
 
     const trustCloud = deferred();
     const trustState = {
@@ -1575,14 +1545,8 @@ test(
       "permanent-synthetic-refresh-trust-event",
     );
 
-    legacyCloud.resolve({ error: null, skipped: [] });
-    clockCloud.reject(new Error("synthetic clock failure"));
     trustCloud.resolve(false);
-    await Promise.all([
-      legacyPromise,
-      clockResult.cloudPromise,
-      trustOperation.cloudPromise,
-    ]);
+    await trustOperation.cloudPromise;
   },
 );
 
@@ -1748,6 +1712,7 @@ test(
       onboardingIntent: "onboardingIntent",
       nextGameFocus: "nextGameFocus",
       trustSpineSync: "trustSpineSync",
+      syncOperations: "syncOperations",
       deletedGames: "deletedGames",
       deletedEvents: "deletedEvents",
       games: "games",
@@ -1779,6 +1744,12 @@ test(
       onboardingIntent: "child",
       nextGameFocus: null,
       trustSpineSync: {},
+      syncOperations: {
+        schemaVersion: 1,
+        deviceId: "synthetic-device",
+        operations: [],
+        acknowledgments: {},
+      },
       deletedGameIds: [],
       deletedEventIds: [],
       games: [
@@ -1910,7 +1881,7 @@ test("R2-01 confirmed-risk coverage manifest is complete", () => {
     lossy_cloud_mapping: "legacy Supabase projections",
     stale_upload_before_read: "stale device uploads",
     duplicate_ui_capture: "repeated logical captures",
-    failed_clock_without_retry: "failed tracked-clock write",
+    durable_clock_retry: "failed tracked-clock writes",
     rejected_trust_operation_removed: "rejected outcomes remove it",
     hydration_removes_participation: "same-ID cloud hydration",
     stale_game_or_event_resurrection: "stale device uploads",
@@ -1927,7 +1898,7 @@ test("R2-01 confirmed-risk coverage manifest is complete", () => {
   assert.deepEqual(Object.keys(coverage).sort(), [
     "authorization_filter_data_loss",
     "duplicate_ui_capture",
-    "failed_clock_without_retry",
+    "durable_clock_retry",
     "generic_legacy_error_state",
     "hydration_removes_participation",
     "nontransactional_multi_key_persist",

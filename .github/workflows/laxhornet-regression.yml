@@ -75,6 +75,9 @@ jobs:
       - name: Event operation service contracts
         run: node tools/test_event_operation_service.mjs
 
+      - name: Durable game and clock operation contracts
+        run: node tools/test_durable_sync_operations.mjs
+
       - name: Sync characterization contracts
         run: node tools/test_sync_characterization.mjs
 

@@ -592,13 +592,16 @@
       "readEffectiveOperations",
     );
     const canUseCloud = typeof hooks.canUseCloud === "function" ? hooks.canUseCloud : () => true;
+    const canQueueClock = typeof hooks.canQueueClock === "function"
+      ? hooks.canQueueClock
+      : canUseCloud;
     const reportError = typeof hooks.reportError === "function" ? hooks.reportError : () => {};
 
     function initializeClock({ game, clockState }) {
       const local = trackedPlayingTimeState(game);
       local.clockState = normalizeClockState(clockState);
       persistLocal();
-      const cloudPromise = canUseCloud()
+      const cloudPromise = canQueueClock()
         ? Promise.resolve(sendClock(clockRpcPayload(local.clockState, { initialize: true }))).catch((error) => {
             reportError(error);
             return false;
@@ -611,7 +614,7 @@
       const local = trackedPlayingTimeState(game);
       local.clockState = normalizeClockState(clockState);
       persistLocal();
-      const cloudPromise = canUseCloud()
+      const cloudPromise = canQueueClock()
         ? Promise.resolve(sendClock(clockRpcPayload(local.clockState, { baseRevision }))).catch((error) => {
             reportError(error);
             return false;

@@ -611,8 +611,23 @@ async function newContext(browser, options = {}) {
         rejectedTeam,
         shared: state.activeGame.isShared,
         syncState: state.trustSpineSync,
+        durableOperations: (state.syncOperations?.operations || []).map((operation) => ({
+          operationType: operation.operationType,
+          state: operation.state,
+          errorCode: operation.lastError?.code || "",
+        })),
+        syncStatus: state.syncStatus,
       };
     }, { primaryEventId, secondaryEventId });
+    if (tokenResult.createdCode !== "SYNTHETICSECURECODE" || tokenResult.shared !== true) {
+      console.log("Secure token diagnostic:", JSON.stringify({
+        durableOperations: tokenResult.durableOperations,
+        syncStatus: tokenResult.syncStatus,
+        tokenRequests: localApiRequests.filter((item) =>
+          item.pathname.endsWith("/lh_create_live_share_token")).length,
+        tokenGames: [...trustApi.tokenGames.entries()],
+      }));
+    }
     check(tokenResult.createdCode === "SYNTHETICSECURECODE", "signed-in token creation uses the approved RPC");
     check(tokenResult.shared === true, "team-scoped secure Live Share remains available after synchronization");
     check(tokenResult.acceptedAudit?.outcome === "accepted", "authorized export audit succeeds");
