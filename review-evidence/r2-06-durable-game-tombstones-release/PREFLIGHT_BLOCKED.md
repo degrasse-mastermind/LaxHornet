@@ -333,3 +333,42 @@ described above.
 7. Restore `supabase_production_readonly-2`, verify production migration and
    catalog state plus recovery readiness, and only then resume a separately
    authorized migration-first rollout.
+
+## R2-06A remediation follow-up
+
+The two P1 findings above are remediated in the repository candidate on:
+
+- Branch:
+  `feature/r2-06a-tombstone-concurrency-recovery`
+- Draft PR:
+  [#48](https://github.com/degrasse-mastermind/LaxHornet/pull/48)
+- Locally verified implementation head:
+  `4ba897370cc5b60c3cba0903dc2283e336778775`
+
+The candidate gives guarded game writes, durable deletes, and the retained
+defense-in-depth trigger one transaction-scoped per-game advisory-lock
+derivation. It also persists private reversible game/event recovery evidence
+before hiding a pending delete, avoids whole-game event-delete markers, restores
+classified rejection/conflict state, and finalizes accepted cleanup only after
+the durable tombstone receipt is stored.
+
+Local remediation verification passed:
+
+- `33/33` tombstone and recovery contracts;
+- `13/13` isolated migration and reverse-order rollback checks;
+- `8/8` real PostgreSQL concurrency checks;
+- `32/32` sync-characterization checks;
+- `33/33` release-containment checks;
+- `20/20` release-preflight checks; and
+- `42/42` complete canonical-plus-additive regression groups.
+
+This follow-up does not mark the blocked release ready. PR #48 still requires
+green final-head CI and a fresh independent Level 3 review bound to its exact
+final SHA. Production application runtime remains on rollback source
+`44f0510d3bde18f459e78f570efd27b72dc2a989`. R2-06 and R2-06A remain unapplied
+and production activation still requires the named read-only verification,
+recovery readiness, and separate explicit migration-first authorization.
+
+No Supabase connection, migration application, deployment, release activation,
+production-data change, or other production mutation was used for this
+repository remediation.

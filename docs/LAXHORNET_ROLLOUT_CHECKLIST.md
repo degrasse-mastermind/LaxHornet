@@ -280,7 +280,8 @@ incomplete.
 **Codex task:** `Implement R2-06A — Remediate Tombstone Concurrency and Delete-Conflict Recovery`
 **Branch:** `feature/r2-06a-tombstone-concurrency-recovery`
 **Starting point:** R2-06 merge `18f5157de159fa7a27b3cefb4c90f5148c3b230d`
-**Draft pull request:** pending
+**Draft pull request:** [#48](https://github.com/degrasse-mastermind/LaxHornet/pull/48)
+**Locally verified implementation head:** `4ba897370cc5b60c3cba0903dc2283e336778775`
 
 ### Remediation record
 
@@ -312,6 +313,8 @@ incomplete.
   migration-before-runtime dependency in release controls.
 - [x] Convert both blocked P1 findings into desired sync-characterization
   contracts while retaining the other unresolved R2 evidence.
+- [x] Pass the complete local canonical-plus-additive regression (`42/42`) on
+  the committed implementation head.
 - [ ] Confirm all required draft-PR CI checks pass.
 - [ ] Obtain a fresh independent Level 3 review bound to the exact final PR
   head SHA.

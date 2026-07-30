@@ -1263,7 +1263,11 @@ Delete-Conflict Recovery`
 Starting point:
 `18f5157de159fa7a27b3cefb4c90f5148c3b230d`
 
-Commit/PR: pending publication
+Implementation commits:
+`a687377d44c3290434616894023226196611691e`,
+`4ba897370cc5b60c3cba0903dc2283e336778775`
+
+Draft PR: [#48](https://github.com/degrasse-mastermind/LaxHornet/pull/48)
 
 #### Root causes and implemented contracts
 
@@ -1322,8 +1326,9 @@ Commit/PR: pending publication
   preflight (`20/20`), phase-aware containment (`33/33`), isolated migration
   and reverse-order rollback (`13/13`), and real concurrent PostgreSQL
   ordering (`8/8`).
-- Full canonical-plus-additive regression: pending final stabilized-diff run.
-- Draft-PR CI: pending publication.
+- Full canonical-plus-additive regression passed `42/42` against committed
+  head `4ba897370cc5b60c3cba0903dc2283e336778775`.
+- Draft-PR CI: pending on PR #48.
 - The two blocked P1 findings are now desired behavior assertions. Unresolved
   characterization remains for non-delete game-write server deduplication,
   field-level conflicts, signed-out namespace migration, cross-key
