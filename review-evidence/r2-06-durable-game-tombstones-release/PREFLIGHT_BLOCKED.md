@@ -1,0 +1,199 @@
+# R2-06 durable game tombstones release preflight
+
+Date: 2026-07-30
+
+Status: `BLOCKED — DO NOT APPLY THE CURRENT MIGRATION`
+
+Risk: Level 3 — production migration, authorization, synchronization,
+deletion, release, and rollback behavior
+
+## Exact source
+
+- Feature PR: #47
+- Reviewed feature head:
+  `c1ab1bd2c6877abfd6d4683204dc19a753b1ec58`
+- Squash merge and proposed runtime source:
+  `18f5157de159fa7a27b3cefb4c90f5148c3b230d`
+- `origin/main` at preflight:
+  `18f5157de159fa7a27b3cefb4c90f5148c3b230d`
+- Release branch:
+  `release/r2-06-durable-game-tombstones`
+
+The R2-06 squash merge was the exact tip of `origin/main`; no later runtime or
+migration commit was included.
+
+## Reviewed database files
+
+| File | SHA-256 | Git blob |
+| --- | --- | --- |
+| `supabase/migrations/20260730134439_durable_game_tombstones.sql` | `138e8edfdaa4b48747ceb63a66a0eae76f91c832b19dffa52914bdea45188900` | `44114477b0f3885310d6bfb401d816b7d74a6196` |
+| `supabase/rollback/20260730134439_durable_game_tombstones_rollback.sql` | `405d0b10370cbcc90aa474f469d9841a5bc56a96453094561cb8a2386dd1545b` | `720dacae5b20cad79366efd9d2c0aba240225b6c` |
+| `supabase/tests/durable_game_tombstones.sql` | `23f4abe853acf82817690b296c5dcf29947f500ded5721e88f5e04f83dea778f` | `5f0308679af04f8aabd22bd54447546f6f204483` |
+
+## Required targets and order
+
+- Intended production database:
+  `ulbmjcvnyznvmjgpstno`
+- Production runtime:
+  `https://laxhornet.mybranford.com/`
+- Required sequence:
+  recovery readiness, apply only the reviewed migration, verify
+  schema/RLS/grants/RPCs/trigger, deploy the compatible exact runtime,
+  synthetic production smoke, stale-device and mixed-client verification,
+  cleanup, and closeout.
+
+No task action advanced this sequence because the preflight failed before a
+production write.
+
+## Blocking findings
+
+### P1 — concurrent write can recreate a tombstoned game
+
+`public.laxhornet_delete_game_durable(jsonb)` acquires
+`pg_advisory_xact_lock(hashtextextended(game_id, 0))`, but
+`public.laxhornet_sync_game(jsonb)` does not acquire the same lock.
+
+A concurrent guarded write can:
+
+1. see no committed tombstone in the RPC check;
+2. see no committed tombstone in the `BEFORE INSERT OR UPDATE` trigger;
+3. block behind the delete's row lock;
+4. continue after the delete commits; and
+5. insert the game without rechecking the newly committed tombstone.
+
+That violates the permanent game-ID guard and the core stale-device acceptance
+criterion.
+
+### P1 — newer-game delete conflict can still delete its events
+
+`confirmDeleteGame` persists one legacy event-delete marker per game event
+before the durable game delete result is known. `flushDeletedCloudRecords`
+processes those event markers before processing the game delete. When the
+durable RPC returns `newer_game_revision`, the game delete correctly becomes a
+conflict, but the event markers remain eligible and can delete events from the
+newer retained server game during the next hydration.
+
+That violates the newer-revision ordering and no-data-loss acceptance
+criteria.
+
+These findings were posted by the late automated exact-head review after the
+independent PASS and after the squash merge. They remain unresolved on the
+deployed source.
+
+## Release-control and access blockers
+
+- The release manifest has no R2-06 review package or three-file checksum set.
+- Its reviewed and required migration sequences stop at
+  `20260730004700_team_members_rls_recursion.sql`.
+- It declares no pending production migration.
+- The existing production preflight remains bound to the earlier v284 release
+  identities and requires clean `main`; it failed on the dedicated R2-06
+  release branch.
+- The specifically required `supabase_production_readonly-2` connection was
+  unavailable. No generic connector was substituted. Production migration,
+  schema, RLS, grant, trigger, RPC, backup, and tombstone-row state are
+  therefore unverified.
+- David's explicit authorization for production writes was not present.
+
+## Existing production runtime state
+
+The merge itself auto-triggered the allowlisted Pages workflow before this
+preflight:
+
+- Deployment run:
+  `30552229360`
+- Deployed source:
+  `18f5157de159fa7a27b3cefb4c90f5148c3b230d`
+- Result:
+  `success`
+
+Public HTTP byte verification matched the exact Git blobs for:
+
+| File | Git blob | Exact production match |
+| --- | --- | --- |
+| `app.js` | `b4884631a6b28fc6f2570a32634292d6c8d7635a` | yes |
+| `event-operation-service.js` | `257773703c2d842cd968d32c432352ac8b4dc4b9` | yes |
+| `app.html` | `3bce8857f1a8992634d64127f0fe8707c2157586` | yes |
+| `service-worker.js` | `2e06b32b9f9ffa39d4cd78176a0f4143e4fd0f1f` | yes |
+
+The previous successful pre-R2-06 allowlisted deployment is:
+
+- Source:
+  `44f0510d3bde18f459e78f570efd27b72dc2a989`
+- Run:
+  `30547712272`
+
+No rollback was dispatched because production deployment authorization was not
+present.
+
+## Safe local verification
+
+- `node tools/test_game_tombstones.mjs`: `29/29` passed.
+- `node tools/test_game_tombstone_migration.mjs`: `11/11` passed with pinned
+  disposable `@electric-sql/pglite@0.5.4`.
+- `node tools/test_release_containment_phase_aware.mjs`: `32/32` passed with
+  the same disposable dependency.
+- `node tools/validate_release_manifest.mjs --require-combined
+  --combined-ref=HEAD`: passed the existing v284 contract, which does not
+  register R2-06.
+- Canonical production preflight:
+  failed because the dedicated branch is not `main` and the disposable PGlite
+  and Playwright preparation gate was not active for that command.
+- Docker client/server, Linux engine, Compose, Supabase CLI, Node, Python, and
+  browser executable checks passed in the canonical preflight.
+
+The disposable dependency junction and cache were removed. The release
+worktree was clean before these documentation-only records.
+
+The passing suites do not exercise the two blocking adversarial paths. The
+complete canonical-plus-additive regression was not rerun after the fail-fast
+P1 findings because it cannot establish release safety without those missing
+contracts.
+
+## Browser boundary
+
+A read-only startup attempt was excluded from smoke evidence when the selected
+browser was found to contain an existing authenticated production context. No
+buttons, forms, game actions, deletion actions, or other test interactions
+were performed, no private details were retained in this evidence, and the tab
+was closed. Public HTTP byte verification was used for the runtime-source
+check instead.
+
+## Production and external mutations by this task
+
+None.
+
+This task did not:
+
+- apply or repair a migration;
+- change Supabase data, schema, RLS, grants, functions, triggers, Auth, or
+  configuration;
+- deploy or roll back Pages;
+- create or delete production synthetic records;
+- change GitHub Pages settings;
+- push the release branch; or
+- create a pull request.
+
+Read-only external activity was limited to fetching Git/GitHub state, PR
+reviews and checks, workflow/deployment metadata, public production assets,
+current Supabase documentation, and the excluded startup attempt described
+above.
+
+## Required next actions
+
+1. Do not apply the current R2-06 migration.
+2. Obtain explicit production authorization before any deployment action and
+   decide whether to roll back only the application runtime to the verified
+   pre-R2-06 source
+   `44f0510d3bde18f459e78f570efd27b72dc2a989`.
+3. Add the shared per-game serialization lock to guarded writes and a real
+   concurrent write/delete regression.
+4. Make a durable game-delete conflict preserve the newer game's events and
+   add an end-to-end regression.
+5. Register the corrected R2-06 package and exact migration sequence in the
+   release manifest/tooling.
+6. Require green focused/full suites, CI, and a fresh independent Level 3
+   exact-SHA review.
+7. Restore `supabase_production_readonly-2`, verify production migration and
+   catalog state plus recovery readiness, and only then resume a separately
+   authorized migration-first rollout.
