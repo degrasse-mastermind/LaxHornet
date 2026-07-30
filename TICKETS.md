@@ -475,6 +475,40 @@ evidence are not copied to the public static site.
 - Closeout evidence:
   `review-evidence/team-members-rls-remediation/PRODUCTION_ROLLOUT_CLOSEOUT.md`.
 
+### LH-DEV-006 — Versioned local-storage safety foundation
+
+Implementation status: `IMPLEMENTATION COMPLETE — DRAFT PR READY`
+
+Files changed:
+
+- `app.js`
+- `tools/test_local_storage_safety.mjs`
+- `tools/test_local_storage_safety_browser.cjs`
+- `tools/fixtures/lh-dev-006-storage-safety.json`
+- `tools/run_v283_local_regression.mjs`
+- `tools/test_product_alignment_remediation.mjs`
+- `TICKETS.md`
+- `REPO_CURRENT_STATE.md`
+
+Tests and results:
+
+- Focused storage-safety suite: `27/27` passed.
+- Complete canonical local regression: `36 passed, 0 failed`.
+- Browser smoke: valid-data startup, saved-game backup recovery, active-game
+  recovery, and immediate offline event persistence passed with no unexpected
+  console/page errors or hosted Supabase requests.
+
+Known limitations:
+
+- `localStorage` cannot provide a true transaction across keys; failed writes
+  restore the prior primary when possible and retain bounded staging/recovery
+  data for diagnosis.
+- A future-schema domain is preserved and write-blocked for the current
+  session; the user must open it with a compatible newer client.
+
+Next step: independent review of the draft pull request. Do not merge or deploy
+until separately authorized.
+
 ## Ticket template
 
 Copy this section for each implementation ticket.

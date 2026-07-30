@@ -1,0 +1,72 @@
+{
+  "accounts": {
+    "first": "synthetic-account-a",
+    "second": "synthetic-account-b"
+  },
+  "savedGames": [
+    {
+      "id": "synthetic-game-saved",
+      "playerId": "synthetic-player-a",
+      "opponent": "Synthetic Opponent",
+      "date": "2026-01-15",
+      "status": "complete",
+      "events": [
+        {
+          "id": "synthetic-event-1",
+          "gameId": "synthetic-game-saved",
+          "statType": "groundBall",
+          "statLabel": "Ground Ball",
+          "timestamp": "2026-01-15T12:00:00.000Z"
+        }
+      ],
+      "trackedPlayingTime": {
+        "version": 1,
+        "enabled": true,
+        "clockState": {
+          "gameId": "synthetic-game-saved",
+          "currentPeriod": "Q1",
+          "clockSecondsRemaining": 600,
+          "isRunning": false
+        },
+        "participationOperations": [
+          {
+            "clientOperationId": "synthetic-participation-operation-1",
+            "operationKind": "player_in",
+            "gameId": "synthetic-game-saved"
+          }
+        ],
+        "remoteEffectiveParticipation": []
+      }
+    }
+  ],
+  "activeGame": {
+    "id": "synthetic-game-active",
+    "playerId": "synthetic-player-a",
+    "opponent": "Synthetic Active Opponent",
+    "date": "2026-01-16",
+    "status": "in-progress",
+    "events": []
+  },
+  "eventOperationState": {
+    "version": 1,
+    "gameScopes": {
+      "synthetic-game-saved": {
+        "gameId": "synthetic-game-saved",
+        "accountId": "synthetic-account-a"
+      }
+    },
+    "events": {
+      "synthetic-event-1": {
+        "gameId": "synthetic-game-saved",
+        "eventId": "synthetic-event-1",
+        "pendingOperations": [
+          {
+            "kind": "create",
+            "clientOperationId": "synthetic-event-operation-1",
+            "clientCreatedAt": "2026-01-15T12:00:00.000Z"
+          }
+        ]
+      }
+    }
+  }
+}
