@@ -1,8 +1,8 @@
 # LaxHornet Development & Rollout Checklist
 
-**Owner:** David / MethodNorth
-**Product:** LaxHornet
-**Current production release:** v284
+**Owner:** David / MethodNorth  
+**Product:** LaxHornet  
+**Current production release:** v284  
 **Purpose:** Keep product, engineering, review, and release work in the correct order without mixing unrelated scopes.
 
 ## Authority and maintenance
@@ -38,85 +38,39 @@ This checklist does not replace `TICKETS.md`, `REPO_CURRENT_STATE.md`, Git histo
 
 # 2. Active Work Package
 
-## LH-DEV-006 — Versioned Local-Storage Safety Foundation
+## R2-04 — Durable Game and Clock Operation States
 
-**Status:** [x] Complete
-**Codex task:** `LH-DEV-006 | Version Local Storage Safely`
-**Branch:** `feature/lh-dev-006-versioned-local-storage`
-**Pull request:** #36
-**Merge SHA:** `255457b3cb51b07b5526c8270bf58d773cb70509`
+**Status:** [~] In progress
+**Risk level:** Level 3 — Critical synchronization and persistence behavior
+**Codex task:** `Implement R2-04 — Add Durable Game and Clock Operation States`
+**Branch:** `feature/r2-04-durable-game-clock-operations`
+**Starting point:** current `main`, including R2-03 merge `5f442b9f009eda644bbdb9892a6e05092e2cb608`
 
-### Implementation
+### Approved scope
 
-- [x] Repository confirmed clean before starting.
-- [x] Current `main` and `origin/main` baseline confirmed.
-- [x] Ticket scope and exclusions defined.
-- [x] Implementation plan approved.
-- [x] Storage-safety core implemented.
-- [x] Existing primary keys and payload shapes preserved.
-- [x] Canonical local schema version added.
-- [x] Legacy read migration added and idempotent.
-- [x] Account-scoped metadata sidecars added.
-- [x] Staged-write verification added.
-- [x] Bounded backup behavior added.
-- [x] Bounded quarantine behavior added.
-- [x] Future-version domains preserved and write-blocked.
-- [x] Missing primaries prevented from restoring stale backups.
-- [x] Intentional deletion removes primary and sidecars.
-- [x] Storage-health notifications deduplicated.
-- [x] Import validation hardened without changing export shapes.
-- [x] Tracked-time and event-operation payloads preserved unchanged.
-- [x] Public Live Share, recap, and CSV remain free of storage metadata.
+- [~] Add durable local operation state for legacy game writes.
+- [~] Add durable local operation state for tracked-clock writes.
+- [~] Assign permanent client operation IDs before cloud attempts.
+- [~] Persist explicit lifecycle states: pending, syncing, accepted, retryable, rejected, and conflicted.
+- [~] Recover pending and stale-syncing work after refresh or reconnect.
+- [~] Add receipt-backed acceptance and prevent older responses from falsely acknowledging newer local changes.
+- [~] Add bounded retry metadata and prevent retry storms.
+- [~] Preserve account isolation and keep signed-out namespace migration out of scope.
+- [~] Keep queue metadata private and excluded from Live Share, recap, CSV, and public payloads.
+- [~] Preserve existing Trust Spine replay, conflict, and tombstone behavior unchanged.
 
-### Verification
+### Explicitly unchanged
 
-- [x] Focused storage-safety suite passed: `28/28`.
-- [x] Existing event-operation tests pass.
-- [x] Existing tracked-playing-time tests pass.
-- [x] Existing game-scope tests pass.
-- [x] Public event semantic-boundary tests pass.
-- [x] Pages allowlist/deployment tests pass.
-- [x] Import/export and disclosure checks pass.
-- [x] Complete canonical regression passed: `36/36`.
-- [x] Product Alignment storage/static contracts passed: `33/33`.
-- [x] Local browser startup passes with normal data.
-- [x] Malformed noncritical-domain recovery passes.
-- [x] Saved-game backup recovery passes.
-- [x] Future-version preservation behavior passes.
-- [x] Active-game recovery passes.
-- [x] Offline event capture and persistence pass.
-- [x] Browser smoke passed: `5/5`.
-- [x] Desktop and mobile console checks show no unexpected errors.
-- [x] `git diff --check` passes.
-- [x] `TICKETS.md` updated with implementation results.
-- [x] `REPO_CURRENT_STATE.md` updated with durable storage facts.
+- [x] No SQL or migration work authorized.
+- [x] No RLS, grant, RPC-signature, or authorization-policy changes authorized.
+- [x] No durable tombstone or game-field version implementation authorized.
+- [x] No sync-status or conflict UI authorized.
+- [x] No signed-out-to-account namespace migration authorized.
+- [x] No deployment, release marker, Supabase, or production change authorized.
 
-### Known limitations
+### Current gate
 
-- `localStorage` cannot provide a true transaction across keys; failed writes
-  restore the prior primary when possible and retain bounded staging/recovery
-  data for diagnosis.
-- A future-schema domain is preserved and write-blocked for the current
-  session; the user must open it with a compatible newer client.
-
-### Review and change control
-
-- [x] Pull request #36 opened.
-- [x] Required GitHub Actions regression passed before merge.
-- [x] Pull request #36 merged at
-  `255457b3cb51b07b5526c8270bf58d773cb70509`.
-- [x] LH-DEV-006 marked complete.
-- [x] Production Pages deployment completed successfully.
-- [x] Production smoke completed successfully: existing saved games remained
-  available, active-game persistence after refresh was verified, and no
-  repeated storage warnings were observed.
-- [x] No SQL, migration, Supabase, authorization, disclosure, release-marker,
-  or public-data behavior changed.
-
-LH-DEV-006 was completed under the approved accelerated closeout. Obsolete
-process gates were superseded by Lean Development Workflow v2; the completed
-implementation, exact commit review, CI, merge, deployment, and production
-smoke provide the durable evidence.
+R2-04 remains in progress until implementation, focused tests, complete regression, CI, and exact-PR-SHA independent review are complete. Local-first game-day capture must remain fast and must not wait on cloud processing.
 
 # 3. Planned Engineering Sequence
 
@@ -124,15 +78,16 @@ Do not combine these into one large Codex task. Each item requires one approved 
 
 ## R2 — Conflict-Safe Offline Synchronization
 
-- [x] Inspect current local/cloud merge behavior again after LH-DEV-006
+- [x] Inspect current local/cloud merge behavior after LH-DEV-006
   (`R2-01`; `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`).
-- [ ] Define permanent client operation IDs.
-- [ ] Define queued-operation states.
-- [ ] Define idempotent replay.
-- [x] Prevent cloud fetches from silently replacing newer local evidence
-  within the current game/event hydration boundary (`R2-03`). Same-ID merge
-  preserves cloud-omitted local evidence and rejects superseded or prior-account
-  responses; durable field versions and explicit conflicts remain later R2 work.
+- [~] Define permanent client operation IDs (`R2-04` in progress).
+- [~] Define queued-operation states (`R2-04` in progress).
+- [~] Establish durable replay for legacy game and tracked-clock operations
+  (`R2-04` in progress). Server-side exactly-once guarantees remain limited until later server work.
+- [x] Prevent cloud fetches from silently replacing newer local evidence within
+  the current game/event hydration boundary (`R2-03`; PR #43; merge
+  `5f442b9f009eda644bbdb9892a6e05092e2cb608`). Same-ID merge preserves
+  cloud-omitted local evidence and rejects superseded or prior-account responses.
 - [ ] Define tombstone-versus-stale-update behavior.
 - [ ] Separate authorization failures from retryable network failures.
 - [ ] Add visible states: Saved on device, Waiting to sync, Syncing, Synced, Needs attention.
@@ -142,9 +97,10 @@ Do not combine these into one large Codex task. Each item requires one approved 
 - [x] Preserve existing saved games and offline capture through the R2-03
   hydration merge, including tracked-time, score-context, pending/recovery,
   local metadata, and active-game evidence.
-- [ ] Keep production mutation and release out of the feature ticket.
+- [x] Keep production mutation and release outside R2-01 through R2-03 feature work.
+- [~] Keep production mutation and release outside R2-04 while implementation is in progress.
 
-**Gate to advance:** No silent local overwrite; offline operations replay exactly once; conflicts are detectable.
+**Gate to advance:** No silent local overwrite; offline operations replay exactly once where server contracts support it; conflicts are detectable and unresolved evidence remains recoverable.
 
 ## R3 — Canonical Player, Roster, and Game Identity
 
