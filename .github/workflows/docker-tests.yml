@@ -79,6 +79,9 @@ jobs:
       - name: Run durable game and clock operation contracts
         run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_durable_sync_operations.mjs
 
+      - name: Run sync error classification contracts
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_sync_error_classification.mjs
+
       - name: Run tracked playing time service contracts
         run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_tracked_playing_time_service.mjs
 

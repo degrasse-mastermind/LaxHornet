@@ -143,11 +143,13 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
 
 ## R2-04 — Durable Game and Clock Operation States
 
-**Status:** [~] In progress  
+**Status:** [x] Complete
 **Risk level:** Level 3 — Critical synchronization and persistence behavior  
 **Codex task:** `Implement R2-04 — Add Durable Game and Clock Operation States`  
 **Branch:** `feature/r2-04-durable-game-clock-operations`  
 **Starting point:** current `main`, including R2-03 merge `5f442b9f009eda644bbdb9892a6e05092e2cb608`
+**Pull request:** #45
+**Merge SHA:** `229face02c14dec3ee134c860d4516ebcfaa1ce3`
 
 ### Approved scope
 
@@ -173,10 +175,58 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
 
 ### Current gate
 
-R2-04 implementation, focused tests, complete regression, and CI are complete.
-The work remains in progress until the exact final PR head receives independent
-Level 3 review. Local-first game-day capture remains fast and does not wait on
-cloud processing.
+R2-04 implementation, focused tests, complete regression, and final-head CI
+completed, and PR #45 merged as
+`229face02c14dec3ee134c860d4516ebcfaa1ce3`. The GitHub review record preserves
+an earlier correction-required exact-SHA review and a later automated final-SHA
+review submitted after merge; it does not show the requested fresh owner
+exact-SHA disposition before merge. That historical review-record gap is not
+silently rewritten here. Local-first game-day capture remains fast and does not
+wait on cloud processing. The overall R2 gate remains open.
+
+## R2-05 — Sync Error Classification
+
+**Status:** [~] In progress
+**Risk level:** Level 3 — Critical synchronization, retry, and authorization behavior
+**Codex task:** `Implement R2-05 — Separate Authorization Failures from Retryable Network Failures`
+**Task ID:** `019fb2fc-fa08-7a53-b927-2a3e6967f319`
+**Branch:** `feature/r2-05-sync-error-classification`
+**Starting point:** R2-04 merge `229face02c14dec3ee134c860d4516ebcfaa1ce3`
+**Draft pull request:** #46
+**Implementation commit:** `0a12565b1e4723986c26c36964540b049b51390e`
+
+### Implemented boundary
+
+- [x] One deterministic classifier covers durable legacy-game and tracked-clock operations.
+- [x] Offline, fetch, timeout, HTTP 408/429/5xx, and temporary service failures become `retryable`.
+- [x] Missing/expired/revoked sessions and HTTP 401 become retained `authentication_required` rejections.
+- [x] HTTP 403, RLS/`42501`, `unauthorized`, `unauthorized_*`, membership, role, and scope failures become retained `authorization_denied` rejections.
+- [x] Malformed/unsupported input and non-capability HTTP 400/422 become retained `validation_rejected` rejections.
+- [x] Missing/stale RPCs, `PGRST202`, schema-cache mismatch, and undeployed backend capability become retained `capability_unavailable` rejections.
+- [x] HTTP 409, stale revision, and explicit server conflicts remain `conflicted`.
+- [x] Unknown permanent failures fail closed as `unclassified_rejection`.
+- [x] Rejected/conflicted work retains its account scope, operation identity, payload revision, base revision, and bounded sanitized evidence without ordinary retry timing.
+- [x] Offline and missing-session handling create no network attempt or retry-counter storm.
+- [x] Explicit sign-in/manual sync recovers only the signed-in account's authentication-required work.
+- [x] Classification metadata remains private and excluded from Live Share, recap, CSV, analytics, normal exports, and private game backup.
+- [x] Existing Trust Spine authorization, replay, conflict, state, tombstone, and RPC semantics remain unchanged.
+
+### Verification and current gate
+
+- [x] Sync error classification passed `22/22`.
+- [x] Durable game/clock operations passed `29/29`, including account-isolated authorization rejection and stale-clock integration journeys.
+- [x] Sync characterization passed `29/29`; only the broad authorization/network ambiguity became desired R2-05 behavior.
+- [x] Local-storage safety passed `28/28`; tracked-time service passed `16/16`; event-operation and account-scope contracts passed.
+- [x] Secure-disclosure activation passed `20/20`.
+- [x] Signed-in secure-disclosure browser passed `73/73` with no hosted Supabase request or browser/page error.
+- [x] Complete canonical-plus-additive regression passed `39/39`.
+- [x] No SQL, migration, RLS, grant, RPC signature, authorization-policy, release-marker, deployment, Supabase, or production state changed.
+- [ ] Final draft-PR CI must pass.
+- [ ] Exact final PR head requires independent Level 3 review before merge.
+
+Visible sync states, a sanitized user journal, tombstones, signed-out namespace
+migration, server-side legacy-game deduplication, field-level conflicts, and
+the overall R2 gate remain incomplete.
 
 # 4. Planned Engineering Sequence
 
@@ -202,7 +252,9 @@ Do not combine these into one large Codex task. Each item requires one approved 
   responses; durable field versions and explicit conflicts remain later R2
   work.
 - [ ] Define tombstone-versus-stale-update behavior.
-- [ ] Separate authorization failures from retryable network failures.
+- [x] Separate authorization failures from retryable network failures for the
+  R2-05 durable legacy-game/tracked-clock boundary. Trust Spine and
+  participation behavior remain under their existing contracts.
 - [ ] Add visible states: Saved on device, Waiting to sync, Syncing, Synced, Needs attention.
 - [ ] Add sanitized sync journal.
 - [x] Test offline creation, reconnect, duplicate replay, refresh, revocation,
@@ -214,6 +266,7 @@ Do not combine these into one large Codex task. Each item requires one approved 
   with account-scoped storage-safety recovery (`R2-04`). This is client
   durability only; legacy game writes still lack server-side deduplication.
 - [x] Keep production mutation and release out of the R2-04 feature ticket.
+- [x] Keep production mutation and release out of the R2-05 feature ticket.
 
 **Gate to advance:** No silent local overwrite; offline operations replay exactly once where server contracts support it; conflicts are detectable and unresolved evidence remains recoverable.
 
@@ -433,6 +486,8 @@ A feature PR is not automatically a production release.
 - [x] Cloud hydration cannot silently erase richer local evidence within the current game/event hydration boundary (`R2-03`).
 - [ ] Offline game and clock operations replay durably and exactly once where server contracts support it.
 - [ ] Conflicts and authorization failures are visible and classified.
+  R2-05 completes internal classification only for durable legacy-game and
+  tracked-clock operations; visible states remain deferred.
 - [ ] Player identity resolves through one canonical path.
 - [ ] Review calculations use one effective evidence set.
 - [ ] Corrections invalidate and regenerate dependent output.

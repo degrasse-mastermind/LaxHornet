@@ -155,6 +155,31 @@
   const RETRY_BASE_MS = 2000;
   const RETRY_MAX_MS = 5 * 60 * 1000;
   const MAX_ACKNOWLEDGMENTS = 100;
+  const FAILURE_CATEGORIES = Object.freeze({
+    retryableTransport: "retryable_transport",
+    authenticationRequired: "authentication_required",
+    authorizationDenied: "authorization_denied",
+    validationRejected: "validation_rejected",
+    capabilityUnavailable: "capability_unavailable",
+    conflict: "conflict",
+    unclassifiedRejection: "unclassified_rejection",
+  });
+  const FAILURE_MESSAGES = Object.freeze({
+    [FAILURE_CATEGORIES.retryableTransport]:
+      "The service could not be reached. This saved operation remains available to retry.",
+    [FAILURE_CATEGORIES.authenticationRequired]:
+      "Sign in again before retrying this saved operation.",
+    [FAILURE_CATEGORIES.authorizationDenied]:
+      "The signed-in account is not authorized for this saved operation.",
+    [FAILURE_CATEGORIES.validationRejected]:
+      "The saved operation was rejected because its request is invalid.",
+    [FAILURE_CATEGORIES.capabilityUnavailable]:
+      "The required backend capability is unavailable.",
+    [FAILURE_CATEGORIES.conflict]:
+      "The saved operation conflicts with a newer server revision.",
+    [FAILURE_CATEGORIES.unclassifiedRejection]:
+      "The saved operation was rejected for an unclassified permanent reason.",
+  });
 
   function requiredFunction(value, name) {
     if (typeof value !== "function") {
@@ -200,16 +225,68 @@
     return new Date(milliseconds).toISOString();
   }
 
-  function normalizedError(value = null) {
+  function safeCode(value = "", fallback = "") {
+    const clean = String(value || "")
+      .trim()
+      .replace(/[^a-zA-Z0-9_.:-]/g, "_")
+      .slice(0, 80);
+    return clean || fallback;
+  }
+
+  function normalizedHttpStatus(...values) {
+    for (const value of values) {
+      if (value === null || value === undefined || value === "") continue;
+      const status = Number(value);
+      if (Number.isInteger(status) && status >= 100 && status <= 599) return status;
+    }
+    return null;
+  }
+
+  function classificationCode(category, sourceCode = "") {
+    if (
+      category === FAILURE_CATEGORIES.conflict
+      && /stale_clock_revision/i.test(sourceCode)
+    ) {
+      return "stale_clock_revision";
+    }
+    if (category === FAILURE_CATEGORIES.conflict) return "revision_conflict";
+    return category;
+  }
+
+  function normalizedError(value = null, options = {}) {
     if (!value) return null;
     if (typeof value === "string") {
-      return { code: "sync_error", message: value.slice(0, 240) };
+      return {
+        category: FAILURE_CATEGORIES.unclassifiedRejection,
+        code: "sync_error",
+        message: FAILURE_MESSAGES[FAILURE_CATEGORIES.unclassifiedRejection],
+        httpStatus: null,
+        classifiedAt: options.classifiedAt ? isoTimestamp(options.classifiedAt) : null,
+        source: "legacy",
+        sourceCode: "",
+      };
     }
+    const category = Object.values(FAILURE_CATEGORIES).includes(value.category)
+      ? value.category
+      : value.outcome === "retryable"
+        ? FAILURE_CATEGORIES.retryableTransport
+        : value.outcome === "conflicted"
+          ? FAILURE_CATEGORIES.conflict
+          : FAILURE_CATEGORIES.unclassifiedRejection;
+    const sourceCode = safeCode(value.sourceCode || "");
     return {
-      code: String(value.code || value.outcome || "sync_error").trim().slice(0, 80),
-      message: String(value.message || value.code || "Synchronization needs attention.")
-        .trim()
-        .slice(0, 240),
+      category,
+      code: safeCode(
+        value.code,
+        classificationCode(category, sourceCode) || "sync_error",
+      ),
+      message: FAILURE_MESSAGES[category],
+      httpStatus: normalizedHttpStatus(value.httpStatus, value.status, value.statusCode),
+      classifiedAt: value.classifiedAt || options.classifiedAt
+        ? isoTimestamp(value.classifiedAt || options.classifiedAt)
+        : null,
+      source: safeCode(value.source, "sync"),
+      sourceCode,
     };
   }
 
@@ -296,10 +373,15 @@
         : null,
       lastError: storedState === "syncing"
         ? {
+            category: FAILURE_CATEGORIES.retryableTransport,
             code: "interrupted_sync",
-            message: "The previous synchronization attempt ended before acknowledgment.",
+            message: FAILURE_MESSAGES[FAILURE_CATEGORIES.retryableTransport],
+            httpStatus: null,
+            classifiedAt: updatedAt,
+            source: "durable_queue",
+            sourceCode: "interrupted_sync",
           }
-        : normalizedError(operation.lastError),
+        : normalizedError(operation.lastError, { classifiedAt: updatedAt }),
       receipt: normalizedReceipt(operation.receipt),
     };
   }
@@ -365,27 +447,133 @@
     return normalized;
   }
 
-  function classifyFailure(error = {}) {
-    const code = String(error.code || error.name || "").toLowerCase();
-    const message = String(error.message || error.code || "Synchronization failed.");
-    const status = Number(error.status || error.statusCode || 0);
+  function classifyFailure(input = {}, options = {}) {
+    const envelope = isObject(input) ? input : { message: String(input || "") };
+    const error = isObject(envelope.error) ? envelope.error : envelope;
+    const sourceCode = safeCode(
+      error.code
+      || envelope.code
+      || error.name
+      || envelope.name,
+    );
+    const code = sourceCode.toLowerCase();
+    const text = [
+      error.message,
+      error.details,
+      error.hint,
+      envelope.message,
+      envelope.details,
+      envelope.hint,
+    ].filter(Boolean).join(" ");
+    const httpStatus = normalizedHttpStatus(
+      envelope.httpStatus,
+      envelope.status,
+      envelope.statusCode,
+      error.httpStatus,
+      error.status,
+      error.statusCode,
+    );
+    const explicitStatusZero = [
+      envelope.httpStatus,
+      envelope.status,
+      envelope.statusCode,
+      error.httpStatus,
+      error.status,
+      error.statusCode,
+    ].some((value) =>
+      value !== null
+      && value !== undefined
+      && value !== ""
+      && Number(value) === 0);
+    const declaredOutcome = String(envelope.outcome || error.outcome || "").toLowerCase();
+    let category = FAILURE_CATEGORIES.unclassifiedRejection;
+
     if (
-      code.includes("stale_clock_revision")
-      || code.includes("conflict")
-      || status === 409
+      declaredOutcome === "conflicted"
+      || code.includes("stale_clock_revision")
+      || /^stale_.*_revision$/.test(code)
+      || code.includes("revision_conflict")
+      || code.includes("clock_acknowledgment_mismatch")
+      || httpStatus === 409
     ) {
-      return { outcome: "conflicted", code: code || "conflict", message };
-    }
-    if (
-      status === 0
-      || status === 408
-      || status === 429
-      || status >= 500
-      || /network|fetch|timeout|temporar|unavailable|rate.?limit/i.test(`${code} ${message}`)
+      category = FAILURE_CATEGORIES.conflict;
+    } else if (
+      httpStatus === 401
+      || /^pgrst30[1-3]$/.test(code)
+      || /authsessionmissing|authinvalidjwt|missing_session|session_missing|expired_session|session_expired|invalid_(?:access_)?token|token_(?:expired|revoked)|jwt_(?:expired|invalid)|bad_jwt|refresh_token_not_found/.test(code)
+      || /missing session|session (?:is )?(?:missing|expired)|jwt (?:has )?expired|invalid or revoked access token|invalid jwt/i.test(text)
     ) {
-      return { outcome: "retryable", code: code || "transport_failure", message };
+      category = FAILURE_CATEGORIES.authenticationRequired;
+    } else if (
+      httpStatus === 403
+      || code === "42501"
+      || code === "authorization_denied"
+      || code === "unauthorized"
+      || code === "not_authorized"
+      || code === "permission_denied"
+      || code === "insufficient_privilege"
+      || code.startsWith("unauthorized_")
+      || /row-level security|violates row-level security|permission denied|not authorized|unauthorized (?:account|team|game|player|scope)|revoked membership|insufficient role|wrong (?:account|team|game|player)/i.test(text)
+    ) {
+      category = FAILURE_CATEGORIES.authorizationDenied;
+    } else if (
+      /^pgrst20[0-5]$/.test(code)
+      || code === "42883"
+      || code === "capability_unavailable"
+      || /schema cache|could not find the function|function .* does not exist|function signature|unsupported backend capability|feature not deployed|backend capability/i.test(text)
+    ) {
+      category = FAILURE_CATEGORIES.capabilityUnavailable;
+    } else if (
+      httpStatus === 400
+      || httpStatus === 422
+      || code === "validation_rejected"
+      || code.startsWith("invalid_")
+      || code.startsWith("unsupported_")
+      || /^pgrst1\d\d$/.test(code)
+      || /malformed payload|required field|unsupported command|invalid (?:game state|clock transition|event payload|request body)/i.test(text)
+    ) {
+      category = FAILURE_CATEGORIES.validationRejected;
+    } else if (
+      declaredOutcome === "retryable"
+      || explicitStatusZero
+      || httpStatus === 408
+      || httpStatus === 429
+      || (httpStatus !== null && httpStatus >= 500)
+      || /^pgrst00[013]$/.test(code)
+      || /^08/.test(code)
+      || code === "offline"
+      || code === "aborterror"
+      || code === "aborted"
+      || /failed to fetch|fetch failed|network|timeout|timed out|connection reset|econnreset|temporary dns|dns lookup|gateway|rate.?limit|service unavailable|temporarily unavailable|offline/i.test(`${code} ${text}`)
+    ) {
+      category = FAILURE_CATEGORIES.retryableTransport;
+    } else if (declaredOutcome === "conflicted") {
+      category = FAILURE_CATEGORIES.conflict;
+    } else if (declaredOutcome === "rejected") {
+      category = FAILURE_CATEGORIES.unclassifiedRejection;
     }
-    return { outcome: "rejected", code: code || "request_rejected", message };
+
+    const retryable = category === FAILURE_CATEGORIES.retryableTransport;
+    return Object.freeze({
+      outcome: category === FAILURE_CATEGORIES.conflict
+        ? "conflicted"
+        : retryable
+          ? "retryable"
+          : "rejected",
+      category,
+      code: classificationCode(category, sourceCode),
+      message: FAILURE_MESSAGES[category],
+      httpStatus,
+      retryable,
+      attentionRequired: !retryable,
+      source: safeCode(
+        options.source || envelope.source,
+        code.startsWith("pgrst") || /^\d{5}$/.test(code)
+          ? "postgrest"
+          : "javascript",
+      ),
+      sourceCode,
+    });
   }
 
   function retryDelayMs(attemptCount) {
@@ -604,12 +792,79 @@
         nextAttemptAt: outcome === "retryable"
           ? isoTimestamp(Date.parse(timestamp) + retryDelayMs(operation.attemptCount))
           : null,
-        lastError: normalizedError(failure),
+        lastError: normalizedError(failure, { classifiedAt: timestamp }),
         receipt: outcome === "conflicted"
           ? normalizedReceipt(failure.receipt)
           : operation.receipt,
       };
       return replaceAndPersist(next, state);
+    }
+
+    function applyFailureWithoutAttempt(accountId, states, failure) {
+      const state = supportedState();
+      if (!state || !accountId) return 0;
+      const timestamp = isoTimestamp(now());
+      const next = copy(state);
+      let changed = 0;
+      next.operations = next.operations.map((operation) => {
+        if (
+          operation.accountId !== accountId
+          || !states.includes(operation.state)
+        ) {
+          return operation;
+        }
+        changed += 1;
+        return {
+          ...operation,
+          state: failure.outcome,
+          updatedAt: timestamp,
+          nextAttemptAt: null,
+          lastError: normalizedError(failure, { classifiedAt: timestamp }),
+          receipt: failure.outcome === "conflicted"
+            ? normalizedReceipt(failure.receipt)
+            : operation.receipt,
+        };
+      });
+      if (!changed) return 0;
+      return replaceAndPersist(next, state) ? changed : 0;
+    }
+
+    function rejectAuthentication(accountId = currentAccountId()) {
+      return applyFailureWithoutAttempt(
+        accountId,
+        ["pending", "syncing", "retryable"],
+        classifyFailure(
+          { code: "missing_session", outcome: "rejected" },
+          { source: "supabase_auth" },
+        ),
+      );
+    }
+
+    function recoverAuthentication(accountId = currentAccountId()) {
+      const state = supportedState();
+      if (!state || !accountId) return 0;
+      const timestamp = isoTimestamp(now());
+      const next = copy(state);
+      let changed = 0;
+      next.operations = next.operations.map((operation) => {
+        if (
+          operation.accountId !== accountId
+          || operation.state !== "rejected"
+          || operation.lastError?.category !== FAILURE_CATEGORIES.authenticationRequired
+        ) {
+          return operation;
+        }
+        changed += 1;
+        return {
+          ...operation,
+          state: "pending",
+          updatedAt: timestamp,
+          nextAttemptAt: null,
+          lastError: null,
+        };
+      });
+      if (!changed) return 0;
+      return replaceAndPersist(next, state) ? changed : 0;
     }
 
     function applyAcceptance(attempted, result) {
@@ -661,7 +916,18 @@
     }
 
     async function runForAccount(accountId) {
-      if (!accountId || isOffline()) return false;
+      if (!accountId) return false;
+      if (isOffline()) {
+        applyFailureWithoutAttempt(
+          accountId,
+          ["pending", "retryable"],
+          classifyFailure(
+            { code: "offline", outcome: "retryable" },
+            { source: "browser_connectivity" },
+          ),
+        );
+        return false;
+      }
       let anyAccepted = false;
       for (let processed = 0; processed < 100; processed += 1) {
         if (currentAccountId() !== accountId || isOffline()) break;
@@ -681,9 +947,17 @@
         if (result?.outcome === "accepted") {
           anyAccepted = applyAcceptance(attempted, result) || anyAccepted;
         } else {
+          const classified = Object.values(FAILURE_CATEGORIES).includes(result?.category)
+            ? result
+            : classifyFailure(result || {}, {
+                source: result?.source || "operation_executor",
+              });
           applyFailure(
             attempted.operationId,
-            result?.outcome ? result : classifyFailure(result || {}),
+            {
+              ...classified,
+              receipt: result?.receipt || null,
+            },
           );
         }
       }
@@ -718,6 +992,8 @@
       process,
       isAcknowledged,
       hasUnresolved,
+      rejectAuthentication,
+      recoverAuthentication,
     });
   }
 
@@ -725,6 +1001,7 @@
     SCHEMA_VERSION,
     OPERATION_TYPES,
     OPERATION_STATES,
+    FAILURE_CATEGORIES,
     isStoredState,
     normalizeState,
     payloadHash,

@@ -206,6 +206,25 @@ function eventOperationApi() {
   return context.window.LaxHornetEventOperations;
 }
 
+function durableSyncOperationApi() {
+  const context = vm.createContext({
+    window: {},
+    Date,
+    Math,
+    Number,
+    Object,
+    String,
+    TypeError,
+    Promise,
+    Set,
+    Map,
+  });
+  vm.runInContext(eventOperationSource, context, {
+    filename: "event-operation-service.js",
+  });
+  return context.window.LaxHornetDurableSyncOperations;
+}
+
 function mapperHarness() {
   const state = {
     activeGame: null,
@@ -1102,50 +1121,22 @@ test(
   },
 );
 
-function legacyErrorClassification(error) {
-  const state = {
-    syncStatus: "",
-    cloudError: "",
-  };
-  const toasts = [];
-  const harness = appHarness(
-    [
-      "supabaseErrorText",
-      "readableSupabaseError",
-      "isTeamSetupError",
-      "reportTeamSetupError",
-      "reportSyncError",
-    ],
-    {
-      state,
-      lastSyncErrorAt: 0,
-      showToast: (message) => toasts.push(message),
-      render: () => {},
-    },
-  );
-  harness.get("reportSyncError")(error);
-  return {
-    syncStatus: state.syncStatus,
-    cloudError: state.cloudError,
-    toast: toasts.at(-1) || "",
-  };
-}
-
 test(
-  "CHARACTERIZATION: legacy sync error outputs do not provide a durable authorization taxonomy",
+  "R2-05: durable operation failures have deterministic authorization and transport taxonomy",
   () => {
+    const classifyFailure = durableSyncOperationApi().classifyFailure;
     const cases = [
       {
         kind: "network",
         error: { message: "Failed to fetch" },
-        expectedStatus: "Live Share needs setup",
-        expectedDurableCode: "",
+        expectedOutcome: "retryable",
+        expectedCategory: "retryable_transport",
       },
       {
         kind: "expired-auth",
         error: { message: "JWT expired" },
-        expectedStatus: "Live Share needs setup",
-        expectedDurableCode: "",
+        expectedOutcome: "rejected",
+        expectedCategory: "authentication_required",
       },
       {
         kind: "rls-denial",
@@ -1153,14 +1144,14 @@ test(
           code: "42501",
           message: "new row violates row-level security policy for table games",
         },
-        expectedStatus: "Team setup needs attention",
-        expectedDurableCode: "",
+        expectedOutcome: "rejected",
+        expectedCategory: "authorization_denied",
       },
       {
         kind: "rpc-validation",
         error: { code: "22023", message: "invalid event payload" },
-        expectedStatus: "Live Share needs setup",
-        expectedDurableCode: "",
+        expectedOutcome: "rejected",
+        expectedCategory: "validation_rejected",
       },
       {
         kind: "capability-loss",
@@ -1168,8 +1159,8 @@ test(
           code: "PGRST202",
           message: "Could not find the function lh_update_game_clock in schema cache",
         },
-        expectedStatus: "Team setup needs attention",
-        expectedDurableCode: "",
+        expectedOutcome: "rejected",
+        expectedCategory: "capability_unavailable",
       },
       {
         kind: "membership-loss",
@@ -1177,31 +1168,34 @@ test(
           code: "42501",
           message: "permission denied for relation games",
         },
-        expectedStatus: "Team setup needs attention",
-        expectedDurableCode: "",
+        expectedOutcome: "rejected",
+        expectedCategory: "authorization_denied",
       },
     ];
 
     for (const scenario of cases) {
-      const result = legacyErrorClassification(scenario.error);
+      const result = classifyFailure(scenario.error, {
+        source: "sync_characterization",
+      });
+      assert.equal(result.outcome, scenario.expectedOutcome, scenario.kind);
+      assert.equal(result.category, scenario.expectedCategory, scenario.kind);
       assert.equal(
-        result.syncStatus,
-        scenario.expectedStatus,
+        result.retryable,
+        scenario.expectedOutcome === "retryable",
         scenario.kind,
       );
       assert.equal(
-        Object.hasOwn(result, "retryability"),
-        false,
-        `${scenario.kind} has no retryability`,
+        result.attentionRequired,
+        scenario.expectedOutcome !== "retryable",
+        scenario.kind,
       );
-      assert.equal(
-        Object.hasOwn(result, "authorizationState"),
-        false,
-        `${scenario.kind} has no authorization state`,
-      );
-      assert.equal(scenario.expectedDurableCode, "");
     }
+  },
+);
 
+test(
+  "CHARACTERIZATION: global sync copy remains transient pending visible R2 sync states",
+  () => {
     const persistBody = extractFunction(appSource, "persistAll");
     assert.doesNotMatch(persistBody, /syncStatus|cloudError/);
   },
@@ -1886,14 +1880,14 @@ test("R2-01 confirmed-risk coverage manifest is complete", () => {
     hydration_removes_participation: "same-ID cloud hydration",
     stale_game_or_event_resurrection: "stale device uploads",
     rls_invisible_delete_marker_clear: "RLS-invisible legacy event delete",
-    generic_legacy_error_state: "legacy sync error outputs",
+    generic_legacy_error_state: "durable operation failures",
     unclassified_participation_rejection: "participation rejections",
     out_of_order_load_regression: "older overlapping cloud load",
     random_identity_instability: "repeated logical captures",
     unsigned_to_signed_isolation: "sign-in switches",
     authorization_filter_data_loss: "authorization refresh",
     nontransactional_multi_key_persist: "cross-key mixed generation",
-    transient_global_sync_status: "legacy sync error outputs",
+    transient_global_sync_status: "global sync copy remains transient",
   };
   assert.deepEqual(Object.keys(coverage).sort(), [
     "authorization_filter_data_loss",

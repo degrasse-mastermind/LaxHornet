@@ -830,6 +830,124 @@ changing server contracts, authorization, tombstones, or release state.
   exact final draft-PR head after all corrections are pushed. Do not merge or
   deploy from this task.
 
+### R2-05 — Separate authorization failures from retryable network failures
+
+Status: `REVIEW`
+
+Risk level: `LEVEL 3`
+
+Branch: `feature/r2-05-sync-error-classification`
+
+Execution task: `Implement R2-05 — Separate Authorization Failures from Retryable Network Failures`
+(`019fb2fc-fa08-7a53-b927-2a3e6967f319`)
+
+Related document: `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`
+
+#### Goal
+
+Give R2-04 durable legacy-game and tracked-clock operations one deterministic,
+sanitized failure taxonomy so retryable transport faults remain replayable
+while authentication, authorization, validation, capability, conflict, and
+unknown permanent failures remain durable without ordinary automatic retry.
+
+#### Implemented taxonomy and transitions
+
+- `retryable_transport` maps offline, browser fetch/timeout/connection
+  failures, HTTP 408/429/5xx, and temporary service failures to `retryable`.
+  A real request increments attempt metadata and receives bounded backoff;
+  known offline state becomes retryable without creating a request, increment,
+  or retry timer.
+- `authentication_required` maps missing/expired/revoked sessions, HTTP 401,
+  invalid JWT outcomes, and equivalent Supabase Auth failures to `rejected`.
+- `authorization_denied` maps HTTP 403, SQLSTATE `42501`, RLS denial,
+  `unauthorized`, `unauthorized_*`, wrong-scope, membership, and role failures
+  to `rejected`.
+- `validation_rejected` maps malformed or unsupported requests, invalid game
+  or clock state, and non-capability HTTP 400/422 outcomes to `rejected`.
+- `capability_unavailable` maps missing/stale RPC signatures, `PGRST202`,
+  schema-cache mismatch, missing backend functions, and undeployed capability
+  outcomes to `rejected`.
+- `conflict` maps HTTP 409, stale revision, explicit conflict, and clock
+  acknowledgment mismatch to `conflicted`; `stale_clock_revision` remains the
+  precise retained code where supplied.
+- `unclassified_rejection` is the fail-closed result for an unknown permanent
+  failure. Unknown failures do not default to retryable.
+- Rejected and conflicted operations retain their operation ID, account/game
+  scope, payload, payload revision, base revision, prior applicable receipt,
+  and sanitized evidence. They receive no ordinary next-attempt time.
+
+#### Classification and evidence contract
+
+The shared classifier returns:
+
+`outcome`, `category`, `code`, `message`, `httpStatus`, `retryable`,
+`attentionRequired`, `source`, and safe `sourceCode`.
+
+Persisted `lastError` is bounded to:
+
+`category`, `code`, canonical `message`, `httpStatus`, `classifiedAt`,
+`source`, and safe `sourceCode`.
+
+Original server messages, details, hints, response bodies, request payloads,
+tokens, headers, stack traces, and private/player/family text are not persisted
+inside the error record.
+
+#### Authentication recovery and boundaries
+
+- Losing the active session rejects the loaded account's pending/syncing/
+  retryable durable work without incrementing attempts, then switches storage
+  namespaces.
+- Signed-out state processes no account operation.
+- A successful explicit sign-in or manual cloud-sync action can reclassify
+  only that signed-in account's `authentication_required` rejections to
+  `pending`; another account cannot recover or execute them.
+- Authorization, payload scope, RLS, roles, RPC signatures, and Trust Spine
+  event-operation semantics are unchanged.
+- Queue classifications and metadata remain excluded from Live Share, public
+  recap, CSV, analytics, normal exports, and private game backup.
+
+#### Characterization updates
+
+- The former broad legacy authorization/network ambiguity assertion is now a
+  passing R2-05 deterministic taxonomy contract.
+- Transient global sync copy, Trust Spine rejection removal, participation
+  batch classification, tombstones/stale resurrection, RLS-invisible deletion,
+  server game deduplication, field-level conflicts, signed-out namespace
+  migration, cross-key transactionality, repeated-capture identity, and
+  visible sync/conflict UI remain explicitly unresolved.
+
+#### Acceptance and completion record
+
+- Baseline: `origin/main` at
+  `229face02c14dec3ee134c860d4516ebcfaa1ce3`, including merged R2-01 through
+  R2-04.
+- Implementation commit:
+  `0a12565b1e4723986c26c36964540b049b51390e`.
+- Draft pull request: #46.
+- Focused classifier assertions: `22/22`; durable game/clock assertions:
+  `29/29`; sync characterization: `29/29`; local-storage safety: `28/28`;
+  tracked-time service: `16/16`; event-operation and game-scope contracts
+  passed.
+- Secure-disclosure activation: `20/20`; signed-in secure-disclosure browser:
+  `73/73`, with no hosted Supabase request and no browser/page error.
+- Complete local regression: canonical-plus-additive `39 passed, 0 failed`.
+- Changed JavaScript syntax and `git diff --check`: passed.
+- CI: portable regression, Docker test suite, and normal preview checks are
+  required on the final draft-PR head.
+- Known limitations: legacy game and clock RPCs still lack server receipt
+  deduplication for the local operation ID; no durable tombstones, field-level
+  conflict resolution, signed-out namespace migration, sanitized journal, or
+  user-facing sync/conflict UI is added. Trust Spine and participation
+  operation behavior remains governed by its existing contracts.
+- Production or external state changed: `NO`.
+- `REPO_CURRENT_STATE.md` updated: `YES`.
+- `docs/LAXHORNET_ROLLOUT_CHECKLIST.md` updated: `YES`; classification is
+  complete only for the R2-05 durable legacy-game/tracked-clock boundary. The
+  overall R2 gate remains open.
+- Review status: `NOT COMPLETE`. Independent Level 3 review must inspect the
+  exact final draft-PR head after all corrections are pushed. Do not merge or
+  deploy from this task.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets
