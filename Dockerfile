@@ -9,6 +9,7 @@ COPY . .
 
 FROM base AS test
 RUN apk add --no-cache python3 git
+RUN git config --system --add safe.directory /app
 COPY --from=build /app /app
 RUN npm ci --ignore-scripts 2>/dev/null || true
 CMD ["npm", "test"]
