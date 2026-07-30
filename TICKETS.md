@@ -514,7 +514,7 @@ until separately authorized.
 
 ### R2-01 — Inventory current local/cloud sync and conflict behavior
 
-Status: `IN PROGRESS`
+Status: `REVIEW`
 
 Risk level: `LEVEL 3`
 
@@ -552,9 +552,15 @@ Completion record:
   `fff8c3fe4f9cf285c3c092a713bef3d3f24c03e1`.
 - Prerequisites confirmed: LH-DEV-006, Lean Development Workflow v2, corrected
   Docker CI, and reconciled rollout checklist.
-- Commit/PR: pending closeout.
-- Files changed: pending closeout.
-- Checks: pending closeout.
+- Inventory commit: `436f618f35a33bd621909ecd1a994d4aa3eb1ded`.
+- Draft pull request: #41.
+- Files changed: `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`,
+  `TICKETS.md`, `docs/LAXHORNET_ROLLOUT_CHECKLIST.md`, and
+  `REPO_CURRENT_STATE.md`.
+- Checks: complete canonical local regression `36 passed, 0 failed`;
+  phase-aware containment `32/32`; Trust Spine SQL acceptance/rollback `33`
+  SQL tests with all 20 Trust Spine tables removed and legacy sentinels
+  preserved after rollback; `git diff --check`; authorized-path audit.
 - Production or external state changed: `NO`.
 - `REPO_CURRENT_STATE.md` updated: `YES` — current limitations only.
 - Remaining work: independent exact-PR-SHA review, then the proposed R2
