@@ -53,22 +53,45 @@ test("bounded package paths exist", () => {
   }
 });
 
-test("migration separates production hashes from the local blank-chain hash", () => {
+test("migration binds the local blank-chain hash away from production", () => {
   assert.match(migration, /STATE_A_CAPTURED_RECURSIVE_DEFECT/);
   assert.match(migration, /75e5d59fce7de054e5f53d7d5d73f99e/);
   assert.match(migration, /STATE_B_CANONICAL_ONLY/);
   assert.match(migration, /c4a69b0c9f9660563eb7aa8ca6e1b3b6/);
-  assert.match(migration, /LOCAL_BLANK_CHAIN_ONLY/);
+  assert.match(migration, /system_identifier = '7642734024280108049'/);
+  assert.match(migration, /elsif not is_production_cluster/);
+  assert.match(migration, /NONPRODUCTION_BLANK_CHAIN_ONLY/);
   assert.match(migration, /1c9c5d532c262c3b9ec850552bdf0512/);
-  assert.match(migration, /not has_table_privilege\('anon'/);
-  assert.match(migration, /proc\.proconfig @> array\['row_security=off'\]/);
+  assert.match(migration, /production migration history drifted/);
   assert.match(migration, /policy definition drift/);
+});
+
+test("production preflight pins helpers, ACLs, FORCE RLS, and schema absence", () => {
+  for (const sourceHash of [
+    "c2b253cf74e691f048cf29a66ddbba76",
+    "f9eb8573e91bc5758f94a3b997966a4e",
+    "17e2d67b8cb33781debcc01d6f1578a6",
+    "bd212e46e7fe3dc8057780eddf0d9240",
+  ]) {
+    assert.match(migration, new RegExp(sourceHash));
+  }
+  assert.match(migration, /class\.relforcerowsecurity/);
+  assert.match(
+    migration,
+    /\{postgres=arwdDxtm\/postgres,anon=arwdDxtm\/postgres,authenticated=arwdDxtm\/postgres,service_role=arwdDxtm\/postgres\}/,
+  );
+  assert.match(migration, /private helper schema unexpectedly exists/);
+  assert.doesNotMatch(migration, /create schema if not exists lh_rls_private/i);
+  assert.doesNotMatch(
+    migration,
+    /create or replace function lh_rls_private\.current_team_role/i,
+  );
 });
 
 test("private helper is bounded and hardened", () => {
   assert.match(
     migration,
-    /create or replace function lh_rls_private\.current_team_role\(check_team_id text\)/,
+    /create function lh_rls_private\.current_team_role\(check_team_id text\)/,
   );
   assert.match(migration, /security definer\s+set search_path = pg_catalog\s+set row_security = off/);
   assert.match(migration, /from public\.team_members member/);
@@ -98,7 +121,7 @@ test("grants and RLS are least privilege", () => {
   assert.match(migration, /revoke all on table public\.team_members from public, anon/);
   assert.match(
     migration,
-    /revoke truncate, references, trigger on table public\.team_members\s+from authenticated, service_role/,
+    /revoke truncate, references, trigger, maintain on table public\.team_members\s+from authenticated, service_role/,
   );
   assert.match(
     migration,
@@ -130,7 +153,7 @@ test("reproduction covers all four operations with SQLSTATE 42P17", () => {
 });
 
 test("authorization test covers the required fail-closed matrix", () => {
-  assert.match(authorizationTest, /extensions\.plan\(37\)/);
+  assert.match(authorizationTest, /extensions\.plan\(40\)/);
   for (const phrase of [
     "same-team tracker",
     "wrong team",
@@ -145,6 +168,8 @@ test("authorization test covers the required fail-closed matrix", () => {
     "remove only its own membership",
     "anonymous membership read",
     "service role retains explicit maintenance",
+    "private helper schema has exact owner",
+    "public authorization helpers have exact owner",
   ]) {
     assert.match(authorizationTest, new RegExp(phrase, "i"));
   }

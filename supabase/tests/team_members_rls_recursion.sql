@@ -3,7 +3,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select extensions.plan(37);
+select extensions.plan(40);
 
 select extensions.ok(
   (
@@ -48,7 +48,8 @@ select extensions.ok(
   and has_table_privilege('authenticated', 'public.team_members', 'delete')
   and not has_table_privilege('authenticated', 'public.team_members', 'truncate')
   and not has_table_privilege('authenticated', 'public.team_members', 'references')
-  and not has_table_privilege('authenticated', 'public.team_members', 'trigger'),
+  and not has_table_privilege('authenticated', 'public.team_members', 'trigger')
+  and not has_table_privilege('authenticated', 'public.team_members', 'maintain'),
   'authenticated direct privileges are limited to RLS-governed DML'
 );
 select extensions.ok(
@@ -58,7 +59,8 @@ select extensions.ok(
   and has_table_privilege('service_role', 'public.team_members', 'delete')
   and not has_table_privilege('service_role', 'public.team_members', 'truncate')
   and not has_table_privilege('service_role', 'public.team_members', 'references')
-  and not has_table_privilege('service_role', 'public.team_members', 'trigger'),
+  and not has_table_privilege('service_role', 'public.team_members', 'trigger')
+  and not has_table_privilege('service_role', 'public.team_members', 'maintain'),
   'service-role maintenance privileges are explicit and limited to DML'
 );
 select extensions.ok(
@@ -79,8 +81,12 @@ select extensions.ok(
 select extensions.ok(
   (
     select proc.prosecdef
+      and pg_catalog.pg_get_userbyid(proc.proowner) = 'postgres'
       and proc.proconfig @> array['search_path=pg_catalog']
       and proc.proconfig @> array['row_security=off']
+      and pg_catalog.md5(
+        pg_catalog.replace(proc.prosrc, pg_catalog.chr(13), '')
+      ) = 'c54385c307c2451078471265c63e77bd'
     from pg_catalog.pg_proc proc
     join pg_catalog.pg_namespace namespace
       on namespace.oid = proc.pronamespace
@@ -88,6 +94,67 @@ select extensions.ok(
       and proc.proname = 'current_team_role'
   ),
   'private helper is SECURITY DEFINER with fixed search path and explicit RLS bypass'
+);
+select extensions.ok(
+  (
+    select namespace.nspowner::regrole::text = 'postgres'
+      and namespace.nspacl::text =
+        '{postgres=UC/postgres,authenticated=U/postgres,service_role=U/postgres}'
+    from pg_catalog.pg_namespace namespace
+    where namespace.nspname = 'lh_rls_private'
+  ),
+  'private helper schema has exact owner and minimal ACL'
+);
+select extensions.ok(
+  (
+    select pg_catalog.array_agg(
+      acl.grantee::regrole::text
+        || '|' || acl.grantor::regrole::text
+        || '|' || acl.privilege_type
+        || '|' || acl.is_grantable::text
+      order by acl.grantee::regrole::text, acl.privilege_type
+    )
+    from pg_catalog.pg_proc proc
+    cross join lateral pg_catalog.aclexplode(proc.proacl) acl
+    where proc.oid =
+      'lh_rls_private.current_team_role(text)'::regprocedure
+  ) = array[
+    'authenticated|postgres|EXECUTE|false',
+    'postgres|postgres|EXECUTE|false',
+    'service_role|postgres|EXECUTE|false'
+  ]::text[],
+  'private helper execute ACL is exact'
+);
+select extensions.is(
+  (
+    select count(*)::integer
+    from pg_catalog.pg_proc proc
+    where proc.oid in (
+      'public.laxhornet_can_create_team()'::regprocedure,
+      'public.laxhornet_is_platform_reviewer()'::regprocedure,
+      'public.laxhornet_is_team_member(text)'::regprocedure,
+      'public.laxhornet_team_role(text)'::regprocedure
+    )
+      and pg_catalog.pg_get_userbyid(proc.proowner) = 'postgres'
+      and proc.prosecdef
+      and proc.proconfig @> array['search_path=pg_catalog, public']
+      and (
+        select pg_catalog.array_agg(
+          acl.grantee::regrole::text
+            || '|' || acl.grantor::regrole::text
+            || '|' || acl.privilege_type
+            || '|' || acl.is_grantable::text
+          order by acl.grantee::regrole::text, acl.privilege_type
+        )
+        from pg_catalog.aclexplode(proc.proacl) acl
+      ) = array[
+        'authenticated|postgres|EXECUTE|false',
+        'postgres|postgres|EXECUTE|false',
+        'service_role|postgres|EXECUTE|false'
+      ]::text[]
+  ),
+  4,
+  'all public authorization helpers have exact owner, config, and execute ACL'
 );
 
 insert into auth.users(id, email)

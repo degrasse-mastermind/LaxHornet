@@ -59,9 +59,9 @@
       "productionApplied": false,
       "productionAuthorizationRequired": true,
       "sha256": {
-        "supabase/migrations/20260730004700_team_members_rls_recursion.sql": "87880505e9664cf0fa798a612f04b81f74abdcedfde996f8922cb2ce43734774",
+        "supabase/migrations/20260730004700_team_members_rls_recursion.sql": "9148401e2ff46fddda0b85853706adf32ef6ca70fd207ca082e111294fcc42c7",
         "supabase/rollback/20260730004700_team_members_rls_recursion_rollback.sql": "26b92bf3ba3c74cc405d7333d906133ab926d42362a2c0400b967949bc7f5254",
-        "supabase/tests/team_members_rls_recursion.sql": "38232c6676a2e950829fde65e6e289eae77732ad8fe89362269c9a2ee0345ecc",
+        "supabase/tests/team_members_rls_recursion.sql": "a9ae65e3e5827afaebb670605114bc0a606bf16065246cfd29a6e4fe53223a5b",
         "supabase/tests/team_members_rls_recursion_reproduction.sql": "3f8232e11ed7a1843ea79d22119156b6c742f62032909d86ed505f2824a88ce3"
       }
     }

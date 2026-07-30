@@ -199,7 +199,11 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
   is `20260730004700_team_members_rls_recursion`; it remains pending production
   application and fail-closed drift reconciliation. Local reproduction,
   authorization, rollback/reapply, blank-chain, and production-shaped gates are
-  green. This is not yet a production closeout.
+  green. The preflight is bound to the captured production cluster and exact
+  policy, helper-source/config/ACL, table ACL, owner, FORCE RLS, private-schema,
+  and migration-history metadata; adversarial schema, helper-body, and ACL
+  drift probes fail closed. The final DML-only ACL also removes PostgreSQL 17
+  `MAINTAIN`. This is not yet a production closeout.
 - Coordinated version and service-worker release hygiene.
 - Maintenance of GitHub Action majors and portability of the CI-selected regression checks.
 

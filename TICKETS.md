@@ -445,10 +445,13 @@ evidence are not copied to the public static site.
   production review/application. It accepts only the captured eight-policy
   state or the exact canonical-only state, moves the bounded current-user role
   lookup into `lh_rls_private`, enables FORCE RLS, removes anonymous ACLs, and
-  limits authenticated/service-role table access to required DML.
+  limits authenticated/service-role table access to required DML, including no
+  PostgreSQL 17 `MAINTAIN`.
 - Local evidence currently passes: defect reproduction 4/4, corrected
-  authorization 37/37, isolated rollback exact `42P17`, reapply from both
-  approved policy hashes, blank migration chain, and production-shaped upgrade.
+  authorization 40/40, isolated rollback exact `42P17`, reapply from both
+  approved policy hashes, blank migration chain, production-shaped upgrade,
+  and adversarial preflight rejection of private-schema, helper-body, and table
+  ACL drift.
 - Production state, full synthetic smoke, allowlisted rollback/restore proof,
   and ticket closeout remain pending the focused PR and independent review.
 

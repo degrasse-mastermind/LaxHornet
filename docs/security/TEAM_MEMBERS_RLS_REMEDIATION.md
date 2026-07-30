@@ -60,19 +60,19 @@ The migration hashes normalized `pg_policies` metadata and accepts only:
 - State B, canonical-only drift: 4 policies, MD5
   `c4a69b0c9f9660563eb7aa8ca6e1b3b6`.
 
-Both states require the canonical four policies, `postgres` ownership,
-SECURITY DEFINER authorization helpers, and enabled RLS. Any other policy name,
-definition, command, role, or ownership shape aborts the transaction. The
-separate production preflight must also compare helper definitions, function
-ACLs, table ACLs, FORCE RLS, and migration history with the sanitized snapshot
-under `review-evidence/team-members-rls-remediation/`.
+Both states require an exact match for the four policy definitions, table
+owner, RLS and FORCE RLS settings, table ACL, four authorization-helper source
+hashes, helper owners, `SECURITY DEFINER` flags, configurations, function ACLs,
+absence of the new private schema, and migration history. The production
+cluster is bound by its PostgreSQL system identifier from the sanitized
+snapshot under `review-evidence/team-members-rls-remediation/`; a restored or
+replaced cluster therefore fails closed until it is captured and reviewed.
 
-The migration also recognizes repository-only blank-chain hash
-`1c9c5d532c262c3b9ec850552bdf0512`, but only when anonymous DML/read privileges
-are absent and the two established helpers have not yet received their
-production `row_security=off` setting. This permits a clean local migration
-chain. It is not an approved production starting state and the production
-preflight must reject it.
+The migration also recognizes repository/preview-only blank-chain hash
+`1c9c5d532c262c3b9ec850552bdf0512` with exact known helper and ACL profiles,
+but only when `pg_control_system()` proves that the database is not the
+captured production cluster. On the production cluster, the branch is
+unreachable and any state other than A or B aborts the transaction.
 
 ## Final state
 
@@ -81,7 +81,8 @@ preflight must reject it.
   invoker path.
 - RLS and FORCE RLS enabled.
 - No anonymous table privileges.
-- Authenticated and service roles limited to the required DML verbs.
+- Authenticated and service roles limited to the required DML verbs, including
+  no PostgreSQL 17 `MAINTAIN` privilege.
 - Migration history records `20260730004700` once.
 
 ## Rollback
@@ -95,7 +96,7 @@ safe recovery if the forward migration cannot be retained.
 ## Required verification
 
 1. Reproduction pgTAP: 4/4 expected `42P17` assertions.
-2. Corrected authorization pgTAP: 37/37 assertions.
+2. Corrected authorization pgTAP: 40/40 assertions.
 3. Rollback: eight policies and exact `42P17`.
 4. Reapply: canonical four policies and both pgTAP suites green.
 5. Blank migration chain and production-shaped upgrade.
