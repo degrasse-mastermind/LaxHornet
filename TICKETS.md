@@ -380,14 +380,15 @@ Commit/PR/merge/deployment: PR #30, final head
 Migration: `20260728193942_v284_public_event_semantic_boundary`, applied once.
 Production smoke tooling: independently reviewed exact SHA
 `0ce0f6734318b07bbf7156e91c79d05d40bd7222`; PR #29 remains non-deployable,
-draft, conflicting, open, unmerged, and must not be merged.
+closed, unmerged, and must not be merged.
 Evidence: `review-evidence/v284-tracked-playing-time-production/`.
 `REPO_CURRENT_STATE.md` updated: `YES`
 
 ### LH-DEV-005 — Publish an allowlisted GitHub Pages artifact
 
-Status: `IN PROGRESS`
-Branch: `codex/infra-allowlisted-pages-deployment`
+Status: `COMPLETE`
+Branches: `codex/infra-allowlisted-pages-deployment`,
+`fix/team-members-state-c-preflight`
 
 #### Goal
 
@@ -431,29 +432,48 @@ evidence are not copied to the public static site.
   same-version legacy-v284 worker upgrade, mobile app, Game Review,
   tracked-time runtime, Live Share entry, and offline shell passed locally.
 - Broader regression, rendered artifact QA, independent PR review, production
-  deployment, internal-path exclusion, and closeout remain in progress.
+  deployment, internal-path exclusion, and closeout passed.
+- Production rollback to allowlisted SHA `9fafa7c2ca7dea90d1469cd1de4591323a359adc`
+  passed in Actions run `30514148729`: 47/47 public files matched, 455 tracked
+  internal paths and 10 adversarial probes remained non-public.
+- Restore to approved `main`
+  `3e952ea7226e12b38d65dd656b528a3240ee5d9a` passed in run `30514207462`:
+  47/47 public files matched, 528 tracked internal paths and 10 adversarial
+  probes remained non-public. Pages remained Actions-based with the custom
+  domain, HTTPS enforcement, and approved certificate intact.
 
 #### Production RLS incident remediation
 
 - The first hosted v284 smoke against the allowlisted artifact reproduced
   SQLSTATE `42P17`: four legacy `team_members_*_team` policies queried
   `public.team_members` from policies on that same table.
-- Production later presented the canonical four policies only, but no
-  corrective migration was recorded. This untracked drift is not accepted as
-  completion.
-- Additive migration `20260730004700_team_members_rls_recursion` is pending
-  production review/application. It accepts only the captured eight-policy
-  state or the exact canonical-only state, moves the bounded current-user role
-  lookup into `lh_rls_private`, enables FORCE RLS, removes anonymous ACLs, and
-  limits authenticated/service-role table access to required DML, including no
+- Production State C contained the canonical four scalar-subselect policies
+  without a corrective migration record. Exact capture, local reproduction,
+  and the 18-case matrix classified it `SEMANTICALLY EQUIVALENT TO STATE B`;
+  it produced no `42P17` and did not broaden or narrow authorization.
+- Follow-up PR #35 recognized only the exact State C authorization envelope and
+  passed independent exact-SHA review. It did not change the approved
+  authorization model.
+- Additive migration `20260730004700_team_members_rls_recursion` is present
+  exactly once in production. It moves the bounded current-user role lookup
+  into `lh_rls_private`, enables FORCE RLS, removes anonymous ACLs, and limits
+  authenticated/service-role table access to required DML, including no
   PostgreSQL 17 `MAINTAIN`.
-- Local evidence currently passes: defect reproduction 4/4, corrected
+- Local evidence passes: defect reproduction 4/4, corrected
   authorization/preflight metadata 43/43, isolated rollback exact `42P17`, reapply from both
-  approved policy hashes, blank migration chain, production-shaped upgrade,
+  approved states plus State C, blank migration chain, production-shaped upgrade,
   and adversarial preflight rejection of private-schema, helper-body, table
   ACL, missing migration-history, and injected lower-version history drift.
-- Production state, full synthetic smoke, allowlisted rollback/restore proof,
-  and ticket closeout remain pending the focused PR and independent review.
+- The final production policy MD5 is
+  `2814223218999d3d6364582d5b9e85e1`; RLS/FORCE RLS, DML-only ACLs, helper
+  owner/config/ACLs, and migration count one were verified.
+- The complete synthetic hosted smoke passed with explicit logout/login and
+  clean-session reconstruction, tracked-time synchronization, Live Share
+  private-semantic exclusion, membership/grant revocation, old-token rejection,
+  and exact-zero mutable/Auth residue. Retained append-only history is private,
+  inert, and synthetic.
+- Closeout evidence:
+  `review-evidence/team-members-rls-remediation/PRODUCTION_ROLLOUT_CLOSEOUT.md`.
 
 ## Ticket template
 

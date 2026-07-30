@@ -1,10 +1,10 @@
 # LaxHornet Repository Current State
 
-Last reviewed: 2026-07-29
+Last reviewed: 2026-07-30
 Baseline branch: `main`
-Baseline commit: `effca6952e647b7424f96675f390fc80d5c42368`
+Baseline commit: `3e952ea7226e12b38d65dd656b528a3240ee5d9a`
 Current repository release marker: `v284`
-Current production marker: `v284` with the remediated public Live Share boundary active
+Current production marker: `v284` with remediated public Live Share and `team_members` RLS active
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
 
@@ -39,11 +39,19 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
 - Supabase synchronization is optional and must not block core game-day tracking.
 - Runtime includes local delete markers and event-operation capabilities.
 - `main` contains the reviewed Tracked Playing Time foundation from merged PR #24 and the opt-in Phase 1 UI from merged PR #25.
-- The v284 frontend is deployed at approved remediation merge SHA `effca6952e647b7424f96675f390fc80d5c42368`.
+- The v284 frontend is deployed through the allowlisted Pages workflow. The
+  completed rollback/restore proof restored approved source SHA
+  `3e952ea7226e12b38d65dd656b528a3240ee5d9a`; the 47 runtime files passed exact
+  byte verification and internal repository paths remained non-public.
 - Production migration `20260727000000_tracked_playing_time_operations` is present exactly once and its 88 normalized statements match the reviewed migration. The v284 team authorization gate passed with an active player-scoped parent grant plus its matching claim. Team-admin-only authority remains intentionally read/list-only for tracked time.
 - A synthetic signed-in reproduction found that legacy participation-like aliases could enter the ordinary Event Pipeline and then appear in public Live Share. Aggregate inspection found no active tokens, no non-synthetic affected share, and no confirmed real-data exposure. Public RPC access was reversibly contained until the reviewed correction was installed.
 - Merged PR #30 establishes a closed ordinary-event vocabulary at browser ingress and public database egress. Unknown or poisoned semantics default private; existing contaminated evidence is retained and either omitted or fully canonicalized at egress. Scope authorization is uniform before event lookup/classification, and pre-migration retries use their original immutable request hash.
 - Production migration `20260728193942_v284_public_event_semantic_boundary` is present exactly once. Its safe public RPC is active with least-privilege grants, while anonymous access to private tracked-time tables and RPCs remains denied.
+- Production migration `20260730004700_team_members_rls_recursion` is present
+  exactly once. The final four-policy set has MD5
+  `2814223218999d3d6364582d5b9e85e1`, RLS and FORCE RLS are enabled, anonymous
+  table access is absent, authenticated/service access is DML-only, and the
+  bounded role lookup is in the non-exposed `lh_rls_private` schema.
 - Any synchronization change must preserve offline operation, reconnection behavior, deduplication, authorization boundaries, and existing saved data.
 
 ## Supabase backend
@@ -69,8 +77,12 @@ The release manifest records:
 - Canonical forward migrations for the legacy baseline, Trust Spine Release 1, minimum-necessary disclosure, and disclosure/evidence fixes.
 - An additive event-pipeline capability migration.
 - A separately contained Tracked Playing Time package with one forward migration, one rollback reference, and one pgTAP contract file. Its reviewed Windows/CRLF identities remain recorded in the v284 manifest. Live production history now independently verifies the migration is present exactly once and matches all 88 reviewed statements after line-ending normalization.
-- A production-applied v284 incident-remediation package with additive migration `20260728193942_v284_public_event_semantic_boundary`, fail-closed rollback, pgTAP coverage, and manifest checksums. No production migration remains pending for v284.
-- Required ordering, rollback references, approved file identities, and pending-production expectations.
+- A production-applied v284 incident-remediation package with additive migration `20260728193942_v284_public_event_semantic_boundary`, fail-closed rollback, pgTAP coverage, and manifest checksums.
+- A production-applied `team_members` recursion-remediation package with exact
+  State C evidence, fail-closed production identity binding, rollback/reapply
+  coverage, and final authorization/ACL contracts.
+- Required ordering, rollback references, approved file identities, and
+  production-applied expectations. No v284 migration remains pending.
 
 Do not rewrite, reorder, squash, rename, or silently regenerate these migration files. Any new migration must be additive, timestamped, reviewed, tested locally, and reflected in release-control documentation.
 
@@ -91,7 +103,9 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   not production assets.
 - Custom domain: `laxhornet.mybranford.com`.
 - Release coordination includes `version.json`, service-worker/cache markers, script query versions, and `release/laxhornet-release-manifest.json`.
-- Current repository and production release marker is `v284`. Public Live Share is active through the corrected public-safe RPC at deployed SHA `effca6952e647b7424f96675f390fc80d5c42368`.
+- Current repository and production release marker is `v284`. Public Live Share
+  is active through the corrected public-safe RPC. GitHub Pages deploys only
+  the explicit 47-file allowlisted artifact.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The v284 cache marker remains unchanged. The updated service worker purges
@@ -192,19 +206,16 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
 - The v284 public-disclosure remediation passed its complete 33/33 regression and all 17 local release-verification gates, including 45/45 disclosure pgTAP checks on both database shapes and 73/73 signed-in browser checks. PR #30 was independently reviewed and merged. Production smoke at application SHA `effca6952e647b7424f96675f390fc80d5c42368` returned exactly two approved public events, excluded all private/unknown semantics, passed ordinary and tracked-time journeys, and proved zero active synthetic authority or mutable residue after cleanup.
-- The allowlisted Pages artifact exposed a production `team_members` RLS defect
-  during synthetic smoke: four untracked recursive policies caused SQLSTATE
-  `42P17`. Production subsequently presented only the canonical four policies
-  without a corresponding migration record. The reviewed additive remediation
-  is `20260730004700_team_members_rls_recursion`; it remains pending production
-  application and fail-closed drift reconciliation. Local reproduction,
-  authorization, rollback/reapply, blank-chain, and production-shaped gates are
-  green. The preflight is bound to the captured production cluster and exact
-  policy, helper-source/config/ACL, table ACL, owner, FORCE RLS, private-schema,
-  and complete ordered migration-history metadata; adversarial schema,
-  helper-body, ACL, missing-history, and injected-history drift probes fail
-  closed. The final DML-only ACL also removes PostgreSQL 17 `MAINTAIN`. This is
-  not yet a production closeout.
+- The allowlisted Pages smoke exposed a production `team_members` recursion
+  defect. Exact production State C was later captured, reproduced, and
+  classified `SEMANTICALLY EQUIVALENT TO STATE B`; it produced no `42P17` and
+  did not broaden or narrow authorization. PR #35 added fail-closed State C
+  recognition without changing the authorization model. Migration
+  `20260730004700_team_members_rls_recursion` is now recorded exactly once in
+  production and the final catalog contract passes. The post-remediation
+  synthetic hosted smoke, explicit logout/login reconstruction, authority
+  revocation, zero-residue cleanup, and allowlisted Pages rollback/restore
+  proof all passed. `LH-DEV-005` is complete.
 - Coordinated version and service-worker release hygiene.
 - Maintenance of GitHub Action majors and portability of the CI-selected regression checks.
 

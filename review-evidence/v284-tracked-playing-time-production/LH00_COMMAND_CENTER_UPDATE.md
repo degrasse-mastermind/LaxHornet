@@ -1,40 +1,69 @@
 # LH-00 Command Center — v284 production completion
 
-Date: 2026-07-29
+Date: 2026-07-30
 Status: complete
 
-- Incident: signed-in synchronization could promote private legacy
-  participation aliases into the ordinary Event Pipeline, and public Live Share
-  returned every active effective event.
-- Containment: public Live Share RPC execution was reversibly revoked while the
-  unsafe definition was active. Aggregate inspection found zero active tokens,
-  no non-synthetic affected share, and no confirmed real/youth-data exposure.
-- Root cause: both ingress and egress lacked a closed semantic publication
-  boundary; active lifecycle state was incorrectly sufficient for disclosure.
-- Correction: PR #30, final head
-  `19f3f89d1120fce167f59237e355bb7cc04394c0`, merged and deployed as
-  `effca6952e647b7424f96675f390fc80d5c42368`.
-- Migration: `20260728193942_v284_public_event_semantic_boundary`, applied once;
-  rollback remains fail-closed and never restores the vulnerable public RPC.
-- Disclosure verification: exactly two approved ordinary events remained
-  public after signed-in synchronization; private aliases, unknown semantics,
-  poisoned evidence, tracked time, notes/tags, and internal metadata were
-  excluded from payload and DOM.
-- Production: `https://laxhornet.mybranford.com`, marker/cache `v284`, exact
-  hosted assets matched the approved merge SHA.
-- Smoke: ordinary game entry, score, Undo, Save, End Game, Game Review,
-  correction, tombstone, offline recovery, quarters/halves clocks,
-  participation, recovery states, CSV, recap, neutral tokens, and anonymous
-  denial gates passed.
-- Cleanup: zero synthetic users, sessions, refresh tokens, active tokens,
-  active grants, mutable legacy rows, active event versions, running clocks,
-  active participation, pending operations, and conflicts. No real data was
-  touched.
-- Retained history: 24 synthetic game scopes, 88 Event Pipeline operations, 107
-  participation operations, 72 grant lifecycle events, and 12 paused
-  clock-state dependencies remain private, inert, revoked, and append-only.
-- Known limitations: non-deployable draft PR #29 must never merge; repository
-  root remains the GitHub Pages publication source; the named read-only
-  production connector required OAuth renewal during closeout.
-- Next product priority: implement `LH-DEV-005`, replacing repository-root
-  GitHub Pages publishing with an explicitly allowlisted deployment artifact.
+- Public-disclosure incident: PR #30 and migration
+  `20260728193942_v284_public_event_semantic_boundary` remain production-active.
+  Public Live Share returns only canonical ordinary event evidence; private
+  aliases, tracked time, notes/tags, and internal metadata remain excluded.
+- Pages boundary: repository-root publishing was replaced by the explicit
+  47-file `Allowlisted GitHub Pages` artifact. Tools, SQL, tests, documentation,
+  release controls, local configuration, and review evidence are not deployed.
+- RLS incident: the first allowlisted-artifact smoke exposed SQLSTATE `42P17`
+  from recursive `team_members` policies. Production later presented exact
+  State C, policy MD5 `1c9c5d532c262c3b9ec850552bdf0512`.
+- State C adjudication: exact capture and local reproduction found no `42P17`.
+  The 18-case matrix classified State C
+  `SEMANTICALLY EQUIVALENT TO STATE B`; it neither broadened nor narrowed the
+  approved model. Its origin is the canonical legacy-baseline policy set with
+  helper hardening not represented in migration history.
+- Repository correction: PR #35, reviewed head
+  `bdcb520085f03e97fe14a97394543ba9df3ecd6d`, passed independent exact-SHA
+  review and merged as
+  `3e952ea7226e12b38d65dd656b528a3240ee5d9a`. It added fail-closed State C
+  recognition and fixtures without changing authorization.
+- RLS migration: `20260730004700_team_members_rls_recursion` is recorded exactly
+  once in production. At the immediate pre-apply re-read, production had
+  already reached the exact approved final state, so no duplicate application
+  was attempted.
+- Final catalog: four policies, MD5
+  `2814223218999d3d6364582d5b9e85e1`; zero recursive legacy policies; RLS and
+  FORCE RLS enabled; no anonymous table privilege; authenticated/service access
+  limited to SELECT/INSERT/UPDATE/DELETE; bounded private helper owned by
+  `postgres` with fixed search path, `row_security=off`, SECURITY DEFINER, and
+  exact EXECUTE ACL.
+- Hosted smoke: a synthetic adult fixture passed clean browser reconstruction,
+  explicit logout/login, ordinary game entry, correction, offline retry,
+  tombstone, quarters/halves clocks, participation closure, Game Review, CSV,
+  recap, neutral-token handling, and anonymous private-access denial.
+- Disclosure: exactly two canonical public events appeared in API and DOM.
+  Four private/invalid semantics remained local and selected-export eligible
+  while staying out of Live Share and recap.
+- Revocation and cleanup: old access/refresh tokens and old private RPC
+  authority were rejected. Synthetic users, sessions, tokens, teams,
+  memberships, claims, roster rows, games, legacy events, active grants,
+  running clocks, active versions/participation, pending operations, and
+  conflicts all returned zero.
+- Retained history: seven Event Pipeline operations, nine participation
+  operations, six grant lifecycle events, two game scopes, and one paused clock
+  dependency remain private, inert, revoked/tombstoned as applicable, and
+  synthetic.
+- Pages rollback: run
+  [30514148729](https://github.com/degrasse-mastermind/LaxHornet/actions/runs/30514148729)
+  deployed known-good allowlisted SHA
+  `9fafa7c2ca7dea90d1469cd1de4591323a359adc`; all 47 public files matched and
+  internal probes remained unavailable.
+- Pages restore: run
+  [30514207462](https://github.com/degrasse-mastermind/LaxHornet/actions/runs/30514207462)
+  restored approved `main`
+  `3e952ea7226e12b38d65dd656b528a3240ee5d9a`; all 47 files matched. Pages
+  remained Actions-based at `laxhornet.mybranford.com` with HTTPS enforced and
+  an approved certificate.
+- Release state: marker/cache remains `v284`; no v284 migration is pending;
+  `LH-DEV-005` is complete.
+- Data boundary: no real user, player, family, or youth data was read or
+  mutated.
+- Durable evidence:
+  `review-evidence/team-members-rls-remediation/PRODUCTION_ROLLOUT_CLOSEOUT.md`
+  and `PRODUCTION_ROLLOUT_RESULTS.json`.
