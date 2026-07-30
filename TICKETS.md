@@ -816,7 +816,9 @@ changing server contracts, authorization, tombstones, or release state.
   Product Alignment browser `64/64`, Trust Spine SQL acceptance/rollback,
   cancel-game `33/33`, delete-permission, player-removal, disclosure, and
   release-containment gates.
-- CI: `PENDING` on the final documentation-closeout head.
+- CI: portable regression, Docker test suite, and Vercel preview passed on the
+  pushed branch before independent-review handoff. Supabase Preview skipped
+  because R2-04 contains no database change.
 - Implementation commit:
   `b0ebbbfb628377dff530805e4db9ea0daccadbeb`; draft PR #45.
 - Production or external state changed: `NO`.
