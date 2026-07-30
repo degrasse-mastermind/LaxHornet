@@ -2,7 +2,7 @@
 
 Date: 2026-07-30
 
-Status: `BLOCKED — APPLICATION ROLLBACK COMPLETE; DO NOT APPLY THE CURRENT MIGRATION`
+Status: `BLOCKED — PRODUCTION STATE CHANGED OUTSIDE THIS TASK; NO FURTHER MUTATION`
 
 Risk: Level 3 — production migration, authorization, synchronization,
 deletion, release, and rollback behavior
@@ -378,3 +378,94 @@ recovery readiness, and separate explicit migration-first authorization.
 No Supabase connection, migration application, deployment, release activation,
 production-data change, or other production mutation was used for this
 repository remediation.
+
+## Resumed preflight after R2-06A merge
+
+The release preflight resumed read-only on 2026-07-30 from clean `main` at:
+
+- R2-06A reviewed PR head:
+  `631f48ed73b326b2b4eed8ac29623d79136fce8f`
+- R2-06A squash merge:
+  `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3`
+- Shared reviewed/merged tree:
+  `a5374b7e4c00fe91cae8de34fbcf417943305df3`
+
+PR #48 has a fresh independent Level 3 PASS bound to the exact reviewed head.
+Portable regression, Docker, Supabase Preview, and Vercel checks passed on that
+head. The reviewed head and squash merge have identical Git trees.
+
+### Observed runtime state
+
+The `main` merge auto-triggered allowlisted Pages run `30559099199`, which
+completed successfully at `2026-07-30T15:56:52Z` and deployed exact source
+`2fcc446d5f3d06ca6d24c69bc4466a13794e02b3`.
+
+The workflow artifact manifest records 47 allowlisted files and 6,255,246
+bytes. Independent public verification matched all 46 served files to that
+manifest byte-for-byte; `CNAME` is the non-served domain configuration entry.
+
+This superseded the authorized application rollback source
+`44f0510d3bde18f459e78f570efd27b72dc2a989`. The resumed preflight did not
+dispatch, approve, or modify that Pages deployment.
+
+### Observed database state
+
+The exact named `supabase_production_readonly-2` connection became available.
+Read-only inspection found both migrations already recorded in production:
+
+| Version | Name | Ledger statements | Ordered statements MD5 |
+| --- | --- | ---: | --- |
+| `20260730134439` | `durable_game_tombstones` | 31 | `573717303b4e63adb3b2f17fc1c3e5ba` |
+| `20260730151714` | `durable_game_tombstone_concurrency` | 13 | `2ce82de5ada5ea526bfc8ab488ac9aec` |
+
+Catalog inspection found:
+
+- `public.legacy_game_tombstones` present with RLS enabled and forced;
+- zero retained tombstone rows;
+- authenticated `SELECT` only on the tombstone table, with no anonymous table
+  access and no authenticated insert/update/delete grant;
+- authenticated-only execution for
+  `public.laxhornet_sync_game(jsonb)` and
+  `public.laxhornet_delete_game_durable(jsonb)`;
+- no anonymous or authenticated execution of the private trigger function;
+- the write RPC, durable-delete RPC, and trigger each acquire the canonical
+  per-game advisory lock before their tombstone read; and
+- the game-write rejection trigger present and enabled.
+
+The resumed preflight used only migration listing and read-only catalog/count
+queries. It did not apply or roll back a migration, change Supabase, or create,
+modify, inspect, or delete a production game or event.
+
+### Fail-closed result
+
+`node tools/run_release_preflight.mjs --release v284 --phase production
+--approved-rollout-sha 2fcc446d5f3d06ca6d24c69bc4466a13794e02b3`
+failed closed at the runtime-migration dependency gate because the committed
+release manifest still declares both migrations pending and records production
+application source
+`44f0510d3bde18f459e78f570efd27b72dc2a989`.
+
+The environment checks that did run passed for clean `main`, approved HEAD,
+release ancestry, reviewed package checksums, manifest structure, release
+markers, protected SQL identity, Node, Python, Docker, Linux engine, Compose,
+Supabase CLI, and Chrome. PGlite and Playwright preparation was not run after
+the authoritative manifest/state contradiction had already failed the
+production gate.
+
+Production activation is not closed out. No synthetic smoke, stale-device
+journey, mixed-client journey, cleanup, or release-manifest state transition
+was authorized or performed.
+
+### Required reconciliation
+
+1. Establish and record the external authority and durable execution evidence
+   for both production migration ledger entries and Pages run `30559099199`.
+2. Decide whether the observed state is an authorized activation to reconcile
+   or an incident requiring separately authorized recovery. Do not infer
+   authorization from successful workflow or migration records.
+3. If reconciliation is authorized, update manifest production state and
+   evidence in a reviewed commit, rerun the complete fail-closed production
+   preflight, and obtain explicit authority for synthetic smoke and cleanup.
+4. If recovery is selected, review the zero-tombstone rollback eligibility and
+   reverse-order database/application procedure under separate explicit
+   authorization. Do not run either rollback from this preflight task.

@@ -90,13 +90,12 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
   automatic retry. Accepted deletion compacts recovery evidence only after its
   durable tombstone receipt is persisted. Existing individual event deletion
   markers and Trust Spine tombstones remain separate and unchanged.
-- The repository-only R2-06 migration adds private durable legacy-game tombstones,
+- The R2-06 migration adds private durable legacy-game tombstones,
   guarded game writes, and one transactional deletion RPC. A tombstone survives
   physical game-row removal and permanently reserves the game ID. Same-ID
   deletion replay is deterministic; a different deletion identity conflicts;
   an older delete conflicts with a server game whose `saved_at` is newer than
-  the client's known value. The migration is repository-only and is not active
-  in any Supabase environment.
+  the client's known value.
 - The additive R2-06A remediation migration gives the guarded game-write RPC,
   durable-delete RPC, and defense-in-depth trigger the same deterministic,
   transaction-scoped advisory lock derived from the canonical game ID. The
@@ -104,6 +103,17 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
   same-game writes/deletes serialize while unrelated game IDs remain
   independent. The trigger is still the final guard against direct or legacy
   writes after a tombstone exists.
+- Read-only resumed release inspection on 2026-07-30 found both R2-06 and
+  R2-06A migrations recorded in production, the tombstone table present with
+  RLS enabled and forced, the guarded RPCs and trigger present with expected
+  least-privilege access and lock-before-read ordering, and zero tombstone
+  rows. Pages run `30559099199` also auto-deployed exact merge
+  `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3`; all 46 served files matched its
+  allowlisted artifact manifest. These external changes were not performed by
+  the resumed preflight task and are not release closeout: the committed
+  manifest still records rollback source `44f0510d3bde18f459e78f570efd27b72dc2a989`
+  and both migrations as pending, so production state requires
+  authority/provenance reconciliation and a fresh fail-closed preflight.
 - Cloud loading fetches authorized tombstones before queued upload, uses the
   current account/request-generation guard for each response, then rechecks
   tombstones before final game merge. Explicit tombstones suppress games in

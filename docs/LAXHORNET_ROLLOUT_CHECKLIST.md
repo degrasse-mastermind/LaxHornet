@@ -230,7 +230,7 @@ the overall R2 gate remain incomplete.
 
 ## R2-06 — Durable Legacy-Game Tombstones
 
-**Status:** [~] Ready for independent review
+**Status:** [!] Merged; superseded by R2-06A; production reconciliation required
 **Risk level:** Level 3 — Critical deletion, synchronization, persistence, database, and authorization behavior
 **Codex task:** `Implement R2-06 — Add Durable Tombstones and Prevent Stale-Device Resurrection`
 **Task ID:** `019fb341-0d54-7b82-8a14-e5bb6f8d811e`
@@ -263,19 +263,21 @@ the overall R2 gate remain incomplete.
 - [x] Event Pipeline and Trust Spine focused contracts passed.
 - [x] Final canonical-plus-additive regression passed `41/41` on the stabilized runtime and migration diff.
 - [x] Final draft-PR Docker, portable regression, Supabase Preview, and Vercel checks passed.
-- [ ] Exact final PR head requires independent Level 3 review before merge.
-- [ ] Apply the migration only in a separately authorized release/production task.
+- [x] Exact final PR head received independent Level 3 review before the
+  repository moved to R2-06A remediation.
+- [!] Production now records this migration applied, but authority/provenance
+  and release evidence are not reconciled. Do not treat the observed ledger as
+  release approval.
 
-The tombstone implementation item below remains open until exact-SHA
-independent review is recorded. Field-level game conflicts, server-side
-deduplication of non-delete writes, signed-out namespace migration, cross-key
-transactionality, visible sync states, a sanitized journal, production
-migration drift, production RLS verification, and the overall R2 gate remain
-incomplete.
+R2-06A supersedes the two P1 implementation defects. Field-level game
+conflicts, server-side deduplication of non-delete writes, signed-out namespace
+migration, cross-key transactionality, visible sync states, a sanitized
+journal, production authority/provenance reconciliation, and the overall R2
+gate remain incomplete.
 
 ## R2-06A — Tombstone Concurrency and Delete-Conflict Recovery
 
-**Status:** [~] Repository remediation implemented; CI and exact-SHA review pending
+**Status:** [!] Merged; production state reconciliation required
 **Risk level:** Level 3 — Critical deletion, synchronization, concurrency, persistence, database, and recovery behavior
 **Codex task:** `Implement R2-06A — Remediate Tombstone Concurrency and Delete-Conflict Recovery`
 **Branch:** `feature/r2-06a-tombstone-concurrency-recovery`
@@ -285,9 +287,10 @@ incomplete.
 
 ### Remediation record
 
-- [x] Preserve the production application-only rollback at
-  `44f0510d3bde18f459e78f570efd27b72dc2a989`; do not treat this repository
-  remediation as production activation.
+- [x] At implementation time, preserve the production application-only rollback
+  at `44f0510d3bde18f459e78f570efd27b72dc2a989`; do not treat repository
+  remediation as production activation. The resumed preflight later observed
+  that automatic Pages deployment had superseded this runtime.
 - [x] Give guarded legacy-game writes and durable deletes one deterministic,
   transaction-scoped per-game advisory lock before tombstone/game reads or
   mutation.
@@ -318,15 +321,22 @@ incomplete.
 - [x] Confirm portable regression (`30558552058`), Docker
   (`30558553453`), Supabase Preview, Vercel Preview, and embedded
   release-containment checks pass on PR #48.
-- [ ] Obtain a fresh independent Level 3 review bound to the exact final PR
-  head SHA.
-- [ ] Mark R2-06A complete only after both CI and that exact-SHA review pass.
+- [x] Obtain a fresh independent Level 3 review bound to exact final PR head
+  `631f48ed73b326b2b4eed8ac29623d79136fce8f`.
+- [x] Confirm squash merge `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3`
+  has the identical reviewed tree.
 - [ ] Keep R2-06 production activation incomplete until named read-only
-  production verification, recovery readiness, and a separately authorized
-  migration-first release task.
+  production verification, recovery readiness, authority/provenance
+  reconciliation, and separately authorized smoke/cleanup.
 
-The overall R2 gate remains open. No migration, Supabase mutation, deployment,
-release activation, or production-data change is authorized by this item.
+Read-only resumed preflight found both R2-06 migrations recorded in production,
+zero tombstone rows, and the expected guarded catalog/security boundary.
+Pages run `30559099199` auto-deployed exact merge `2fcc446d...`, superseding the
+documented rollback runtime. The committed manifest still declares both
+migrations pending and records rollback source `44f0510d...`, so the canonical
+production preflight fails closed. These external changes were not performed
+or authorized by the resumed preflight task. The overall R2 gate remains open;
+do not infer activation approval from the observed state.
 
 # 4. Planned Engineering Sequence
 
@@ -351,9 +361,9 @@ Do not combine these into one large Codex task. Each item requires one approved 
   cloud-omitted local evidence and rejects superseded or prior-account
   responses; durable field versions and explicit conflicts remain later R2
   work.
-- [ ] Define tombstone-versus-stale-update behavior (`R2-06A` repository
-  remediation and local validation complete; final CI and exact-SHA independent
-  Level 3 review remain).
+- [x] Define tombstone-versus-stale-update behavior (`R2-06A`; exact-SHA
+  independent Level 3 review and merge complete). Production closeout remains
+  blocked on state/authority reconciliation and separately authorized smoke.
 - [x] Separate authorization failures from retryable network failures for the
   R2-05 durable legacy-game/tracked-clock boundary. Trust Spine and
   participation behavior remain under their existing contracts.

@@ -514,7 +514,7 @@ until separately authorized.
 
 ### R2-01 — Inventory current local/cloud sync and conflict behavior
 
-Status: `REVIEW`
+Status: `MERGED — SUPERSEDED BY R2-06A; PRODUCTION RECONCILIATION REQUIRED`
 
 Risk level: `LEVEL 3`
 
@@ -1231,27 +1231,25 @@ mutation.
 
 #### Required remediation and approval gates
 
-1. Keep R2-06 activation stopped. Do not apply the current migration.
-2. Preserve the completed application-only rollback at
-   `44f0510d3bde18f459e78f570efd27b72dc2a989`. Do not remove or roll back
-   database tombstones if production inspection later proves any exist.
-3. Serialize guarded game writes with durable deletes and add a real concurrent
-   write/delete regression.
-4. Prevent event-delete markers from deleting events after a durable
-   game-delete conflict and add an end-to-end conflict regression.
-5. Update the release manifest/tooling for the reviewed R2-06 package and
-   exact migration sequence.
-6. Obtain a new exact-SHA independent Level 3 review and green CI.
-7. Restore the named production read-only connection, verify migration/catalog
-   state and recovery readiness, and obtain David's explicit production
-   authorization before resuming the migration-first release sequence.
+1. Make no further production mutation while authority and provenance remain
+   unreconciled.
+2. Record the external authority and execution evidence for both production
+   migration ledger entries and Pages run `30559099199`.
+3. Reconcile the release manifest with observed production state only in a
+   reviewed commit after that authority is established.
+4. Rerun the complete fail-closed production preflight and recovery-readiness
+   checks against the reconciled exact source.
+5. Obtain separate explicit authorization before synthetic production smoke,
+   cleanup, release closeout, or any additional deployment.
+6. If recovery is selected instead, require explicit authorization for the
+   reverse-order zero-tombstone database/application procedure.
 
 Evidence:
 `review-evidence/r2-06-durable-game-tombstones-release/PREFLIGHT_BLOCKED.md`.
 
 ### R2-06A — Remediate tombstone concurrency and delete-conflict recovery
 
-Status: `IMPLEMENTED — CI AND INDEPENDENT REVIEW PENDING`
+Status: `MERGED — PRODUCTION STATE RECONCILIATION REQUIRED`
 
 Risk level: `LEVEL 3`
 
@@ -1315,9 +1313,11 @@ Draft PR: [#48](https://github.com/degrasse-mastermind/LaxHornet/pull/48)
   rollback, and pgTAP identities in required order. Containment and preflight
   recognize both packages and fail production runtime release while either
   migration dependency remains pending.
-- Production application runtime remains on rollback source
-  `44f0510d3bde18f459e78f570efd27b72dc2a989`. Neither migration is recorded
-  applied by this ticket.
+- At implementation closeout, production application runtime was recorded on
+  rollback source `44f0510d3bde18f459e78f570efd27b72dc2a989`, and neither migration was
+  applied by the implementation ticket. The later resumed preflight observation
+  below supersedes that runtime/database snapshot without attributing authority
+  to the implementation task.
 
 #### Verification and remaining gates
 
@@ -1338,14 +1338,44 @@ Draft PR: [#48](https://github.com/degrasse-mastermind/LaxHornet/pull/48)
   field-level conflicts, signed-out namespace migration, cross-key
   transactionality, visible sync/conflict UI, sanitized journal, production
   migration/RLS verification, and production drift.
-- R2-06A is not complete until final CI and a fresh independent Level 3 review
-  are bound to the exact PR head SHA.
+- Final PR head `631f48ed73b326b2b4eed8ac29623d79136fce8f`
+  passed CI and received an independent Level 3 exact-SHA PASS. Squash merge
+  `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3` has the identical tree
+  `a5374b7e4c00fe91cae8de34fbcf417943305df3`.
 - R2-06 production activation remains blocked until the named
   `supabase_production_readonly-2` path is available, production
   migration/catalog state and recovery readiness are verified, and David
   separately authorizes the migration-first release sequence.
 - No migration, Supabase change, deployment, release activation, or
   production-data change occurred.
+
+#### Resumed production preflight
+
+- The exact named read-only path is now available.
+- Pages run `30559099199` auto-deployed merge
+  `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3`. Its 47-file artifact manifest
+  identifies that exact source, and all 46 served files matched it.
+- Production migration history now records both
+  `20260730134439_durable_game_tombstones` and
+  `20260730151714_durable_game_tombstone_concurrency`.
+- Read-only catalog inspection found the tombstone table and guarded RPCs
+  present, RLS enabled and forced, expected least-privilege table/RPC access,
+  all three shared-lock acquisitions before tombstone reads, the trigger
+  enabled, and zero retained tombstone rows.
+- These production changes were not performed or authorized by this resumed
+  preflight task. Their external authority and execution evidence are not
+  recorded in this ticket.
+- The committed release manifest still records production application source
+  `44f0510d3bde18f459e78f570efd27b72dc2a989`, marks both packages not applied,
+  and expects both migrations to remain pending.
+- The canonical production preflight therefore fails closed at the
+  runtime-migration dependency gate despite the observed production ledger.
+- No synthetic smoke, cleanup, manifest state transition, migration,
+  database rollback, Pages rollback, deployment, or production-data mutation
+  was performed.
+- R2-06 production activation remains `BLOCKED` pending provenance/authority
+  reconciliation, a reviewed manifest/evidence update, a green rerun of the
+  complete production preflight, and separately authorized smoke/cleanup.
 
 ## Ticket template
 
