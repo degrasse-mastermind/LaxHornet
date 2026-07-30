@@ -4,10 +4,35 @@ services:
   laxhornet-server:
     build:
       context: .
-      target: server
+      target: runtime
+    container_name: laxhornet-app
     ports:
       - "5173:5173"
     environment:
-      - NODE_ENV=development
-    volumes:
-      - ./:/app
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=5173
+    # Production: remove volumes for immutable container
+    # Development: uncomment volumes below and use docker-compose -f docker-compose.yml -f docker-compose.dev.yml
+    volumes: []
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5173/index.html', (res) => { if (res.statusCode !== 200) throw new Error(res.statusCode); })"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+    networks:
+      - laxhornet-net
+    labels:
+      - "com.laxhornet.service=app"
+      - "com.laxhornet.version=${APP_VERSION:-latest}"
+
+networks:
+  laxhornet-net:
+    driver: bridge

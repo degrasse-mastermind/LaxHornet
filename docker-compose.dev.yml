@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  laxhornet-server:
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./index.html:/app/index.html
+      - ./app.html:/app/app.html
+      - ./app.js:/app/app.js
+      - ./styles.css:/app/styles.css
+      - ./manifest.json:/app/manifest.json
+      - ./service-worker.js:/app/service-worker.js
+      - ./version.json:/app/version.json
+      - ./landing.css:/app/landing.css
+      - ./runtime-config.js:/app/runtime-config.js
+      - ./event-operation-service.js:/app/event-operation-service.js
+      - ./next-focus-recommendation.js:/app/next-focus-recommendation.js
+      - ./public-event-semantics.js:/app/public-event-semantics.js
+      - ./tracked-playing-time-service.js:/app/tracked-playing-time-service.js
+      - ./assets:/app/assets:ro
+    read_only: false

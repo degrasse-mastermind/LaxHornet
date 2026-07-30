@@ -1,3 +1,70 @@
-# Docker-specific patterns
-.docker/
+# Version control
+.git
+.gitignore
+.gitattributes
+.github
+
+# CI/CD
+.gitlab-ci.yml
+.circleci
+Jenkinsfile
+
+# Docker
+.docker
 docker-compose.override.yml
+Dockerfile
+
+# Node/npm
+node_modules
+npm-debug.log
+npm-error.log
+package-lock.json
+yarn.lock
+.npm
+
+# Development
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Documentation
+docs
+*.md
+README.md
+LICENSE
+
+# Testing & Coverage
+coverage
+.nyc_output
+.mocha
+test
+__tests__
+spec
+
+# Artifacts
+dist
+build
+.cache
+.next
+out
+
+# Project-specific
+.agents
+.codex
+research
+launch-kit
+laxhornet-review-audit-jimi-win-low-impact
+release
+review-evidence
+tools
+LaxHornet-launch-kit.zip
+AGENTS.md
+TICKETS.md
+REPO_CURRENT_STATE.md
+*.sql
+*.html.bak
+skills-lock.json

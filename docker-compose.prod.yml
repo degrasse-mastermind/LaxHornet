@@ -1,0 +1,60 @@
+version: '3.8'
+
+# Production-ready configuration for LaxHornet
+# Usage: docker compose -f docker-compose.prod.yml up
+
+services:
+  laxhornet-server:
+    image: laxhornet:latest  # Use pre-built image from registry
+    container_name: laxhornet-app
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=production
+      - PORT=5173
+    restart: unless-stopped
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.25'
+          memory: 64M
+    
+    # Health checks
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5173/index.html', (res) => { if (res.statusCode !== 200) throw new Error(res.statusCode); })"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
+      - /run:size=64M
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=laxhornet"
+    
+    networks:
+      - laxhornet-net
+    
+    labels:
+      - "com.laxhornet.service=app"
+      - "com.laxhornet.environment=production"
+
+networks:
+  laxhornet-net:
+    driver: bridge
