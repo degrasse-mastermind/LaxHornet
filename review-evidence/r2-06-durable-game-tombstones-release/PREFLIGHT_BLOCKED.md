@@ -2,7 +2,7 @@
 
 Date: 2026-07-30
 
-Status: `BLOCKED — DO NOT APPLY THE CURRENT MIGRATION`
+Status: `BLOCKED — APPLICATION ROLLBACK COMPLETE; DO NOT APPLY THE CURRENT MIGRATION`
 
 Risk: Level 3 — production migration, authorization, synchronization,
 deletion, release, and rollback behavior
@@ -123,8 +123,145 @@ The previous successful pre-R2-06 allowlisted deployment is:
 - Run:
   `30547712272`
 
-No rollback was dispatched because production deployment authorization was not
-present.
+An application-only rollback was later explicitly authorized and completed as
+recorded below.
+
+## Authorized application-only rollback
+
+Authorization was explicit and limited to rolling back the production
+application runtime at `laxhornet.mybranford.com` to exact source
+`44f0510d3bde18f459e78f570efd27b72dc2a989`. It did not authorize the R2-06
+migration, database rollback, Supabase changes, production-data changes,
+synthetic records, unrelated release settings, or remediation of either P1.
+
+### Pre-rollback verification
+
+- `44f0510d3bde18f459e78f570efd27b72dc2a989` is the merged
+  `R2-05: Separate authorization from retryable sync failures (#46)` commit.
+- R2-06 source `18f5157de159fa7a27b3cefb4c90f5148c3b230d`
+  has `44f0510d3bde18f459e78f570efd27b72dc2a989` as its sole parent.
+- Runtime/source at the rollback SHA contains no reference to
+  `public.legacy_game_tombstones`, `public.laxhornet_sync_game(jsonb)`, or
+  `public.laxhornet_delete_game_durable(jsonb)`, and the R2-06 migration is
+  absent from that source tree.
+- A clean detached worktree at the exact SHA passed
+  `tools/validate_release_manifest.mjs`,
+  `tools/test_pages_deployment.mjs` (`21/21`),
+  `tools/build_pages_artifact.mjs`, and
+  `tools/validate_pages_artifact.mjs`.
+- Pre-rollback production was source
+  `18f5157de159fa7a27b3cefb4c90f5148c3b230d`, Pages run
+  `30552229360`, result `success`.
+
+### Deployment record
+
+- Exact rollback source:
+  `44f0510d3bde18f459e78f570efd27b72dc2a989`
+- Workflow/deployment ID:
+  `30554377617`
+- Workflow URL:
+  `https://github.com/degrasse-mastermind/LaxHornet/actions/runs/30554377617`
+- Result:
+  `success`
+- Created:
+  `2026-07-30T14:58:35Z`
+- Completed:
+  `2026-07-30T14:59:18Z`
+- Deploy job completed:
+  `2026-07-30T14:59:06Z`
+- Workflow manifest:
+  47 files, 6,221,926 bytes, allowlist version `2026-07-29`, release `v284`,
+  custom domain `laxhornet.mybranford.com`
+
+The public artifact contained:
+
+- `CNAME`
+- `LaxHornet-launch-kit.zip`
+- `access-and-trust.html`
+- `app.html`
+- `app.js`
+- `assets/LHbanner.png`
+- `assets/LHicon.png`
+- `assets/club-family-recap.png`
+- `assets/club-review-insight.png`
+- `assets/club-review-start.png`
+- `assets/honeycombblack.png`
+- `assets/supabase.min.js`
+- `coach-alignment.html`
+- `event-operation-service.js`
+- `index.html`
+- `landing.css`
+- `launch-kit/LaxHornet-admin-launch-checklist.pdf`
+- `launch-kit/LaxHornet-overview.pdf`
+- `launch-kit/LaxHornet-parent-handout.pdf`
+- `launch-kit/LaxHornet-promo-demo-thumbnail.png`
+- `launch-kit/LaxHornet-promo-demo.mp4`
+- `launch-kit/admin-launch-checklist.html`
+- `launch-kit/invite-message.txt`
+- `launch-kit/launch-kit-readme.md`
+- `launch-kit/laxhornet-overview.html`
+- `launch-kit/laxhornet-qr.png`
+- `launch-kit/parent-email.eml`
+- `launch-kit/parent-email.html`
+- `launch-kit/parent-handout.html`
+- `launch-kit/short-text-message.txt`
+- `launch-kit/social-captions.txt`
+- `launch-kit/team-chat-posts.txt`
+- `manifest.json`
+- `next-focus-recommendation.js`
+- `parent-experience.html`
+- `player-development.html`
+- `privacy.html`
+- `program-value.html`
+- `public-event-semantics.js`
+- `rollout-guide.html`
+- `runtime-config.js`
+- `service-worker.js`
+- `styles.css`
+- `terms.html`
+- `tracked-playing-time-service.js`
+- `tracking-framework.html`
+- `version.json`
+
+### Post-rollback verification
+
+- All 46 publicly served artifact files returned HTTP 200 and matched the
+  authoritative workflow-manifest SHA-256 values exactly. `CNAME` is the
+  non-served custom-domain configuration entry.
+- `TICKETS.md`, the R2-06 migration path, this evidence path, and
+  `.git/config` each returned HTTP 404.
+- The landing page loaded with the expected title and navigation and no
+  console warnings or errors.
+- The app loaded with the expected title and no console warnings or errors.
+- The existing authenticated session restored. Past Games opened through
+  normal app navigation and exposed 45 saved-game rows. Only row count was
+  observed; no game, player, event, family, or team contents were read.
+- No form was submitted and no start, edit, sync, share, export, reset,
+  deletion, or other mutation action was used.
+- Exact-source inspection plus complete live artifact byte identity confirms
+  the deployed runtime contains no calls to the R2-06 tombstone table or RPCs.
+- `tools/test_public_event_semantic_boundary.mjs` passed.
+- `tools/test_v284_team_authorization_policy.mjs` passed.
+- `tools/test_minimum_disclosure.mjs` was not recorded as a full pass:
+  39/40 checks passed; its only failure was the release-hygiene assertion that
+  expects a service-worker/version release delta not present in R2-05.
+
+The authentication form was not submitted or forced by signing out because
+that would alter the existing session. Its rollback-source markup remains
+present, and the live runtime is byte-identical to that exact source.
+
+### Production and database non-mutation confirmation
+
+- No Supabase MCP, SQL, CLI migration, function deployment, configuration
+  action, or database rollback command was used.
+- No Supabase schema, function, trigger, RLS, grant, Auth, configuration, or
+  data change occurred.
+- No production synthetic or real record was created, modified, or deleted.
+- The R2-06 migration was not applied by this rollback task.
+- The R2-06 database rollback was not executed.
+- R2-06 was not marked production-activated.
+- Both P1 findings remain unresolved and require the remediation and fresh
+  exact-SHA review sequence below.
 
 ## Safe local verification
 
@@ -150,7 +287,7 @@ complete canonical-plus-additive regression was not rerun after the fail-fast
 P1 findings because it cannot establish release safety without those missing
 contracts.
 
-## Browser boundary
+## Original browser boundary
 
 A read-only startup attempt was excluded from smoke evidence when the selected
 browser was found to contain an existing authenticated production context. No
@@ -159,11 +296,12 @@ were performed, no private details were retained in this evidence, and the tab
 was closed. Public HTTP byte verification was used for the runtime-source
 check instead.
 
-## Production and external mutations by this task
+## Production and external mutations before rollback authorization
 
-None.
+None before the separately authorized application-only rollback documented
+above.
 
-This task did not:
+Before the later rollback authorization, this task had not:
 
 - apply or repair a migration;
 - change Supabase data, schema, RLS, grants, functions, triggers, Auth, or
@@ -174,17 +312,15 @@ This task did not:
 - push the release branch; or
 - create a pull request.
 
-Read-only external activity was limited to fetching Git/GitHub state, PR
-reviews and checks, workflow/deployment metadata, public production assets,
-current Supabase documentation, and the excluded startup attempt described
-above.
+External activity before authorization was limited to fetching Git/GitHub
+state, PR reviews and checks, workflow/deployment metadata, public production
+assets, current Supabase documentation, and the excluded startup attempt
+described above.
 
 ## Required next actions
 
 1. Do not apply the current R2-06 migration.
-2. Obtain explicit production authorization before any deployment action and
-   decide whether to roll back only the application runtime to the verified
-   pre-R2-06 source
+2. Preserve the completed application-only rollback at
    `44f0510d3bde18f459e78f570efd27b72dc2a989`.
 3. Add the shared per-game serialization lock to guarded writes and a real
    concurrent write/delete regression.

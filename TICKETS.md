@@ -1089,10 +1089,12 @@ Branch: `release/r2-06-durable-game-tombstones`
 Execution task: `Execute the R2-06 Durable Game Tombstones production activation and release`
 (`019fb379-0c66-76c1-bed2-cd037ab70e8c`)
 
-Owner approval: David's explicit authorization is required before any
-production migration, deployment, synthetic-data creation, synthetic-data
-cleanup, or other production mutation. That authorization was not present in
-the execution task.
+Owner approval: David explicitly authorized an immediate application-only
+rollback to
+`44f0510d3bde18f459e78f570efd27b72dc2a989` on 2026-07-30. That authorization
+did not authorize a production migration, database rollback, Supabase change,
+synthetic-data creation or cleanup, P1 remediation, or any other production
+mutation.
 
 #### Exact release inputs and targets
 
@@ -1182,16 +1184,57 @@ the execution task.
   match their Git blobs at that blocked source.
 - The previous successful pre-R2-06 allowlisted Pages artifact is source
   `44f0510d3bde18f459e78f570efd27b72dc2a989`, run `30547712272`.
-- This task did not deploy, roll back, apply a migration, create or delete
-  production synthetic records, or otherwise mutate production.
+- The application-only rollback superseded that runtime as recorded below.
+
+#### Authorized application-only rollback
+
+- Authorization: immediate application/runtime rollback only; no Supabase,
+  migration, database rollback, production-data, or P1-remediation action.
+- Pre-rollback deployed source:
+  `18f5157de159fa7a27b3cefb4c90f5148c3b230d`, Pages run `30552229360`.
+- Rollback source:
+  `44f0510d3bde18f459e78f570efd27b72dc2a989`, the merged R2-05 commit and
+  direct parent of R2-06.
+- Rollback workflow:
+  `30554377617`; result `success`; completed
+  `2026-07-30T14:59:18Z`.
+- The workflow checked out the exact approved source, verified main ancestry,
+  validated the v284 release identity and custom domain, ran all 21 Pages
+  deployment safety contracts, built and validated the affirmative allowlist,
+  deployed the artifact, and passed the production-boundary verification job.
+- The authoritative workflow manifest records 47 files, 6,221,926 bytes,
+  allowlist version `2026-07-29`, release `v284`, and exact source
+  `44f0510d3bde18f459e78f570efd27b72dc2a989`.
+- Independent public verification matched all 46 served files byte-for-byte
+  to that workflow manifest. `CNAME` is the forty-seventh allowlisted artifact
+  entry and is the non-served custom-domain configuration file.
+- `TICKETS.md`, the R2-06 migration path, this review-evidence path, and
+  `.git/config` each returned HTTP 404 from production.
+- Read-only production smoke loaded the landing page and app without console
+  warnings or errors, restored the existing authenticated session, navigated
+  normally to Past Games, and confirmed 45 saved-game rows without reading
+  game contents. No buttons that create, edit, share, sync, or delete data
+  were used.
+- Exact-source inspection and live byte identity establish that the rollback
+  runtime contains no reference to `public.legacy_game_tombstones`,
+  `public.laxhornet_sync_game(jsonb)`, or
+  `public.laxhornet_delete_game_durable(jsonb)`.
+- Public-event semantic and v284 team-authorization boundary contracts passed.
+  The general minimum-disclosure suite was not recorded as a full pass:
+  39/40 checks passed and its release-hygiene assertion expected a coordinated
+  service-worker/version delta that R2-05 does not contain.
+- No Supabase schema, function, trigger, RLS, grant, configuration, Auth, or
+  data change occurred. No production record was created, modified, or
+  deleted. The R2-06 migration was not applied by this task, and the database
+  rollback was not run.
+- R2-06 remains `BLOCKED`; this rollback is not production activation.
 
 #### Required remediation and approval gates
 
-1. Stop R2-06 activation. Do not apply the current migration.
-2. Decide whether to authorize an immediate application-only rollback to the
-   verified pre-R2-06 allowlisted source `44f0510d3bde18f459e78f570efd27b72dc2a989`.
-   Do not remove or roll back database tombstones if production inspection
-   later proves any exist.
+1. Keep R2-06 activation stopped. Do not apply the current migration.
+2. Preserve the completed application-only rollback at
+   `44f0510d3bde18f459e78f570efd27b72dc2a989`. Do not remove or roll back
+   database tombstones if production inspection later proves any exist.
 3. Serialize guarded game writes with durable deletes and add a real concurrent
    write/delete regression.
 4. Prevent event-delete markers from deleting events after a durable
