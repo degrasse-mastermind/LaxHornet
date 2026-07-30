@@ -55,6 +55,23 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
   conflicts. Accepted payloads are compacted only after an acknowledgment is
   persisted; rejected and conflicted work remains local and is not reported as
   synced.
+- R2-05 gives those durable legacy-game and tracked-clock operations one
+  deterministic failure taxonomy. Offline/fetch/timeout/connection,
+  HTTP 408/429/5xx, and temporary service failures are `retryable`;
+  authentication, authorization/RLS, validation, missing capability/schema,
+  conflict, and unknown permanent failures become precise retained
+  `rejected` or `conflicted` states. Unknown failures fail closed instead of
+  defaulting to retry.
+- Persisted R2-05 error evidence contains only bounded `category`, normalized
+  `code` and canonical `message`, `httpStatus`, `classifiedAt`, `source`, and
+  safe `sourceCode`. It does not persist original server messages, response
+  bodies, request payloads, headers, tokens, stack traces, or private names.
+  Rejected/conflicted records receive no ordinary retry time.
+- Known offline state creates no request or attempt increment. Losing the
+  active session rejects eligible work in the loaded account namespace before
+  switching namespaces. Explicit sign-in or manual sync can recover only that
+  same account's authentication-required rejections; signed-out state and a
+  different account cannot process them.
 - R2-03 makes ordinary same-ID `games`/`events` hydration lossless at the
   current storage boundary. Explicitly projected cloud-owned values can
   update, newer supported cloud values can update conflict-sensitive fields,
