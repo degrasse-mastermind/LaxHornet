@@ -105,8 +105,14 @@ jobs:
       - name: Release hygiene
         run: node tools/test_release_hygiene.mjs
 
-      - name: Install embedded database test dependency
-        run: npm install --no-save --no-package-lock --ignore-scripts @electric-sql/pglite@0.5.4
+      - name: Allowlisted Pages deployment contracts
+        run: node tools/test_pages_deployment.mjs
+
+      - name: Install ephemeral browser and embedded database test dependencies
+        run: npm install --no-save --no-package-lock --ignore-scripts @electric-sql/pglite@0.5.4 playwright@1.61.1
+
+      - name: Install Chromium for artifact browser verification
+        run: npx playwright install --with-deps chromium
 
       - name: Phase-aware release containment
         run: node tools/test_release_containment_phase_aware.mjs
@@ -137,3 +143,9 @@ jobs:
 
       - name: Git diff hygiene
         run: git diff --check
+
+      - name: Build and validate the Pages artifact in a browser
+        run: |
+          node tools/build_pages_artifact.mjs
+          node tools/validate_pages_artifact.mjs
+          node tools/test_pages_artifact_browser.cjs

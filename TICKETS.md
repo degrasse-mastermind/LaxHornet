@@ -224,7 +224,7 @@ Remaining work: public-disclosure verification, exact-main frontend deployment, 
 
 ### LH-22 — Tracked Playing Time Phase 1 user experience
 
-Status: `REVIEW`
+Status: `DONE`
 Branch: `release/v284-tracked-playing-time`
 Base: `main` at UI merge `fc9c079d69757cfc2667dea7e1dfcc56524dce56`
 Related design document: `docs/TRACKED_PLAYING_TIME_FOUNDATION.md`
@@ -271,10 +271,10 @@ Provide a complete, private, local-first Phase 1 experience for tracking one sel
 
 #### Risks and rollback
 
-- The foundation migration is present in production and the corrected synthetic team authorization gate passed. The v284 frontend is not yet deployed, and public-disclosure plus browser-smoke gates remain pending; local tracking remains usable.
+- The foundation and corrective disclosure migrations are present exactly once in production. The corrected synthetic team authorization gate and final production browser smoke passed at deployed SHA `effca6952e647b7424f96675f390fc80d5c42368`.
 - A review browser that reaches a backend without the tracked-time RPCs fails soft to device-only tracking for that session; the local event gate remains authoritative and is unaffected by hosted capability availability.
 - Running-clock recovery gaps longer than 30 seconds freeze and require review rather than inventing time.
-- Feature rollback is the removal of the additive UI/service wiring before release. Accepted database history remains governed by the foundation's fail-closed rollback.
+- Runtime rollback uses the approved v284 release procedure. Accepted database history remains governed by the foundation's fail-closed rollback.
 
 #### Completion record
 
@@ -282,11 +282,11 @@ Commit/PR: implementation commits through `76274fe`; pull request #25 merged as 
 Files changed: `app.html`, `app.js`, `styles.css`, `service-worker.js`, `tracked-playing-time-service.js`, `.github/workflows/laxhornet-regression.yml`, focused tests, review evidence, `TICKETS.md`, and `REPO_CURRENT_STATE.md`.
 Evidence: `review-evidence/tracked-playing-time-ui/`
 `REPO_CURRENT_STATE.md` updated: `YES`
-Remaining work: complete public-disclosure verification, deploy the exact approved `main` frontend, run production browser smoke tests, and close final release evidence.
+Remaining work: post-release monitoring and the separate allowlisted GitHub Pages artifact ticket.
 
 ### LH-23 — v284 public-event semantic boundary incident remediation
 
-Status: `REVIEW`
+Status: `DONE`
 Branch: `fix/v284-public-event-semantic-boundary`
 Evidence: `review-evidence/v284-tracked-playing-time-production/`
 
@@ -342,9 +342,24 @@ appear through public Live Share.
   cleanup at exact candidate commit `d4a30baa64134e05b01d644ccf33d8e3ba88913d`.
 - Initial independent review found four actionable gaps; the first re-review
   confirmed those fixes and found two additional tombstone/retry gaps. All six
-  are now fixed locally and the full regression rerun is green. CI rerun, clean
-  exact-SHA independent re-review, merge, and production rollout remain
-  required before `DONE`.
+  were fixed on the same branch.
+- Final remediation PR #30 passed CI and independent exact-SHA review at head
+  `19f3f89d1120fce167f59237e355bb7cc04394c0`, then merged as
+  `effca6952e647b7424f96675f390fc80d5c42368`.
+- Corrective migration `20260728193942` is present exactly once in production;
+  the safe public RPC definition and least-privilege grants are active.
+- Exact hosted runtime assets match merge SHA `effca6952e647b7424f96675f390fc80d5c42368`.
+- Final synthetic production smoke passed with exactly two approved public
+  events; aliases, tracked time, unknown semantics, private notes, and internal
+  metadata remained absent from public payload and DOM.
+- Ordinary game entry, score, Undo, Save, End Game, Game Review, offline
+  recovery, corrections, tombstones, quarters/halves clocks, participation,
+  manual/recovery states, selected CSV, recap, token lifecycle, and anonymous
+  denial gates passed.
+- Cleanup proved zero synthetic users, sessions, refresh tokens, active tokens,
+  active grants, mutable legacy rows, active event versions, running clocks,
+  active participation, and pending/conflicted operations. No real data was
+  touched.
 
 #### Risks and rollback
 
@@ -354,17 +369,25 @@ appear through public Live Share.
   tombstoned from the public pipeline.
 - Recovery rollback revokes public RPC execution and intentionally does not
   restore the vulnerable function.
-- Production rollout is database-first; the contained public RPC must not be
-  re-enabled before the corrective migration is verified.
+- Retained synthetic append-only history is private, inert, revoked, and
+  documented in the production evidence package.
 
 #### Completion record
 
-Commit/PR/merge/deployment: pending review gates.
+Commit/PR/merge/deployment: PR #30, final head
+`19f3f89d1120fce167f59237e355bb7cc04394c0`, merge/deployment
+`effca6952e647b7424f96675f390fc80d5c42368`.
+Migration: `20260728193942_v284_public_event_semantic_boundary`, applied once.
+Production smoke tooling: independently reviewed exact SHA
+`0ce0f6734318b07bbf7156e91c79d05d40bd7222`; PR #29 remains non-deployable,
+draft, conflicting, open, unmerged, and must not be merged.
+Evidence: `review-evidence/v284-tracked-playing-time-production/`.
 `REPO_CURRENT_STATE.md` updated: `YES`
 
 ### LH-DEV-005 — Publish an allowlisted GitHub Pages artifact
 
-Status: `PROPOSED`
+Status: `IN PROGRESS`
+Branch: `codex/infra-allowlisted-pages-deployment`
 
 #### Goal
 
@@ -382,6 +405,33 @@ evidence are not copied to the public static site.
   evidence, local configuration, and secrets are absent from the artifact.
 - The deployment workflow retains least-privilege permissions and does not
   change Supabase production state.
+
+#### Implemented scope
+
+- Added an all-files-explicit 47-file production allowlist. Directory-wide
+  copying is prohibited and unknown files default to excluded.
+- Added deterministic artifact build/validation tooling with exact membership,
+  SHA-256, runtime-reference, service-worker, CNAME, secret, traversal, and
+  symlink checks. The public launch-kit ZIP is entry-allowlisted, traversal and
+  symlink checked, secret scanned, and SHA-256 pinned per approved member.
+- Added focused deployment contracts and pull-request regression coverage.
+- Added a least-privilege custom Pages workflow using
+  `actions/configure-pages@v5`, `actions/upload-pages-artifact@v4`, and
+  `actions/deploy-pages@v4`.
+- Preserved the v284 marker while adding service-worker activation cleanup for
+  stale, non-allowlisted cache entries.
+- Documented the legacy exposure, custom-domain requirements, and allowlisted
+  rollback procedure.
+
+#### Verification status
+
+- Focused deployment safety contracts: `21/21` passed locally.
+- Deterministic artifact build: `47` files, `v284`, exact allowlist membership.
+- Artifact browser: service-worker registration/control, stale-cache purge,
+  same-version legacy-v284 worker upgrade, mobile app, Game Review,
+  tracked-time runtime, Live Share entry, and offline shell passed locally.
+- Broader regression, rendered artifact QA, independent PR review, production
+  deployment, internal-path exclusion, and closeout remain in progress.
 
 ## Ticket template
 

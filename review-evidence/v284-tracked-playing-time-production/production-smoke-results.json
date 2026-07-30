@@ -1,0 +1,199 @@
+{
+  "status": "PASS",
+  "environment": "production",
+  "syntheticAdultFixture": true,
+  "approvedApplicationSha": "effca6952e647b7424f96675f390fc80d5c42368",
+  "approvedToolingSha": "0ce0f6734318b07bbf7156e91c79d05d40bd7222",
+  "productionOrigin": "https://laxhornet.mybranford.com",
+  "correctiveMigrationVersion": "20260728193942",
+  "prewrite": {
+    "activeTokenCount": 0,
+    "migrationCount": 1,
+    "hostedAssetsMatch": true,
+    "toolingAbsentFromDeployment": true
+  },
+  "hostedAssets": [
+    {
+      "file": "app.html",
+      "sha256": "a0b10fe98fb5845d54664bb6d09438e4e732f6039fd82247783c040cc07b3151",
+      "matches": true
+    },
+    {
+      "file": "app.js",
+      "sha256": "19c1d33c4add1c1a9b01d524f9ffb50881486f0b8776527e11aa685b7cd9b660",
+      "matches": true
+    },
+    {
+      "file": "public-event-semantics.js",
+      "sha256": "1b950bcc28f2a245316d5caa89de694f99ab6c9ecb801929a49b7bb0141f6625",
+      "matches": true
+    },
+    {
+      "file": "service-worker.js",
+      "sha256": "39ebceb2a13c4e9d4694715ecf88bd3714c06142cc090ea69023994601284501",
+      "matches": true
+    },
+    {
+      "file": "version.json",
+      "sha256": "af6375d110d3bfdc5d74c73acf9ecbece3e20c45f5d07483a689a2931eb2724e",
+      "matches": true
+    }
+  ],
+  "smoke": {
+    "publicEventCount": 2,
+    "publicPayloadForbiddenMatches": [],
+    "publicGameKeys": [
+      "final_score_against",
+      "final_score_for",
+      "game_date",
+      "game_id",
+      "jersey_number",
+      "opponent",
+      "period_format",
+      "player_name",
+      "position",
+      "team_name"
+    ],
+    "publicEventKeys": [
+      "category",
+      "event_id",
+      "field_zone",
+      "occurred_at",
+      "period",
+      "point_value",
+      "stat_label",
+      "stat_type"
+    ],
+    "adversarialIngress": [
+      {
+        "statType": "legacy_shift_alias",
+        "code": "unsupported_event_semantics"
+      },
+      {
+        "statType": "player_in",
+        "code": "unsupported_event_semantics"
+      },
+      {
+        "statType": "goal",
+        "code": "invalid_public_event_evidence"
+      },
+      {
+        "statType": "unknown_future_event",
+        "code": "unsupported_event_semantics"
+      }
+    ],
+    "ordinaryJourney": {
+      "entryAccepted": true,
+      "scored": true,
+      "undoRestoredCount": true,
+      "saved": true,
+      "endGame": true,
+      "gameReview": true
+    },
+    "eventLifecycle": {
+      "correctionSynchronized": true,
+      "offlineRecoveryAttempts": 1,
+      "offlinePendingAfterRetry": 0,
+      "tombstoneSynchronized": true,
+      "tombstoneLifecycle": "tombstoned"
+    },
+    "trackedPlayingTime": {
+      "quartersClock": [
+        "clock_updated",
+        "clock_updated",
+        "clock_updated"
+      ],
+      "halvesClock": [
+        "clock_initialized",
+        "clock_updated",
+        "clock_updated"
+      ],
+      "recoveryStates": [
+        "estimated",
+        "needs_review",
+        "complete"
+      ],
+      "participationClosureCode": "participation_operation_created",
+      "trackedOperationCount": 9
+    },
+    "disclosureBoundaries": {
+      "freshPrivateEventsOutsideEventPipeline": true,
+      "localPrivateCount": 4,
+      "selectedCsvPrivateEvidenceRetained": true,
+      "selectedCsvPrivateNotesOmitted": true,
+      "recapPrivateSemanticsOmitted": true,
+      "viewerStatus": "Watching live",
+      "viewerEventCount": 2,
+      "publicSafeRpcObserved": true,
+      "legacyGamesOrEventsRequests": 0
+    },
+    "neutralTokens": {
+      "unknownUnavailable": true,
+      "invalidUnavailable": true,
+      "expiredUnavailable": true,
+      "revokedUnavailable": true
+    },
+    "anonymousPrivateAccess": {
+      "trackedTimeRpcCount": 9,
+      "trackedTimeTableCount": 4,
+      "allDeniedWithCode": "42501",
+      "legacyGamesDeniedOrEmpty": true,
+      "legacyEventsDeniedOrEmpty": true
+    }
+  },
+  "cleanup": {
+    "activeEventVersions": 0,
+    "activeGrants": 0,
+    "activeTokens": 0,
+    "authSessions": 0,
+    "authUsers": 0,
+    "conflictedEventOperations": 0,
+    "legacyEvents": 0,
+    "legacyGames": 0,
+    "pendingEventOperations": 0,
+    "playerClaims": 0,
+    "refreshTokens": 0,
+    "retainedClockRows": 1,
+    "retainedEventOperations": 9,
+    "retainedGameScopes": 2,
+    "retainedLifecycleEvents": 6,
+    "retainedParticipationOperations": 9,
+    "rosterPlayers": 0,
+    "runningClockRows": 0,
+    "teamMembers": 0,
+    "teams": 0,
+    "userProfiles": 0,
+    "activeParticipation": 0,
+    "oldAccessTokenRejected": true,
+    "oldRefreshTokenRejected": true,
+    "oldPrivateRpcRejected": true,
+    "realDataTouched": false
+  },
+  "retainedHistory": {
+    "successfulRun": {
+      "eventOperations": 9,
+      "participationOperations": 9,
+      "grantLifecycleEvents": 6,
+      "gameScopes": 2,
+      "clockStates": 1
+    },
+    "finalSyntheticAggregate": {
+      "eventOperations": 88,
+      "participationOperations": 107,
+      "grantLifecycleEvents": 72,
+      "gameScopes": 24,
+      "clockStates": 12,
+      "activeEventVersions": 0,
+      "activeTokens": 0,
+      "activeGrants": 0,
+      "runningClocks": 0,
+      "pendingEventOperations": 0,
+      "conflictedEventOperations": 0
+    },
+    "inert": true,
+    "private": true,
+    "synthetic": true
+  },
+  "secretsEmitted": false,
+  "realDataTouched": false
+}

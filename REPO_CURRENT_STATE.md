@@ -1,10 +1,10 @@
 # LaxHornet Repository Current State
 
-Last reviewed: 2026-07-28
+Last reviewed: 2026-07-29
 Baseline branch: `main`
-Baseline commit: `1221f418c1e005606d54c545148944f9ec69f132`
+Baseline commit: `effca6952e647b7424f96675f390fc80d5c42368`
 Current repository release marker: `v284`
-Current production marker: `v284` with public Live Share temporarily contained pending incident remediation
+Current production marker: `v284` with the remediated public Live Share boundary active
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
 
@@ -39,10 +39,11 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
 - Supabase synchronization is optional and must not block core game-day tracking.
 - Runtime includes local delete markers and event-operation capabilities.
 - `main` contains the reviewed Tracked Playing Time foundation from merged PR #24 and the opt-in Phase 1 UI from merged PR #25.
-- The v284 frontend is deployed at application SHA `1221f418c1e005606d54c545148944f9ec69f132`.
+- The v284 frontend is deployed at approved remediation merge SHA `effca6952e647b7424f96675f390fc80d5c42368`.
 - Production migration `20260727000000_tracked_playing_time_operations` is present exactly once and its 88 normalized statements match the reviewed migration. The v284 team authorization gate passed with an active player-scoped parent grant plus its matching claim. Team-admin-only authority remains intentionally read/list-only for tracked time.
-- A synthetic signed-in reproduction found that legacy participation-like aliases could enter the ordinary Event Pipeline and then appear in public Live Share. Aggregate inspection found no active tokens, no non-synthetic affected share, and no confirmed real-data exposure. Execute access to the affected public RPC is temporarily revoked from browser roles, producing the existing neutral unavailable state while preserving private tracking and evidence.
-- The focused remediation branch adds a closed ordinary-event vocabulary at browser ingress and public database egress. Unknown or poisoned semantics default private; existing contaminated evidence is retained and either omitted or fully canonicalized at egress. Scope authorization is uniform before event lookup/classification, and pre-migration retries use their original immutable request hash.
+- A synthetic signed-in reproduction found that legacy participation-like aliases could enter the ordinary Event Pipeline and then appear in public Live Share. Aggregate inspection found no active tokens, no non-synthetic affected share, and no confirmed real-data exposure. Public RPC access was reversibly contained until the reviewed correction was installed.
+- Merged PR #30 establishes a closed ordinary-event vocabulary at browser ingress and public database egress. Unknown or poisoned semantics default private; existing contaminated evidence is retained and either omitted or fully canonicalized at egress. Scope authorization is uniform before event lookup/classification, and pre-migration retries use their original immutable request hash.
+- Production migration `20260728193942_v284_public_event_semantic_boundary` is present exactly once. Its safe public RPC is active with least-privilege grants, while anonymous access to private tracked-time tables and RPCs remains denied.
 - Any synchronization change must preserve offline operation, reconnection behavior, deduplication, authorization boundaries, and existing saved data.
 
 ## Supabase backend
@@ -68,7 +69,7 @@ The release manifest records:
 - Canonical forward migrations for the legacy baseline, Trust Spine Release 1, minimum-necessary disclosure, and disclosure/evidence fixes.
 - An additive event-pipeline capability migration.
 - A separately contained Tracked Playing Time package with one forward migration, one rollback reference, and one pgTAP contract file. Its reviewed Windows/CRLF identities remain recorded in the v284 manifest. Live production history now independently verifies the migration is present exactly once and matches all 88 reviewed statements after line-ending normalization.
-- A separately contained v284 incident-remediation package with additive migration `20260728193942_v284_public_event_semantic_boundary`, fail-closed rollback, pgTAP coverage, and manifest checksums. It is the only expected pending production migration.
+- A production-applied v284 incident-remediation package with additive migration `20260728193942_v284_public_event_semantic_boundary`, fail-closed rollback, pgTAP coverage, and manifest checksums. No production migration remains pending for v284.
 - Required ordering, rollback references, approved file identities, and pending-production expectations.
 
 Do not rewrite, reorder, squash, rename, or silently regenerate these migration files. Any new migration must be additive, timestamped, reviewed, tested locally, and reflected in release-control documentation.
@@ -77,12 +78,27 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
 
 ## Deployment and release control
 
-- Static deployment uses GitHub Pages from the `main` branch repository root.
+- Static production deployment uses the custom `Allowlisted GitHub Pages`
+  workflow. It constructs `.pages-artifact` from the all-files-explicit
+  `release/pages-deployment-allowlist.json`, validates hashes, references,
+  secrets, symlinks, path traversal, custom-domain identity, and exact output
+  membership, then uploads only that generated directory.
+- The workflow fails closed unless Pages uses Actions and the custom domain,
+  HTTPS enforcement, approved certificate, and v284 production marker remain
+  intact before and after deployment.
+- Repository-root and `/docs` branch publishing are prohibited. Internal
+  tools, documentation, SQL, tests, release controls, and review evidence are
+  not production assets.
 - Custom domain: `laxhornet.mybranford.com`.
 - Release coordination includes `version.json`, service-worker/cache markers, script query versions, and `release/laxhornet-release-manifest.json`.
-- Current repository and production release marker is `v284`. Public Live Share remains temporarily unavailable until the reviewed semantic-boundary migration and corrected frontend are deployed in database-first order.
+- Current repository and production release marker is `v284`. Public Live Share is active through the corrected public-safe RPC at deployed SHA `effca6952e647b7424f96675f390fc80d5c42368`.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
+- The v284 cache marker remains unchanged. The updated service worker purges
+  previously cached non-allowlisted same-origin paths during activation and
+  no longer caches unknown paths. A same-release replacement worker activates
+  immediately when the existing v284 cache proves an older v284 worker is
+  already installed.
 
 ## Local development
 
@@ -109,6 +125,10 @@ node tools/test_game_scope_capabilities.mjs
 node tools/test_tracked_playing_time_service.mjs
 node tools/test_tracked_playing_time_foundation.mjs
 node tools/test_public_event_semantic_boundary.mjs
+node tools/test_pages_deployment.mjs
+node tools/build_pages_artifact.mjs
+node tools/validate_pages_artifact.mjs
+node tools/test_pages_artifact_browser.cjs
 supabase test db --local supabase/tests/tracked_playing_time_foundation.sql
 supabase test db --local supabase/tests/v284_public_event_semantic_boundary.sql
 ```
@@ -158,12 +178,12 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 
 ## Known areas requiring continued care
 
-- Production cutover and activation of staged Trust Spine/minimum-disclosure capabilities.
+- Continued regression protection for the active Trust Spine and minimum-disclosure capabilities.
 - Migration provenance and release-manifest integrity.
 - Live Share and export disclosure boundaries.
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
-- The v284 public-disclosure remediation passes its complete 33/33 regression and all 17 local release-verification gates after the latest review hardening, including 45/45 disclosure pgTAP checks on both database shapes and 73/73 signed-in browser checks. A clean exact-SHA independent review is still required before merge. Production still requires application of the one corrective migration, exact-merge frontend deployment, final signed-in synthetic smoke, cleanup, and evidence closure.
+- The v284 public-disclosure remediation passed its complete 33/33 regression and all 17 local release-verification gates, including 45/45 disclosure pgTAP checks on both database shapes and 73/73 signed-in browser checks. PR #30 was independently reviewed and merged. Production smoke at application SHA `effca6952e647b7424f96675f390fc80d5c42368` returned exactly two approved public events, excluded all private/unknown semantics, passed ordinary and tracked-time journeys, and proved zero active synthetic authority or mutable residue after cleanup.
 - Coordinated version and service-worker release hygiene.
 - Maintenance of GitHub Action majors and portability of the CI-selected regression checks.
 

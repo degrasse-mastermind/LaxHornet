@@ -1,0 +1,73 @@
+{
+  "capturedAt": "2026-07-29T23:20:00Z",
+  "productionUrl": "https://laxhornet.mybranford.com",
+  "auditedSha": "86e3ff79d569c3ec84e382b1b93d2d85df1cd550",
+  "pagesBuildType": "legacy",
+  "pagesSource": {
+    "branch": "main",
+    "path": "/"
+  },
+  "results": [
+    {
+      "path": "/tools/test_event_operation_service.mjs",
+      "status": 200,
+      "contentType": "text/javascript; charset=utf-8"
+    },
+    {
+      "path": "/tools/run_release_verification.mjs",
+      "status": 200,
+      "contentType": "text/javascript; charset=utf-8"
+    },
+    {
+      "path": "/docs/RELEASE_VERIFICATION_WORKFLOW.md",
+      "status": 200,
+      "contentType": "text/markdown; charset=utf-8"
+    },
+    {
+      "path": "/review-evidence/v284-tracked-playing-time-production/production-smoke-results.json",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "path": "/supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql",
+      "status": 200,
+      "contentType": "application/sql"
+    },
+    {
+      "path": "/supabase/rollback/20260728193942_v284_public_event_semantic_boundary_rollback.sql",
+      "status": 200,
+      "contentType": "application/sql"
+    },
+    {
+      "path": "/supabase/tests/v284_public_event_semantic_boundary.sql",
+      "status": 200,
+      "contentType": "application/sql"
+    },
+    {
+      "path": "/REPO_CURRENT_STATE.md",
+      "status": 200,
+      "contentType": "text/markdown; charset=utf-8"
+    },
+    {
+      "path": "/TICKETS.md",
+      "status": 200,
+      "contentType": "text/markdown; charset=utf-8"
+    },
+    {
+      "path": "/AGENTS.md",
+      "status": 200,
+      "contentType": "text/markdown; charset=utf-8"
+    },
+    {
+      "path": "/release/laxhornet-release-manifest.json",
+      "status": 200,
+      "contentType": "application/json; charset=utf-8"
+    },
+    {
+      "path": "/supabase-schema.sql",
+      "status": 200,
+      "contentType": "application/sql"
+    }
+  ],
+  "realUserDataTouched": false
+}

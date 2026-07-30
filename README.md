@@ -56,20 +56,40 @@ You can also use any static file server. Serving over `http://localhost` is reco
 
 ## GitHub Pages Deployment
 
-1. Push this repository to GitHub.
-2. In the GitHub repository, open **Settings**.
-3. Go to **Pages**.
-4. Under **Build and deployment**, choose **Deploy from a branch**.
-5. Select your branch, usually `main`, and the root folder `/`.
-6. Save. GitHub Pages will publish the static PWA.
+Production is deployed by `.github/workflows/pages-deployment.yml`. The
+workflow builds a clean artifact from the affirmative specification at
+`release/pages-deployment-allowlist.json`, validates it, uploads only
+`.pages-artifact`, and deploys through the `github-pages` environment.
+
+Repository-root or `/docs` branch publishing must not be enabled. Internal
+tools, documentation, SQL, migrations, tests, review evidence, and release
+runbooks are not production assets.
 
 The site is configured for:
 
 ```text
-https://mybranford.com/
+https://laxhornet.mybranford.com/
 ```
 
 The public landing page lives at `/`. The PWA app lives at `/app.html`, and the manifest opens installed home-screen icons directly into the app.
+
+Build and validate locally with:
+
+```powershell
+node tools/build_pages_artifact.mjs
+node tools/validate_pages_artifact.mjs
+node tools/test_pages_deployment.mjs
+node tools/test_pages_artifact_browser.cjs
+```
+
+The production workflow also runs `tools/verify_pages_settings.mjs` before
+upload and after deployment. It fails closed unless Pages uses Actions and the
+configured custom domain, HTTPS enforcement, approved certificate, and v284
+production marker remain intact.
+
+Rollback uses a previously verified allowlisted `main` commit through manual
+workflow dispatch. See
+`docs/deployment/LAXHORNET_PAGES_ARTIFACT_ROLLBACK.md`.
 
 ## Launch Kit
 
