@@ -42,10 +42,15 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
   are preserved and write-blocked rather than downgraded.
 - Supabase synchronization is optional and must not block core game-day tracking.
 - Runtime includes local delete markers and event-operation capabilities.
-- R2-01 documents that ordinary `games`/`events` hydration is cloud-wins for a
-  matching game ID and does not preserve all richer local-only fields,
-  including embedded tracked-time state and event score context. The current
-  sync model therefore does not yet meet the conflict-safe R2 gate.
+- R2-03 makes ordinary same-ID `games`/`events` hydration lossless at the
+  current storage boundary. Explicitly projected cloud-owned values can
+  update, newer supported cloud values can update conflict-sensitive fields,
+  and same-ID events merge by stable ID. Cloud-omitted and local-authoritative
+  evidence remains intact, including scores, event score context, embedded
+  tracked-time state, pending/recovery state, and unknown local metadata.
+  `loadCloudGames` also rejects responses from superseded request generations
+  or a prior account. This does not add durable game-field versions,
+  tombstones, queued clock writes, or conflict UI, so the R2 gate remains open.
 - Canonical team-event RPCs have durable client operation IDs, server event
   versions, replay protection, conflicts, and permanent tombstones. Those
   guarantees do not currently extend to legacy game fields, tracked clock
