@@ -281,6 +281,18 @@ represents discovered-but-unauthorized production state without converting
 that state into approval. Until then, the manifest contradiction remains an
 intentional blocker.
 
+### Subsequent R2-06B control remediation
+
+R2-06B subsequently implements that separate remediation in a review-bound
+feature branch. It records the observed runtime, both applied migrations, and
+the verified catalog while retaining explicit false states for tracked
+production authorization, synthetic verification, cleanup, and release
+closeout. This does not alter the historical fact that the reconciliation task
+itself left the manifest unchanged.
+
+Implementation evidence:
+`RELEASE_MANIFEST_RECONCILIATION.md`.
+
 ## Remaining gates
 
 - authorize and execute the bounded synthetic plan in

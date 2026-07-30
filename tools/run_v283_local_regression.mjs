@@ -94,6 +94,7 @@ const tests = [
       ...(combinedMode ? ["--require-combined", "--combined-ref=HEAD"] : []),
     ],
   },
+  { name: "release manifest reconciliation", command: process.execPath, args: ["tools/test_release_manifest_reconciliation.mjs"] },
   { name: "release preflight phase-aware", command: process.execPath, args: ["tools/test_release_preflight_phase_aware.mjs"] },
   { name: "release containment phase-aware", command: process.execPath, args: ["tools/test_release_containment_phase_aware.mjs"] },
   { name: "release hygiene", command: process.execPath, args: ["tools/test_release_hygiene.mjs"] },

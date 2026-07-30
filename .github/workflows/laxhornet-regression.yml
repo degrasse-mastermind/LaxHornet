@@ -120,6 +120,9 @@ jobs:
       - name: Release manifest validation
         run: node tools/validate_release_manifest.mjs --require-combined --combined-ref=HEAD
 
+      - name: Release manifest reconciliation contracts
+        run: node tools/test_release_manifest_reconciliation.mjs
+
       - name: Release hygiene
         run: node tools/test_release_hygiene.mjs
 
