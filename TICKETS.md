@@ -571,6 +571,82 @@ Completion record:
 - Remaining work: fresh independent review of the exact post-correction PR
   head, then the proposed R2 implementation sequence.
 
+### R2-02 — Lock the current sync boundary with adversarial regression tests
+
+Status: `REVIEW`
+
+Risk level: `LEVEL 2`
+
+Branch: `feature/r2-02-sync-characterization-tests`
+
+Related document: `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`
+
+#### Goal
+
+Freeze the current synchronization boundary with deterministic, passing
+characterization tests before R2 runtime behavior changes.
+
+#### In scope
+
+- Synthetic VM and in-memory Supabase/storage harnesses for every confirmed
+  R2-01 overwrite, ordering, retry, deletion, authorization, identity,
+  namespace, recovery, and user-state risk.
+- Existing Trust Spine replay, version, conflict, and tombstone guarantees.
+- Focused local and read-only CI regression wiring.
+
+#### Out of scope
+
+- Runtime fixes or refactors.
+- SQL, migration, Supabase, deployment, release, or production changes.
+- Desired-behavior assertions for R2-03 and later tickets.
+
+#### Acceptance criteria
+
+- Every confirmed R2-01 risk has deterministic coverage.
+- Unsafe current behavior is captured by passing `CHARACTERIZATION` tests.
+- Equivalent Trust Spine coverage is referenced rather than weakened or
+  duplicated.
+- Fixtures are synthetic and no remote service is contacted.
+- The R2 gate remains open.
+
+#### Completion record
+
+- Baseline: `origin/main` at
+  `f8351afa63e4b017bbf133eb2e10fb8d3b5ccf9f`, including merged R2-01.
+- New focused suite: `tools/test_sync_characterization.mjs`, `17/17` passing.
+- Characterized scenarios: same-ID richer-local overwrite; inbound/outbound
+  lossy mapping; out-of-order loads; stale-device game/event resurrection;
+  RLS-invisible delete-marker clearing; failed tracked-clock write; network,
+  auth, RLS, validation, capability, and membership error handling; Trust
+  Spine rejection removal; unclassified participation rejection; partial
+  game/event success; refresh during pending legacy, clock, and Trust Spine
+  work; signed-out/account namespace transition; authorization filtering;
+  nontransactional multi-key persistence; unstable repeated-capture IDs.
+- Confirmed risks: all `17` R2-01 risks remain confirmed by executable
+  characterization.
+- Reclassified risks: `NONE`.
+- Existing guarantees: permanent Trust Spine operation IDs, replay/tamper
+  detection, server event versions, conflict creation, and permanent
+  tombstones remain covered by the existing event-operation and Trust Spine
+  suites; embedded Postgres migration/acceptance/rollback passed all `33` SQL
+  tests with all `20` Trust Spine tables removed and legacy sentinels
+  preserved after rollback.
+- Focused checks: local-storage safety `28/28`; event-operation service
+  contracts passed; tracked-time service `16/16`; tracked-time foundation
+  `11/11`; tracked-time UI `44/44`; Trust Spine source contracts `18/18`;
+  cancel-game `33/33`; changed JavaScript syntax; `git diff --check`.
+- CI: implementation commit `7db9a469877378f3124608147a19737059ab328d`
+  passed both the portable GitHub Actions regression, including the new
+  `17/17` suite, and the Docker test suite.
+- Implementation commit:
+  `7db9a469877378f3124608147a19737059ab328d`; draft PR #42.
+- Production or external state changed: `NO`.
+- `REPO_CURRENT_STATE.md` updated: `NOT REQUIRED` — no current-state fact was
+  disproved and no runtime behavior changed.
+- Remaining work: confirm read-only CI, review the draft PR, and use these
+  assertions as the explicit change boundary for R2-03. The R2 gate remains
+  open.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

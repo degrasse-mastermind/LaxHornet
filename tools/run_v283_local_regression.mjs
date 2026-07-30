@@ -53,6 +53,7 @@ const tests = [
   ...rootJavaScript,
   { name: "local-storage safety contracts", command: process.execPath, args: ["tools/test_local_storage_safety.mjs"] },
   { name: "event-operation service contracts", command: process.execPath, args: ["tools/test_event_operation_service.mjs"] },
+  { name: "sync characterization contracts", command: process.execPath, args: ["tools/test_sync_characterization.mjs"] },
   { name: "tracked playing time service contracts", command: process.execPath, args: ["tools/test_tracked_playing_time_service.mjs"] },
   { name: "tracked playing time foundation contracts", command: process.execPath, args: ["tools/test_tracked_playing_time_foundation.mjs"] },
   { name: "v284 team authorization policy", command: process.execPath, args: ["tools/test_v284_team_authorization_policy.mjs"] },
