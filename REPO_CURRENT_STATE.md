@@ -90,13 +90,12 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
   automatic retry. Accepted deletion compacts recovery evidence only after its
   durable tombstone receipt is persisted. Existing individual event deletion
   markers and Trust Spine tombstones remain separate and unchanged.
-- The repository-only R2-06 migration adds private durable legacy-game tombstones,
+- The R2-06 migration adds private durable legacy-game tombstones,
   guarded game writes, and one transactional deletion RPC. A tombstone survives
   physical game-row removal and permanently reserves the game ID. Same-ID
   deletion replay is deterministic; a different deletion identity conflicts;
   an older delete conflicts with a server game whose `saved_at` is newer than
-  the client's known value. The migration is repository-only and is not active
-  in any Supabase environment.
+  the client's known value.
 - The additive R2-06A remediation migration gives the guarded game-write RPC,
   durable-delete RPC, and defense-in-depth trigger the same deterministic,
   transaction-scoped advisory lock derived from the canonical game ID. The
@@ -104,6 +103,17 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
   same-game writes/deletes serialize while unrelated game IDs remain
   independent. The trigger is still the final guard against direct or legacy
   writes after a tombstone exists.
+- Read-only resumed release inspection on 2026-07-30 found both R2-06 and
+  R2-06A migrations recorded in production, the tombstone table present with
+  RLS enabled and forced, the guarded RPCs and trigger present with expected
+  least-privilege access and lock-before-read ordering, and zero tombstone
+  rows. Pages run `30559099199` also auto-deployed exact merge
+  `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3`; all 47 served files matched its
+  allowlisted artifact manifest. These external changes were not performed by
+  the resumed preflight task and are not release closeout: the committed
+  manifest still records rollback source `44f0510d3bde18f459e78f570efd27b72dc2a989`
+  and both migrations as pending, so production state requires
+  authority/provenance reconciliation and a fresh fail-closed preflight.
 - Cloud loading fetches authorized tombstones before queued upload, uses the
   current account/request-generation guard for each response, then rechecks
   tombstones before final game merge. Explicit tombstones suppress games in
@@ -334,10 +344,17 @@ A green GitHub Actions result complements but does not replace browser, mobile-d
 - Authorization and player/team scope enforcement.
 - Offline operation reconciliation and conflict handling.
 - R2-06A closes the two repository P1 paths with shared same-game server
-  serialization and reversible client delete recovery. Production activation
-  remains blocked on green CI, exact-PR-SHA independent Level 3 review, named
-  read-only production verification, recovery readiness, and separately
-  authorized migration-first release work. Non-delete game-write
+  serialization and reversible client delete recovery. Exact-PR-SHA review and
+  merge are complete. Read-only reconciliation found exact reviewed runtime
+  `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3` and both R2-06 migrations already
+  present in production, with definition-equivalent catalog objects, expected
+  least-privilege boundaries, and zero tombstones. These changes were not
+  explicitly authorized through the tracked production-release process.
+  Classification is `Unauthorized release-control deviation with apparently
+  aligned reviewed state`; migration actor/time/route attribution remains
+  unresolved. Current state is preserved, not approved retroactively, and
+  production activation remains incomplete pending separately authorized
+  synthetic verification and reviewed manifest-control remediation. Non-delete game-write
   deduplication, field-level conflicts, signed-out namespace migration,
   cross-key transactionality, visible sync/conflict UI, and a sanitized journal
   remain open R2 work.
