@@ -979,6 +979,8 @@ let trustSpineSyncInFlight = null;
 let gameEventOperationService = null;
 let trackedPlayingTimeService = null;
 let trackedPlayingTimeCloudAvailability = "unknown";
+let cloudGameHydrationGeneration = 0;
+const cloudGameHydrationMetadata = new WeakMap();
 let backendCapabilityState = {
   value: null,
   checkedAt: 0,
@@ -2736,6 +2738,7 @@ function normalizeEvent(event = {}, gameId = "") {
   const scoreAgainstBeforeEvent = optionalScoreNumber(event.scoreAgainstBeforeEvent ?? event.score_against_before_event);
 
   return {
+    ...event,
     id: event.id || uid("event"),
     gameId: event.gameId || gameId,
     userId: event.userId || event.user_id || "",
@@ -4766,8 +4769,64 @@ function eventFromSupabaseRow(row) {
   );
 }
 
-function gameFromSupabaseRow(row, events = []) {
-  return normalizeGame({
+function cloudProjectionMetadataForRow(row = {}, events = null) {
+  const gameFieldMap = {
+    id: "id",
+    player_id: "playerId",
+    team_id: "teamId",
+    roster_player_id: "rosterPlayerId",
+    user_id: "userId",
+    share_code: "shareCode",
+    is_shared: "isShared",
+    opponent: "opponent",
+    game_date: "date",
+    location: "location",
+    game_type: "gameType",
+    period_format: "periodFormat",
+    player_snapshot: "playerSnapshot",
+    current_quarter: "currentQuarter",
+    status: "status",
+    created_at: "createdAt",
+    saved_at: "savedAt",
+    ended_at: "endedAt",
+  };
+  const eventFieldMap = {
+    id: "id",
+    game_id: "gameId",
+    user_id: "userId",
+    team_id: "teamId",
+    roster_player_id: "rosterPlayerId",
+    timestamp: "timestamp",
+    quarter: "quarter",
+    stat_type: "statType",
+    stat_label: "statLabel",
+    category: "category",
+    point_value: "pointValue",
+    tags: "tags",
+    note: "note",
+    field_zone: "fieldZone",
+    corrected_at: "correctedAt",
+    tags_updated_at: "tagsUpdatedAt",
+  };
+  const projectedFields = (value, fieldMap) => new Set(
+    Object.entries(fieldMap)
+      .filter(([sourceField]) => Object.hasOwn(value || {}, sourceField))
+      .map(([, localField]) => localField),
+  );
+  return {
+    gameFields: projectedFields(row, gameFieldMap),
+    eventsProjected: Array.isArray(events),
+    eventFieldsById: new Map(
+      (Array.isArray(events) ? events : [])
+        .filter((event) => event?.id)
+        .map((event) => [event.id, projectedFields(event, eventFieldMap)]),
+    ),
+  };
+}
+
+function gameFromSupabaseRow(row, events = null) {
+  const projectedEvents = Array.isArray(events) ? events : [];
+  const game = normalizeGame({
     id: row.id,
     playerId: row.player_id || row.player_snapshot?.id || "",
     teamId: row.team_id || "",
@@ -4786,8 +4845,15 @@ function gameFromSupabaseRow(row, events = []) {
     createdAt: row.created_at,
     savedAt: row.saved_at,
     endedAt: row.ended_at,
-    events: events.map(eventFromSupabaseRow).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)),
+    events: projectedEvents
+      .map(eventFromSupabaseRow)
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)),
   });
+  cloudGameHydrationMetadata.set(
+    game,
+    cloudProjectionMetadataForRow(row, events),
+  );
+  return game;
 }
 
 function shareLinkForGame(game, shareCode = "") {
@@ -5062,19 +5128,198 @@ async function upsertWithOptionalColumns(table, payload, optionalColumns = []) {
   return { error: { message: "Could not sync Live Share data" }, skipped: [...skipped] };
 }
 
-function mergeGames(localGames, cloudGames) {
+function cloudGameMergePolicy() {
+  return {
+    identity: ["id"],
+    cloudAuthoritative: ["userId", "teamId", "rosterPlayerId", "shareCode", "isShared"],
+    localAuthoritative: [
+      "scoreFor",
+      "scoreAgainst",
+      "scoreTrackingTouched",
+      "finalScoreFor",
+      "finalScoreAgainst",
+      "trackedPlayingTime",
+      "localOnlyMetadata",
+      "pendingLegacyOperation",
+    ],
+    merged: ["events", "playerSnapshot"],
+    conflictSensitive: [
+      "playerId",
+      "opponent",
+      "date",
+      "location",
+      "gameType",
+      "periodFormat",
+      "currentQuarter",
+      "status",
+      "createdAt",
+      "savedAt",
+      "endedAt",
+    ],
+    preserveIfOmitted: true,
+  };
+}
+
+function cloudEventMergePolicy() {
+  return {
+    identity: ["id", "gameId"],
+    cloudAuthoritative: ["userId", "teamId", "rosterPlayerId"],
+    localAuthoritative: [
+      "scoreForAtEvent",
+      "scoreAgainstAtEvent",
+      "scoreMarginAtEvent",
+      "scoreStateAtEvent",
+      "gameSegmentAtEvent",
+      "scoreAutoIncrement",
+      "scoreForBeforeEvent",
+      "scoreAgainstBeforeEvent",
+    ],
+    conflictSensitive: [
+      "timestamp",
+      "quarter",
+      "statType",
+      "statLabel",
+      "category",
+      "pointValue",
+      "tags",
+      "note",
+      "fieldZone",
+      "correctedAt",
+      "tagsUpdatedAt",
+    ],
+    preserveIfOmitted: true,
+  };
+}
+
+function hydrationTimestamp(value) {
+  const timestamp = Date.parse(value || "");
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function cloudConflictFieldsAreCurrent(localGame = {}, cloudGame = {}, projectedFields = new Set()) {
+  // saved_at is the only game freshness value the current legacy projection
+  // round-trips. It is not treated as a server version: an omitted, invalid,
+  // or older value cannot authorize replacement of conflict-sensitive local
+  // fields. Durable field versions remain deferred to R2-07.
+  if (!projectedFields.has("savedAt")) return false;
+  const cloudSavedAt = hydrationTimestamp(cloudGame.savedAt);
+  const localSavedAt = hydrationTimestamp(localGame.savedAt);
+  if (cloudSavedAt === null) return false;
+  return localSavedAt === null || cloudSavedAt >= localSavedAt;
+}
+
+function hydrationValueIsMissing(value) {
+  return value === undefined || value === null || value === "";
+}
+
+function mergeHydratedEvent(
+  localEvent,
+  cloudEvent,
+  projectedFields,
+  cloudConflictFieldsAreAccepted,
+) {
+  const policy = cloudEventMergePolicy();
+  const merged = { ...localEvent };
+  for (const field of policy.cloudAuthoritative) {
+    if (projectedFields.has(field)) merged[field] = cloudEvent[field];
+  }
+  for (const field of policy.conflictSensitive) {
+    if (
+      projectedFields.has(field)
+      && (cloudConflictFieldsAreAccepted || hydrationValueIsMissing(localEvent[field]))
+    ) {
+      merged[field] = cloudEvent[field];
+    }
+  }
+  return normalizeEvent(merged, localEvent.gameId || cloudEvent.gameId);
+}
+
+function mergeHydratedGame(localGame, cloudGame) {
+  const local = normalizeGame(localGame);
+  const cloud = normalizeGame(cloudGame);
+  const metadata = cloudGameHydrationMetadata.get(cloudGame);
+  const projectedFields = metadata?.gameFields || new Set(Object.keys(cloudGame || {}));
+  const policy = cloudGameMergePolicy();
+  const acceptCloudConflictFields = cloudConflictFieldsAreCurrent(
+    local,
+    cloud,
+    projectedFields,
+  );
+  const merged = { ...local };
+
+  for (const field of policy.cloudAuthoritative) {
+    if (projectedFields.has(field)) merged[field] = cloud[field];
+  }
+  for (const field of policy.conflictSensitive) {
+    if (
+      projectedFields.has(field)
+      && (acceptCloudConflictFields || hydrationValueIsMissing(local[field]))
+    ) {
+      merged[field] = cloud[field];
+    }
+  }
+  if (
+    projectedFields.has("playerSnapshot")
+    && (acceptCloudConflictFields || hydrationValueIsMissing(local.playerSnapshot?.id))
+  ) {
+    merged.playerSnapshot = {
+      ...(local.playerSnapshot || {}),
+      ...(cloud.playerSnapshot || {}),
+    };
+  }
+
+  const eventsById = new Map(local.events.map((event) => [event.id, event]));
+  if (metadata?.eventsProjected !== false) {
+    cloud.events.forEach((cloudEvent) => {
+      const localEvent = eventsById.get(cloudEvent.id);
+      if (!localEvent) {
+        eventsById.set(cloudEvent.id, cloudEvent);
+        return;
+      }
+      const eventFields = metadata?.eventFieldsById?.get(cloudEvent.id)
+        || new Set(Object.keys(cloudEvent));
+      eventsById.set(
+        cloudEvent.id,
+        mergeHydratedEvent(
+          localEvent,
+          cloudEvent,
+          eventFields,
+          acceptCloudConflictFields,
+        ),
+      );
+    });
+  }
+  merged.events = [...eventsById.values()]
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  return normalizeGame(merged);
+}
+
+function mergeGames(localGames, cloudGames, options = {}) {
   const merged = new Map(
     localGames
       .filter((game) => !isDeletedGame(game.id))
       .filter(canShowGameForCurrentAccess)
       .map((game) => [game.id, normalizeGame(game)]),
   );
+  const activeGame = options.activeGame ? normalizeGame(options.activeGame) : null;
   cloudGames
     .filter((game) => !isDeletedGame(game.id))
-    .map(normalizeGame)
     .filter(canShowGameForCurrentAccess)
-    .forEach((game) => merged.set(game.id, game));
+    .forEach((cloudGame) => {
+      const localGame = activeGame?.id === cloudGame.id
+        ? activeGame
+        : merged.get(cloudGame.id);
+      merged.set(
+        cloudGame.id,
+        localGame ? mergeHydratedGame(localGame, cloudGame) : normalizeGame(cloudGame),
+      );
+    });
   return [...merged.values()].sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+}
+
+function cloudGameHydrationIsCurrent(generation, userId) {
+  return generation === cloudGameHydrationGeneration
+    && userId === currentUserId();
 }
 
 function teamFromSupabaseRows(memberRow = {}) {
@@ -5366,18 +5611,22 @@ async function loadClaimedRosterPlayers(options = {}) {
 }
 
 async function loadCloudGames(options = {}) {
-  if (!supabaseClient || !currentUserId()) return;
+  const hydrationUserId = currentUserId();
+  if (!supabaseClient || !hydrationUserId) return;
+  const hydrationGeneration = ++cloudGameHydrationGeneration;
   await loadCloudTeams({ silent: true });
   await flushDeletedCloudRecords({ quiet: Boolean(options.silent) });
   const uploadedCount = await syncLocalGamesToCloud();
   const { data: ownData, error } = await supabaseClient
     .from("games")
     .select("*, events(*)")
-    .eq("user_id", currentUserId())
+    .eq("user_id", hydrationUserId)
     .order("game_date", { ascending: false });
 
   if (error) {
-    if (!options.silent) reportSyncError(error);
+    if (cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId) && !options.silent) {
+      reportSyncError(error);
+    }
     return;
   }
 
@@ -5395,11 +5644,20 @@ async function loadCloudGames(options = {}) {
     }
   }
 
+  if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) return;
+
   const rowsById = new Map([...(ownData || []), ...teamData].map((game) => [game.id, game]));
   const cloudGames = [...rowsById.values()]
-    .map((game) => gameFromSupabaseRow(game, game.events || []))
+    .map((game) => gameFromSupabaseRow(
+      game,
+      Array.isArray(game.events) ? game.events : null,
+    ))
     .filter(canShowGameForCurrentAccess);
-  state.games = mergeGames(state.games, cloudGames).filter(canShowGameForCurrentAccess);
+  state.games = mergeGames(
+    state.games,
+    cloudGames,
+    { activeGame: state.activeGame },
+  ).filter(canShowGameForCurrentAccess);
   mergePlayersFromGames(state.games);
   const newestCloudGame = cloudGames.find((game) => !isDeletedGame(game.id));
   if (!options.silent && newestCloudGame) {

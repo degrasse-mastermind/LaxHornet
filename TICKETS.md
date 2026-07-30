@@ -647,6 +647,82 @@ characterization tests before R2 runtime behavior changes.
   assertions as the explicit change boundary for R2-03. The R2 gate remains
   open.
 
+### R2-03 — Make cloud game hydration lossless
+
+Status: `REVIEW`
+
+Risk level: `LEVEL 3`
+
+Branch: `feature/r2-03-lossless-cloud-hydration`
+
+Execution task: `Implement R2-03 — Make Cloud Game Hydration Lossless`
+(`019fb1f9-d65b-70c2-a53c-671411c6c909`)
+
+Related document: `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`
+
+#### Goal
+
+Prevent same-ID account hydration from discarding richer or newer local game
+and event evidence while preserving the current offline-first and cloud
+storage boundaries.
+
+#### In scope
+
+- Explicit game/event hydration ownership and conflict-sensitive field policy.
+- Same-ID merge by stable game and event IDs with preserve-if-omitted behavior.
+- Preservation of scores, event score context, tracked-time, pending/recovery
+  state, active-game evidence, and unknown local metadata.
+- A request-generation and account guard scoped to `loadCloudGames`.
+- Adversarial R2-03 regression assertions and narrow current-state records.
+
+#### Out of scope
+
+- SQL, migrations, RLS, RPC, queue, durable tombstone, namespace-migration,
+  sync-status UI, conflict UI, release-marker, deployment, or production work.
+- New cloud storage for tracked-time or local-only fields.
+- A general sync coordinator or the remaining R2 conflict model.
+
+#### Acceptance criteria
+
+- Richer or newer local same-ID evidence survives poorer or older hydration.
+- Explicitly projected cloud-owned and supported newer cloud fields update.
+- Partial payload omission is not interpreted as deletion.
+- Same-ID events merge without duplicates or loss of local score context.
+- Active-game evidence is not replaced by a poorer saved/cloud representation.
+- A superseded or prior-account response cannot regress accepted local state,
+  while a later legitimate request can apply.
+- Focused and complete local regression pass, CI is green, and the exact final
+  PR head receives an independent Level 3 review before merge.
+- The R2 gate remains open.
+
+#### Completion record
+
+- Baseline: `origin/main` at
+  `62ca4d46cbadf859546465144938d419f792bec9`, including merged R2-01 and R2-02.
+- Runtime behavior: same-ID hydration now uses an explicit field policy,
+  preserve-if-omitted mapping metadata, ID-based event merge, active-game-safe
+  local precedence, and a monotonic request/account acceptance guard.
+- Corrected R2-02 assertions: the former richer-local overwrite,
+  poorer-partial-success hydration, and out-of-order response characterizations
+  are now passing R2-03 behavior contracts. Unresolved R2 characterizations
+  remain intact.
+- Focused checks: R2 sync characterization `28/28`; local-storage safety
+  `28/28`; event-operation service passed; tracked-time service `16/16`;
+  tracked-time foundation `11/11`; tracked-time UI `44/44`; tracked-time
+  manual scenarios `7/7`; cancel-game `33/33`; changed JavaScript syntax.
+- Complete local regression: canonical-plus-additive `37 passed, 0 failed`.
+- CI: portable regression and Docker test suite passed on the pushed
+  implementation-and-record branch before independent-review handoff.
+- Implementation commit:
+  `aec4e30ef12e3dcc1c633d1e0a1d118f549857b9`.
+- Production or external state changed: `NO`.
+- `REPO_CURRENT_STATE.md` updated: `YES`.
+- `docs/LaxHornet_Rollout_Checklist.md` updated: `YES`; only the bounded R2-03
+  hydration items are complete and the R2 gate remains open.
+- Review status: `NOT COMPLETE`. Independent Level 3 review must inspect the
+  exact final draft-PR head after all corrections are pushed. Do not merge or
+  deploy from this task.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

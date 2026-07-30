@@ -129,14 +129,19 @@ Do not combine these into one large Codex task. Each item requires one approved 
 - [ ] Define permanent client operation IDs.
 - [ ] Define queued-operation states.
 - [ ] Define idempotent replay.
-- [ ] Prevent cloud fetches from silently replacing newer local evidence.
+- [x] Prevent cloud fetches from silently replacing newer local evidence
+  within the current game/event hydration boundary (`R2-03`). Same-ID merge
+  preserves cloud-omitted local evidence and rejects superseded or prior-account
+  responses; durable field versions and explicit conflicts remain later R2 work.
 - [ ] Define tombstone-versus-stale-update behavior.
 - [ ] Separate authorization failures from retryable network failures.
 - [ ] Add visible states: Saved on device, Waiting to sync, Syncing, Synced, Needs attention.
 - [ ] Add sanitized sync journal.
 - [x] Test offline creation, reconnect, duplicate replay, refresh, revocation,
   and conflict (`R2-02`; `tools/test_sync_characterization.mjs`).
-- [ ] Preserve existing saved games and offline capture.
+- [x] Preserve existing saved games and offline capture through the R2-03
+  hydration merge, including tracked-time, score-context, pending/recovery,
+  local metadata, and active-game evidence.
 - [ ] Keep production mutation and release out of the feature ticket.
 
 **Gate to advance:** No silent local overwrite; offline operations replay exactly once; conflicts are detectable.

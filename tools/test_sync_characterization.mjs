@@ -128,6 +128,7 @@ function appHarness(functionNames, globals = {}) {
     Math,
     Map,
     Set,
+    WeakMap,
     Promise,
     URL,
     console: {
@@ -220,7 +221,15 @@ function mapperHarness() {
       "gameToSupabaseRow",
       "eventToSupabaseRow",
       "eventFromSupabaseRow",
+      "cloudProjectionMetadataForRow",
       "gameFromSupabaseRow",
+      "cloudGameMergePolicy",
+      "cloudEventMergePolicy",
+      "hydrationTimestamp",
+      "cloudConflictFieldsAreCurrent",
+      "hydrationValueIsMissing",
+      "mergeHydratedEvent",
+      "mergeHydratedGame",
       "mergeGames",
     ],
     {
@@ -284,6 +293,7 @@ function mapperHarness() {
       isDeletedGame: (gameId) => state.deletedGameIds.includes(gameId),
       canShowGameForCurrentAccess: () => true,
       currentUserId: () => "synthetic-account",
+      cloudGameHydrationMetadata: new WeakMap(),
     },
   );
   return {
@@ -293,6 +303,8 @@ function mapperHarness() {
     eventToSupabaseRow: harness.get("eventToSupabaseRow"),
     eventFromSupabaseRow: harness.get("eventFromSupabaseRow"),
     gameFromSupabaseRow: harness.get("gameFromSupabaseRow"),
+    cloudGameMergePolicy: harness.get("cloudGameMergePolicy"),
+    cloudEventMergePolicy: harness.get("cloudEventMergePolicy"),
     mergeGames: harness.get("mergeGames"),
   };
 }
@@ -407,55 +419,224 @@ function poorerCloudRow(overrides = {}) {
   };
 }
 
+test("R2-03: ownership policy is explicit for games and events", () => {
+  const mapper = mapperHarness();
+  const gamePolicy = mapper.cloudGameMergePolicy();
+  const eventPolicy = mapper.cloudEventMergePolicy();
+
+  assert.deepEqual(Array.from(gamePolicy.identity), ["id"]);
+  assert.ok(gamePolicy.cloudAuthoritative.includes("shareCode"));
+  assert.ok(gamePolicy.localAuthoritative.includes("trackedPlayingTime"));
+  assert.ok(gamePolicy.merged.includes("events"));
+  assert.ok(gamePolicy.conflictSensitive.includes("status"));
+  assert.equal(gamePolicy.preserveIfOmitted, true);
+
+  assert.deepEqual(Array.from(eventPolicy.identity), ["id", "gameId"]);
+  assert.ok(eventPolicy.cloudAuthoritative.includes("teamId"));
+  assert.ok(eventPolicy.localAuthoritative.includes("scoreForAtEvent"));
+  assert.ok(eventPolicy.conflictSensitive.includes("statType"));
+  assert.equal(eventPolicy.preserveIfOmitted, true);
+});
+
+test("R2-03: richer local game survives poorer same-ID cloud hydration", () => {
+  const mapper = mapperHarness();
+  const local = mapper.normalizeGame(richerLocalGame());
+  const row = poorerCloudRow();
+  const cloud = mapper.gameFromSupabaseRow(row, row.events);
+  const [merged] = mapper.mergeGames([local], [cloud]);
+
+  assert.equal(merged.id, local.id);
+  assert.equal(merged.status, "complete");
+  assert.equal(merged.currentQuarter, "Q3");
+  assert.equal(merged.location, "Device-only field");
+  assert.equal(merged.scoreFor, 7);
+  assert.equal(merged.scoreAgainst, 5);
+  assert.equal(merged.scoreTrackingTouched, true);
+  assert.equal(merged.finalScoreFor, 7);
+  assert.equal(merged.finalScoreAgainst, 5);
+  assert.deepEqual(merged.localOnlyMetadata, local.localOnlyMetadata);
+  assert.deepEqual(merged.pendingLegacyOperation, local.pendingLegacyOperation);
+});
+
+test("R2-03: tracked playing-time state and pending operations survive hydration", () => {
+  const mapper = mapperHarness();
+  const local = mapper.normalizeGame(richerLocalGame());
+  const row = poorerCloudRow();
+  const [merged] = mapper.mergeGames(
+    [local],
+    [mapper.gameFromSupabaseRow(row, row.events)],
+  );
+
+  assert.deepEqual(merged.trackedPlayingTime, local.trackedPlayingTime);
+  assert.equal(merged.trackedPlayingTime.clockState.revision, 4);
+  assert.equal(
+    merged.trackedPlayingTime.participationOperations[0].syncState,
+    "pending",
+  );
+});
+
+test("R2-03: same-ID events merge without losing score context or local metadata", () => {
+  const mapper = mapperHarness();
+  const localFixture = richerLocalGame();
+  localFixture.events[0].localEventMetadata = {
+    recoverySource: "synthetic-event-backup",
+  };
+  const local = mapper.normalizeGame(localFixture);
+  const row = poorerCloudRow({
+    saved_at: "2026-07-30T16:30:00.000Z",
+    events: [
+      {
+        ...poorerCloudRow().events[0],
+        stat_label: "Cloud-corrected goal",
+        note: "Cloud-known update",
+      },
+    ],
+  });
+  const [merged] = mapper.mergeGames(
+    [local],
+    [mapper.gameFromSupabaseRow(row, row.events)],
+  );
+
+  assert.equal(merged.events.length, 1);
+  const [event] = merged.events;
+  assert.equal(event.statLabel, "Cloud-corrected goal");
+  assert.equal(event.note, "Cloud-known update");
+  assert.equal(event.scoreForAtEvent, 7);
+  assert.equal(event.scoreAgainstAtEvent, 5);
+  assert.equal(event.scoreMarginAtEvent, 2);
+  assert.equal(event.scoreStateAtEvent, "leading");
+  assert.equal(event.scoreAutoIncrement, "for");
+  assert.equal(event.scoreForBeforeEvent, 6);
+  assert.equal(event.scoreAgainstBeforeEvent, 5);
+  assert.deepEqual(event.localEventMetadata, {
+    recoverySource: "synthetic-event-backup",
+  });
+});
+
+test("R2-03: omitted cloud fields do not delete local game or event fields", () => {
+  const mapper = mapperHarness();
+  const local = mapper.normalizeGame(richerLocalGame());
+  const partialRow = {
+    id: local.id,
+    user_id: "synthetic-account",
+    share_code: "PARTIAL",
+    is_shared: true,
+    events: [
+      {
+        id: local.events[0].id,
+        game_id: local.id,
+        user_id: "synthetic-account",
+        note: "Only this cloud field was projected",
+      },
+    ],
+  };
+  const [merged] = mapper.mergeGames(
+    [local],
+    [mapper.gameFromSupabaseRow(partialRow, partialRow.events)],
+  );
+
+  assert.equal(merged.shareCode, "PARTIAL");
+  assert.equal(merged.isShared, true);
+  assert.equal(merged.status, "complete");
+  assert.equal(merged.location, "Device-only field");
+  assert.equal(merged.events[0].note, "Synthetic fixture");
+  assert.equal(merged.events[0].statType, "goal");
+  assert.equal(merged.events[0].scoreForAtEvent, 7);
+});
+
+test("R2-03: newer local conflict-sensitive values defeat older cloud values", () => {
+  const mapper = mapperHarness();
+  const local = mapper.normalizeGame(richerLocalGame());
+  const row = poorerCloudRow();
+  const [merged] = mapper.mergeGames(
+    [local],
+    [mapper.gameFromSupabaseRow(row, row.events)],
+  );
+
+  assert.equal(merged.savedAt, local.savedAt);
+  assert.equal(merged.status, "complete");
+  assert.equal(merged.currentQuarter, "Q3");
+  assert.equal(merged.location, "Device-only field");
+});
+
+test("R2-03: newer cloud conflict-sensitive values update while local-only evidence survives", () => {
+  const mapper = mapperHarness();
+  const local = mapper.normalizeGame(richerLocalGame());
+  const row = poorerCloudRow({
+    status: "complete",
+    current_quarter: "Q4",
+    location: "Newer cloud location",
+    saved_at: "2026-07-30T16:30:00.000Z",
+  });
+  const [merged] = mapper.mergeGames(
+    [local],
+    [mapper.gameFromSupabaseRow(row, row.events)],
+  );
+
+  assert.equal(merged.savedAt, "2026-07-30T16:30:00.000Z");
+  assert.equal(merged.status, "complete");
+  assert.equal(merged.currentQuarter, "Q4");
+  assert.equal(merged.location, "Newer cloud location");
+  assert.equal(merged.scoreFor, 7);
+  assert.deepEqual(merged.trackedPlayingTime, local.trackedPlayingTime);
+});
+
+test("R2-03: cloud-only games are added", () => {
+  const mapper = mapperHarness();
+  const row = poorerCloudRow({
+    id: "synthetic-cloud-only-game",
+    events: [],
+  });
+  const [merged] = mapper.mergeGames(
+    [],
+    [mapper.gameFromSupabaseRow(row, row.events)],
+  );
+  assert.equal(merged.id, "synthetic-cloud-only-game");
+  assert.equal(merged.location, "Cloud field");
+});
+
+test("R2-03: repeated same-ID game and event payloads do not create duplicates", () => {
+  const mapper = mapperHarness();
+  const local = mapper.normalizeGame(richerLocalGame());
+  const row = poorerCloudRow({
+    saved_at: "2026-07-30T16:30:00.000Z",
+  });
+  const cloud = mapper.gameFromSupabaseRow(row, [
+    row.events[0],
+    { ...row.events[0] },
+  ]);
+  const games = mapper.mergeGames([local], [cloud, cloud]);
+
+  assert.equal(games.length, 1);
+  assert.equal(games[0].events.length, 1);
+});
+
+test("R2-03: active game is the same-ID hydration base and remains unmodified", () => {
+  const mapper = mapperHarness();
+  const active = mapper.normalizeGame({
+    ...richerLocalGame(),
+    scoreFor: 9,
+    savedAt: "2026-07-30T17:00:00.000Z",
+  });
+  const activeBefore = clone(active);
+  const staleSaved = mapper.normalizeGame({
+    ...richerLocalGame(),
+    scoreFor: 2,
+    savedAt: "2026-07-30T14:00:00.000Z",
+  });
+  const row = poorerCloudRow();
+  const [merged] = mapper.mergeGames(
+    [staleSaved],
+    [mapper.gameFromSupabaseRow(row, row.events)],
+    { activeGame: active },
+  );
+
+  assert.equal(merged.scoreFor, 9);
+  assert.deepEqual(clone(active), activeBefore);
+});
+
 test(
-  "CHARACTERIZATION: same-ID cloud hydration currently replaces richer local game",
-  () => {
-    const mapper = mapperHarness();
-    const local = mapper.normalizeGame(richerLocalGame());
-    const row = poorerCloudRow();
-    const cloud = mapper.gameFromSupabaseRow(row, row.events);
-    const [merged] = mapper.mergeGames([local], [cloud]);
-
-    const gameFieldMatrix = [
-      ["id", "synthetic-game-same-id", "survives from cloud identity"],
-      ["status", "in-progress", "cloud-known status replaces local status"],
-      ["currentQuarter", "Q2", "cloud-known period replaces local period"],
-      ["location", "Cloud field", "cloud-known metadata survives"],
-      ["scoreFor", 0, "local score is lost"],
-      ["scoreAgainst", 0, "local opponent score is lost"],
-      ["scoreTrackingTouched", false, "local score tracking state is lost"],
-      ["finalScoreFor", null, "local final score is lost"],
-      ["finalScoreAgainst", null, "local final opponent score is lost"],
-      ["trackedPlayingTime", undefined, "tracked-time payload is lost"],
-      ["localOnlyMetadata", undefined, "local-only metadata is lost"],
-      ["pendingLegacyOperation", undefined, "pending/recovery state is lost"],
-    ];
-    for (const [field, expected, explanation] of gameFieldMatrix) {
-      assert.equal(merged[field], expected, `${field}: ${explanation}`);
-    }
-
-    assert.equal(merged.events.length, 1);
-    const event = merged.events[0];
-    const eventFieldMatrix = [
-      ["id", "synthetic-event-same-id", "cloud event identity survives"],
-      ["statType", "goal", "cloud-known stat survives"],
-      ["fieldZone", "offensive_end", "cloud-known field survives"],
-      ["scoreForAtEvent", null, "event score-for context is lost"],
-      ["scoreAgainstAtEvent", null, "event score-against context is lost"],
-      ["scoreMarginAtEvent", null, "event score margin is lost"],
-      ["scoreStateAtEvent", "unknown", "event score state is lost"],
-      ["scoreAutoIncrement", "", "score mutation provenance is lost"],
-      ["scoreForBeforeEvent", null, "prior score-for context is lost"],
-      ["scoreAgainstBeforeEvent", null, "prior score-against context is lost"],
-    ];
-    for (const [field, expected, explanation] of eventFieldMatrix) {
-      assert.equal(event[field], expected, `${field}: ${explanation}`);
-    }
-  },
-);
-
-test(
-  "CHARACTERIZATION: legacy Supabase projections are explicitly lossy in both directions",
+  "R2-03: legacy outbound projections stay lossy while hydration merge is lossless",
   () => {
     const mapper = mapperHarness();
     const local = mapper.normalizeGame(richerLocalGame());
@@ -529,17 +710,20 @@ test(
     }
 
     const row = poorerCloudRow();
-    const roundTripped = mapper.gameFromSupabaseRow(row, row.events);
-    assert.equal(roundTripped.scoreFor, 0);
-    assert.equal(roundTripped.trackedPlayingTime, undefined);
-    assert.equal(roundTripped.events[0].scoreForAtEvent, null);
+    const projected = mapper.gameFromSupabaseRow(row, row.events);
+    const [hydrated] = mapper.mergeGames([local], [projected]);
+    assert.equal(hydrated.scoreFor, 7);
+    assert.deepEqual(hydrated.trackedPlayingTime, local.trackedPlayingTime);
+    assert.equal(hydrated.events[0].scoreForAtEvent, 7);
   },
 );
 
-function loadCloudGamesHarness(initialGames = []) {
+function loadCloudGamesHarness(initialGames = [], options = {}) {
   const requests = [];
+  const mapper = mapperHarness();
   const state = {
     games: clone(initialGames),
+    activeGame: options.activeGame ? clone(options.activeGame) : null,
     players: [],
     activePlayerId: "",
     reviewGameId: null,
@@ -570,26 +754,21 @@ function loadCloudGamesHarness(initialGames = []) {
     },
   };
   let persistCount = 0;
-  const harness = appHarness(["loadCloudGames"], {
+  let currentAccountId = options.accountId || "synthetic-account";
+  const harness = appHarness(
+    ["cloudGameHydrationIsCurrent", "loadCloudGames"],
+    {
     state,
     supabaseClient,
-    currentUserId: () => "synthetic-account",
+    cloudGameHydrationGeneration: 0,
+    currentUserId: () => currentAccountId,
     loadCloudTeams: async () => [],
     flushDeletedCloudRecords: async () => {},
     syncLocalGamesToCloud: async () => 0,
     teamIds: () => [],
-    gameFromSupabaseRow: (row, events) => ({
-      ...clone(row),
-      date: row.game_date,
-      createdAt: row.created_at,
-      events: clone(events),
-    }),
+    gameFromSupabaseRow: mapper.gameFromSupabaseRow,
     canShowGameForCurrentAccess: () => true,
-    mergeGames: (localGames, cloudGames) => {
-      const merged = new Map(localGames.map((game) => [game.id, clone(game)]));
-      cloudGames.forEach((game) => merged.set(game.id, clone(game)));
-      return [...merged.values()];
-    },
+    mergeGames: mapper.mergeGames,
     mergePlayersFromGames: () => {},
     isDeletedGame: () => false,
     gamePlayerId: (game) => game.player_id || game.playerId || "",
@@ -603,24 +782,31 @@ function loadCloudGamesHarness(initialGames = []) {
     reportSyncError: (error) => {
       throw error;
     },
-  });
+    },
+  );
   return {
     state,
     requests,
     get persistCount() {
       return persistCount;
     },
+    setAccountId(accountId) {
+      currentAccountId = accountId;
+    },
     loadCloudGames: harness.get("loadCloudGames"),
   };
 }
 
 test(
-  "CHARACTERIZATION: older overlapping cloud load can regress newer state when it finishes last",
+  "R2-03: older overlapping cloud load cannot regress a newer accepted response",
   async () => {
     const harness = loadCloudGamesHarness([
       {
         id: "synthetic-overlap-game",
-        revisionLabel: "local",
+        userId: "synthetic-account",
+        status: "in-progress",
+        savedAt: "2026-07-30T14:00:00.000Z",
+        events: [],
       },
     ]);
 
@@ -633,7 +819,9 @@ test(
       data: [
         {
           id: "synthetic-overlap-game",
-          revisionLabel: "newer-response-b",
+          user_id: "synthetic-account",
+          status: "complete",
+          saved_at: "2026-07-30T16:00:00.000Z",
           game_date: "2026-07-30",
           events: [],
         },
@@ -642,8 +830,8 @@ test(
     });
     await requestB;
     assert.equal(
-      harness.state.games[0].revisionLabel,
-      "newer-response-b",
+      harness.state.games[0].status,
+      "complete",
       "request B applies first",
     );
 
@@ -651,7 +839,9 @@ test(
       data: [
         {
           id: "synthetic-overlap-game",
-          revisionLabel: "older-response-a",
+          user_id: "synthetic-account",
+          status: "in-progress",
+          saved_at: "2026-07-30T15:00:00.000Z",
           game_date: "2026-07-29",
           events: [],
         },
@@ -660,13 +850,70 @@ test(
     });
     await requestA;
     assert.equal(
-      harness.state.games[0].revisionLabel,
-      "older-response-a",
-      "request A regresses state because there is no generation guard",
+      harness.state.games[0].status,
+      "complete",
+      "request A is ignored after request B becomes the current generation",
     );
-    assert.equal(harness.persistCount, 2);
+    assert.equal(harness.persistCount, 1);
   },
 );
+
+test("R2-03: a later legitimate request C becomes the accepted generation", async () => {
+  const harness = loadCloudGamesHarness([]);
+  const requestA = harness.loadCloudGames({ silent: true });
+  await waitFor(() => harness.requests.length === 1, "request A did not start");
+  const requestB = harness.loadCloudGames({ silent: true });
+  await waitFor(() => harness.requests.length === 2, "request B did not start");
+
+  harness.requests[1].resolve({ data: [], error: null });
+  await requestB;
+  harness.requests[0].resolve({ data: [], error: null });
+  await requestA;
+
+  const requestC = harness.loadCloudGames({ silent: true });
+  await waitFor(() => harness.requests.length === 3, "request C did not start");
+  harness.requests[2].resolve({
+    data: [
+      {
+        id: "synthetic-request-c-game",
+        user_id: "synthetic-account",
+        game_date: "2026-07-30",
+        saved_at: "2026-07-30T17:00:00.000Z",
+        events: [],
+      },
+    ],
+    error: null,
+  });
+  await requestC;
+
+  assert.deepEqual(
+    Array.from(harness.state.games, (game) => game.id),
+    ["synthetic-request-c-game"],
+  );
+  assert.equal(harness.persistCount, 2);
+});
+
+test("R2-03: a response from the prior account cannot hydrate the new namespace", async () => {
+  const harness = loadCloudGamesHarness([]);
+  const request = harness.loadCloudGames({ silent: true });
+  await waitFor(() => harness.requests.length === 1, "account request did not start");
+  harness.setAccountId("synthetic-other-account");
+  harness.requests[0].resolve({
+    data: [
+      {
+        id: "synthetic-prior-account-game",
+        user_id: "synthetic-account",
+        game_date: "2026-07-30",
+        events: [],
+      },
+    ],
+    error: null,
+  });
+  await request;
+
+  assert.equal(harness.state.games.length, 0);
+  assert.equal(harness.persistCount, 0);
+});
 
 test(
   "CHARACTERIZATION: stale device uploads a legacy game and event before learning of deletion",
@@ -1178,7 +1425,7 @@ function syncGameHarness(upsertWithOptionalColumns) {
 }
 
 test(
-  "CHARACTERIZATION: partial game success followed by hydration produces a poorer local game",
+  "R2-03: integrated loadCloudGames hydration preserves richer local evidence after partial sync",
   async () => {
     const calls = [];
     const local = richerLocalGame();
@@ -1222,8 +1469,16 @@ test(
     await hydration;
 
     assert.equal(loadHarness.state.games[0].id, local.id);
-    assert.equal(loadHarness.state.games[0].events.length, 0);
-    assert.equal(loadHarness.state.games[0].trackedPlayingTime, undefined);
+    assert.equal(loadHarness.state.games[0].events.length, 1);
+    assert.deepEqual(
+      loadHarness.state.games[0].trackedPlayingTime,
+      local.trackedPlayingTime,
+    );
+    assert.equal(loadHarness.state.games[0].scoreFor, 7);
+    assert.equal(
+      loadHarness.state.games[0].events[0].scoreForAtEvent,
+      7,
+    );
   },
 );
 
@@ -1343,6 +1598,19 @@ test(
       "laxhornet.games.user.synthetic-account": [
         {
           id: "synthetic-account-game",
+          savedAt: "2026-07-30T18:00:00.000Z",
+          localOnlyMetadata: {
+            namespace: "synthetic-account",
+          },
+          trackedPlayingTime: {
+            participationOperations: [
+              {
+                clientOperationId: "synthetic-account-operation",
+                syncState: "pending",
+              },
+            ],
+          },
+          events: [],
         },
       ],
     };
@@ -1384,6 +1652,12 @@ test(
     const mapper = mapperHarness();
     state.games = mapper.mergeGames(state.games, [
       {
+        id: "synthetic-account-game",
+        savedAt: "2026-07-30T17:00:00.000Z",
+        status: "in-progress",
+        events: [],
+      },
+      {
         id: "synthetic-cloud-game",
         date: "2026-07-30",
         events: [],
@@ -1392,6 +1666,16 @@ test(
     assert.deepEqual(
       Array.from(state.games, (game) => game.id).sort(),
       ["synthetic-account-game", "synthetic-cloud-game"],
+    );
+    const accountGame = state.games.find(
+      (game) => game.id === "synthetic-account-game",
+    );
+    assert.deepEqual(clone(accountGame.localOnlyMetadata), {
+      namespace: "synthetic-account",
+    });
+    assert.equal(
+      accountGame.trackedPlayingTime.participationOperations[0].syncState,
+      "pending",
     );
     assert.deepEqual(
       namespaceStorage["laxhornet.games"].map((game) => game.id),
