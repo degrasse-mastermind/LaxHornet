@@ -5,6 +5,7 @@ import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import {
   APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
+  DURABLE_GAME_TOMBSTONE_CONCURRENCY_REVIEW_DB_PATHS,
   DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS,
   TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS,
   TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
@@ -483,6 +484,7 @@ test("Phase-aware release containment preserves the authorized Trust Spine SQL",
         ...V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS,
         ...TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS,
         ...DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS,
+        ...DURABLE_GAME_TOMBSTONE_CONCURRENCY_REVIEW_DB_PATHS,
       ].sort(),
     );
     if (containment.mode.includes("with_provenance")) {

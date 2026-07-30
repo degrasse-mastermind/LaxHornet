@@ -7,6 +7,8 @@ import {
   APPROVED_AUTHORIZED_DB_PATHS,
   APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
   APPROVED_HISTORICAL_PROVENANCE_PATHS,
+  DURABLE_GAME_TOMBSTONE_CONCURRENCY_REVIEW_DB_PATHS,
+  DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS,
   TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
   ReleaseContainmentError,
   validateReleaseContainment,
@@ -323,6 +325,34 @@ try {
       result.reviewAdditiveDatabaseFiles,
       [...TRACKED_PLAYING_TIME_REVIEW_DB_PATHS].sort(),
     );
+  });
+
+  git(["switch", "-c", "r206a-review-package", "review-package-ref"]);
+  for (const [index, file] of [
+    ...DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS,
+    ...DURABLE_GAME_TOMBSTONE_CONCURRENCY_REVIEW_DB_PATHS,
+  ].entries()) {
+    write(file, `synthetic R2-06/R2-06A review file ${index + 1}\n`);
+  }
+  commit("Add synthetic R2-06 and R2-06A review packages");
+  test("combined containment recognizes the ordered R2-06 and R2-06A packages", () => {
+    const allowed = [
+      ...TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
+      ...DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS,
+      ...DURABLE_GAME_TOMBSTONE_CONCURRENCY_REVIEW_DB_PATHS,
+    ];
+    const result = validateReleaseContainment({
+      repoRoot: tempRoot,
+      releaseBaseRef: "release-base",
+      authorizedDbRef: "authorized-db-ref",
+      approvedAdditiveRef: "approved-additive-ref",
+      allowedAdditiveDbPaths: allowed,
+    });
+    assert.equal(
+      result.mode,
+      "canonical_plus_additive_with_provenance_and_review_package",
+    );
+    assert.deepEqual(result.reviewAdditiveDatabaseFiles, [...allowed].sort());
   });
 
   git(["switch", "-c", "review-package-with-extra", "review-package-ref"]);

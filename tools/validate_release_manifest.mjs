@@ -8,6 +8,7 @@ import {
   APPROVED_EVENT_PIPELINE_ADDITIVE_DB_PATHS,
   APPROVED_HISTORICAL_PROVENANCE_IDENTITIES,
   APPROVED_HISTORICAL_PROVENANCE_PATHS,
+  DURABLE_GAME_TOMBSTONE_CONCURRENCY_REVIEW_DB_PATHS,
   DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS,
   TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS,
   TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
@@ -94,8 +95,17 @@ expect(
   "incidentRemediationMergeSha must identify the approved PR #30 merge",
 );
 expect(
-  manifest.productionApplicationSha === manifest.incidentRemediationMergeSha,
-  "productionApplicationSha must identify the deployed incident-remediation merge",
+  manifest.productionApplicationSha === manifest.productionRollbackSourceSha
+    && manifest.productionApplicationSha === "44f0510d3bde18f459e78f570efd27b72dc2a989",
+  "productionApplicationSha must identify the verified R2-05 rollback source",
+);
+expect(
+  manifest.blockedRuntimeSourceSha === "18f5157de159fa7a27b3cefb4c90f5148c3b230d",
+  "blockedRuntimeSourceSha must identify the rolled-back R2-06 source",
+);
+expect(
+  fs.existsSync(path.join(root, manifest.productionRollbackEvidence || "")),
+  "production rollback evidence must exist",
 );
 expect(
   manifest.productionSmokeToolingSha === "0ce0f6734318b07bbf7156e91c79d05d40bd7222",
@@ -111,8 +121,8 @@ expect(
   "productionSmokeEvidence must identify the sanitized closeout result",
 );
 expect(
-  manifest.productionVerifiedAt === "2026-07-29",
-  "productionVerifiedAt must record the completed production gate date",
+  manifest.productionVerifiedAt === "2026-07-30",
+  "productionVerifiedAt must record the completed application rollback date",
 );
 expect(
   fs.existsSync(path.join(root, manifest.productionSmokeEvidence || "")),
@@ -181,10 +191,18 @@ const publicEventBoundaryReview = reviewPackages.find(
 const teamMembersRlsReview = reviewPackages.find(
   (entry) => entry.name === "team_members_rls_recursion",
 );
-expect(reviewPackages.length === 3, "manifest must contain the three bounded v284 database packages");
+const durableGameTombstoneReview = reviewPackages.find(
+  (entry) => entry.name === "durable_game_tombstones",
+);
+const durableGameConcurrencyReview = reviewPackages.find(
+  (entry) => entry.name === "durable_game_tombstone_concurrency",
+);
+expect(reviewPackages.length === 5, "manifest must contain the five bounded database packages");
 expect(Boolean(trackedTimeReview), "tracked playing time review package must be present");
 expect(Boolean(publicEventBoundaryReview), "public event semantic boundary package must be present");
 expect(Boolean(teamMembersRlsReview), "team_members RLS remediation package must be present");
+expect(Boolean(durableGameTombstoneReview), "R2-06 durable tombstone package must be present");
+expect(Boolean(durableGameConcurrencyReview), "R2-06A concurrency package must be present");
 const trackedTimeReviewPaths = trackedTimeReview
   ? [
       trackedTimeReview.forwardMigration,
@@ -280,6 +298,77 @@ for (const file of TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS) {
     expect(
       teamMembersRlsReview?.sha256?.[file] === localHash,
       `team_members RLS remediation SHA-256 is stale: ${file}`,
+    );
+  }
+}
+
+const durableGameTombstonePaths = durableGameTombstoneReview
+  ? [
+      durableGameTombstoneReview.forwardMigration,
+      durableGameTombstoneReview.rollbackReference,
+      durableGameTombstoneReview.testSql,
+    ]
+  : [];
+expect(
+  JSON.stringify([...durableGameTombstonePaths].sort())
+    === JSON.stringify([...DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS].sort()),
+  "R2-06 durable tombstone paths must match the explicit containment allowlist",
+);
+expect(
+  durableGameTombstoneReview?.status === "blocked_pending_remediation_review"
+    && durableGameTombstoneReview?.productionApplied === false,
+  "R2-06 durable tombstones must remain blocked and unapplied",
+);
+expect(
+  durableGameTombstoneReview?.productionAuthorizationRequired === true,
+  "R2-06 durable tombstones must require separate production authorization",
+);
+for (const file of DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS) {
+  const absolute = path.join(root, file);
+  expect(fs.existsSync(absolute), `R2-06 durable tombstone file is missing: ${file}`);
+  if (fs.existsSync(absolute)) {
+    expect(
+      durableGameTombstoneReview?.sha256?.[file]
+        === reviewedTextSha256(fs.readFileSync(absolute)),
+      `R2-06 durable tombstone SHA-256 is stale: ${file}`,
+    );
+  }
+}
+
+const durableGameConcurrencyPaths = durableGameConcurrencyReview
+  ? [
+      durableGameConcurrencyReview.forwardMigration,
+      durableGameConcurrencyReview.rollbackReference,
+      durableGameConcurrencyReview.testSql,
+    ]
+  : [];
+expect(
+  JSON.stringify([...durableGameConcurrencyPaths].sort())
+    === JSON.stringify([...DURABLE_GAME_TOMBSTONE_CONCURRENCY_REVIEW_DB_PATHS].sort()),
+  "R2-06A concurrency paths must match the explicit containment allowlist",
+);
+expect(
+  durableGameConcurrencyReview?.status === "review_pending"
+    && durableGameConcurrencyReview?.productionApplied === false,
+  "R2-06A concurrency remediation must remain review-pending and unapplied",
+);
+expect(
+  durableGameConcurrencyReview?.requiresMigration
+    === durableGameTombstoneReview?.forwardMigration,
+  "R2-06A must depend on the R2-06 tombstone migration",
+);
+expect(
+  durableGameConcurrencyReview?.productionAuthorizationRequired === true,
+  "R2-06A concurrency remediation must require separate production authorization",
+);
+for (const file of DURABLE_GAME_TOMBSTONE_CONCURRENCY_REVIEW_DB_PATHS) {
+  const absolute = path.join(root, file);
+  expect(fs.existsSync(absolute), `R2-06A concurrency file is missing: ${file}`);
+  if (fs.existsSync(absolute)) {
+    expect(
+      durableGameConcurrencyReview?.sha256?.[file]
+        === reviewedTextSha256(fs.readFileSync(absolute)),
+      `R2-06A concurrency SHA-256 is stale: ${file}`,
     );
   }
 }
@@ -410,37 +499,47 @@ const expectedMigrationSequence = [
   trackedTimeReview?.forwardMigration,
   publicEventBoundaryReview?.forwardMigration,
   teamMembersRlsReview?.forwardMigration,
+  durableGameTombstoneReview?.forwardMigration,
+  durableGameConcurrencyReview?.forwardMigration,
 ];
 expect(
   JSON.stringify(manifest.requiredMigrationSequence) === JSON.stringify(expectedMigrationSequence),
-  "requiredMigrationSequence must preserve the applied v284 migration order",
+  "requiredMigrationSequence must preserve production order through R2-06A",
 );
 expect(
   JSON.stringify(manifest.reviewMigrationSequence)
     === JSON.stringify(expectedMigrationSequence),
-  "reviewMigrationSequence must include the reviewed team_members remediation",
+  "reviewMigrationSequence must include R2-06 and R2-06A in order",
 );
-const expectedAppliedMigrationSequence = teamMembersRlsReview?.productionApplied
-  ? expectedMigrationSequence
-  : expectedMigrationSequence.slice(0, -1);
+const expectedAppliedMigrationSequence = expectedMigrationSequence.slice(0, -2);
 expect(
   JSON.stringify(manifest.expectedRemoteAppliedMigrations)
     === JSON.stringify(expectedAppliedMigrationSequence),
-  "expectedRemoteAppliedMigrations must match the confirmed production phase",
+  "expectedRemoteAppliedMigrations must stop before unapplied R2-06/R2-06A",
 );
-const expectedPendingMigrations = teamMembersRlsReview?.productionApplied
-  ? []
-  : [teamMembersRlsReview?.forwardMigration];
+const expectedPendingMigrations = [
+  durableGameTombstoneReview?.forwardMigration,
+  durableGameConcurrencyReview?.forwardMigration,
+];
 expect(
   JSON.stringify(manifest.expectedPendingProductionMigrations)
     === JSON.stringify(expectedPendingMigrations),
-  "expectedPendingProductionMigrations must match the team_members remediation phase",
+  "expectedPendingProductionMigrations must identify R2-06 then R2-06A",
 );
 expect(
   teamMembersRlsReview?.productionApplied
     ? teamMembersRlsReview?.status === "production_applied"
     : teamMembersRlsReview?.status === "approved_pending_production",
   "team_members RLS package status and productionApplied flag must agree",
+);
+expect(
+  manifest.runtimeReleaseBlockedUntilMigrationsApplied === true,
+  "runtime release must remain blocked until required migrations are applied",
+);
+expect(
+  JSON.stringify(manifest.runtimeDatabaseDependencies)
+    === JSON.stringify(expectedPendingMigrations),
+  "runtime database dependencies must require R2-06 before R2-06A",
 );
 
 expect(
@@ -534,6 +633,7 @@ if (requireCombined) {
         ...V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS,
         ...TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS,
         ...DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS,
+        ...DURABLE_GAME_TOMBSTONE_CONCURRENCY_REVIEW_DB_PATHS,
       ],
       headRef: combinedRef,
     });
@@ -566,6 +666,7 @@ const allowedCleanupMigrations = new Set([
   publicEventBoundaryReview?.forwardMigration,
   teamMembersRlsReview?.forwardMigration,
   DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS[0],
+  DURABLE_GAME_TOMBSTONE_CONCURRENCY_REVIEW_DB_PATHS[0],
 ]);
 for (const file of cleanupMigrations) {
   expect(allowedCleanupMigrations.has(file), `unknown cleanup migration detected: ${file}`);

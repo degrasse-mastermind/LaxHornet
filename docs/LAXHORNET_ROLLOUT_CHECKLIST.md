@@ -273,6 +273,61 @@ transactionality, visible sync states, a sanitized journal, production
 migration drift, production RLS verification, and the overall R2 gate remain
 incomplete.
 
+## R2-06A — Tombstone Concurrency and Delete-Conflict Recovery
+
+**Status:** [~] Repository remediation implemented; CI and exact-SHA review pending
+**Risk level:** Level 3 — Critical deletion, synchronization, concurrency, persistence, database, and recovery behavior
+**Codex task:** `Implement R2-06A — Remediate Tombstone Concurrency and Delete-Conflict Recovery`
+**Branch:** `feature/r2-06a-tombstone-concurrency-recovery`
+**Starting point:** R2-06 merge `18f5157de159fa7a27b3cefb4c90f5148c3b230d`
+**Draft pull request:** [#48](https://github.com/degrasse-mastermind/LaxHornet/pull/48)
+**Locally verified implementation head:** `4ba897370cc5b60c3cba0903dc2283e336778775`
+
+### Remediation record
+
+- [x] Preserve the production application-only rollback at
+  `44f0510d3bde18f459e78f570efd27b72dc2a989`; do not treat this repository
+  remediation as production activation.
+- [x] Give guarded legacy-game writes and durable deletes one deterministic,
+  transaction-scoped per-game advisory lock before tombstone/game reads or
+  mutation.
+- [x] Retain the tombstone trigger as defense in depth for direct or legacy
+  writes after deletion.
+- [x] Prove both same-game lock acquisition orders with isolated concurrent
+  PostgreSQL transactions and prove unrelated game IDs remain independent.
+- [x] Persist a private, versioned, account-scoped game/event recovery snapshot
+  before hiding a pending deletion.
+- [x] Keep pending/retryable deletion hidden and recoverable without creating
+  whole-game event-delete markers.
+- [x] Restore the game, retained events, and prior local relationships after
+  classified rejection or conflict; retain the operation evidence without
+  automatic conflict retry.
+- [x] Preserve individually deleted events and Trust Spine event tombstones as
+  separate behavior.
+- [x] Finalize accepted cleanup only after the durable tombstone receipt is
+  persisted.
+- [x] Add the separate R2-06A remediation migration and reverse-order,
+  pre-activation-only rollback; leave the merged R2-06 migration bytes
+  unchanged.
+- [x] Register R2-06 and R2-06A assets, exact ordering, rollback limits, and
+  migration-before-runtime dependency in release controls.
+- [x] Convert both blocked P1 findings into desired sync-characterization
+  contracts while retaining the other unresolved R2 evidence.
+- [x] Pass the complete local canonical-plus-additive regression (`42/42`) on
+  the committed implementation head.
+- [x] Confirm portable regression (`30558552058`), Docker
+  (`30558553453`), Supabase Preview, Vercel Preview, and embedded
+  release-containment checks pass on PR #48.
+- [ ] Obtain a fresh independent Level 3 review bound to the exact final PR
+  head SHA.
+- [ ] Mark R2-06A complete only after both CI and that exact-SHA review pass.
+- [ ] Keep R2-06 production activation incomplete until named read-only
+  production verification, recovery readiness, and a separately authorized
+  migration-first release task.
+
+The overall R2 gate remains open. No migration, Supabase mutation, deployment,
+release activation, or production-data change is authorized by this item.
+
 # 4. Planned Engineering Sequence
 
 Do not combine these into one large Codex task. Each item requires one approved ticket, one primary implementation task, and a separate independent review when warranted.
@@ -296,8 +351,9 @@ Do not combine these into one large Codex task. Each item requires one approved 
   cloud-omitted local evidence and rejects superseded or prior-account
   responses; durable field versions and explicit conflicts remain later R2
   work.
-- [ ] Define tombstone-versus-stale-update behavior (`R2-06` implementation and
-  local validation complete; exact-SHA independent Level 3 review remains).
+- [ ] Define tombstone-versus-stale-update behavior (`R2-06A` repository
+  remediation and local validation complete; final CI and exact-SHA independent
+  Level 3 review remain).
 - [x] Separate authorization failures from retryable network failures for the
   R2-05 durable legacy-game/tracked-clock boundary. Trust Spine and
   participation behavior remain under their existing contracts.

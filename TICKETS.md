@@ -1078,6 +1078,275 @@ Related document: `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`
 - Review status: `NOT COMPLETE`. Do not merge, deploy, or apply the migration
   from this task.
 
+### R2-06-REL — Activate durable legacy-game tombstones in production
+
+Status: `BLOCKED`
+
+Risk level: `LEVEL 3`
+
+Branch: `release/r2-06-durable-game-tombstones`
+
+Execution task: `Execute the R2-06 Durable Game Tombstones production activation and release`
+(`019fb379-0c66-76c1-bed2-cd037ab70e8c`)
+
+Owner approval: David explicitly authorized an immediate application-only
+rollback to
+`44f0510d3bde18f459e78f570efd27b72dc2a989` on 2026-07-30. That authorization
+did not authorize a production migration, database rollback, Supabase change,
+synthetic-data creation or cleanup, P1 remediation, or any other production
+mutation.
+
+#### Exact release inputs and targets
+
+- Reviewed feature head:
+  `c1ab1bd2c6877abfd6d4683204dc19a753b1ec58`.
+- Squash merge and proposed runtime source:
+  `18f5157de159fa7a27b3cefb4c90f5148c3b230d`.
+- `origin/main` was exactly the squash merge at preflight; no later commit was
+  included.
+- Migration:
+  `supabase/migrations/20260730134439_durable_game_tombstones.sql`;
+  SHA-256
+  `138e8edfdaa4b48747ceb63a66a0eae76f91c832b19dffa52914bdea45188900`.
+- Pre-activation rollback:
+  `supabase/rollback/20260730134439_durable_game_tombstones_rollback.sql`;
+  SHA-256
+  `405d0b10370cbcc90aa474f469d9841a5bc56a96453094561cb8a2386dd1545b`.
+- pgTAP:
+  `supabase/tests/durable_game_tombstones.sql`; SHA-256
+  `23f4abe853acf82817690b296c5dcf29947f500ded5721e88f5e04f83dea778f`.
+- Intended database target: production project
+  `ulbmjcvnyznvmjgpstno`.
+- Runtime target:
+  `https://laxhornet.mybranford.com/` through the allowlisted Pages workflow.
+- Required order remains recovery readiness, migration application,
+  schema/RLS/grant/RPC/trigger verification, exact runtime deployment,
+  synthetic production smoke, stale-device/mixed-client verification,
+  cleanup, and closeout.
+
+#### Authorization, rollback, smoke, and cleanup boundaries
+
+- Tombstone reads must remain authenticated and limited to existing
+  owner/platform-reviewer/player-tracking authority. Anonymous access, direct
+  authenticated tombstone writes, direct authenticated game deletes, private
+  trigger-function execution, and any Team Admin authority expansion remain
+  prohibited.
+- Before any accepted tombstone, the reviewed rollback may reverse only the
+  empty additive schema. After any tombstone exists, application rollback must
+  retain the tombstone table and rows, write guard, guarded write RPC, and
+  durable legacy delete wrapper. Never bypass the rollback refusal.
+- Production smoke must use synthetic accounts and games only and cover
+  same-ID replay, different-ID conflict, newer-server-revision conflict,
+  stale-client rejection, both hydration response orders, refresh/retry,
+  account isolation, old/new clients, offline capture, and minimum-necessary
+  disclosure.
+- Remove mutable synthetic records and temporary authority after smoke.
+  Retain only inert, non-identifying tombstone evidence that cannot safely be
+  removed, with its synthetic identifier and retention reason documented.
+
+#### Preflight blockers
+
+- A late automated exact-head review, posted after the independent PASS and
+  squash merge, identified two unresolved P1 defects on
+  `c1ab1bd2c6877abfd6d4683204dc19a753b1ec58`:
+  1. `laxhornet_sync_game(jsonb)` does not acquire the durable delete RPC's
+     per-game advisory lock. A concurrent write can pass both tombstone checks,
+     wait for the deleting transaction, and recreate the game after the
+     tombstone commits.
+  2. `confirmDeleteGame` persists per-event delete markers before the durable
+     game outcome is known, while `flushDeletedCloudRecords` processes events
+     first. A `newer_game_revision` game-delete conflict can therefore retain
+     the newer game but delete its events on the next hydration.
+- Existing focused tests passed `29/29` client contracts and `11/11` isolated
+  migration checks, but neither suite exercises these two adversarial paths.
+- The v284 manifest validator passes its existing contract, but
+  `release/laxhornet-release-manifest.json` does not register R2-06, does not
+  include its three reviewed hashes in a release package, stops the reviewed
+  migration sequence at `20260730004700`, and declares no pending production
+  migration.
+- The canonical production preflight failed because it requires clean `main`
+  and the existing tooling is bound to the earlier v284 release identity. The
+  release worktree itself was clean.
+- The specifically required `supabase_production_readonly-2` connection was
+  not callable in this task. No generic Supabase connector was substituted, so
+  production migration and catalog state remain unverified.
+- Full canonical-plus-additive regression, production schema verification,
+  synthetic database verification, production smoke, compatibility testing,
+  disclosure testing, and cleanup were not run after these fail-fast blockers.
+
+#### Existing production runtime state
+
+- The `main` push auto-triggered allowlisted Pages run
+  `30552229360`, which completed successfully from
+  `18f5157de159fa7a27b3cefb4c90f5148c3b230d` before this release preflight.
+- Public HTTP byte verification confirmed that production `app.js`,
+  `event-operation-service.js`, `app.html`, and `service-worker.js` exactly
+  match their Git blobs at that blocked source.
+- The previous successful pre-R2-06 allowlisted Pages artifact is source
+  `44f0510d3bde18f459e78f570efd27b72dc2a989`, run `30547712272`.
+- The application-only rollback superseded that runtime as recorded below.
+
+#### Authorized application-only rollback
+
+- Authorization: immediate application/runtime rollback only; no Supabase,
+  migration, database rollback, production-data, or P1-remediation action.
+- Pre-rollback deployed source:
+  `18f5157de159fa7a27b3cefb4c90f5148c3b230d`, Pages run `30552229360`.
+- Rollback source:
+  `44f0510d3bde18f459e78f570efd27b72dc2a989`, the merged R2-05 commit and
+  direct parent of R2-06.
+- Rollback workflow:
+  `30554377617`; result `success`; completed
+  `2026-07-30T14:59:18Z`.
+- The workflow checked out the exact approved source, verified main ancestry,
+  validated the v284 release identity and custom domain, ran all 21 Pages
+  deployment safety contracts, built and validated the affirmative allowlist,
+  deployed the artifact, and passed the production-boundary verification job.
+- The authoritative workflow manifest records 47 files, 6,221,926 bytes,
+  allowlist version `2026-07-29`, release `v284`, and exact source
+  `44f0510d3bde18f459e78f570efd27b72dc2a989`.
+- Independent public verification matched all 46 served files byte-for-byte
+  to that workflow manifest. `CNAME` is the forty-seventh allowlisted artifact
+  entry and is the non-served custom-domain configuration file.
+- `TICKETS.md`, the R2-06 migration path, this review-evidence path, and
+  `.git/config` each returned HTTP 404 from production.
+- Read-only production smoke loaded the landing page and app without console
+  warnings or errors, restored the existing authenticated session, navigated
+  normally to Past Games, and confirmed 45 saved-game rows without reading
+  game contents. No buttons that create, edit, share, sync, or delete data
+  were used.
+- Exact-source inspection and live byte identity establish that the rollback
+  runtime contains no reference to `public.legacy_game_tombstones`,
+  `public.laxhornet_sync_game(jsonb)`, or
+  `public.laxhornet_delete_game_durable(jsonb)`.
+- Public-event semantic and v284 team-authorization boundary contracts passed.
+  The general minimum-disclosure suite was not recorded as a full pass:
+  39/40 checks passed and its release-hygiene assertion expected a coordinated
+  service-worker/version delta that R2-05 does not contain.
+- No Supabase schema, function, trigger, RLS, grant, configuration, Auth, or
+  data change occurred. No production record was created, modified, or
+  deleted. The R2-06 migration was not applied by this task, and the database
+  rollback was not run.
+- R2-06 remains `BLOCKED`; this rollback is not production activation.
+
+#### Required remediation and approval gates
+
+1. Keep R2-06 activation stopped. Do not apply the current migration.
+2. Preserve the completed application-only rollback at
+   `44f0510d3bde18f459e78f570efd27b72dc2a989`. Do not remove or roll back
+   database tombstones if production inspection later proves any exist.
+3. Serialize guarded game writes with durable deletes and add a real concurrent
+   write/delete regression.
+4. Prevent event-delete markers from deleting events after a durable
+   game-delete conflict and add an end-to-end conflict regression.
+5. Update the release manifest/tooling for the reviewed R2-06 package and
+   exact migration sequence.
+6. Obtain a new exact-SHA independent Level 3 review and green CI.
+7. Restore the named production read-only connection, verify migration/catalog
+   state and recovery readiness, and obtain David's explicit production
+   authorization before resuming the migration-first release sequence.
+
+Evidence:
+`review-evidence/r2-06-durable-game-tombstones-release/PREFLIGHT_BLOCKED.md`.
+
+### R2-06A — Remediate tombstone concurrency and delete-conflict recovery
+
+Status: `IMPLEMENTED — CI AND INDEPENDENT REVIEW PENDING`
+
+Risk level: `LEVEL 3`
+
+Branch: `feature/r2-06a-tombstone-concurrency-recovery`
+
+Execution task: `Implement R2-06A — Remediate Tombstone Concurrency and
+Delete-Conflict Recovery`
+
+Starting point:
+`18f5157de159fa7a27b3cefb4c90f5148c3b230d`
+
+Implementation commits:
+`a687377d44c3290434616894023226196611691e`,
+`4ba897370cc5b60c3cba0903dc2283e336778775`
+
+Draft PR: [#48](https://github.com/degrasse-mastermind/LaxHornet/pull/48)
+
+#### Root causes and implemented contracts
+
+- P1-A root cause: the durable delete RPC serialized by game ID, but
+  `laxhornet_sync_game(jsonb)` performed its tombstone checks without the same
+  lock. A write could therefore pass its checks before tombstone insertion and
+  resume after deletion.
+- The additive R2-06A migration gives the write RPC, delete RPC, and retained
+  defense-in-depth trigger one deterministic transaction-scoped advisory-lock
+  derivation based on the canonical game ID. Each acquires it before tombstone
+  or game-row reads and before mutation. Same-game operations serialize in one
+  lock order; unrelated IDs do not share a global lock.
+- P1-B root cause: whole-game deletion called the individual-event deletion
+  marker path before the durable game-delete result was known. A
+  `newer_game_revision` conflict could retain the server game while later
+  event-flush work removed its events.
+- Pending delete intent now persists a validated, versioned, account-scoped
+  recovery record in `laxhornet.syncOperations.v1` before the UI hides the
+  game. It contains the complete game/event snapshot, prior active-game and
+  review relationships, deletion ID, capture time, and the pre-existing
+  individual-event marker baseline.
+- Pending/retryable deletion stays hidden and recoverable without whole-game
+  event markers. Rejected/conflicted deletion restores the game and retained
+  non-individually-deleted events, restores prior local relationships,
+  neutralizes only markers attributable to the attempted whole-game delete,
+  keeps the classified operation evidence, and does not auto-retry conflict.
+- Accepted deletion compacts recovery evidence only after its durable
+  tombstone receipt is persisted. Permanent game-ID reservation remains.
+  Individual event deletes, cancel-game behavior, and Trust Spine event
+  tombstones remain separate.
+- Recovery evidence is private, storage-validated, future-version preserving
+  and write-blocked, excluded from public/export/backup paths, and unavailable
+  across accounts.
+
+#### Migration and release controls
+
+- The merged R2-06 migration, rollback, and pgTAP bytes remain unchanged.
+- Additive migration
+  `supabase/migrations/20260730151714_durable_game_tombstone_concurrency.sql`
+  replaces the affected functions with the shared lock contract.
+- Its rollback restores the prior R2-06 function definitions only while no
+  tombstone exists. Once activation has produced retained evidence, rollback
+  refuses and the durable guard must remain.
+- The release manifest now registers exact R2-06 and R2-06A forward,
+  rollback, and pgTAP identities in required order. Containment and preflight
+  recognize both packages and fail production runtime release while either
+  migration dependency remains pending.
+- Production application runtime remains on rollback source
+  `44f0510d3bde18f459e78f570efd27b72dc2a989`. Neither migration is recorded
+  applied by this ticket.
+
+#### Verification and remaining gates
+
+- Focused local contracts pass for tombstone/recovery behavior (`33/33`),
+  durable operations (`29/29`), sync characterization (`32/32`), phase-aware
+  preflight (`20/20`), phase-aware containment (`33/33`), isolated migration
+  and reverse-order rollback (`13/13`), and real concurrent PostgreSQL
+  ordering (`8/8`).
+- Full canonical-plus-additive regression passed `42/42` against committed
+  head `4ba897370cc5b60c3cba0903dc2283e336778775`.
+- Draft-PR CI passed on PR #48 implementation/evidence head
+  `69182e48578af59ba6df1c0623cb5646f9e7f3df`: portable regression run
+  `30558552058`, Docker run `30558553453`, Supabase Preview, and Vercel
+  Preview all completed successfully. Both GitHub workflows include the
+  release-containment gate.
+- The two blocked P1 findings are now desired behavior assertions. Unresolved
+  characterization remains for non-delete game-write server deduplication,
+  field-level conflicts, signed-out namespace migration, cross-key
+  transactionality, visible sync/conflict UI, sanitized journal, production
+  migration/RLS verification, and production drift.
+- R2-06A is not complete until final CI and a fresh independent Level 3 review
+  are bound to the exact PR head SHA.
+- R2-06 production activation remains blocked until the named
+  `supabase_production_readonly-2` path is available, production
+  migration/catalog state and recovery readiness are verified, and David
+  separately authorizes the migration-first release sequence.
+- No migration, Supabase change, deployment, release activation, or
+  production-data change occurred.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

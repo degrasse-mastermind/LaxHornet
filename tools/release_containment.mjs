@@ -43,6 +43,12 @@ export const DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS = Object.freeze([
   "supabase/tests/durable_game_tombstones.sql",
 ]);
 
+export const DURABLE_GAME_TOMBSTONE_CONCURRENCY_REVIEW_DB_PATHS = Object.freeze([
+  "supabase/migrations/20260730151714_durable_game_tombstone_concurrency.sql",
+  "supabase/rollback/20260730151714_durable_game_tombstone_concurrency_rollback.sql",
+  "supabase/tests/durable_game_tombstone_concurrency.sql",
+]);
+
 export const APPROVED_HISTORICAL_PROVENANCE_PATHS = Object.freeze([
   "supabase/migrations/20260723010607_remote_schema.sql",
   "supabase/production-history/20260723010607_remote_schema.sql",

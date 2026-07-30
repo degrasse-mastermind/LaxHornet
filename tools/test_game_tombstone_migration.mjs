@@ -13,8 +13,21 @@ const migration = fs.readFileSync(
   path.join(migrations, "20260730134439_durable_game_tombstones.sql"),
   "utf8",
 );
+const concurrencyMigration = fs.readFileSync(
+  path.join(migrations, "20260730151714_durable_game_tombstone_concurrency.sql"),
+  "utf8",
+);
 const rollback = fs.readFileSync(
   path.join(root, "supabase", "rollback", "20260730134439_durable_game_tombstones_rollback.sql"),
+  "utf8",
+);
+const concurrencyRollback = fs.readFileSync(
+  path.join(
+    root,
+    "supabase",
+    "rollback",
+    "20260730151714_durable_game_tombstone_concurrency_rollback.sql",
+  ),
   "utf8",
 );
 
@@ -64,6 +77,7 @@ async function bootstrap(db) {
   `);
   await db.exec(baseline);
   await db.exec(migration);
+  await db.exec(concurrencyMigration);
   await db.exec(`
     insert into auth.users(id, email)
     values
@@ -276,11 +290,26 @@ try {
     await db.exec(rollback);
   } catch (error) {
     rollbackRefusal = error;
+    await db.exec("rollback");
   }
   check(
     /Rollback refused: retain durable legacy game tombstones/i.test(String(rollbackRefusal)),
     "rollback refuses to discard activated tombstones",
     { error: String(rollbackRefusal).split("\n")[0] },
+  );
+  let concurrencyRollbackRefusal = null;
+  try {
+    await db.exec(concurrencyRollback);
+  } catch (error) {
+    concurrencyRollbackRefusal = error;
+    await db.exec("rollback");
+  }
+  check(
+    /Rollback refused: retain shared legacy game serialization/i.test(
+      String(concurrencyRollbackRefusal),
+    ),
+    "R2-06A rollback refuses to remove shared serialization after activation",
+    { error: String(concurrencyRollbackRefusal).split("\n")[0] },
   );
 } finally {
   await db.close();
@@ -289,6 +318,20 @@ try {
 const cleanDb = new PGlite();
 try {
   await bootstrap(cleanDb);
+  await cleanDb.exec(concurrencyRollback);
+  const r206Restored = await cleanDb.query(`
+    select
+      pg_get_functiondef('public.laxhornet_delete_game_durable(jsonb)'::regprocedure)
+        like '%hashtextextended(target_game_id, 0)%' as original_delete_lock,
+      pg_get_functiondef('public.laxhornet_sync_game(jsonb)'::regprocedure)
+        not like '%pg_advisory_xact_lock%' as original_write_definition
+  `);
+  check(
+    r206Restored.rows[0].original_delete_lock
+      && r206Restored.rows[0].original_write_definition,
+    "pre-activation R2-06A rollback restores the exact prior R2-06 lock contract",
+    r206Restored.rows[0],
+  );
   await cleanDb.exec(rollback);
   const reversed = await cleanDb.query(`
     select
@@ -307,4 +350,4 @@ try {
   await cleanDb.close();
 }
 
-console.log("11 durable game tombstone migration checks passed.");
+console.log("13 durable game tombstone migration checks passed.");
