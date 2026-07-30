@@ -552,7 +552,12 @@ Completion record:
   `fff8c3fe4f9cf285c3c092a713bef3d3f24c03e1`.
 - Prerequisites confirmed: LH-DEV-006, Lean Development Workflow v2, corrected
   Docker CI, and reconciled rollout checklist.
-- Inventory commit: `436f618f35a33bd621909ecd1a994d4aa3eb1ded`.
+- Independently reviewed inventory PR head:
+  `554fb2923f4fd9285c34ca1b32ad6a9498fea834`.
+- Independent review disposition: `CORRECTION REQUIRED` — review was
+  performed against that exact PR head. Review is not complete; after this
+  completion-record correction is pushed, the resulting new exact PR head
+  must receive a fresh independent review.
 - Draft pull request: #41.
 - Files changed: `docs/architecture/R2_CURRENT_SYNC_INVENTORY.md`,
   `TICKETS.md`, `docs/LAXHORNET_ROLLOUT_CHECKLIST.md`, and
@@ -563,8 +568,8 @@ Completion record:
   preserved after rollback; `git diff --check`; authorized-path audit.
 - Production or external state changed: `NO`.
 - `REPO_CURRENT_STATE.md` updated: `YES` — current limitations only.
-- Remaining work: independent exact-PR-SHA review, then the proposed R2
-  implementation sequence.
+- Remaining work: fresh independent review of the exact post-correction PR
+  head, then the proposed R2 implementation sequence.
 
 ## Ticket template
 
