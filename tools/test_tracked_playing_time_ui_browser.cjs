@@ -84,9 +84,16 @@ async function liveEventSnapshot(page) {
 
 (async () => {
   const server = await startServer();
+  const executablePath = [
+    process.env.LAXHORNET_BROWSER_EXECUTABLE,
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+  ].find((candidate) => candidate && fs.existsSync(candidate));
   const browser = await chromium.launch({
     headless: true,
-    executablePath: process.env.LAXHORNET_BROWSER_EXECUTABLE || "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    ...(executablePath ? { executablePath } : {}),
     timeout: 15000,
   });
   const context = await browser.newContext({
