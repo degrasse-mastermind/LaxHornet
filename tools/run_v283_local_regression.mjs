@@ -98,6 +98,7 @@ const tests = [
   { name: "release preflight phase-aware", command: process.execPath, args: ["tools/test_release_preflight_phase_aware.mjs"] },
   { name: "release containment phase-aware", command: process.execPath, args: ["tools/test_release_containment_phase_aware.mjs"] },
   { name: "release hygiene", command: process.execPath, args: ["tools/test_release_hygiene.mjs"] },
+  { name: "R2-06 browser runtime and failure-envelope contracts", command: process.execPath, args: ["tools/test_r206_browser_runtime.mjs"] },
   { name: "R2-06 reviewed synthetic runner contracts", command: process.execPath, args: ["tools/test_r206_synthetic_verification.mjs"] },
   { name: "R2-06 disposable synthetic verification", command: process.execPath, args: ["tools/test_r206_synthetic_verification_disposable.mjs"] },
   { name: "minimum disclosure", command: process.execPath, args: ["tools/test_minimum_disclosure.mjs"] },
@@ -130,6 +131,7 @@ const tests = [
 ];
 
 const log = [];
+const failureDiagnostics = [];
 let failed = 0;
 let completed = 0;
 let firstFailed = "";
@@ -166,6 +168,12 @@ for (const test of tests) {
   if (exitCode !== 0) {
     failed += 1;
     firstFailed ||= test.name;
+    failureDiagnostics.push(
+      `===== FAILED: ${test.name} =====`,
+      (result.stdout || "").trimEnd(),
+      (result.stderr || "").trimEnd(),
+      `EXIT: ${exitCode}`,
+    );
   }
   if (localServer && !localServer.killed) localServer.kill();
   log.push(
@@ -187,4 +195,7 @@ log.push(
 writeFileSync(evidenceFile, log.join("\n"));
 console.log(log.findLast((line) => line.startsWith("TOTAL:")));
 
-if (failed) process.exitCode = 1;
+if (failed) {
+  console.error(failureDiagnostics.join("\n"));
+  process.exitCode = 1;
+}

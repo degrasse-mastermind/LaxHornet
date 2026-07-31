@@ -1,0 +1,9 @@
+{
+  "name": "laxhornet-r206-browser-runtime",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pinned browser runtime used only by the reviewed R2-06 synthetic verification runner.",
+  "dependencies": {
+    "playwright": "1.61.1"
+  }
+}

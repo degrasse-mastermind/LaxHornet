@@ -1290,7 +1290,11 @@ async function newContext(browser, options = {}) {
     check(/waiting for synchronization/i.test(reconciliationFailure.status), "reconciliation failure explains that secure sharing is waiting");
     await reconciliationFailureContext.close();
 
-    const offlineBridgeContext = await newContext(browser, { serviceWorkers: "block" });
+    const offlineBridgeContext = await newContext(browser, {
+      serviceWorkers: "block",
+      diagnosticLabel: "offline-bridge",
+      expectedConsoleErrorPatterns: [/ERR_INTERNET_DISCONNECTED/],
+    });
     const offlineBridgePage = await offlineBridgeContext.newPage();
     await installApiRoutes(offlineBridgePage);
     await offlineBridgePage.goto(`${baseUrl}/app.html?fresh=v284-offline-bridge`, { waitUntil: "domcontentloaded" });
@@ -1474,7 +1478,12 @@ async function newContext(browser, options = {}) {
     check(true, "updated client recovers secure Live Share after reconnection");
 
     check(hostedRequests.length === 0, "activation browser suite contacts no hosted Supabase project");
-    check(browserErrors.length === 0, "browser console and pages report no errors");
+    check(
+      browserErrors.length === 0,
+      `browser console and pages report no errors${
+        browserErrors.length ? `: ${browserErrors.join(" | ")}` : ""
+      }`,
+    );
 
     const inventory = {
       generatedAt: new Date().toISOString(),

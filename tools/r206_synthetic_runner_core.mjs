@@ -245,7 +245,111 @@ export class R206StopError extends Error {
     super(message, { cause });
     this.name = "R206StopError";
     this.code = code;
+    this.nativeErrorName = /^[A-Za-z][A-Za-z0-9_.-]{0,79}$/.test(String(cause?.name || ""))
+      ? String(cause.name)
+      : null;
+    this.nativeErrorCode = /^[A-Za-z][A-Za-z0-9_.-]{0,79}$/.test(String(cause?.code || ""))
+      ? String(cause.code)
+      : null;
   }
+}
+
+function sanitizeFailureMessage(error) {
+  const fallback = error instanceof R206StopError
+    ? "runner stopped on a classified R2-06 condition"
+    : "runner stopped on an unexpected execution failure";
+  const message = String(error?.message || fallback);
+  if (
+    message.length > 240
+    || EMAIL_PATTERN.test(message)
+    || UUID_PATTERN.test(message)
+    || SECRET_PATTERN.test(message)
+    || /(?:[A-Za-z]:\\|\/(?:home|Users|tmp)\/)/.test(message)
+  ) {
+    return fallback;
+  }
+  return message;
+}
+
+function sanitizedResidueCounts(counts) {
+  if (!counts || typeof counts !== "object") return null;
+  const allowed = new Set([
+    "authUsers",
+    "profiles",
+    "sessions",
+    "games",
+    "events",
+    "tombstones",
+    "liveShareTokens",
+    "operations",
+  ]);
+  return Object.fromEntries(
+    Object.entries(counts)
+      .filter(([key, value]) => allowed.has(key) && Number.isInteger(value))
+      .map(([key, value]) => [key, value]),
+  );
+}
+
+function sanitizedCheckpointReference(value) {
+  const normalized = String(value || "");
+  return /^r206-private-[a-z0-9-]{1,64}$/i.test(normalized) ? normalized : null;
+}
+
+export function attachExecutionContext(error, context) {
+  const normalized = error instanceof R206StopError
+    ? error
+    : new R206StopError("runner stopped on an unexpected execution failure", {
+      code: "UNEXPECTED_EXECUTION_FAILURE",
+      cause: error,
+    });
+  normalized.executionContext = {
+    ...(normalized.executionContext || {}),
+    ...context,
+    residueCounts: sanitizedResidueCounts(context?.residueCounts),
+    authorizationConsumed: context?.authorizationConsumed === true,
+  };
+  return normalized;
+}
+
+export function createFailureEnvelope(error, context = {}) {
+  const normalized = error instanceof R206StopError
+    ? error
+    : new R206StopError("runner stopped on an unexpected execution failure", {
+      code: "UNEXPECTED_EXECUTION_FAILURE",
+      cause: error,
+    });
+  const execution = {
+    ...(normalized.executionContext || {}),
+    ...context,
+  };
+  const authorizationConsumed = execution.authorizationConsumed === true;
+  return {
+    ok: false,
+    code: normalized.code || "UNEXPECTED_EXECUTION_FAILURE",
+    message: sanitizeFailureMessage(normalized),
+    currentOperation: execution.currentOperation || "unknown",
+    phase: execution.phase || "startup",
+    lastSuccessfullyCompletedPhase: execution.lastSuccessfullyCompletedPhase || "none",
+    completedActionCount: Number.isInteger(execution.completedActionCount)
+      ? execution.completedActionCount
+      : 0,
+    mutationStarted: execution.mutationStarted === true,
+    cleanupOnlyStarted: execution.cleanupOnlyStarted === true,
+    cleanupCompleted: execution.cleanupCompleted === true,
+    residueCounts: sanitizedResidueCounts(execution.residueCounts),
+    privateCheckpointReference: sanitizedCheckpointReference(
+      execution.privateCheckpointReference,
+    ),
+    retainedTombstone: execution.retainedTombstone === true,
+    manualCleanupRequired: execution.manualCleanupRequired === true,
+    authorizationConsumed,
+    authorizationState: authorizationConsumed ? "failed_consumed" : "failed_unused",
+    nativeError: {
+      name: normalized.nativeErrorName || null,
+      code: normalized.nativeErrorCode || null,
+    },
+    releaseCloseoutApproved: false,
+  };
 }
 
 export function sha256(value) {
@@ -931,8 +1035,9 @@ async function persistCheckpoint(adapter, ledger, machine, limits) {
   return result;
 }
 
-async function cleanupAfterFailure({ adapter, ledger, machine, limits }) {
+export async function cleanupAfterFailure({ adapter, ledger, machine, limits }) {
   const cleanupErrors = [];
+  let residueCounts = null;
   const attempt = async (operation) => {
     try {
       await operation();
@@ -945,7 +1050,6 @@ async function cleanupAfterFailure({ adapter, ledger, machine, limits }) {
     await attempt(async () => {
       const result = await adapter.cleanupGameViaReviewedRpc({
         ledger,
-        deletionId: ledger.deletions.deletion_a,
       });
       if (result?.outcome === "accepted" && ["game_deleted", "game_delete_replayed"].includes(result.code)) {
         if (result.code === "game_deleted") {
@@ -954,7 +1058,7 @@ async function cleanupAfterFailure({ adapter, ledger, machine, limits }) {
         }
         ledger.markGameDeleted({
           gameId: result.gameId || ledger.game.id,
-          deletionId,
+          deletionId: ledger.deletions.deletion_a,
           deletedAt: result.deletedAt || null,
         });
       } else if (result?.code !== "game_not_found") {
@@ -1001,6 +1105,7 @@ async function cleanupAfterFailure({ adapter, ledger, machine, limits }) {
   let cleanupComplete = false;
   await attempt(async () => {
     const counts = await adapter.finalCounts(ledger);
+    residueCounts = counts;
     for (const key of [
       "authUsers",
       "profiles",
@@ -1016,7 +1121,11 @@ async function cleanupAfterFailure({ adapter, ledger, machine, limits }) {
   });
 
   await persistCheckpoint(adapter, ledger, machine, limits).catch((error) => cleanupErrors.push(error));
-  return { cleanupComplete: cleanupComplete && cleanupErrors.length === 0, cleanupErrors };
+  return {
+    cleanupComplete: cleanupComplete && cleanupErrors.length === 0,
+    cleanupErrors,
+    residueCounts,
+  };
 }
 
 export async function executeSyntheticVerification({
@@ -1036,6 +1145,11 @@ export async function executeSyntheticVerification({
   let privateLedger = null;
   const operationResults = [];
   let cleanupResults = null;
+  let currentOperation = "preflight";
+  let authorizationConsumed = false;
+  let executionStartedAt = null;
+  const completedActions = new Set();
+  const completeAction = (action) => completedActions.add(action);
 
   const machine = new ExecutionStateMachine({
     persist: async () => {
@@ -1058,20 +1172,47 @@ export async function executeSyntheticVerification({
     const preflight = await adapter.preflight(config);
     validatePreflightResult(preflight);
     await machine.advance("preflight_verified", { gates: "all_verified" });
+    currentOperation = "authorization_consumption";
+    executionStartedAt = now().toISOString();
+    if (adapter.recordExecutionState) {
+      await adapter.recordExecutionState({
+        executionStartedAt,
+        mutationStarted: false,
+        terminalOutcome: "execution_started",
+        cleanupCompleted: false,
+      });
+      authorizationConsumed = config.executionMode === "production";
+    }
     await machine.advance("credentials_available", { source: config.credentialSource || "disposable" });
 
+    currentOperation = "authorization_consumption_before_first_mutation";
+    if (adapter.recordExecutionState) {
+      await adapter.recordExecutionState({
+        executionStartedAt,
+        mutationStarted: true,
+        terminalOutcome: "running",
+        cleanupCompleted: false,
+      });
+    }
     mutationStarted = true;
+    currentOperation = "create_owner_user";
     const owner = await adapter.createSyntheticUser("owner_user", scope.owner);
     limits.add("authUsersCreated", 1);
     ledger.recordUser("owner_user", owner);
+    completeAction("create_owner_user");
+    currentOperation = "create_challenger_user";
     const challenger = await adapter.createSyntheticUser("challenger_user", scope.challenger);
     limits.add("authUsersCreated", 1);
     ledger.recordUser("challenger_user", challenger);
+    completeAction("create_challenger_user");
+    currentOperation = "verify_profiles";
     const profiles = await adapter.verifyProfiles(ledger);
     assertExactCount(profiles, 2, "automatic profiles");
     limits.add("profilesExpected", profiles);
+    completeAction("verify_profiles");
     await machine.advance("users_created", { users: 2, profiles });
 
+    currentOperation = "establish_sessions";
     const ownerInitial = await adapter.signInSyntheticUser("owner_initial", scope.owner);
     limits.add("sessionsCreated", 1);
     ledger.recordSession("owner_initial", { userAlias: "owner_user", ...ownerInitial });
@@ -1089,8 +1230,10 @@ export async function executeSyntheticVerification({
     }
     scope.challenger.password = null;
     scope.challenger.email = null;
+    completeAction("establish_sessions");
     await machine.advance("initial_sessions_established", { sessions: 2 });
 
+    currentOperation = "guarded_create";
     const t1 = new Date(now().getTime() + 1_000).toISOString();
     const createResult = await adapter.guardedCreate({
       session: ledger.sessions.get("owner_initial"),
@@ -1117,9 +1260,12 @@ export async function executeSyntheticVerification({
     }
     limits.add("gamesCreated", 1);
     ledger.game.savedAtT1 = t1;
+    completeAction("guarded_create");
+    completeAction("prohibit_events");
     record("guarded_create", createResult);
     await machine.advance("game_created", { games: 1, events: 0, liveShareTokens: 0 });
 
+    currentOperation = "verify_denials";
     const denialResult = await adapter.verifyDenials({
       ownerSession: ledger.sessions.get("owner_initial"),
       challengerSession: ledger.sessions.get("challenger_initial"),
@@ -1135,9 +1281,11 @@ export async function executeSyntheticVerification({
       outcome: "verified",
       code: "authorization_denials_verified",
     });
+    completeAction("verify_denials");
     record("authorization_denials", denialResult);
     await machine.advance("denials_verified", { unauthorizedSuccesses: 0 });
 
+    currentOperation = "guarded_update";
     const t2 = new Date(now().getTime() + 2_000).toISOString();
     const updateResult = await adapter.guardedUpdate({
       session: ledger.sessions.get("owner_initial"),
@@ -1164,9 +1312,11 @@ export async function executeSyntheticVerification({
     }
     limits.add("gameUpdates", 1);
     ledger.game.savedAtT2 = t2;
+    completeAction("guarded_update");
     record("guarded_update", updateResult);
     await machine.advance("game_updated", { updates: 1 });
 
+    currentOperation = "stale_delete";
     const deletedAt = new Date(now().getTime() + 3_000).toISOString();
     const staleDelete = await adapter.durableDelete({
       session: ledger.sessions.get("owner_initial"),
@@ -1177,9 +1327,11 @@ export async function executeSyntheticVerification({
       outcome: "conflicted",
       code: "newer_game_revision",
     });
+    completeAction("stale_delete");
     record("stale_delete", staleDelete);
     await machine.advance("stale_delete_verified", { mutations: 0 });
 
+    currentOperation = "durable_delete";
     const durableDelete = await adapter.durableDelete({
       session: ledger.sessions.get("owner_initial"),
       deletion: deletionPayload(scope, owner.id, scope.game.deletionA, t2, deletedAt),
@@ -1202,9 +1354,11 @@ export async function executeSyntheticVerification({
       deviceId: scope.game.deviceId,
       deletedAt: durableDelete.deletedAt,
     });
+    completeAction("durable_delete");
     record("durable_delete", durableDelete);
     await machine.advance("durable_delete_verified", { tombstoneDelta: 1 });
 
+    currentOperation = "same_id_replay";
     const replay = await adapter.durableDelete({
       session: ledger.sessions.get("owner_initial"),
       deletion: deletionPayload(scope, owner.id, scope.game.deletionA, t2, deletedAt),
@@ -1214,9 +1368,11 @@ export async function executeSyntheticVerification({
       outcome: "accepted",
       code: "game_delete_replayed",
     });
+    completeAction("same_id_replay");
     record("same_id_replay", replay);
     await machine.advance("replay_verified", { tombstones: 1 });
 
+    currentOperation = "different_id_conflict";
     const differentId = await adapter.durableDelete({
       session: ledger.sessions.get("owner_initial"),
       deletion: deletionPayload(scope, owner.id, scope.game.deletionB, t2, deletedAt),
@@ -1226,9 +1382,11 @@ export async function executeSyntheticVerification({
       outcome: "conflicted",
       code: "game_already_deleted",
     });
+    completeAction("different_id_conflict");
     record("different_id_conflict", differentId);
     await machine.advance("different_id_conflict_verified", { mutations: 0 });
 
+    currentOperation = "stale_write";
     const staleWrite = await adapter.guardedUpdate({
       session: ledger.sessions.get("owner_initial"),
       operation: {
@@ -1243,9 +1401,11 @@ export async function executeSyntheticVerification({
       outcome: "conflicted",
       code: "game_deleted",
     });
+    completeAction("stale_write");
     record("stale_write", staleWrite);
     await machine.advance("stale_write_verified", { resurrections: 0 });
 
+    currentOperation = "clean_session_hydration";
     await adapter.revokeSession("owner_initial", ledger.sessions.get("owner_initial"));
     ledger.markSessionRevoked("owner_initial");
     const ownerHydration = await adapter.signInSyntheticUser("owner_hydration", scope.owner);
@@ -1279,6 +1439,7 @@ export async function executeSyntheticVerification({
       code: "clean_hydration_verified",
     });
     if (hydration.browserProfilePath) ledger.addBrowserProfile(hydration.browserProfilePath);
+    completeAction("clean_session_hydration");
     record("clean_session_hydration", hydration);
     await machine.advance("hydration_verified", {
       gameVisible: false,
@@ -1286,6 +1447,7 @@ export async function executeSyntheticVerification({
       retryStorm: false,
     });
 
+    currentOperation = "verify_disclosure_absent";
     const disclosure = await adapter.verifyDisclosure({
       challengerSession: ledger.sessions.get("challenger_initial"),
       ledger,
@@ -1301,17 +1463,21 @@ export async function executeSyntheticVerification({
       outcome: "verified",
       code: "disclosure_absent",
     });
+    completeAction("verify_disclosure_absent");
     record("disclosure", disclosure);
     await machine.advance("disclosure_verified", { disclosed: false, liveShareTokens: 0 });
 
+    currentOperation = "write_private_ledger";
     privateLedger = await persistCheckpoint(adapter, ledger, machine, limits);
     if (!privateLedger?.path || !/^[a-f0-9]{64}$/.test(privateLedger.sha256 || "")) {
       throw new R206StopError("private ledger was not written and hash-bound", {
         code: "PRIVATE_LEDGER_WRITE_FAILED",
       });
     }
+    completeAction("write_private_ledger");
     await machine.advance("private_ledger_written", { recordCount: 1 });
 
+    currentOperation = "revoke_sessions";
     for (const [alias, session] of ledger.sessions) {
       if (!session.revoked) {
         await adapter.revokeSession(alias, session);
@@ -1326,27 +1492,35 @@ export async function executeSyntheticVerification({
         });
       }
     }
+    completeAction("revoke_sessions");
     await machine.advance("sessions_revoked", { sessions: 3 });
 
+    currentOperation = "delete_users";
     for (const alias of ["challenger_user", "owner_user"]) {
       const user = ledger.users.get(alias);
       await adapter.deleteSyntheticUser(alias, user);
       ledger.markUserDeleted(alias);
     }
+    completeAction("delete_users");
     await machine.advance("users_deleted", { users: 2 });
 
+    currentOperation = "verify_profile_cascade";
     const removedProfiles = await adapter.verifyProfilesRemoved(ledger);
     assert.deepEqual([...removedProfiles].sort(), ["challenger_user", "owner_user"]);
     for (const alias of removedProfiles) ledger.markProfileRemoved(alias);
+    completeAction("verify_profile_cascade");
     await machine.advance("profiles_removed", { profiles: 2 });
 
+    currentOperation = "clear_browser_state";
     for (const profilePath of ledger.browserProfiles) {
       await adapter.clearBrowserProfile(profilePath);
     }
+    completeAction("clear_browser_state");
     await machine.advance("browser_state_cleared", {
       browserProfiles: ledger.browserProfiles.size,
     });
 
+    currentOperation = "verify_final_residue";
     const finalCounts = await adapter.finalCounts(ledger);
     for (const key of [
       "authUsers",
@@ -1405,10 +1579,20 @@ export async function executeSyntheticVerification({
       counts: finalCounts,
       exactIdentifiers: ledger.exactIdentifiers(),
     });
+    currentOperation = "write_public_evidence";
     const publicEvidence = await adapter.writePublicEvidence(evidenceBundle);
     ledger.publicEvidencePaths = [...publicEvidence.paths];
+    completeAction("write_public_evidence");
     await machine.advance("evidence_written", { publicEvidenceFiles: publicEvidence.paths.length });
     await machine.advance("completed", { releaseCloseoutApproved: false });
+    if (adapter.recordExecutionState) {
+      await adapter.recordExecutionState({
+        executionStartedAt,
+        mutationStarted: true,
+        terminalOutcome: "completed",
+        cleanupCompleted: true,
+      });
+    }
     ledger.destroySecrets();
     clearSyntheticScopeSecrets(scope);
     return {
@@ -1436,11 +1620,17 @@ export async function executeSyntheticVerification({
         code: "UNEXPECTED_EXECUTION_FAILURE",
         cause: caught,
       });
+    const lastSuccessfullyCompletedPhase = machine.phase;
+    const failedOperation = currentOperation;
+    let residueCounts = null;
+    let cleanupCompleted = false;
     if (!mutationStarted) {
       await machine.block(error);
     } else {
       await machine.enterCleanupOnly(error);
       const cleanup = await cleanupAfterFailure({ adapter, ledger, machine, limits });
+      cleanupCompleted = cleanup.cleanupComplete;
+      residueCounts = cleanup.residueCounts;
       cleanupResults = {
         cleanupComplete: cleanup.cleanupComplete,
         errorCount: cleanup.cleanupErrors.length,
@@ -1450,10 +1640,31 @@ export async function executeSyntheticVerification({
         error,
       });
     }
+    if (adapter.recordExecutionState && executionStartedAt) {
+      await adapter.recordExecutionState({
+        executionStartedAt,
+        mutationStarted,
+        terminalOutcome: "failed",
+        cleanupCompleted,
+      }).catch(() => {});
+    }
     ledger.destroySecrets();
     clearSyntheticScopeSecrets(scope);
     error.cleanupResults = cleanupResults;
-    throw error;
+    throw attachExecutionContext(error, {
+      currentOperation: failedOperation,
+      phase: machine.phase,
+      lastSuccessfullyCompletedPhase,
+      completedActionCount: completedActions.size,
+      mutationStarted,
+      cleanupOnlyStarted: machine.cleanupOnly,
+      cleanupCompleted,
+      residueCounts,
+      privateCheckpointReference: privateLedger?.opaqueReference || null,
+      retainedTombstone: ledger.tombstone != null,
+      manualCleanupRequired: mutationStarted && !cleanupCompleted,
+      authorizationConsumed,
+    });
   } finally {
     await adapter.close?.();
   }

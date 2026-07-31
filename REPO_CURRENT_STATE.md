@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-07-30
 Baseline branch: `main`
-Baseline commit: `77f3cf4b0c86c7ce1cc44a42fafa9f3b111e9f3b`
+Baseline commit: `bf72d740960bb2947aecb8724de8c27aa7d2181b`
 Current repository release marker: `v284`
 Current production marker: `v284` at reconciled R2-06A runtime/catalog state;
 synthetic verification and release closeout remain incomplete
@@ -248,6 +248,16 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   a disposable PGlite integration. Disposable results are never production
   evidence. No production connection, mutation, migration, deployment, or
   release-closeout state change occurred during R2-06E implementation.
+- R2-06I makes that runner fail closed on browser readiness before credentials
+  or mutation. A runner-local lockfile pins Playwright `1.61.1`, Chromium
+  revision `1228`, and Chrome for Testing `149.0.7827.55`; the production
+  command never installs them. Failures retain sanitized operation/phase,
+  native class/code, mutation, cleanup, residue, checkpoint, tombstone, and
+  authorization-consumption context. Future execution writes a separate
+  create-new private consumption record before mutation and refuses reuse.
+  Failure cleanup now uses only the ledger-owned deletion and device
+  identities. This remediation did not use production credentials, contact or
+  mutate production, or advance synthetic verification, cleanup, or closeout.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The v284 cache marker remains unchanged. The updated service worker purges
@@ -285,6 +295,9 @@ node tools/test_pages_deployment.mjs
 node tools/build_pages_artifact.mjs
 node tools/validate_pages_artifact.mjs
 node tools/test_pages_artifact_browser.cjs
+node tools/test_r206_browser_runtime.mjs
+node tools/test_r206_synthetic_verification.mjs
+node tools/run_r206_synthetic_verification.mjs --check-browser-runtime
 supabase test db --local supabase/tests/tracked_playing_time_foundation.sql
 supabase test db --local supabase/tests/v284_public_event_semantic_boundary.sql
 ```
@@ -295,7 +308,7 @@ The current broad local regression entry point is:
 node tools/run_v283_local_regression.mjs
 ```
 
-That runner covers JavaScript syntax, event-operation contracts, tracked-playing-time service and static foundation contracts, game-scope capabilities, update/release checks, release-manifest validation and reconciliation characterization, containment and hygiene, minimum disclosure, secure disclosure, Product Alignment, Trust Spine contracts, SQL acceptance/rollback tests, deletion permissions, cleanup, secret scanning, and `git diff --check`.
+That runner covers JavaScript syntax, event-operation contracts, tracked-playing-time service and static foundation contracts, game-scope capabilities, R2-06 browser/failure-envelope and disposable-runner contracts, update/release checks, release-manifest validation and reconciliation characterization, containment and hygiene, minimum disclosure, secure disclosure, Product Alignment, Trust Spine contracts, SQL acceptance/rollback tests, deletion permissions, cleanup, secret scanning, and `git diff --check`.
 
 Release preparation starts with the reusable preflight and uses one fail-fast local command:
 
@@ -316,7 +329,10 @@ node tools/run_release_verification.mjs v284
 - Uses `contents: read` permissions and no repository or environment secrets.
 - Resolves release-control refs from the committed release manifest and repository ancestry.
 - Runs existing JavaScript, release, disclosure, Trust Spine, Python permission/cleanup, secret-scan, and diff-hygiene checks as individually named steps.
-- Installs pinned `@electric-sql/pglite@0.5.4` temporarily only for embedded-database tests, without committing package metadata or enabling dependency caching.
+- Installs pinned `@electric-sql/pglite@0.5.4` temporarily for shared embedded
+  database tests and installs the reviewed runner-local Playwright lockfile and
+  Chromium before the credential-free readiness check. The static application
+  still has no root package metadata or runtime dependency.
 - Does not deploy, publish, merge, start Docker, invoke the Supabase CLI, create Supabase branches, contact production services, or mutate remote state.
 
 A green GitHub Actions result complements but does not replace browser, mobile-device, visual, game-day, or local Supabase migration testing.

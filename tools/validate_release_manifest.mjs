@@ -45,6 +45,10 @@ const reviewedTextSha256 = (bytes) => {
     .replace(/\n/g, "\r\n");
   return createHash("sha256").update(Buffer.from(canonicalCrLf, "utf8")).digest("hex");
 };
+const repositoryTextSha256 = (bytes) =>
+  createHash("sha256")
+    .update(Buffer.from(bytes.toString("utf8").replace(/\r\n/g, "\n"), "utf8"))
+    .digest("hex");
 const existsAt = (ref, file) => {
   try {
     git("cat-file", "-e", `${ref}:${file}`);
@@ -572,10 +576,14 @@ expect(
 const syntheticRunner = manifest.r206ReleaseControl?.syntheticRunner;
 const expectedRunnerPaths = [
   "tools/run_r206_synthetic_verification.mjs",
+  "tools/r206_browser_runtime.mjs",
+  "tools/r206-browser-runtime/package.json",
+  "tools/r206-browser-runtime/package-lock.json",
   "tools/r206_synthetic_runner_core.mjs",
   "tools/r206_synthetic_production_adapter.mjs",
   "tools/r206_synthetic_disposable_adapter.mjs",
   "tools/test_r206_synthetic_verification.mjs",
+  "tools/test_r206_browser_runtime.mjs",
   "tools/test_r206_synthetic_verification_disposable.mjs",
   "tools/fixtures/r206-synthetic-evidence-schema.json",
 ];
@@ -583,6 +591,19 @@ expect(syntheticRunner?.implemented === true, "R2-06 synthetic runner must be re
 expect(
   syntheticRunner?.productionExecutionDefault === "disabled",
   "R2-06 synthetic runner production execution must default to disabled",
+);
+expect(
+  syntheticRunner?.browserReadinessPath === "tools/r206_browser_runtime.mjs"
+    && syntheticRunner?.browserReadinessTestPath === "tools/test_r206_browser_runtime.mjs"
+    && syntheticRunner?.browserRuntimePackagePath === "tools/r206-browser-runtime/package.json"
+    && syntheticRunner?.browserRuntimeLockPath === "tools/r206-browser-runtime/package-lock.json",
+  "R2-06 browser runtime reviewed paths changed",
+);
+expect(
+  syntheticRunner?.playwrightVersion === "1.61.1"
+    && syntheticRunner?.chromiumRevision === "1228"
+    && syntheticRunner?.chromiumVersion === "149.0.7827.55",
+  "R2-06 browser runtime reviewed identities changed",
 );
 expect(syntheticRunner?.actionCount === 21, "R2-06 synthetic runner must retain exactly 21 actions");
 expect(
@@ -609,7 +630,7 @@ for (const file of expectedRunnerPaths) {
   const absolute = path.join(root, file);
   expect(fs.existsSync(absolute), `R2-06 synthetic runner file is missing: ${file}`);
   if (fs.existsSync(absolute)) {
-    const actual = createHash("sha256").update(fs.readFileSync(absolute)).digest("hex");
+    const actual = repositoryTextSha256(fs.readFileSync(absolute));
     expect(
       syntheticRunner?.sha256?.[file] === actual,
       `R2-06 synthetic runner SHA-256 mismatch: ${file}`,

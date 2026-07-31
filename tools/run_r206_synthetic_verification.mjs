@@ -9,6 +9,8 @@ import {
   R206_PROJECT_REF,
   R206_PUBLIC_EVIDENCE_DIR,
   R206StopError,
+  attachExecutionContext,
+  createFailureEnvelope,
   dryRunPlan,
   executeSyntheticVerification,
 } from "./r206_synthetic_runner_core.mjs";
@@ -16,12 +18,14 @@ import {
   createProductionAdapter,
   validateProductionConfiguration,
 } from "./r206_synthetic_production_adapter.mjs";
+import { checkR206BrowserRuntime } from "./r206_browser_runtime.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function usage() {
   return [
     "Usage:",
+    "  node tools/run_r206_synthetic_verification.mjs --check-browser-runtime",
     "  node tools/run_r206_synthetic_verification.mjs --dry-run [--target-ref <sha>]",
     "  node tools/run_r206_synthetic_verification.mjs --execution-mode disposable [paths]",
     "  node tools/run_r206_synthetic_verification.mjs --execution-mode production --allow-production [reviewed inputs]",
@@ -63,6 +67,10 @@ export function parseArgs(argv) {
     }
     if (argument === "--allow-production") {
       options.allowProduction = true;
+      continue;
+    }
+    if (argument === "--check-browser-runtime") {
+      options.checkBrowserRuntime = true;
       continue;
     }
     if (argument === "--reviewed-private-path-override") {
@@ -121,9 +129,37 @@ function disposableConfiguration(options) {
   };
 }
 
-export async function run(argv = process.argv.slice(2), env = process.env) {
+export async function run(
+  argv = process.argv.slice(2),
+  env = process.env,
+  dependencies = {},
+) {
+  const readinessCheck = dependencies.checkBrowserRuntime || checkR206BrowserRuntime;
+  const validateProduction = dependencies.validateProductionConfiguration
+    || validateProductionConfiguration;
+  const buildProductionAdapter = dependencies.createProductionAdapter
+    || createProductionAdapter;
+  const executeVerification = dependencies.executeSyntheticVerification
+    || executeSyntheticVerification;
   const options = parseArgs(argv);
   if (options.help) return { help: usage() };
+  if (options.checkBrowserRuntime) {
+    if (argv.length !== 1) {
+      throw attachExecutionContext(
+        new R206StopError("--check-browser-runtime cannot be combined with other arguments", {
+          code: "INVALID_ARGUMENT",
+        }),
+        {
+          currentOperation: "browser_runtime_readiness",
+          phase: "browser_readiness",
+          mutationStarted: false,
+          authorizationConsumed: false,
+        },
+      );
+    }
+    const readiness = await readinessCheck();
+    return readiness.result;
+  }
   if (options.dryRun) {
     if (options.executionMode && options.executionMode !== "dry-run") {
       throw new R206StopError("--dry-run cannot be combined with another execution mode", {
@@ -143,29 +179,61 @@ export async function run(argv = process.argv.slice(2), env = process.env) {
       privateEvidenceDir: config.privateEvidenceDir,
       publicEvidenceDir: config.publicEvidenceDir,
     });
-    return executeSyntheticVerification({ adapter, config });
+    return executeVerification({ adapter, config });
   }
   if (options.executionMode === "production") {
     options.projectRef ||= R206_PROJECT_REF;
     options.publicEvidenceDir ||= path.join(repoRoot, R206_PUBLIC_EVIDENCE_DIR);
-    const validated = validateProductionConfiguration({
-      repoRoot,
-      options,
-      env,
-    });
+    let browserRuntime;
+    try {
+      browserRuntime = await readinessCheck();
+    } catch (error) {
+      throw attachExecutionContext(error, {
+        currentOperation: "browser_runtime_readiness",
+        phase: "browser_readiness",
+        lastSuccessfullyCompletedPhase: "none",
+        completedActionCount: 0,
+        mutationStarted: false,
+        cleanupOnlyStarted: false,
+        cleanupCompleted: false,
+        authorizationConsumed: false,
+        manualCleanupRequired: false,
+      });
+    }
+    let validated;
+    try {
+      validated = validateProduction({
+        repoRoot,
+        options,
+        env,
+      });
+    } catch (error) {
+      throw attachExecutionContext(error, {
+        currentOperation: "production_configuration_validation",
+        phase: "configuration_validation",
+        lastSuccessfullyCompletedPhase: "browser_readiness",
+        completedActionCount: 0,
+        mutationStarted: false,
+        cleanupOnlyStarted: false,
+        cleanupCompleted: false,
+        authorizationConsumed: error?.code === "PRODUCTION_AUTHORIZATION_ALREADY_CONSUMED",
+        manualCleanupRequired: false,
+      });
+    }
     delete env.R206_SUPABASE_PUBLISHABLE_KEY;
     delete env.R206_SUPABASE_SECRET_KEY;
-    const adapter = createProductionAdapter({
+    const adapter = buildProductionAdapter({
       repoRoot,
       config: validated.config,
       authorization: validated.authorization,
       preflightArtifact: validated.preflight,
       artifactHashes: validated.artifactHashes,
       secrets: validated.secrets,
+      browserRuntime,
     });
     validated.secrets.publishableKey = null;
     validated.secrets.secretKey = null;
-    return executeSyntheticVerification({ adapter, config: validated.config });
+    return executeVerification({ adapter, config: validated.config });
   }
   throw new R206StopError(
     "choose --dry-run or an explicit --execution-mode disposable|production",
@@ -183,14 +251,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       }
     })
     .catch((error) => {
-      const safe = {
-        ok: false,
-        code: error instanceof R206StopError ? error.code : "UNEXPECTED_EXECUTION_FAILURE",
-        message: error instanceof R206StopError
-          ? error.message
-          : "runner stopped on an unexpected execution failure",
-      };
-      process.stderr.write(`${JSON.stringify(safe)}\n`);
+      process.stderr.write(`${JSON.stringify(createFailureEnvelope(error))}\n`);
       process.exitCode = 1;
     });
 }

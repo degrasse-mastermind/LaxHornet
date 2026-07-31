@@ -564,7 +564,7 @@ export async function createDisposableAdapter({
       return { paths, hashes };
     },
 
-    async cleanupGameViaReviewedRpc({ ledger, deletionId }) {
+    async cleanupGameViaReviewedRpc({ ledger }) {
       const ownerSessionEntry = [...sessions.entries()].find(
         ([alias, session]) => alias.startsWith("owner") && !session.revoked,
       );
@@ -578,8 +578,8 @@ export async function createDisposableAdapter({
         p_deletion: {
           game_id: ledger.game.id,
           account_id: ownerSession.accountId,
-          deletion_id: deletionId,
-          device_id: `${ledger.game.id}-cleanup-device`,
+          deletion_id: ledger.deletions.deletion_a,
+          device_id: ledger.game.deviceId,
           deleted_at: new Date().toISOString(),
           known_game_saved_at: ledger.game.savedAtT2 || ledger.game.savedAtT1,
         },

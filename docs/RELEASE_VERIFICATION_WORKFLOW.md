@@ -67,13 +67,19 @@ Clean the disposable environment:
 node tools/run_release_preflight.mjs --cleanup
 ```
 
-Preflight results use `PASS`, `FAIL`, `NOT REQUIRED`, or `RESTORED EPHEMERALLY`. Repository package metadata must remain absent.
+Preflight results use `PASS`, `FAIL`, `NOT REQUIRED`, or `RESTORED EPHEMERALLY`.
+Root application package metadata remains absent. The separately reviewed
+R2-06 synthetic runner owns only its isolated pinned tooling package under
+`tools/r206-browser-runtime`; release preflight's disposable dependency
+junction remains independent of that production-runner provisioning.
 
 ## Resume rules
 
 - Preserve verified work in an isolated release worktree.
 - Record the last passed gate and resume there after an environmental interruption.
-- Restore exact ephemeral dependencies automatically; do not add a package system to the app.
+- Restore exact ephemeral dependencies automatically; do not add a root package
+  system or runtime dependency to the static app. Runner-local reviewed tooling
+  metadata is kept separate.
 - Check Docker and Supabase health before database testing.
 - Run a focused failed test before the full regression.
 - Run the complete regression once after focused fixes pass.
