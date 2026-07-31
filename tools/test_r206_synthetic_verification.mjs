@@ -254,10 +254,16 @@ test("normal Windows path passes the native reparse-point probe", (context) => {
 test("approved private root itself is rejected", () => {
   const fixture = createProductionFixture();
   try {
-    assert.throws(
-      () => validatePrivatePath(fixture, fixture.approvedPrivateRoot),
-      (error) => error.code === "PRIVATE_EVIDENCE_RUN_DIR_INVALID",
-    );
+    for (const reviewedOverride of [false, true]) {
+      assert.throws(
+        () => validatePrivatePath(
+          fixture,
+          fixture.approvedPrivateRoot,
+          { reviewedOverride },
+        ),
+        (error) => error.code === "PRIVATE_EVIDENCE_RUN_DIR_INVALID",
+      );
+    }
   } finally {
     cleanupFixture(fixture.root);
   }

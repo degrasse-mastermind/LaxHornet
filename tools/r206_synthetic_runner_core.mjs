@@ -497,12 +497,13 @@ export function assertSafePrivateEvidencePath({
   assertOutsideWorktrees(resolvedRoot, gitWorktreeRoots);
   assertOutsideWorktrees(resolved, gitWorktreeRoots);
 
+  if (pathEquals(resolved, resolvedRoot)) {
+    throw new R206StopError("the approved private root is not an execution directory", {
+      code: "PRIVATE_EVIDENCE_RUN_DIR_INVALID",
+    });
+  }
+
   if (executionMode === "production" && reviewedOverride !== true) {
-    if (pathEquals(resolved, resolvedRoot)) {
-      throw new R206StopError("the approved private root is not an execution directory", {
-        code: "PRIVATE_EVIDENCE_RUN_DIR_INVALID",
-      });
-    }
     const relative = path.relative(resolvedRoot, resolved);
     if (
       relative.startsWith(`..${path.sep}`)
