@@ -457,6 +457,36 @@ Authorization-ready plan:
 Implementation evidence:
 `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_IMPLEMENTATION.md`.
 
+### R2-06I browser-runtime remediation
+
+- [x] Pin Playwright `1.61.1`, Chromium revision `1228`, and Chrome for Testing
+  `149.0.7827.55` in runner-local reviewed package metadata.
+- [x] Add a credential-free readiness command that resolves/imports the module,
+  verifies the executable, launches and closes one isolated temporary profile,
+  and removes its artifacts.
+- [x] Run readiness before credential acceptance, `mutationStarted`, Auth user
+  creation, or any production mutation; keep production disabled by default.
+- [x] Preserve classified and safe native failures through adapter, core, and
+  CLI with phase/operation, completed-action, mutation, cleanup, residue,
+  checkpoint, tombstone/manual-cleanup, and authorization state.
+- [x] Create a separate private authorization-consumption record before first
+  mutation, never overwrite authorization, and refuse reuse after any recorded
+  execution start.
+- [x] Fix failure cleanup to use only ledger-owned deletion/device identities
+  and cover the post-game, pre-durable-delete path without `ReferenceError`.
+- [x] Add focused browser, envelope, redaction, consumption, cleanup, CLI, CI,
+  Docker, and disposable coverage without executing production mode.
+- [x] Pass the complete canonical-plus-additive local regression (`46/46`).
+- [ ] Confirm draft-PR CI passes on the exact final R2-06I head.
+- [ ] Obtain independent exact-PR-SHA Level 3 review before merge.
+- [ ] Obtain a new explicit production authorization and fresh named read-only
+  preflight for any future exact reviewed runner SHA.
+- [ ] Execute production synthetic verification and cleanup.
+- [ ] Obtain separate reviewed release-closeout approval.
+
+Remediation evidence:
+`review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_BROWSER_REMEDIATION.md`.
+
 # 4. Planned Engineering Sequence
 
 Do not combine these into one large Codex task. Each item requires one approved ticket, one primary implementation task, and a separate independent review when warranted.

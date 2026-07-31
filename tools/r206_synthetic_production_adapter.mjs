@@ -30,6 +30,8 @@ const AUTHORIZATION_SCHEMA_VERSION = 1;
 const PREFLIGHT_SCHEMA_VERSION = 1;
 const PREFLIGHT_MAX_AGE_MS = 15 * 60 * 1000;
 const FUTURE_CLOCK_SKEW_MS = 5 * 60 * 1000;
+export const R206_AUTHORIZATION_CONSUMPTION_NAME =
+  "R2-06_AUTHORIZATION_CONSUMPTION.json";
 
 function readJson(file, label) {
   let raw;
@@ -204,11 +206,20 @@ export function validateProductionConfiguration({
   const authorizationPath = path.resolve(options.authorizationArtifact || "");
   const preflightPath = path.resolve(options.preflightArtifact || "");
   const retainedLedgerPath = path.join(realPrivateDir, R206_PRIVATE_LEDGER_NAME);
+  const authorizationConsumptionPath = path.join(
+    realPrivateDir,
+    R206_AUTHORIZATION_CONSUMPTION_NAME,
+  );
   const publicResultPaths = [
     "SYNTHETIC_VERIFICATION_AUTHORIZATION.md",
     "SYNTHETIC_VERIFICATION_RESULT.md",
     "SYNTHETIC_CLEANUP_RESULT.md",
   ].map((name) => path.join(publicEvidenceDir, name));
+  if (fs.existsSync(authorizationConsumptionPath)) {
+    throw new R206StopError("production authorization has a separate consumption record and cannot be reused", {
+      code: "PRODUCTION_AUTHORIZATION_ALREADY_CONSUMED",
+    });
+  }
   if (fs.existsSync(retainedLedgerPath) || publicResultPaths.some((file) => fs.existsSync(file))) {
     throw new R206StopError("reviewed evidence targets already exist and will not be overwritten", {
       code: "EVIDENCE_TARGET_ALREADY_EXISTS",
@@ -250,6 +261,7 @@ export function validateProductionConfiguration({
       applicationOrigin: R206_APPLICATION_ORIGIN,
       privateEvidenceDir: realPrivateDir,
       publicEvidenceDir,
+      authorizationConsumptionPath,
       credentialSource: "process_environment",
     },
     authorization: authorization.value,
@@ -300,6 +312,7 @@ export function createProductionAdapter({
   preflightArtifact,
   artifactHashes,
   secrets,
+  browserRuntime,
   fetchImpl = globalThis.fetch,
 }) {
   let publishableKey = secrets.publishableKey;
@@ -309,6 +322,9 @@ export function createProductionAdapter({
   const credentialIdentities = new Map();
   let hydrationBrowser = null;
   const privateLedgerPath = path.join(config.privateEvidenceDir, R206_PRIVATE_LEDGER_NAME);
+  const authorizationConsumptionPath = config.authorizationConsumptionPath;
+  let authorizationConsumptionInitialized = false;
+  const chromium = browserRuntime?.chromium || null;
 
   const assertUrl = (url) => {
     const parsed = new URL(url);
@@ -323,21 +339,35 @@ export function createProductionAdapter({
 
   const request = async (url, init = {}, label = "request") => {
     assertUrl(url);
-    const response = await fetchImpl(url, {
-      ...init,
-      redirect: "error",
-      headers: {
-        "content-type": "application/json",
-        ...(init.headers || {}),
-      },
-    });
+    let response;
+    try {
+      response = await fetchImpl(url, {
+        ...init,
+        redirect: "error",
+        headers: {
+          "content-type": "application/json",
+          ...(init.headers || {}),
+        },
+      });
+    } catch (cause) {
+      throw new R206StopError("bounded network request failed", {
+        code: "NETWORK_REQUEST_FAILED",
+        cause,
+      });
+    }
     let body = null;
     if (response.status !== 204) {
       const text = await response.text();
       if (text) {
         try {
           body = JSON.parse(text);
-        } catch {
+        } catch (cause) {
+          if (response.ok) {
+            throw new R206StopError("successful bounded response was not valid JSON", {
+              code: "JSON_PARSE_FAILURE",
+              cause,
+            });
+          }
           body = null;
         }
       }
@@ -423,88 +453,171 @@ export function createProductionAdapter({
   };
 
   const signInViaIsolatedBrowser = async (identity, alias) => {
-    const { chromium } = await import("playwright");
-    const profilePath = fs.mkdtempSync(path.join(os.tmpdir(), "laxhornet-r206-browser-"));
-    const context = await chromium.launchPersistentContext(profilePath, {
-      headless: true,
-      serviceWorkers: "block",
-    });
-    const page = context.pages()[0] || await context.newPage();
-    const network = [];
-    const consoleClasses = [];
-    page.on("request", (requestEvent) => {
-      const url = new URL(requestEvent.url());
-      if ([R206_API_URL, R206_APPLICATION_ORIGIN].includes(url.origin)) {
-        network.push({ method: requestEvent.method(), origin: url.origin, pathname: url.pathname });
-      }
-    });
-    page.on("console", (message) => {
-      if (["error", "warning"].includes(message.type())) consoleClasses.push(message.type());
-    });
-    await page.goto(`${R206_APPLICATION_ORIGIN}/app.html`, { waitUntil: "networkidle" });
-    await page.locator("#authEmail").fill(identity.email);
-    await page.locator("#authPassword").fill(identity.password);
-    await page.locator('button[value="sign-in"]').click();
-    await page.locator('[data-action="sign-out"]').waitFor({ timeout: 30_000 });
-    const storedSession = await page.evaluate(() => {
-      for (let index = 0; index < localStorage.length; index += 1) {
-        const key = localStorage.key(index);
-        if (!key?.startsWith("sb-") || !key.endsWith("-auth-token")) continue;
-        try {
-          const parsed = JSON.parse(localStorage.getItem(key));
-          const container = Array.isArray(parsed) ? parsed[0] : parsed;
-          const candidate =
-            container?.currentSession
-            ?? container?.session
-            ?? container;
-          if (candidate?.access_token && candidate?.refresh_token) {
-            return {
-              accessToken: candidate.access_token,
-              refreshToken: candidate.refresh_token,
-            };
-          }
-        } catch {
-          // Ignore unrelated local values; the expected auth record is validated below.
-        }
-      }
-      return null;
-    });
-    if (!storedSession) {
-      await context.close();
-      fs.rmSync(profilePath, { recursive: true, force: true });
-      throw new R206StopError("isolated browser did not establish the required synthetic session", {
-        code: "BROWSER_SESSION_UNAVAILABLE",
+    if (!chromium) {
+      throw new R206StopError("the preflight-verified Chromium runtime is unavailable", {
+        code: "BROWSER_RUNTIME_UNAVAILABLE",
       });
     }
-    const browserEntry = { context, page, profilePath, network, consoleClasses };
-    if (alias === "owner_hydration") hydrationBrowser = browserEntry;
-    browserProfiles.set(path.resolve(profilePath), browserEntry);
-    return {
-      sessionId: decodeSessionId(storedSession.accessToken),
-      accessToken: storedSession.accessToken,
-      refreshToken: storedSession.refreshToken,
-      browserProfilePath: profilePath,
-    };
+    const profilePath = fs.mkdtempSync(path.join(os.tmpdir(), "laxhornet-r206-browser-"));
+    let context;
+    try {
+      context = await chromium.launchPersistentContext(profilePath, {
+        headless: true,
+        serviceWorkers: "block",
+      });
+    } catch (cause) {
+      fs.rmSync(profilePath, { recursive: true, force: true });
+      throw new R206StopError("isolated synthetic browser session could not launch", {
+        code: "BROWSER_SESSION_LAUNCH_FAILED",
+        cause,
+      });
+    }
+    try {
+      const page = context.pages()[0] || await context.newPage();
+      const network = [];
+      const consoleClasses = [];
+      page.on("request", (requestEvent) => {
+        const url = new URL(requestEvent.url());
+        if ([R206_API_URL, R206_APPLICATION_ORIGIN].includes(url.origin)) {
+          network.push({ method: requestEvent.method(), origin: url.origin, pathname: url.pathname });
+        }
+      });
+      page.on("console", (message) => {
+        if (["error", "warning"].includes(message.type())) consoleClasses.push(message.type());
+      });
+      await page.goto(`${R206_APPLICATION_ORIGIN}/app.html`, { waitUntil: "networkidle" });
+      await page.locator("#authEmail").fill(identity.email);
+      await page.locator("#authPassword").fill(identity.password);
+      await page.locator('button[value="sign-in"]').click();
+      await page.locator('[data-action="sign-out"]').waitFor({ timeout: 30_000 });
+      const storedSession = await page.evaluate(() => {
+        for (let index = 0; index < localStorage.length; index += 1) {
+          const key = localStorage.key(index);
+          if (!key?.startsWith("sb-") || !key.endsWith("-auth-token")) continue;
+          try {
+            const parsed = JSON.parse(localStorage.getItem(key));
+            const container = Array.isArray(parsed) ? parsed[0] : parsed;
+            const candidate =
+              container?.currentSession
+              ?? container?.session
+              ?? container;
+            if (candidate?.access_token && candidate?.refresh_token) {
+              return {
+                accessToken: candidate.access_token,
+                refreshToken: candidate.refresh_token,
+              };
+            }
+          } catch {
+            // Ignore unrelated local values; the expected auth record is validated below.
+          }
+        }
+        return null;
+      });
+      if (!storedSession) {
+        throw new R206StopError("isolated browser did not establish the required synthetic session", {
+          code: "BROWSER_SESSION_UNAVAILABLE",
+        });
+      }
+      const browserEntry = { context, page, profilePath, network, consoleClasses };
+      if (alias === "owner_hydration") hydrationBrowser = browserEntry;
+      browserProfiles.set(path.resolve(profilePath), browserEntry);
+      return {
+        sessionId: decodeSessionId(storedSession.accessToken),
+        accessToken: storedSession.accessToken,
+        refreshToken: storedSession.refreshToken,
+        browserProfilePath: profilePath,
+      };
+    } catch (cause) {
+      await context.close().catch(() => {});
+      try {
+        fs.rmSync(profilePath, { recursive: true, force: true });
+      } catch (cleanupCause) {
+        throw new R206StopError("failed isolated browser session profile could not be removed", {
+          code: "BROWSER_READINESS_CLEANUP_FAILED",
+          cause: cleanupCause,
+        });
+      }
+      if (cause instanceof R206StopError) throw cause;
+      throw new R206StopError("isolated synthetic browser session failed", {
+        code: "BROWSER_SESSION_FAILURE",
+        cause,
+      });
+    }
   };
 
   return {
+    async recordExecutionState({
+      executionStartedAt,
+      mutationStarted,
+      terminalOutcome,
+      cleanupCompleted,
+    }) {
+      const value = {
+        schemaVersion: 1,
+        authorizationArtifactSha256: artifactHashes.authorization,
+        approvedRunnerSha: config.targetRef,
+        executionStartedAt,
+        mutationStarted: mutationStarted === true,
+        terminalOutcome,
+        cleanupCompleted: cleanupCompleted === true,
+        authorizationConsumed: true,
+        recordedAt: new Date().toISOString(),
+      };
+      const serialized = `${JSON.stringify(value, null, 2)}\n`;
+      if (!authorizationConsumptionInitialized) {
+        fs.writeFileSync(authorizationConsumptionPath, serialized, {
+          encoding: "utf8",
+          mode: 0o600,
+          flag: "wx",
+        });
+        authorizationConsumptionInitialized = true;
+      } else {
+        const temporary = `${authorizationConsumptionPath}.tmp`;
+        fs.writeFileSync(temporary, serialized, { encoding: "utf8", mode: 0o600 });
+        fs.renameSync(temporary, authorizationConsumptionPath);
+      }
+      return {
+        path: authorizationConsumptionPath,
+        terminalOutcome,
+        mutationStarted: mutationStarted === true,
+      };
+    },
+
     async preflight() {
       if (authorization.browserExecutionAuthorized !== true) {
         throw new R206StopError("production browser execution is not separately authorized", {
           code: "PRODUCTION_BROWSER_EXECUTION_DISABLED",
         });
       }
-      const [versionResponse, workerResponse] = await Promise.all([
-        fetchImpl(`${R206_APPLICATION_ORIGIN}/version.json`, { redirect: "error" }),
-        fetchImpl(`${R206_APPLICATION_ORIGIN}/service-worker.js`, { redirect: "error" }),
-      ]);
+      let versionResponse;
+      let workerResponse;
+      try {
+        [versionResponse, workerResponse] = await Promise.all([
+          fetchImpl(`${R206_APPLICATION_ORIGIN}/version.json`, { redirect: "error" }),
+          fetchImpl(`${R206_APPLICATION_ORIGIN}/service-worker.js`, { redirect: "error" }),
+        ]);
+      } catch (cause) {
+        throw new R206StopError("live runtime identity request failed", {
+          code: "NETWORK_REQUEST_FAILED",
+          cause,
+        });
+      }
       if (!versionResponse.ok || !workerResponse.ok) {
         throw new R206StopError("live runtime marker verification failed", {
           code: "RUNTIME_IDENTITY_UNAVAILABLE",
         });
       }
-      const version = await versionResponse.json();
-      const worker = await workerResponse.text();
+      let version;
+      let worker;
+      try {
+        version = await versionResponse.json();
+        worker = await workerResponse.text();
+      } catch (cause) {
+        throw new R206StopError("live runtime identity response could not be parsed", {
+          code: "JSON_PARSE_FAILURE",
+          cause,
+        });
+      }
       if (
         version.version !== R206_RELEASE_MARKER
         || !worker.includes(R206_CACHE_NAME)
@@ -1015,7 +1128,7 @@ export function createProductionAdapter({
       return { paths, hashes };
     },
 
-    async cleanupGameViaReviewedRpc({ ledger, deletionId }) {
+    async cleanupGameViaReviewedRpc({ ledger }) {
       const ownerSession = [...ledger.sessions.values()].find(
         (session) => session.userAlias === "owner_user" && !session.revoked,
       );
@@ -1031,8 +1144,8 @@ export function createProductionAdapter({
           p_deletion: {
             game_id: ledger.game.id,
             account_id: ownerId,
-            deletion_id: deletionId,
-            device_id: `${ledger.game.id}-cleanup-device`,
+            deletion_id: ledger.deletions.deletion_a,
+            device_id: ledger.game.deviceId,
             deleted_at: new Date().toISOString(),
             known_game_saved_at: ledger.game.savedAtT2 || ledger.game.savedAtT1,
           },
@@ -1044,7 +1157,12 @@ export function createProductionAdapter({
     async close() {
       for (const [profilePath, entry] of browserProfiles) {
         await entry.context.close().catch(() => {});
-        fs.rmSync(profilePath, { recursive: true, force: true });
+        try {
+          fs.rmSync(profilePath, { recursive: true, force: true });
+        } catch {
+          // Normal and failure cleanup report profile-removal failures. This
+          // final close is a non-throwing safety net that must not mask them.
+        }
       }
       browserProfiles.clear();
       hydrationBrowser = null;

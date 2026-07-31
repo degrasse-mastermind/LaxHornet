@@ -1610,6 +1610,67 @@ documentation baseline)
   required before merge, and a later production run needs separate explicit
   authorization against that reviewed SHA.
 
+### R2-06I — Remediate browser readiness and partial-failure diagnostics
+
+Status: `READY FOR INDEPENDENT REVIEW`
+
+Risk level: `LEVEL 3`
+
+Branch: `fix/r2-06i-browser-readiness-failure-reporting`
+
+Starting point:
+`bf72d740960bb2947aecb8724de8c27aa7d2181b` (merged R2-06E runner)
+
+#### Incident remediation
+
+- The first authorized runner attempt passed repository/artifact/preflight/
+  credential gates and created the bounded two users/profiles and owner
+  session, then failed starting the challenger browser. Cleanup removed all
+  mutable/Auth residue. The strongest supported cause is missing Playwright,
+  not the already accepted runtime keys.
+- Add a credential-free browser-readiness command and a production gate before
+  credential acceptance or mutation. Pin Playwright `1.61.1`, Chromium
+  revision `1228`, and Chrome for Testing `149.0.7827.55` in a runner-local
+  package and lockfile. Production invocation never downloads dependencies.
+- Preserve classified and native-safe error context through adapter, core, and
+  CLI. Final JSON reports operation, phase, completed actions, mutation,
+  cleanup entry/outcome, residue counts, opaque checkpoint, tombstone/manual
+  cleanup, and authorization-consumption state without identifiers or secrets.
+- Create a separate private consumption record before first mutation, never
+  overwrite the authorization artifact, record mutation/terminal/cleanup
+  state, and refuse any future authorization with an existing consumption
+  record even when its source JSON still says `unused`.
+- Fix failure cleanup to use only the ledger-owned deletion and device
+  identities. Remove the undefined `deletionId` reference and add no broad or
+  generated-identity fallback.
+
+#### Verification and boundaries
+
+- Focused tests cover missing module/executable, launch and cleanup readiness,
+  isolated profiles, no credential/Auth/mutation path on readiness failure,
+  classified/native failure envelopes, redaction, authorization reuse,
+  failed-unused versus failed-consumed state, post-user and post-game cleanup,
+  ledger-only identities, CLI JSON behavior, and false closeout.
+- CI installs the pinned runner dependency/browser separately, runs readiness,
+  focused runner/browser tests, disposable integration, and the complete
+  canonical-plus-additive regression. Docker retains mock/browser-contract and
+  disposable runner coverage without production mode.
+- Local verification passed browser/failure-envelope `11/11`, runner/cleanup/
+  authorization `29/29`, disposable integration, Docker runner/disposable
+  surfaces, manifest reconciliation `8/8`, phase-aware preflight `22/22`,
+  containment `33/33`, Pages `21/21`, migration/rollback `13/13`, concurrency
+  `8/8`, secret/manifest/syntax/diff checks, and the complete
+  canonical-plus-additive regression `46/46`.
+- No production credential, connection, Auth/data access, runner execution,
+  cleanup, deployment, migration, or release action is authorized or used.
+- Synthetic authorization/completion, cleanup completion, and release closeout
+  remain false. Exact-PR-SHA independent Level 3 review is required before
+  merge; a future production attempt requires a new reviewed authorization.
+- Exact-head draft-PR CI remains pending.
+
+Evidence:
+`review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_BROWSER_REMEDIATION.md`.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

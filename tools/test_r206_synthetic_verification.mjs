@@ -23,12 +23,18 @@ import {
   R206StopError,
   assertAllowedRpc,
   assertPublicEvidenceSafe,
+  cleanupAfterFailure,
+  createFailureEnvelope,
   createPublicEvidenceBundle,
   createSyntheticScope,
   dryRunPlan,
   executeSyntheticVerification,
 } from "./r206_synthetic_runner_core.mjs";
-import { validateProductionConfiguration } from "./r206_synthetic_production_adapter.mjs";
+import {
+  R206_AUTHORIZATION_CONSUMPTION_NAME,
+  createProductionAdapter,
+  validateProductionConfiguration,
+} from "./r206_synthetic_production_adapter.mjs";
 import { parseArgs } from "./run_r206_synthetic_verification.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -226,6 +232,117 @@ test("production refuses to overwrite retained evidence", () => {
   }
 });
 
+test("a separate consumption record prevents authorization reuse even when authorization remains unused", () => {
+  const fixture = createProductionFixture();
+  try {
+    fs.writeFileSync(
+      path.join(fixture.options.privateEvidenceDir, R206_AUTHORIZATION_CONSUMPTION_NAME),
+      JSON.stringify({
+        schemaVersion: 1,
+        authorizationConsumed: true,
+        terminalOutcome: "failed",
+        mutationStarted: false,
+      }),
+    );
+    assert.throws(
+      () => validateProductionConfiguration({
+        repoRoot,
+        options: fixture.options,
+        env: {
+          R206_SUPABASE_PUBLISHABLE_KEY: "publishable-test",
+          R206_SUPABASE_SECRET_KEY: "secret-test",
+        },
+        now: fixedNow,
+        verifyGit: false,
+      }),
+      (error) => error.code === "PRODUCTION_AUTHORIZATION_ALREADY_CONSUMED",
+    );
+  } finally {
+    cleanupFixture(fixture.root);
+  }
+});
+
+test("failed-unused authorization remains distinguishable before any consumption record exists", () => {
+  const fixture = createProductionFixture();
+  try {
+    const authorization = JSON.parse(fs.readFileSync(fixture.options.authorizationArtifact, "utf8"));
+    authorization.status = "unused";
+    authorization.priorAttemptOutcome = "failed_before_execution_started";
+    fs.writeFileSync(fixture.options.authorizationArtifact, JSON.stringify(authorization));
+    const validated = validateProductionConfiguration({
+      repoRoot,
+      options: fixture.options,
+      env: {
+        R206_SUPABASE_PUBLISHABLE_KEY: "publishable-test",
+        R206_SUPABASE_SECRET_KEY: "secret-test",
+      },
+      now: fixedNow,
+      verifyGit: false,
+    });
+    assert.equal(
+      path.basename(validated.config.authorizationConsumptionPath),
+      R206_AUTHORIZATION_CONSUMPTION_NAME,
+    );
+    assert.equal(fs.existsSync(validated.config.authorizationConsumptionPath), false);
+    assert.equal(createFailureEnvelope(
+      new R206StopError("failed before execution began", { code: "INJECTED" }),
+    ).authorizationState, "failed_unused");
+  } finally {
+    cleanupFixture(fixture.root);
+  }
+});
+
+test("production execution state is recorded separately without changing authorization", async () => {
+  const fixture = createProductionFixture();
+  try {
+    const authorizationBefore = fs.readFileSync(fixture.options.authorizationArtifact, "utf8");
+    const validated = validateProductionConfiguration({
+      repoRoot,
+      options: fixture.options,
+      env: {
+        R206_SUPABASE_PUBLISHABLE_KEY: "publishable-test",
+        R206_SUPABASE_SECRET_KEY: "secret-test",
+      },
+      now: fixedNow,
+      verifyGit: false,
+    });
+    const adapter = createProductionAdapter({
+      repoRoot,
+      config: validated.config,
+      authorization: validated.authorization,
+      preflightArtifact: validated.preflight,
+      artifactHashes: validated.artifactHashes,
+      secrets: validated.secrets,
+      browserRuntime: { chromium: {} },
+    });
+    await adapter.recordExecutionState({
+      executionStartedAt: fixedNow.toISOString(),
+      mutationStarted: false,
+      terminalOutcome: "execution_started",
+      cleanupCompleted: false,
+    });
+    await adapter.recordExecutionState({
+      executionStartedAt: fixedNow.toISOString(),
+      mutationStarted: true,
+      terminalOutcome: "failed",
+      cleanupCompleted: true,
+    });
+    const consumption = JSON.parse(
+      fs.readFileSync(validated.config.authorizationConsumptionPath, "utf8"),
+    );
+    assert.equal(consumption.authorizationConsumed, true);
+    assert.equal(consumption.mutationStarted, true);
+    assert.equal(consumption.terminalOutcome, "failed");
+    assert.equal(consumption.cleanupCompleted, true);
+    assert.equal(
+      fs.readFileSync(fixture.options.authorizationArtifact, "utf8"),
+      authorizationBefore,
+    );
+  } finally {
+    cleanupFixture(fixture.root);
+  }
+});
+
 test("hard limit prevents creating more than two users", () => {
   const limits = new HardLimitGuard();
   limits.add("authUsersCreated", 2);
@@ -345,7 +462,28 @@ test("an execution failure after first mutation enters cleanup-only and deletes 
       config: { executionMode: "disposable", targetRef },
       now: () => fixedNow,
     }),
-    (error) => error.code === "INJECTED" && error.cleanupResults.cleanupComplete === true,
+    (error) => {
+      const envelope = createFailureEnvelope(error);
+      assert.equal(envelope.code, "INJECTED");
+      assert.equal(envelope.currentOperation, "create_challenger_user");
+      assert.equal(envelope.phase, "failed");
+      assert.equal(envelope.lastSuccessfullyCompletedPhase, "credentials_available");
+      assert.equal(envelope.completedActionCount, 1);
+      assert.equal(envelope.mutationStarted, true);
+      assert.equal(envelope.cleanupOnlyStarted, true);
+      assert.equal(envelope.cleanupCompleted, true);
+      assert.equal(envelope.manualCleanupRequired, false);
+      assert.deepEqual(envelope.residueCounts, {
+        authUsers: 0,
+        profiles: 0,
+        sessions: 0,
+        games: 0,
+        events: 0,
+        tombstones: 0,
+        liveShareTokens: 0,
+      });
+      return error.cleanupResults.cleanupComplete === true;
+    },
   );
   assert.deepEqual(deleted, ["owner_user"]);
 });
@@ -358,6 +496,70 @@ test("one accepted durable delete permits exactly one retained tombstone", () =>
     () => limits.add("permanentTombstonesCreated", 1),
     (error) => error.code === "HARD_MUTATION_LIMIT_EXCEEDED",
   );
+});
+
+test("failure cleanup after game creation uses only the ledger-owned deletion identity", async () => {
+  const scope = createSyntheticScope(fixedNow);
+  const ledger = new CleanupLedger(scope);
+  const limits = new HardLimitGuard();
+  ledger.recordUser("owner_user", { id: randomUUID() });
+  ledger.recordSession("owner_initial", {
+    userAlias: "owner_user",
+    sessionId: randomUUID(),
+    accessToken: "synthetic-test-access",
+    refreshToken: "synthetic-test-refresh",
+  });
+  ledger.game.savedAtT1 = "2026-07-30T18:00:01.000Z";
+  const machine = new ExecutionStateMachine();
+  await machine.enterCleanupOnly(new R206StopError("injected", { code: "INJECTED" }));
+  let cleanupDeletionId = null;
+  const adapter = {
+    async cleanupGameViaReviewedRpc({ ledger: ownedLedger }) {
+      cleanupDeletionId = ownedLedger.deletions.deletion_a;
+      return {
+        outcome: "accepted",
+        code: "game_deleted",
+        gameId: ownedLedger.game.id,
+        deletedAt: "2026-07-30T18:00:02.000Z",
+      };
+    },
+    async revokeSession() {},
+    async verifyRevokedAuthority() {
+      return true;
+    },
+    async deleteSyntheticUser() {},
+    async verifyProfilesRemoved() {
+      return ["owner_user"];
+    },
+    async finalCounts() {
+      return {
+        authUsers: 0,
+        profiles: 0,
+        sessions: 0,
+        games: 0,
+        events: 0,
+        tombstones: 1,
+        liveShareTokens: 0,
+      };
+    },
+    async persistPrivateLedger(snapshot) {
+      const serialized = JSON.stringify(snapshot);
+      return {
+        path: path.join(os.tmpdir(), "r206-game-created-cleanup-ledger.json"),
+        sha256: createHash("sha256").update(serialized).digest("hex"),
+        opaqueReference: "r206-private-cleanup",
+      };
+    },
+  };
+  const cleanup = await cleanupAfterFailure({ adapter, ledger, machine, limits });
+  assert.equal(cleanup.cleanupComplete, true);
+  assert.equal(cleanupDeletionId, ledger.deletions.deletion_a);
+  assert.equal(ledger.tombstone.deletionId, ledger.deletions.deletion_a);
+  assert.equal(cleanup.residueCounts.tombstones, 1);
+  const productionSource = read("r206_synthetic_production_adapter.mjs");
+  assert.match(productionSource, /deletion_id:\s*ledger\.deletions\.deletion_a/);
+  assert.match(productionSource, /device_id:\s*ledger\.game\.deviceId/);
+  assert.doesNotMatch(productionSource, /cleanupGameViaReviewedRpc\(\{\s*ledger,\s*deletionId/);
 });
 
 test("same-id replay cannot count as a second accepted delete", () => {

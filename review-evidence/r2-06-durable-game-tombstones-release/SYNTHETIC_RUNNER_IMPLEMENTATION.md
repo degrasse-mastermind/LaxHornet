@@ -1,4 +1,4 @@
-# R2-06E Synthetic Runner Implementation
+# R2-06E / R2-06I Synthetic Runner Implementation
 
 Status: `READY FOR INDEPENDENT REVIEW`
 
@@ -10,8 +10,13 @@ release-closeout decision.
 ## Architecture and entry points
 
 - `tools/run_r206_synthetic_verification.mjs` is the only operator entry point.
-  It supports `--dry-run`, `--execution-mode disposable`, and the separately
-  gated `--execution-mode production --allow-production`.
+  It supports credential-free `--check-browser-runtime`, `--dry-run`,
+  `--execution-mode disposable`, and the separately gated
+  `--execution-mode production --allow-production`.
+- `tools/r206_browser_runtime.mjs` owns the pre-credential, pre-mutation
+  Playwright/Chromium identity, executable, isolated-launch, and cleanup gate.
+  Its runner-local package and lockfile pin Playwright `1.61.1`, Chromium
+  revision `1228`, and Chrome for Testing `149.0.7827.55`.
 - `tools/r206_synthetic_runner_core.mjs` owns the 21-action plan, hard limits,
   strict state machine, cleanup ledger, classified-result checks, evidence
   redaction, and fail-closed orchestration.
@@ -45,6 +50,11 @@ Existing private-ledger or public-result targets are a stop condition. Initial
 writes use create-new semantics, so a rerun cannot silently replace retained
 evidence.
 
+R2-06I adds a separate private authorization-consumption record. It is created
+after preflight passes and before mutation, never overwrites the authorization
+artifact, records mutation and terminal/cleanup state, and blocks reuse even
+if the original authorization still says `unused`.
+
 The runner never turns `releaseCloseoutApproved` on. Successful production
 behavior and cleanup evidence still require a separate reviewed closeout.
 
@@ -72,6 +82,30 @@ are not in the ledger.
 Historical direct SQL cleanup, Auth-table deletion, refresh-token deletion,
 and broad `r206-smoke-*` mutation are explicitly not part of this runner.
 Reusing an older smoke tool or adding a cleanup fallback requires a new review.
+Failure cleanup uses only `ledger.deletions.deletion_a` and the existing
+ledger-owned device identity; the prior undefined cleanup `deletionId`
+reference is removed.
+
+## Browser setup and failure reporting
+
+Install the reviewed runner dependency and browser separately on Windows:
+
+```powershell
+npm ci --ignore-scripts --prefix tools\r206-browser-runtime
+node tools\r206-browser-runtime\node_modules\playwright\cli.js install chromium
+node tools\run_r206_synthetic_verification.mjs --check-browser-runtime
+```
+
+Production execution performs no package or browser download. Readiness runs
+before credentials are accepted and before any mutation. The final CLI failure
+object preserves classified errors, safe native class/code, phase, operation,
+completed-action count, mutation and cleanup state, integer residue counts,
+opaque checkpoint reference, retained-tombstone/manual-cleanup state, and
+authorization consumption without exposing identifiers, credentials, private
+rows, browser paths, or stacks.
+
+Detailed remediation evidence:
+`SYNTHETIC_RUNNER_BROWSER_REMEDIATION.md`.
 
 ## Evidence and credential handling
 
@@ -102,3 +136,8 @@ reference.
 The exact final PR SHA still requires independent Level 3 review. Any future
 production execution requires a new, explicit, time-bounded authorization
 artifact and fresh named read-only preflight artifact for that reviewed SHA.
+
+R2-06I added `11/11` browser/failure-envelope checks and expanded the runner
+suite to `29/29`; the disposable integration and Linux Docker surfaces passed.
+The final canonical-plus-additive local regression passed `46/46`. Exact-head
+draft-PR CI and independent Level 3 review remain required.

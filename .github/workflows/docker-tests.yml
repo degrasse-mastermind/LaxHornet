@@ -131,6 +131,20 @@ jobs:
           laxhornet:test
           node tools/test_release_hygiene.mjs
 
+      - name: Run R2-06 reviewed synthetic runner contracts
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_r206_synthetic_verification.mjs
+
+      - name: Run R2-06 browser runtime and failure-envelope contracts
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_r206_browser_runtime.mjs
+
+      - name: Run R2-06 disposable synthetic verification
+        run: >-
+          docker run --rm
+          -v "${{ github.workspace }}:/app"
+          laxhornet:test
+          sh -c 'npm install --no-save --no-package-lock --ignore-scripts @electric-sql/pglite@0.5.4
+          && node tools/test_r206_synthetic_verification_disposable.mjs'
+
       - name: Run phase-aware release containment
         run: >-
           docker run --rm
