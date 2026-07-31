@@ -192,5 +192,11 @@ jobs:
           node tools/validate_pages_artifact.mjs
           node tools/test_pages_artifact_browser.cjs
 
+      - name: Remove generated Pages artifacts before complete regression
+        run: >-
+          node -e 'const fs = require("node:fs");
+          for (const target of [".pages-artifact", ".pages-artifact-metadata"])
+          fs.rmSync(target, { recursive: true, force: true });'
+
       - name: Complete canonical-plus-additive regression
         run: node tools/run_v283_local_regression.mjs --fail-fast
