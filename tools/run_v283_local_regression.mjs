@@ -131,6 +131,7 @@ const tests = [
 ];
 
 const log = [];
+const failureDiagnostics = [];
 let failed = 0;
 let completed = 0;
 let firstFailed = "";
@@ -167,6 +168,12 @@ for (const test of tests) {
   if (exitCode !== 0) {
     failed += 1;
     firstFailed ||= test.name;
+    failureDiagnostics.push(
+      `===== FAILED: ${test.name} =====`,
+      (result.stdout || "").trimEnd(),
+      (result.stderr || "").trimEnd(),
+      `EXIT: ${exitCode}`,
+    );
   }
   if (localServer && !localServer.killed) localServer.kill();
   log.push(
@@ -188,4 +195,7 @@ log.push(
 writeFileSync(evidenceFile, log.join("\n"));
 console.log(log.findLast((line) => line.startsWith("TOTAL:")));
 
-if (failed) process.exitCode = 1;
+if (failed) {
+  console.error(failureDiagnostics.join("\n"));
+  process.exitCode = 1;
+}
