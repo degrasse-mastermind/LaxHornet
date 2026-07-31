@@ -1715,6 +1715,9 @@ Starting point:
   Chromium readiness passed, disposable integration passed as non-production
   evidence, and the complete canonical-plus-additive regression passed
   `46/46`.
+- Draft-PR Docker and portable regression CI passed on the published R2-06K
+  implementation head; preview deployment checks passed and the Supabase
+  preview check skipped as configured.
 - Synthetic authorization/completion, cleanup completion, and release closeout
   remain false. Exact-PR-SHA independent Level 3 review is required before
   merge, and any future production attempt requires new authorization and a

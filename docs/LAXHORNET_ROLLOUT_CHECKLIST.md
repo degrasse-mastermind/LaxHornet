@@ -506,7 +506,7 @@ Remediation evidence:
   reuse, retained-ledger collision, artifact containment, override separation,
   and Windows path behavior without executing production mode.
 - [x] Pass the complete canonical-plus-additive local regression (`46/46`).
-- [ ] Confirm draft-PR CI passes on the exact final R2-06K head.
+- [x] Confirm draft-PR CI passes on the exact final R2-06K head.
 - [ ] Obtain independent exact-PR-SHA Level 3 review before merge.
 - [ ] Obtain a new explicit production authorization and fresh named read-only
   preflight for any future exact reviewed runner SHA.

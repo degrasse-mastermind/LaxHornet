@@ -147,7 +147,9 @@ Local results on the final shared-runtime diff:
   diff hygiene: passed;
 - complete canonical-plus-additive regression: `46/46`.
 
-Exact-head draft-PR CI remains pending.
+Draft-PR Docker and portable regression suites passed. Vercel preview checks
+passed, and the Supabase preview check skipped as configured. CI must remain
+green on the final documentation-only closeout head.
 
 Synthetic verification authorization, synthetic verification completion,
 cleanup completion, and release closeout remain false. A future production run
