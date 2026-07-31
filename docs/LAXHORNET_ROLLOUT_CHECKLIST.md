@@ -516,6 +516,46 @@ Remediation evidence:
 Remediation evidence:
 `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_PRIVATE_PATH_REMEDIATION.md`.
 
+### R2-06M browser session-establishment remediation
+
+- [x] Trace every existing browser-session operation and document all old
+  timeout-capable calls that were flattened to `BROWSER_SESSION_FAILURE`.
+- [x] Preserve the evidence boundary: no private identifier ledger,
+  authorization, preflight, consumption, credential, identifier, or private
+  row content was opened; the consumed run directory was not changed.
+- [x] Add explicit bounded context/page/navigation/application/Supabase/Auth/
+  storage/session/application-state/close/profile operations with no generic
+  `networkidle`, hidden locator wait, or full-session retry.
+- [x] Preserve specific classifications, safe `TimeoutError` name/code,
+  exact/last-completed operation, per-operation timing/limit, browser/Auth/
+  storage/cleanup state, residue, authorization consumption, and false
+  closeout through adapter, core, and CLI.
+- [x] Add credential-free `--diagnose-browser-session` using only ephemeral
+  loopback mocked Auth and the exact shared orchestration.
+- [x] Prove two browser-driven sessions use separate context/profile/storage
+  state and keep the reviewed owner-HTTP/challenger-browser/owner-browser
+  three-session sequence.
+- [x] Inject failure before/after every browser boundary and prove partial
+  session failure enters cleanup-only with zero mutable/Auth/session residue
+  and no game, event, token, tombstone, or operation residue.
+- [x] Keep production disabled by default and synthetic authorization,
+  completion, cleanup completion, and release closeout false.
+- [ ] Resolve the exact historic timeout call site from independently
+  authorized evidence, or explicitly accept the old runner's irreversible
+  attribution loss. The current sanitized facts do not distinguish navigation,
+  fill, click, or authenticated-UI waits.
+- [x] Pass final focused verification and one complete canonical-plus-additive
+  regression after the diff stabilizes (`74` focused passes, one Windows
+  symlink-permission skip, disposable and diagnostic pass, complete regression
+  `47/47`).
+- [ ] Confirm exact-head draft-PR CI and obtain independent exact-PR-SHA Level 3
+  review before merge.
+- [ ] Obtain a new explicit production authorization and fresh named read-only
+  preflight before any future production attempt.
+
+Remediation evidence:
+`review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_SESSION_ESTABLISHMENT_REMEDIATION.md`.
+
 # 4. Planned Engineering Sequence
 
 Do not combine these into one large Codex task. Each item requires one approved ticket, one primary implementation task, and a separate independent review when warranted.

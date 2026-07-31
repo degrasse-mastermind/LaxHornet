@@ -1,7 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import {
   ACTION_PLAN,
@@ -26,6 +25,10 @@ import {
   isPathInside,
   sha256,
 } from "./r206_synthetic_runner_core.mjs";
+import {
+  closeR206BrowserSession,
+  establishR206BrowserSession,
+} from "./r206_browser_session.mjs";
 
 const AUTHORIZATION_SCHEMA_VERSION = 1;
 const PREFLIGHT_SCHEMA_VERSION = 1;
@@ -508,6 +511,7 @@ export function createProductionAdapter({
       events: events.length,
       liveShareTokens: tokens.length,
       tombstones: tombstones.length,
+      operations: 0,
     };
   };
 
@@ -552,84 +556,49 @@ export function createProductionAdapter({
         code: "BROWSER_RUNTIME_UNAVAILABLE",
       });
     }
-    const profilePath = fs.mkdtempSync(path.join(os.tmpdir(), "laxhornet-r206-browser-"));
-    let context;
+    let browserEntry = null;
     try {
-      context = await chromium.launchPersistentContext(profilePath, {
-        headless: true,
-        serviceWorkers: "block",
-      });
-    } catch (cause) {
-      fs.rmSync(profilePath, { recursive: true, force: true });
-      throw new R206StopError("isolated synthetic browser session could not launch", {
-        code: "BROWSER_SESSION_LAUNCH_FAILED",
-        cause,
-      });
-    }
-    try {
-      const page = context.pages()[0] || await context.newPage();
-      const network = [];
-      const consoleClasses = [];
-      page.on("request", (requestEvent) => {
-        const url = new URL(requestEvent.url());
-        if ([R206_API_URL, R206_APPLICATION_ORIGIN].includes(url.origin)) {
-          network.push({ method: requestEvent.method(), origin: url.origin, pathname: url.pathname });
-        }
-      });
-      page.on("console", (message) => {
-        if (["error", "warning"].includes(message.type())) consoleClasses.push(message.type());
-      });
-      await page.goto(`${R206_APPLICATION_ORIGIN}/app.html`, { waitUntil: "networkidle" });
-      await page.locator("#authEmail").fill(identity.email);
-      await page.locator("#authPassword").fill(identity.password);
-      await page.locator('button[value="sign-in"]').click();
-      await page.locator('[data-action="sign-out"]').waitFor({ timeout: 30_000 });
-      const storedSession = await page.evaluate(() => {
-        for (let index = 0; index < localStorage.length; index += 1) {
-          const key = localStorage.key(index);
-          if (!key?.startsWith("sb-") || !key.endsWith("-auth-token")) continue;
-          try {
-            const parsed = JSON.parse(localStorage.getItem(key));
-            const container = Array.isArray(parsed) ? parsed[0] : parsed;
-            const candidate =
-              container?.currentSession
-              ?? container?.session
-              ?? container;
-            if (candidate?.access_token && candidate?.refresh_token) {
-              return {
-                accessToken: candidate.access_token,
-                refreshToken: candidate.refresh_token,
-              };
+      const established = await establishR206BrowserSession({
+        chromium,
+        applicationOrigin: R206_APPLICATION_ORIGIN,
+        authOrigin: R206_API_URL,
+        identity,
+        expectedRedirect: false,
+        onContextCreated(entry) {
+          browserEntry = entry;
+          entry.network = [];
+          entry.consoleClasses = [];
+          browserProfiles.set(path.resolve(entry.profilePath), entry);
+        },
+        onPageCreated(page, entry) {
+          page.on("request", (requestEvent) => {
+            const url = new URL(requestEvent.url());
+            if ([R206_API_URL, R206_APPLICATION_ORIGIN].includes(url.origin)) {
+              entry.network.push({
+                method: requestEvent.method(),
+                origin: url.origin,
+                pathname: url.pathname,
+              });
             }
-          } catch {
-            // Ignore unrelated local values; the expected auth record is validated below.
-          }
-        }
-        return null;
+          });
+          page.on("console", (message) => {
+            if (["error", "warning"].includes(message.type())) {
+              entry.consoleClasses.push(message.type());
+            }
+          });
+        },
       });
-      if (!storedSession) {
-        throw new R206StopError("isolated browser did not establish the required synthetic session", {
-          code: "BROWSER_SESSION_UNAVAILABLE",
-        });
-      }
-      const browserEntry = { context, page, profilePath, network, consoleClasses };
+      browserEntry = established.entry;
       if (alias === "owner_hydration") hydrationBrowser = browserEntry;
-      browserProfiles.set(path.resolve(profilePath), browserEntry);
       return {
-        sessionId: decodeSessionId(storedSession.accessToken),
-        accessToken: storedSession.accessToken,
-        refreshToken: storedSession.refreshToken,
-        browserProfilePath: profilePath,
+        sessionId: decodeSessionId(established.session.accessToken),
+        accessToken: established.session.accessToken,
+        refreshToken: established.session.refreshToken,
+        browserProfilePath: browserEntry.profilePath,
       };
     } catch (cause) {
-      await context.close().catch(() => {});
-      try {
-        fs.rmSync(profilePath, { recursive: true, force: true });
-      } catch (cleanupCause) {
-        throw new R206StopError("failed isolated browser session profile could not be removed", {
-          code: "BROWSER_READINESS_CLEANUP_FAILED",
-          cause: cleanupCause,
-        });
+      if (browserEntry?.profileRemoved) {
+        browserProfiles.delete(path.resolve(browserEntry.profilePath));
       }
       if (cause instanceof R206StopError) throw cause;
       throw new R206StopError("isolated synthetic browser session failed", {
@@ -976,7 +945,23 @@ export function createProductionAdapter({
         });
       }
       const { page, network, consoleClasses, profilePath } = hydrationBrowser;
-      await page.waitForLoadState("networkidle");
+      await page.locator('[data-action="sign-out"]').waitFor({
+        state: "visible",
+        timeout: 10_000,
+      });
+      let hydrationRequestsReady = false;
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        hydrationRequestsReady = network.some(
+          (entry) => entry.pathname.endsWith("/legacy_game_tombstones"),
+        ) && network.some((entry) => entry.pathname.endsWith("/games"));
+        if (hydrationRequestsReady) break;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      if (!hydrationRequestsReady) {
+        throw new R206StopError("hydration request evidence did not become ready", {
+          code: "HYDRATION_REQUEST_TIMEOUT",
+        });
+      }
       const tombstoneIndex = network.findIndex(
         (entry) => entry.pathname.endsWith("/legacy_game_tombstones"),
       );
@@ -991,7 +976,11 @@ export function createProductionAdapter({
       const body = await page.locator("body").innerText();
       const firstPassVisible = body.includes(ledger.game.id) || localEvidence;
       const beforeRefreshRequests = network.length;
-      await page.reload({ waitUntil: "networkidle" });
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 15_000 });
+      await page.locator('[data-action="sign-out"]').waitFor({
+        state: "visible",
+        timeout: 10_000,
+      });
       const afterBody = await page.locator("body").innerText();
       const afterRefreshVisible = afterBody.includes(ledger.game.id);
       const refreshRequests = network.slice(beforeRefreshRequests);
@@ -1165,8 +1154,7 @@ export function createProductionAdapter({
           code: "CLEANUP_LEDGER_OWNERSHIP_VIOLATION",
         });
       }
-      await entry.context.close();
-      fs.rmSync(resolved, { recursive: true, force: true });
+      await closeR206BrowserSession(entry);
       browserProfiles.delete(resolved);
       if (hydrationBrowser?.profilePath === resolved) hydrationBrowser = null;
     },

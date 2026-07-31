@@ -299,6 +299,27 @@ function sanitizedCheckpointReference(value) {
   return /^r206-private-[a-z0-9-]{1,64}$/i.test(normalized) ? normalized : null;
 }
 
+function sanitizedOperation(value, fallback = null) {
+  const normalized = String(value || "");
+  return /^[a-z][a-z0-9_]{0,79}$/.test(normalized) ? normalized : fallback;
+}
+
+function sanitizedMilliseconds(value) {
+  return Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+function sanitizedOperationTimings(values) {
+  if (!Array.isArray(values)) return [];
+  return values
+    .map((value) => ({
+      operation: sanitizedOperation(value?.operation),
+      elapsedMilliseconds: sanitizedMilliseconds(value?.elapsedMilliseconds),
+      timeoutMilliseconds: sanitizedMilliseconds(value?.timeoutMilliseconds),
+    }))
+    .filter((value) => value.operation && value.elapsedMilliseconds != null && value.timeoutMilliseconds != null)
+    .slice(0, 24);
+}
+
 export function attachExecutionContext(error, context) {
   const normalized = error instanceof R206StopError
     ? error
@@ -327,18 +348,41 @@ export function createFailureEnvelope(error, context = {}) {
     ...context,
   };
   const authorizationConsumed = execution.authorizationConsumed === true;
+  const completedActionCount = Number.isInteger(execution.completedActionCount)
+    ? execution.completedActionCount
+    : 0;
+  const operation = sanitizedOperation(
+    execution.operation,
+    sanitizedOperation(execution.currentOperation, "unknown"),
+  );
   return {
     ok: false,
     code: normalized.code || "UNEXPECTED_EXECUTION_FAILURE",
     message: sanitizeFailureMessage(normalized),
-    currentOperation: execution.currentOperation || "unknown",
+    currentOperation: operation,
+    operation,
+    runnerOperation: sanitizedOperation(execution.runnerOperation),
+    lastCompletedOperation: sanitizedOperation(execution.lastCompletedOperation, "none"),
     phase: execution.phase || "startup",
     lastSuccessfullyCompletedPhase: execution.lastSuccessfullyCompletedPhase || "none",
-    completedActionCount: Number.isInteger(execution.completedActionCount)
-      ? execution.completedActionCount
-      : 0,
+    completedActionCount,
+    actionCount: ACTION_PLAN.length,
+    elapsedMilliseconds: sanitizedMilliseconds(execution.elapsedMilliseconds),
+    timeoutMilliseconds: sanitizedMilliseconds(execution.timeoutMilliseconds),
+    operationTimings: sanitizedOperationTimings(execution.operationTimings),
+    browserContextExisted: execution.browserContextExisted === true,
+    pageLifecycleState: sanitizedOperation(execution.pageLifecycleState, "unknown"),
+    authRequestStarted: execution.authRequestStarted === true,
+    authSessionConfirmed: execution.authSessionConfirmed === true,
+    cookieStatePresent: execution.cookieStatePresent === true,
+    localStorageStatePresent: execution.localStorageStatePresent === true,
+    authenticatedApplicationState: execution.authenticatedApplicationState === true,
+    browserCleanupEntered: execution.browserCleanupEntered === true,
+    browserContextClosed: execution.browserContextClosed === true,
+    browserProfileRemoved: execution.browserProfileRemoved === true,
     mutationStarted: execution.mutationStarted === true,
     cleanupOnlyStarted: execution.cleanupOnlyStarted === true,
+    cleanupEntered: execution.cleanupOnlyStarted === true,
     cleanupCompleted: execution.cleanupCompleted === true,
     residueCounts: sanitizedResidueCounts(execution.residueCounts),
     privateCheckpointReference: sanitizedCheckpointReference(
@@ -1929,7 +1973,21 @@ export async function executeSyntheticVerification({
     clearSyntheticScopeSecrets(scope);
     error.cleanupResults = cleanupResults;
     throw attachExecutionContext(error, {
-      currentOperation: failedOperation,
+      currentOperation: error.executionContext?.currentOperation || failedOperation,
+      operation: error.executionContext?.operation || failedOperation,
+      runnerOperation: failedOperation,
+      lastCompletedOperation: error.executionContext?.lastCompletedOperation || "none",
+      elapsedMilliseconds: error.executionContext?.elapsedMilliseconds ?? null,
+      timeoutMilliseconds: error.executionContext?.timeoutMilliseconds ?? null,
+      operationTimings: error.executionContext?.operationTimings || [],
+      browserContextExisted: error.executionContext?.browserContextExisted === true,
+      pageLifecycleState: error.executionContext?.pageLifecycleState || "unknown",
+      authRequestStarted: error.executionContext?.authRequestStarted === true,
+      authSessionConfirmed: error.executionContext?.authSessionConfirmed === true,
+      cookieStatePresent: error.executionContext?.cookieStatePresent === true,
+      localStorageStatePresent: error.executionContext?.localStorageStatePresent === true,
+      authenticatedApplicationState:
+        error.executionContext?.authenticatedApplicationState === true,
       phase: machine.phase,
       lastSuccessfullyCompletedPhase,
       completedActionCount: completedActions.size,

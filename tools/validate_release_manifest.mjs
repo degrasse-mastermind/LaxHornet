@@ -577,6 +577,7 @@ const syntheticRunner = manifest.r206ReleaseControl?.syntheticRunner;
 const expectedRunnerPaths = [
   "tools/run_r206_synthetic_verification.mjs",
   "tools/r206_browser_runtime.mjs",
+  "tools/r206_browser_session.mjs",
   "tools/r206-browser-runtime/package.json",
   "tools/r206-browser-runtime/package-lock.json",
   "tools/r206_synthetic_runner_core.mjs",
@@ -584,8 +585,12 @@ const expectedRunnerPaths = [
   "tools/r206_synthetic_disposable_adapter.mjs",
   "tools/test_r206_synthetic_verification.mjs",
   "tools/test_r206_browser_runtime.mjs",
+  "tools/test_r206_browser_session.mjs",
   "tools/test_r206_synthetic_verification_disposable.mjs",
   "tools/fixtures/r206-synthetic-evidence-schema.json",
+  "tools/run_v283_local_regression.mjs",
+  ".github/workflows/laxhornet-regression.yml",
+  ".github/workflows/docker-tests.yml",
 ];
 expect(syntheticRunner?.implemented === true, "R2-06 synthetic runner must be registered");
 expect(
@@ -595,9 +600,31 @@ expect(
 expect(
   syntheticRunner?.browserReadinessPath === "tools/r206_browser_runtime.mjs"
     && syntheticRunner?.browserReadinessTestPath === "tools/test_r206_browser_runtime.mjs"
+    && syntheticRunner?.browserSessionPath === "tools/r206_browser_session.mjs"
+    && syntheticRunner?.browserSessionTestPath === "tools/test_r206_browser_session.mjs"
+    && syntheticRunner?.browserSessionDiagnostic === "--diagnose-browser-session"
     && syntheticRunner?.browserRuntimePackagePath === "tools/r206-browser-runtime/package.json"
     && syntheticRunner?.browserRuntimeLockPath === "tools/r206-browser-runtime/package-lock.json",
   "R2-06 browser runtime reviewed paths changed",
+);
+expect(
+  JSON.stringify(syntheticRunner?.browserSessionTimeoutMilliseconds) === JSON.stringify({
+    browserContextCreate: 15000,
+    browserPageCreate: 5000,
+    browserNavigate: 15000,
+    applicationReady: 5000,
+    supabaseClientReady: 5000,
+    authUiReady: 10000,
+    authSubmit: 5000,
+    authResponseWait: 15000,
+    authRedirectWait: 5000,
+    authStorageVerify: 10000,
+    authSessionVerify: 10000,
+    authenticatedAppVerify: 10000,
+    browserContextClose: 10000,
+    browserProfileRemove: 5000,
+  }),
+  "R2-06 browser session timeout policy changed",
 );
 expect(
   syntheticRunner?.playwrightVersion === "1.61.1"

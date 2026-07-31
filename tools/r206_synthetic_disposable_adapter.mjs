@@ -149,6 +149,7 @@ export async function createDisposableAdapter({
       liveShareTokens: row.live_share_tokens,
       tombstones: row.tombstones,
       sessions: [...sessions.values()].filter((session) => !session.revoked).length,
+      operations: 0,
     };
   };
 
@@ -512,6 +513,9 @@ export async function createDisposableAdapter({
         });
       }
       await db.query("delete from auth.users where id = $1::uuid", [user.id]);
+      for (const session of sessions.values()) {
+        if (session.accountId === user.id) session.revoked = true;
+      }
       expected.password = null;
       expected.email = null;
     },

@@ -174,3 +174,18 @@ cleanup completion, and release closeout remain false. A future production run
 requires a new authorization and fresh named read-only preflight bound to the
 independently reviewed exact runner SHA. Independent exact-PR-SHA Level 3
 review is required before merge.
+
+## Subsequent R2-06M session-establishment remediation
+
+A later separately authorized attempt passed this browser-runtime readiness
+gate but failed inside `establish_sessions` with public
+`BROWSER_SESSION_FAILURE` and native `TimeoutError`. Readiness remained correct
+for the scope documented above: it proves runtime launch and cleanup, not
+application navigation or authentication.
+
+R2-06M adds the missing operation-specific navigation/Auth/storage/session
+diagnostics without changing the pinned runtime or production-default gate.
+The old public failure facts cannot distinguish the exact timeout-capable call
+because the earlier adapter flattened navigation, fill, click, and
+authenticated-UI waits. See
+`SYNTHETIC_RUNNER_SESSION_ESTABLISHMENT_REMEDIATION.md`.

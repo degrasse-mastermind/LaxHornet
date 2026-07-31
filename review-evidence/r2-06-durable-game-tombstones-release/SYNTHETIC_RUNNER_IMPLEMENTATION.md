@@ -10,8 +10,9 @@ release-closeout decision.
 ## Architecture and entry points
 
 - `tools/run_r206_synthetic_verification.mjs` is the only operator entry point.
-  It supports credential-free `--check-browser-runtime`, `--dry-run`,
-  `--prepare-run-directory`, `--execution-mode disposable`, and the separately gated
+  It supports credential-free `--check-browser-runtime`,
+  `--diagnose-browser-session`, `--dry-run`, `--prepare-run-directory`,
+  `--execution-mode disposable`, and the separately gated
   `--execution-mode production --allow-production`.
 - `tools/r206_browser_runtime.mjs` owns the pre-credential, pre-mutation
   Playwright/Chromium identity, executable, isolated-launch, and cleanup gate.
@@ -20,6 +21,9 @@ release-closeout decision.
 - `tools/r206_synthetic_runner_core.mjs` owns the 21-action plan, hard limits,
   strict state machine, cleanup ledger, classified-result checks, evidence
   redaction, and fail-closed orchestration.
+- `tools/r206_browser_session.mjs` owns the shared bounded browser sign-in
+  operations, stage classifications, safe timing/state diagnostics, and
+  context/profile cleanup used by production and the loopback-only diagnostic.
 - `tools/r206_synthetic_production_adapter.mjs` contains the fixed production
   HTTP/browser surface. It accepts only the reviewed Supabase and application
   origins, bounded Auth Admin lifecycle calls, exact-scope reads, the two
@@ -121,6 +125,9 @@ rows, browser paths, or stacks.
 Detailed remediation evidence:
 `SYNTHETIC_RUNNER_BROWSER_REMEDIATION.md`.
 
+R2-06M session-establishment remediation evidence:
+`SYNTHETIC_RUNNER_SESSION_ESTABLISHMENT_REMEDIATION.md`.
+
 ## Evidence and credential handling
 
 Passwords, email addresses, access tokens, refresh tokens, key material,
@@ -165,3 +172,12 @@ private historical evidence remained untouched. Local runner coverage passed
 junction check passed. Browser contracts passed `11/11`, pinned Chromium
 readiness passed, disposable integration passed as non-production evidence,
 and the complete canonical-plus-additive regression passed `46/46`.
+
+R2-06M adds operation-specific browser session establishment, a credential-free
+loopback diagnostic, partial-session cleanup coverage, and safe per-operation
+failure timing/state. Final local coverage passed 74 focused checks with one
+Windows directory-symlink permission skip, pinned readiness, the diagnostic,
+disposable integration, release/Pages/tombstone/concurrency gates, and the
+complete canonical-plus-additive regression `47/47`. The old attempt's exact
+timeout call site remains unrecoverable from its sanitized public evidence;
+this limitation is not treated as resolved or as production authorization.
