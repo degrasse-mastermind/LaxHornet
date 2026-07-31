@@ -19,6 +19,7 @@ import {
   R206_RUNTIME_SHA,
   R206StopError,
   assertAllowedRpc,
+  assertNoUnsafePathSegments,
   assertPublicEvidenceSafe,
   assertSafePrivateEvidencePath,
   assertSyntheticEmail,
@@ -89,7 +90,8 @@ function validateAuthorizationArtifact(artifact, config, now) {
     || artifact.runtimeSourceSha !== R206_RUNTIME_SHA
     || artifact.actionCount !== ACTION_PLAN.length
     || !exactObjectMatches(artifact.hardLimits, HARD_LIMITS)
-    || path.resolve(artifact.privateEvidenceDir || "") !== expectedPrivatePath
+    || path.normalize(path.resolve(artifact.privateEvidenceDir || "")).toLowerCase()
+      !== path.normalize(expectedPrivatePath).toLowerCase()
     || artifact.browserExecutionAuthorized !== true
     || artifact.releaseCloseoutApproved !== false
   ) {
@@ -155,6 +157,66 @@ function validateGitIdentity(repoRoot, targetRef) {
   }
 }
 
+function listGitWorktreeRoots(repoRoot) {
+  return git(repoRoot, "worktree", "list", "--porcelain")
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("worktree "))
+    .map((line) => fs.realpathSync(path.resolve(line.slice("worktree ".length))));
+}
+
+function assertDirectPrivateArtifact({
+  artifactPath,
+  label,
+  privateEvidenceDir,
+  pathSafetyOptions,
+}) {
+  if (/(^|[\\/])\.\.([\\/]|$)/.test(String(artifactPath || ""))) {
+    throw new R206StopError(`${label} contains path traversal`, {
+      code: "PRIVATE_EVIDENCE_PATH_ESCAPE",
+    });
+  }
+  const resolved = path.resolve(artifactPath || "");
+  const sameDirectory = process.platform === "win32"
+    ? path.dirname(resolved).toLowerCase() === privateEvidenceDir.toLowerCase()
+    : path.dirname(resolved) === privateEvidenceDir;
+  if (!sameDirectory) {
+    throw new R206StopError(`${label} must be a direct file in the selected run directory`, {
+      code: "PRIVATE_ARTIFACT_PATH_UNSAFE",
+    });
+  }
+  let status;
+  try {
+    status = fs.lstatSync(resolved);
+  } catch (error) {
+    if (error?.code === "ENOENT") return resolved;
+    throw new R206StopError(`${label} path could not be inspected safely`, {
+      code: "PRIVATE_EVIDENCE_REPARSE_POINT_UNSAFE",
+      cause: error,
+    });
+  }
+  if (status.isSymbolicLink()) {
+    throw new R206StopError(`${label} must not be a link or reparse point`, {
+      code: "PRIVATE_EVIDENCE_REPARSE_POINT_UNSAFE",
+    });
+  }
+  assertNoUnsafePathSegments(resolved, pathSafetyOptions);
+  if (!status.isFile()) {
+    throw new R206StopError(`${label} must be a regular non-link file`, {
+      code: "PRIVATE_EVIDENCE_REPARSE_POINT_UNSAFE",
+    });
+  }
+  const real = fs.realpathSync(resolved);
+  const realSameDirectory = process.platform === "win32"
+    ? path.dirname(real).toLowerCase() === privateEvidenceDir.toLowerCase()
+    : path.dirname(real) === privateEvidenceDir;
+  if (!realSameDirectory) {
+    throw new R206StopError(`${label} resolves outside the selected run directory`, {
+      code: "PRIVATE_EVIDENCE_PATH_ESCAPE",
+    });
+  }
+  return real;
+}
+
 function validatePublicEvidenceDir(repoRoot, publicEvidenceDir) {
   const expected = path.resolve(repoRoot, R206_PUBLIC_EVIDENCE_DIR);
   const resolved = path.resolve(publicEvidenceDir || "");
@@ -172,6 +234,9 @@ export function validateProductionConfiguration({
   env = process.env,
   now = new Date(),
   verifyGit = true,
+  approvedPrivateRoot = R206_PRIVATE_EVIDENCE_DIR,
+  gitWorktreeRoots,
+  pathSafetyOptions = {},
 }) {
   if (options.executionMode !== "production" || options.allowProduction !== true) {
     throw new R206StopError("production execution is disabled unless --allow-production is explicit", {
@@ -189,22 +254,42 @@ export function validateProductionConfiguration({
     });
   }
   if (verifyGit) validateGitIdentity(repoRoot, options.targetRef);
+  const reviewedWorktrees = gitWorktreeRoots || listGitWorktreeRoots(repoRoot);
   const privateEvidenceDir = assertSafePrivateEvidencePath({
     repoRoot,
     privateEvidenceDir: options.privateEvidenceDir,
     executionMode: "production",
     reviewedOverride: options.reviewedPrivatePathOverride === true,
+    approvedPrivateRoot,
+    gitWorktreeRoots: reviewedWorktrees,
+    ...pathSafetyOptions,
   });
   const publicEvidenceDir = validatePublicEvidenceDir(repoRoot, options.publicEvidenceDir);
-  fs.mkdirSync(privateEvidenceDir, { recursive: true });
-  const realPrivateDir = fs.realpathSync(privateEvidenceDir);
-  if (isPathInside(repoRoot, realPrivateDir)) {
-    throw new R206StopError("private evidence directory resolves inside the repository", {
-      code: "PRIVATE_EVIDENCE_DIR_INSIDE_REPOSITORY",
+  const realPrivateDir = privateEvidenceDir;
+  const artifactPathSafety = {
+    ...pathSafetyOptions,
+  };
+  const authorizationPath = assertDirectPrivateArtifact({
+    artifactPath: options.authorizationArtifact,
+    label: "authorization artifact",
+    privateEvidenceDir: realPrivateDir,
+    pathSafetyOptions: artifactPathSafety,
+  });
+  const preflightPath = assertDirectPrivateArtifact({
+    artifactPath: options.preflightArtifact,
+    label: "preflight artifact",
+    privateEvidenceDir: realPrivateDir,
+    pathSafetyOptions: artifactPathSafety,
+  });
+  if (
+    process.platform === "win32"
+      ? authorizationPath.toLowerCase() === preflightPath.toLowerCase()
+      : authorizationPath === preflightPath
+  ) {
+    throw new R206StopError("authorization and preflight artifacts must be separate files", {
+      code: "PRIVATE_ARTIFACT_PATH_UNSAFE",
     });
   }
-  const authorizationPath = path.resolve(options.authorizationArtifact || "");
-  const preflightPath = path.resolve(options.preflightArtifact || "");
   const retainedLedgerPath = path.join(realPrivateDir, R206_PRIVATE_LEDGER_NAME);
   const authorizationConsumptionPath = path.join(
     realPrivateDir,
@@ -217,20 +302,29 @@ export function validateProductionConfiguration({
   ].map((name) => path.join(publicEvidenceDir, name));
   if (fs.existsSync(authorizationConsumptionPath)) {
     throw new R206StopError("production authorization has a separate consumption record and cannot be reused", {
-      code: "PRODUCTION_AUTHORIZATION_ALREADY_CONSUMED",
+      code: "PRIVATE_EVIDENCE_RUN_ALREADY_CONSUMED",
     });
   }
-  if (fs.existsSync(retainedLedgerPath) || publicResultPaths.some((file) => fs.existsSync(file))) {
-    throw new R206StopError("reviewed evidence targets already exist and will not be overwritten", {
+  if (fs.existsSync(retainedLedgerPath)) {
+    throw new R206StopError("selected run directory already contains a retained identifier ledger", {
       code: "EVIDENCE_TARGET_ALREADY_EXISTS",
     });
   }
-  if (
-    !isPathInside(realPrivateDir, authorizationPath)
-    || !isPathInside(realPrivateDir, preflightPath)
-  ) {
-    throw new R206StopError("production authorization and preflight artifacts must be in the private store", {
-      code: "PRIVATE_ARTIFACT_PATH_UNSAFE",
+  const allowedPrivateEntries = new Set([
+    path.basename(authorizationPath),
+    path.basename(preflightPath),
+  ]);
+  const unrelatedPrivateEntries = fs
+    .readdirSync(realPrivateDir)
+    .filter((name) => !allowedPrivateEntries.has(name));
+  if (unrelatedPrivateEntries.length > 0) {
+    throw new R206StopError("selected run directory contains unrelated or prior-run content", {
+      code: "PRIVATE_EVIDENCE_RUN_DIR_NOT_EMPTY",
+    });
+  }
+  if (publicResultPaths.some((file) => fs.existsSync(file))) {
+    throw new R206StopError("reviewed evidence targets already exist and will not be overwritten", {
+      code: "EVIDENCE_TARGET_ALREADY_EXISTS",
     });
   }
   const authorization = readJson(authorizationPath, "authorization artifact");

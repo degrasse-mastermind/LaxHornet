@@ -255,6 +255,16 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   native class/code, mutation, cleanup, residue, checkpoint, tombstone, and
   authorization-consumption context. Future execution writes a separate
   create-new private consumption record before mutation and refuses reuse.
+- R2-06K makes the fixed
+  `C:\Users\user\Documents\LaxHornet-Private-Release-Evidence\R2-06` path an
+  authority root and accepts one strict immediate run child beneath it. The
+  root itself, deeper nesting, traversal, external/sibling paths, links,
+  junctions/reparse points, repositories, and all Git worktrees remain
+  rejected. Authorization and preflight must be direct files in the selected
+  child; consumption and retained-ledger state are isolated there. The
+  credential-free `--prepare-run-directory` helper creates one empty child
+  with exclusive semantics. Production remains disabled by default, and no
+  production or private historical evidence was accessed during remediation.
   Failure cleanup now uses only the ledger-owned deletion and device
   identities. This remediation did not use production credentials, contact or
   mutate production, or advance synthetic verification, cleanup, or closeout.

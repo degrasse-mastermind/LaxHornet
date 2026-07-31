@@ -93,7 +93,7 @@ New runner classifications include:
 - `BROWSER_SESSION_FAILURE`;
 - `NETWORK_REQUEST_FAILED`;
 - `JSON_PARSE_FAILURE`;
-- `PRODUCTION_AUTHORIZATION_ALREADY_CONSUMED`.
+- `PRIVATE_EVIDENCE_RUN_ALREADY_CONSUMED`.
 
 ## Authorization consumption
 
@@ -107,9 +107,13 @@ outcome, and consumed state.
 
 The first write uses create-new semantics. Later state transitions atomically
 update only the consumption record. Any existing consumption record blocks
-reuse even when the original authorization JSON still says `unused`.
+reuse of that exact run child even when the original authorization JSON still
+says `unused`. It does not block a different fresh reviewed run child.
 Pre-readiness failures are reported as `failed_unused`; failures after the
 consumption checkpoint are `failed_consumed`.
+
+R2-06K moves this record from the fixed authority root into the exact reviewed
+run child. See `SYNTHETIC_RUNNER_PRIVATE_PATH_REMEDIATION.md`.
 
 ## Cleanup correction
 
