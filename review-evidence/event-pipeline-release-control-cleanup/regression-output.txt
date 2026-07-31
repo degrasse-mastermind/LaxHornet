@@ -73,35 +73,35 @@ Event operation service contracts passed.
 EXIT: 0
 
 ===== durable game and clock operation contracts =====
-✔ R2-04 operation schema and lifecycle are explicit (2.5321ms)
-✔ game write is durable before its cloud attempt (10.8319ms)
-✔ clock write is durable before its RPC attempt (1.2952ms)
-✔ permanent game operation ID survives retry (0.969ms)
-✔ permanent clock operation ID survives retry (1.6054ms)
-✔ refresh recovers pending game operation (2.2791ms)
-✔ refresh recovers pending clock operation (1.4003ms)
-✔ stale syncing operation becomes replayable after refresh (0.6432ms)
-✔ accepted receipt is durable before accepted payload compaction (1.0251ms)
-✔ older accepted response cannot acknowledge a newer coalesced game payload (2.5771ms)
-✔ duplicate queue processing has only one active attempt (0.9083ms)
-✔ network failure becomes retryable with bounded backoff (0.83ms)
-✔ authorization failure is retained as a non-retryable rejection (0.806ms)
-✔ revision conflict remains conflicted and is not retried (0.851ms)
-✔ offline processing becomes retryable without attempts or retry storms (0.8378ms)
-✔ missing session rejects eligible work without incrementing attempt counters (0.8378ms)
-✔ account A queue is isolated while account B is active (1.1889ms)
-✔ app auth transitions reject before account switch and recover only on explicit triggers (1.6683ms)
-✔ fresh sign-in recovery resumes only the active account's authentication rejection (1.4625ms)
-✔ accepted operation does not reappear after intentional compaction (1.2385ms)
-✔ malformed operation domain is quarantined without blocking startup (2.375ms)
-✔ future operation-domain version is preserved and write-blocked (1.7536ms)
-✔ public Live Share, CSV, recap, and private backup exclude queue metadata (0.6941ms)
-✔ unresolved durable work cannot be reported as Synced (0.9177ms)
-✔ existing Trust Spine event-operation service remains a separate namespace (0.9437ms)
-✔ integrated game journey survives failure, refresh, replay, receipt, and cleanup (2.6158ms)
-✔ integrated game journey retains authorization denial and never runs it under another account (1.1009ms)
-✔ integrated clock journey survives failure, refresh, replay, revision receipt, and cleanup (1.6333ms)
-✔ integrated clock journey retains stale revision evidence and local payload without retry (1.1196ms)
+✔ R2-04 operation schema and lifecycle are explicit (2.1846ms)
+✔ game write is durable before its cloud attempt (3.7608ms)
+✔ clock write is durable before its RPC attempt (1.3326ms)
+✔ permanent game operation ID survives retry (1.007ms)
+✔ permanent clock operation ID survives retry (1.0072ms)
+✔ refresh recovers pending game operation (1.4519ms)
+✔ refresh recovers pending clock operation (1.3448ms)
+✔ stale syncing operation becomes replayable after refresh (0.6214ms)
+✔ accepted receipt is durable before accepted payload compaction (0.954ms)
+✔ older accepted response cannot acknowledge a newer coalesced game payload (1.8489ms)
+✔ duplicate queue processing has only one active attempt (0.8145ms)
+✔ network failure becomes retryable with bounded backoff (0.7782ms)
+✔ authorization failure is retained as a non-retryable rejection (0.8544ms)
+✔ revision conflict remains conflicted and is not retried (0.9001ms)
+✔ offline processing becomes retryable without attempts or retry storms (0.8175ms)
+✔ missing session rejects eligible work without incrementing attempt counters (0.8173ms)
+✔ account A queue is isolated while account B is active (1.0492ms)
+✔ app auth transitions reject before account switch and recover only on explicit triggers (1.4004ms)
+✔ fresh sign-in recovery resumes only the active account's authentication rejection (1.3931ms)
+✔ accepted operation does not reappear after intentional compaction (0.871ms)
+✔ malformed operation domain is quarantined without blocking startup (1.5529ms)
+✔ future operation-domain version is preserved and write-blocked (1.0096ms)
+✔ public Live Share, CSV, recap, and private backup exclude queue metadata (0.4219ms)
+✔ unresolved durable work cannot be reported as Synced (0.7844ms)
+✔ existing Trust Spine event-operation service remains a separate namespace (0.6596ms)
+✔ integrated game journey survives failure, refresh, replay, receipt, and cleanup (1.4346ms)
+✔ integrated game journey retains authorization denial and never runs it under another account (0.8725ms)
+✔ integrated clock journey survives failure, refresh, replay, revision receipt, and cleanup (1.4327ms)
+✔ integrated clock journey retains stale revision evidence and local payload without retry (0.9069ms)
 ℹ tests 29
 ℹ suites 0
 ℹ pass 29
@@ -109,44 +109,44 @@ EXIT: 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 58.2869
+ℹ duration_ms 40.7863
 
 EXIT: 0
 
 ===== durable legacy game tombstone contracts =====
-✔ 1 deletion intent and operation are persisted atomically before network execution (4.2789ms)
-✔ 2 permanent deletion ID survives retry and refresh (4.3699ms)
-✔ 3 repeated delete action reuses one logical operation (0.8145ms)
-✔ 4 network failure retains retryable deletion evidence (1.0776ms)
-✔ 5 authentication failure retains rejected deletion evidence (1.0768ms)
-✔ 6 authorization denial retains rejected deletion evidence (1.1059ms)
-✔ 7 delete conflict retains conflicted evidence without ordinary retry (0.9565ms)
-✔ 8 accepted delete receipt is stored on permanent tombstone before operation compaction (0.9813ms)
-✔ 8b application rejects a delete receipt whose permanent identity does not match (0.3445ms)
-✔ 9 stale game write cannot process after a tombstone (3.2431ms)
-✔ 10 older queued game write is retained as superseded history (1.3019ms)
-✔ 11 older in-flight game response cannot acknowledge away a newer delete (1.4491ms)
-✔ 12 authorized tombstone suppresses a cloud game during hydration (0.4892ms)
-✔ 13 both game-then-tombstone and tombstone-then-game response orders end deleted (0.0851ms)
+✔ 1 deletion intent and operation are persisted atomically before network execution (4.2516ms)
+✔ 2 permanent deletion ID survives retry and refresh (3.0873ms)
+✔ 3 repeated delete action reuses one logical operation (0.764ms)
+✔ 4 network failure retains retryable deletion evidence (1.007ms)
+✔ 5 authentication failure retains rejected deletion evidence (1.0506ms)
+✔ 6 authorization denial retains rejected deletion evidence (0.9779ms)
+✔ 7 delete conflict retains conflicted evidence without ordinary retry (0.9919ms)
+✔ 8 accepted delete receipt is stored on permanent tombstone before operation compaction (1.0228ms)
+✔ 8b application rejects a delete receipt whose permanent identity does not match (0.3552ms)
+✔ 9 stale game write cannot process after a tombstone (1.9848ms)
+✔ 10 older queued game write is retained as superseded history (0.7588ms)
+✔ 11 older in-flight game response cannot acknowledge away a newer delete (1.1303ms)
+✔ 12 authorized tombstone suppresses a cloud game during hydration (0.4795ms)
+✔ 13 both game-then-tombstone and tombstone-then-game response orders end deleted (0.0879ms)
 ✔ 14 a missing cloud row without explicit tombstone does not delete local state (0.1258ms)
-✔ 15 account A tombstone is not visible through account B service scope (0.7034ms)
-✔ 16 signed-out state processes no account tombstone operation (1.1425ms)
-✔ 17 refresh recovers pending deletion (1.2967ms)
-✔ 18 reconnect retries an eligible deletion (1.6435ms)
-✔ 19 proven local-only deletion creates no server operation (1.0557ms)
-✔ 20 ambiguous cloud visibility creates durable server deletion protection (0.389ms)
-✔ 21 future-version operation, tombstone, and recovery state is preserved and write-blocked (1.1514ms)
-✔ 22 malformed tombstone or recovery state fails structural validation for quarantine (0.9192ms)
-✔ 23 public, recap, CSV, and private backup builders exclude tombstone metadata (0.5265ms)
-✔ 23b pending whole-game deletion creates no event-delete markers (0.2054ms)
-✔ 23c individual event deletion retains its separate marker path (0.1204ms)
-✔ 23d rejected and conflicted deletes restore retained game and event evidence (0.1993ms)
-✔ 23e refresh after newer-revision conflict restores events without reviving an individual deletion (2.6277ms)
-✔ 24 R2-03 lossless same-ID hydration contracts remain present (0.342ms)
-✔ 25 R2-04 permanent game-write identity behavior remains present (1.1964ms)
-✔ 26 R2-05 classification remains deterministic for tombstone errors (0.8424ms)
-✔ 27 Trust Spine event tombstones remain a separate unchanged service (0.5185ms)
-✔ integrated two-device stale upload is rejected and both devices end deleted (1.9398ms)
+✔ 15 account A tombstone is not visible through account B service scope (0.692ms)
+✔ 16 signed-out state processes no account tombstone operation (1.124ms)
+✔ 17 refresh recovers pending deletion (1.2783ms)
+✔ 18 reconnect retries an eligible deletion (0.9496ms)
+✔ 19 proven local-only deletion creates no server operation (0.5779ms)
+✔ 20 ambiguous cloud visibility creates durable server deletion protection (0.2522ms)
+✔ 21 future-version operation, tombstone, and recovery state is preserved and write-blocked (0.9429ms)
+✔ 22 malformed tombstone or recovery state fails structural validation for quarantine (0.9568ms)
+✔ 23 public, recap, CSV, and private backup builders exclude tombstone metadata (0.4466ms)
+✔ 23b pending whole-game deletion creates no event-delete markers (0.1769ms)
+✔ 23c individual event deletion retains its separate marker path (0.1239ms)
+✔ 23d rejected and conflicted deletes restore retained game and event evidence (0.1965ms)
+✔ 23e refresh after newer-revision conflict restores events without reviving an individual deletion (3.0693ms)
+✔ 24 R2-03 lossless same-ID hydration contracts remain present (0.1007ms)
+✔ 25 R2-04 permanent game-write identity behavior remains present (0.904ms)
+✔ 26 R2-05 classification remains deterministic for tombstone errors (0.5418ms)
+✔ 27 Trust Spine event tombstones remain a separate unchanged service (0.4124ms)
+✔ integrated two-device stale upload is rejected and both devices end deleted (1.6811ms)
 ℹ tests 33
 ℹ suites 0
 ℹ pass 33
@@ -154,7 +154,7 @@ EXIT: 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 46.7073
+ℹ duration_ms 38.685
 
 EXIT: 0
 
@@ -190,28 +190,28 @@ PASS: different game IDs remain independently processable
 EXIT: 0
 
 ===== sync error classification contracts =====
-✔ offline has the required deterministic classification (2.2377ms)
-✔ fetch failure has the required deterministic classification (0.398ms)
-✔ timeout has the required deterministic classification (0.0995ms)
-✔ HTTP 429 has the required deterministic classification (0.0792ms)
-✔ HTTP 500 has the required deterministic classification (0.3737ms)
-✔ HTTP 401 has the required deterministic classification (0.0931ms)
-✔ missing session has the required deterministic classification (0.0716ms)
-✔ HTTP 403 has the required deterministic classification (0.0807ms)
-✔ RLS permission denial has the required deterministic classification (0.0848ms)
-✔ unauthorized scope has the required deterministic classification (0.6552ms)
-✔ tracked-clock unauthorized outcome has the required deterministic classification (0.1074ms)
-✔ HTTP 400 malformed payload has the required deterministic classification (0.0704ms)
-✔ HTTP 422 invalid state has the required deterministic classification (0.0454ms)
-✔ PGRST202 has the required deterministic classification (0.0631ms)
-✔ missing RPC signature has the required deterministic classification (0.0392ms)
-✔ HTTP 409 has the required deterministic classification (0.1127ms)
-✔ stale clock revision has the required deterministic classification (0.1727ms)
-✔ unknown permanent failure has the required deterministic classification (0.1318ms)
-✔ schema-cache capability failure takes precedence over a retryable HTTP status (0.0983ms)
-✔ unknown errors without an explicit transport signal fail closed (0.0798ms)
+✔ offline has the required deterministic classification (1.7042ms)
+✔ fetch failure has the required deterministic classification (0.3656ms)
+✔ timeout has the required deterministic classification (0.1101ms)
+✔ HTTP 429 has the required deterministic classification (0.0855ms)
+✔ HTTP 500 has the required deterministic classification (0.1251ms)
+✔ HTTP 401 has the required deterministic classification (0.0765ms)
+✔ missing session has the required deterministic classification (0.0658ms)
+✔ HTTP 403 has the required deterministic classification (0.0639ms)
+✔ RLS permission denial has the required deterministic classification (0.0797ms)
+✔ unauthorized scope has the required deterministic classification (0.6493ms)
+✔ tracked-clock unauthorized outcome has the required deterministic classification (0.108ms)
+✔ HTTP 400 malformed payload has the required deterministic classification (0.0736ms)
+✔ HTTP 422 invalid state has the required deterministic classification (0.0479ms)
+✔ PGRST202 has the required deterministic classification (0.0645ms)
+✔ missing RPC signature has the required deterministic classification (0.039ms)
+✔ HTTP 409 has the required deterministic classification (0.1062ms)
+✔ stale clock revision has the required deterministic classification (0.1935ms)
+✔ unknown permanent failure has the required deterministic classification (0.1273ms)
+✔ schema-cache capability failure takes precedence over a retryable HTTP status (0.1583ms)
+✔ unknown errors without an explicit transport signal fail closed (0.0797ms)
 ✔ classification output never retains private server text, tokens, or payloads (0.2083ms)
-✔ Supabase result envelopes preserve safe HTTP status and source code (0.0653ms)
+✔ Supabase result envelopes preserve safe HTTP status and source code (0.0599ms)
 ℹ tests 22
 ℹ suites 0
 ℹ pass 22
@@ -219,43 +219,43 @@ EXIT: 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 12.1167
+ℹ duration_ms 9.8287
 
 EXIT: 0
 
 ===== sync characterization contracts =====
-✔ R2-03: ownership policy is explicit for games and events (5.4482ms)
-✔ R2-03: richer local game survives poorer same-ID cloud hydration (5.4159ms)
-✔ R2-03: tracked playing-time state and pending operations survive hydration (1.9887ms)
-✔ R2-03: same-ID events merge without losing score context or local metadata (1.9471ms)
-✔ R2-03: omitted cloud fields do not delete local game or event fields (7.0007ms)
-✔ R2-03: newer local conflict-sensitive values defeat older cloud values (1.4474ms)
-✔ R2-03: newer cloud conflict-sensitive values update while local-only evidence survives (1.4244ms)
-✔ R2-03: cloud-only games are added (1.7811ms)
-✔ R2-03: repeated same-ID game and event payloads do not create duplicates (1.5481ms)
-✔ R2-03: active game is the same-ID hydration base and remains unmodified (1.6489ms)
-✔ R2-03: legacy outbound projections stay lossy while hydration merge is lossless (1.6058ms)
-✔ R2-03: older overlapping cloud load cannot regress a newer accepted response (4.0005ms)
-✔ R2-03: a later legitimate request C becomes the accepted generation (2.1366ms)
-✔ R2-03: a response from the prior account cannot hydrate the new namespace (1.7194ms)
-✔ R2-06: explicit durable tombstone supersedes a stale legacy game write before processing (2.362ms)
-✔ R2-06A: guarded game writes and durable deletes share one per-game transaction lock before tombstone reads (0.2691ms)
-✔ R2-06A: newer-revision delete conflict restores retained events without whole-game event-delete markers (0.3003ms)
-✔ R2-06: missing game rows are not interpreted as deletion without tombstone evidence (1.2413ms)
-✔ CHARACTERIZATION: RLS-invisible legacy event delete clears a device marker as if absent (1.4596ms)
-✔ R2-04: failed tracked-clock writes keep local clock state and use the separate durable queue (1.7195ms)
-✔ R2-05: durable operation failures have deterministic authorization and transport taxonomy (1.2845ms)
-✔ CHARACTERIZATION: global sync copy remains transient pending visible R2 sync states (0.1317ms)
-✔ CHARACTERIZATION: Trust Spine transport failures retain pending work but rejected outcomes remove it (4.4532ms)
-✔ CHARACTERIZATION: participation rejections remain pending without stored server classification (0.8401ms)
-✔ R2-03: integrated loadCloudGames hydration preserves richer local evidence after partial sync (2.9699ms)
-✔ R2-04: refresh preserves separate durable game and clock operations alongside Trust Spine work (0.9265ms)
-✔ CHARACTERIZATION: sign-in switches to account namespace without migrating signed-out evidence (1.9873ms)
-✔ CHARACTERIZATION: authorization refresh can remove local games before persistence (0.6121ms)
-✔ CHARACTERIZATION: persistAll can leave a cross-key mixed generation after one domain write fails (0.7589ms)
-✔ CHARACTERIZATION: repeated logical captures receive different unstable client IDs (0.6453ms)
-✔ GUARANTEE: existing Trust Spine coverage proves permanent IDs, replay, versions, conflicts, and tombstones (0.2845ms)
-✔ R2-01 confirmed-risk coverage manifest is complete (0.095ms)
+✔ R2-03: ownership policy is explicit for games and events (3.2075ms)
+✔ R2-03: richer local game survives poorer same-ID cloud hydration (2.39ms)
+✔ R2-03: tracked playing-time state and pending operations survive hydration (1.4359ms)
+✔ R2-03: same-ID events merge without losing score context or local metadata (1.6166ms)
+✔ R2-03: omitted cloud fields do not delete local game or event fields (2.926ms)
+✔ R2-03: newer local conflict-sensitive values defeat older cloud values (1.3838ms)
+✔ R2-03: newer cloud conflict-sensitive values update while local-only evidence survives (1.5832ms)
+✔ R2-03: cloud-only games are added (2.4568ms)
+✔ R2-03: repeated same-ID game and event payloads do not create duplicates (1.8694ms)
+✔ R2-03: active game is the same-ID hydration base and remains unmodified (2.0375ms)
+✔ R2-03: legacy outbound projections stay lossy while hydration merge is lossless (1.7073ms)
+✔ R2-03: older overlapping cloud load cannot regress a newer accepted response (4.0972ms)
+✔ R2-03: a later legitimate request C becomes the accepted generation (2.2413ms)
+✔ R2-03: a response from the prior account cannot hydrate the new namespace (2.4981ms)
+✔ R2-06: explicit durable tombstone supersedes a stale legacy game write before processing (2.5136ms)
+✔ R2-06A: guarded game writes and durable deletes share one per-game transaction lock before tombstone reads (0.2715ms)
+✔ R2-06A: newer-revision delete conflict restores retained events without whole-game event-delete markers (0.3082ms)
+✔ R2-06: missing game rows are not interpreted as deletion without tombstone evidence (0.4211ms)
+✔ CHARACTERIZATION: RLS-invisible legacy event delete clears a device marker as if absent (1.3625ms)
+✔ R2-04: failed tracked-clock writes keep local clock state and use the separate durable queue (1.9446ms)
+✔ R2-05: durable operation failures have deterministic authorization and transport taxonomy (1.5025ms)
+✔ CHARACTERIZATION: global sync copy remains transient pending visible R2 sync states (0.1567ms)
+✔ CHARACTERIZATION: Trust Spine transport failures retain pending work but rejected outcomes remove it (6.0276ms)
+✔ CHARACTERIZATION: participation rejections remain pending without stored server classification (0.9485ms)
+✔ R2-03: integrated loadCloudGames hydration preserves richer local evidence after partial sync (2.9526ms)
+✔ R2-04: refresh preserves separate durable game and clock operations alongside Trust Spine work (0.9207ms)
+✔ CHARACTERIZATION: sign-in switches to account namespace without migrating signed-out evidence (1.9298ms)
+✔ CHARACTERIZATION: authorization refresh can remove local games before persistence (0.5872ms)
+✔ CHARACTERIZATION: persistAll can leave a cross-key mixed generation after one domain write fails (0.7361ms)
+✔ CHARACTERIZATION: repeated logical captures receive different unstable client IDs (0.6724ms)
+✔ GUARANTEE: existing Trust Spine coverage proves permanent IDs, replay, versions, conflicts, and tombstones (0.2875ms)
+✔ R2-01 confirmed-risk coverage manifest is complete (0.0972ms)
 ℹ tests 32
 ℹ suites 0
 ℹ pass 32
@@ -263,7 +263,7 @@ EXIT: 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 66.4859
+ℹ duration_ms 60.7847
 
 EXIT: 0
 
@@ -601,17 +601,17 @@ PASS: terms.html retains sensitive-data caution
 EXIT: 0
 
 ===== R2-06 browser runtime and failure-envelope contracts =====
-✔ missing Playwright is classified before production credentials or mutation (1.2336ms)
-✔ missing Chromium executable is classified before launch (0.2862ms)
-✔ browser launch failure is classified and removes the isolated profile (2.958ms)
-✔ successful readiness uses and removes only an isolated temporary profile (2.7088ms)
-✔ credential-free readiness command performs no production work (0.5463ms)
-✔ production readiness failure prevents configuration, adapter, Auth, and mutation (0.7129ms)
-✔ failure envelope retains classified and sanitized execution context (1.3165ms)
-✔ unexpected native error keeps a safe native class and code without raw details (0.3093ms)
-✔ production adapter classifies a native network failure safely (1.4357ms)
-✔ production adapter classifies successful invalid JSON safely (0.887ms)
-✔ CLI emits one JSON failure envelope and preserves a classified code (86.4358ms)
+✔ missing Playwright is classified before production credentials or mutation (1.4059ms)
+✔ missing Chromium executable is classified before launch (0.3651ms)
+✔ browser launch failure is classified and removes the isolated profile (6.1495ms)
+✔ successful readiness uses and removes only an isolated temporary profile (4.5008ms)
+✔ credential-free readiness command performs no production work (0.5087ms)
+✔ production readiness failure prevents configuration, adapter, Auth, and mutation (0.904ms)
+✔ failure envelope retains classified and sanitized execution context (0.9441ms)
+✔ unexpected native error keeps a safe native class and code without raw details (0.5043ms)
+✔ production adapter classifies a native network failure safely (1.6828ms)
+✔ production adapter classifies successful invalid JSON safely (1.1788ms)
+✔ CLI emits one JSON failure envelope and preserves a classified code (131.1282ms)
 ℹ tests 11
 ℹ suites 0
 ℹ pass 11
@@ -619,48 +619,95 @@ EXIT: 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 105.6985
+ℹ duration_ms 156.1433
 
 EXIT: 0
 
-===== R2-06 reviewed synthetic runner contracts =====
-✔ dry run enumerates exactly 21 actions and zero mutations (0.8627ms)
-✔ argument parser does not enable production implicitly (0.3495ms)
-✔ production mode fails when runtime credentials are missing (12.989ms)
-✔ production mode fails when the authorization target ref differs (5.9346ms)
-✔ production mode refuses the wrong project reference (6.041ms)
-✔ private evidence inside the repository is rejected (4.8611ms)
-✔ production requires an explicit separate authorization gate (5.073ms)
-✔ production refuses to overwrite retained evidence (5.8362ms)
-✔ a separate consumption record prevents authorization reuse even when authorization remains unused (6.2698ms)
-✔ failed-unused authorization remains distinguishable before any consumption record exists (6.5821ms)
-✔ production execution state is recorded separately without changing authorization (9.9179ms)
-✔ hard limit prevents creating more than two users (0.369ms)
-✔ hard limit prevents creating more than one game (0.121ms)
-✔ event creation is impossible under the zero limit (0.1025ms)
-✔ live-share-token creation is impossible under the zero limit (0.0683ms)
-✔ arbitrary RPC calls are rejected (0.4904ms)
-✔ production adapter exposes no arbitrary SQL execution path (0.5764ms)
-✔ production adapter exposes no generic direct-table mutation method (0.4809ms)
-✔ state transitions cannot be skipped (0.3074ms)
-✔ cleanup ledger accepts only the reviewed owned objects (1.1385ms)
-✔ an execution failure after first mutation enters cleanup-only and deletes known residue (2.6667ms)
-✔ one accepted durable delete permits exactly one retained tombstone (0.1535ms)
-✔ failure cleanup after game creation uses only the ledger-owned deletion identity (1.8699ms)
-✔ same-id replay cannot count as a second accepted delete (0.144ms)
-✔ public evidence rejects identifiers and credentials (0.1764ms)
-✔ public evidence keeps release closeout false and binds the private ledger hash (0.2203ms)
-✔ runner output and state never set releaseCloseoutApproved true (0.64ms)
-✔ secret environment variable names are never emitted by the CLI (0.3715ms)
-✔ evidence schema requires false closeout flags and a SHA-256 ledger binding (0.3693ms)
-ℹ tests 29
+===== R2-06 browser session establishment contracts =====
+✔ navigation timeout is specific and preserves native TimeoutError (7.2973ms)
+✔ missing application marker is distinct from auth UI readiness (3.5171ms)
+✔ missing Supabase client marker is classified before credential submission (2.1504ms)
+✔ auth UI readiness timeout is specific (1.8814ms)
+✔ auth request timeout records whether the request began (36.8536ms)
+✔ auth request rejection is not flattened to a generic browser failure (2.4927ms)
+✔ required redirect timeout is classified, while the current no-redirect flow succeeds (4.0244ms)
+✔ storage and Supabase session checks allow one bounded delayed appearance (164.0002ms)
+✔ missing storage and missing Supabase session have separate classifications (94.8363ms)
+✔ a hanging Supabase session lookup is bounded (31.8993ms)
+✔ browser contexts, storage, and profiles are isolated across sequential sessions (3.2797ms)
+✔ failure envelope does not disclose credentials, tokens, IDs, URLs, or native messages (30.3493ms)
+✔ last-completed, elapsed, and operation-specific timeout fields are reported (29.5084ms)
+✔ failure injection at each browser boundary removes the context and profile (9.5241ms)
+✔ browser context cleanup failure is separately classified (28.6467ms)
+✔ temporary-profile cleanup failure is separately classified (31.5307ms)
+✔ generic fallback remains only for failures without a classified operation (0.1599ms)
+✔ partial session establishment after user/profile creation enters cleanup-only and returns zero residue (1610.6845ms)
+✔ diagnostic CLI path is credential-free, production-free, and false-closeout (0.3921ms)
+ℹ tests 19
 ℹ suites 0
-ℹ pass 29
+ℹ pass 19
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 82.3228
+ℹ duration_ms 2099.385
+
+EXIT: 0
+
+===== R2-06 reviewed synthetic runner contracts =====
+✔ dry run enumerates exactly 21 actions and zero mutations (0.9628ms)
+✔ argument parser does not enable production implicitly (0.3258ms)
+✔ prepare-run-directory CLI path reads no credentials and performs no production work (104.7778ms)
+✔ production mode fails when runtime credentials are missing (11.3549ms)
+✔ approved immediate run child passes without the reviewed override (6.8608ms)
+✔ normal Windows path passes the native reparse-point probe (985.1612ms)
+✔ approved private root itself is rejected (5.2017ms)
+✔ grandchild run path is rejected (6.2047ms)
+✔ sibling and arbitrary external paths are rejected (6.8014ms)
+✔ another Git worktree path is rejected before private-root acceptance (5.4507ms)
+✔ dot-dot traversal is rejected even when normalization lands on the approved child (5.1703ms)
+✔ invalid, reserved, overlong, and non-ASCII run names are rejected (0.3102ms)
+﹣ symlink escape is rejected where the platform permits creating it (6.4991ms) # directory symlinks unsupported: EPERM
+✔ Windows junction escape is rejected where supported (7.0408ms)
+✔ existing unrelated files, public-result names, and nested directories are rejected (26.1603ms)
+✔ authorization and preflight must be direct files in the selected child (14.577ms)
+✔ prepare-run-directory creates one empty reviewed child with exclusive semantics (7.6286ms)
+✔ separate run children remain isolated and a consumed child does not block a fresh child (14.7985ms)
+✔ the emergency override does not broaden normal production acceptance (6.2106ms)
+✔ production mode fails when the authorization target ref differs (6.7878ms)
+✔ production mode refuses the wrong project reference (4.75ms)
+✔ private evidence inside the repository is rejected (5.1204ms)
+✔ production requires an explicit separate authorization gate (5.1049ms)
+✔ production refuses to overwrite retained evidence (7.11ms)
+✔ a separate consumption record prevents authorization reuse even when authorization remains unused (7.2994ms)
+✔ failed-unused authorization remains distinguishable before any consumption record exists (7.8781ms)
+✔ production execution state is recorded separately without changing authorization (13.1085ms)
+✔ hard limit prevents creating more than two users (0.3387ms)
+✔ hard limit prevents creating more than one game (0.0941ms)
+✔ event creation is impossible under the zero limit (0.0624ms)
+✔ live-share-token creation is impossible under the zero limit (0.0632ms)
+✔ arbitrary RPC calls are rejected (0.2368ms)
+✔ production adapter exposes no arbitrary SQL execution path (0.6933ms)
+✔ production adapter exposes no generic direct-table mutation method (0.4079ms)
+✔ state transitions cannot be skipped (0.3594ms)
+✔ cleanup ledger accepts only the reviewed owned objects (0.6714ms)
+✔ an execution failure after first mutation enters cleanup-only and deletes known residue (2.8867ms)
+✔ one accepted durable delete permits exactly one retained tombstone (0.1215ms)
+✔ failure cleanup after game creation uses only the ledger-owned deletion identity (1.5091ms)
+✔ same-id replay cannot count as a second accepted delete (0.1482ms)
+✔ public evidence rejects identifiers and credentials (0.1822ms)
+✔ public evidence keeps release closeout false and binds the private ledger hash (0.2435ms)
+✔ runner output and state never set releaseCloseoutApproved true (0.7695ms)
+✔ secret environment variable names are never emitted by the CLI (0.4025ms)
+✔ evidence schema requires false closeout flags and a SHA-256 ledger binding (0.3875ms)
+ℹ tests 45
+ℹ suites 0
+ℹ pass 44
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 1297.1397
 
 EXIT: 0
 
@@ -744,14 +791,14 @@ EXIT: 0
 
 ===== secure disclosure browser =====
 [secure-disclosure-browser +0ms] local server startup
-[secure-disclosure-browser +6ms] local server ready at http://127.0.0.1:5258
-[secure-disclosure-browser +788ms] browser launched with C:\Program Files\Google\Chrome\Application\chrome.exe
-[secure-disclosure-browser +1137ms] secure viewer setup complete
-[secure-disclosure-browser +6064ms] secure disclosure assertions complete
-[secure-disclosure-browser +10914ms] update-path navigation started
-[secure-disclosure-browser +10989ms] update-path navigation complete
-[secure-disclosure-browser +11002ms] update-path signal invoked for v285
-[secure-disclosure-browser +11148ms] update-path banner visible
+[secure-disclosure-browser +5ms] local server ready at http://127.0.0.1:5258
+[secure-disclosure-browser +498ms] browser launched with C:\Program Files\Google\Chrome\Application\chrome.exe
+[secure-disclosure-browser +805ms] secure viewer setup complete
+[secure-disclosure-browser +5678ms] secure disclosure assertions complete
+[secure-disclosure-browser +10775ms] update-path navigation started
+[secure-disclosure-browser +10852ms] update-path navigation complete
+[secure-disclosure-browser +10863ms] update-path signal invoked for v285
+[secure-disclosure-browser +11061ms] update-path banner visible
 PASS: all three secure disclosure flags are active
 PASS: runtime status reports every disclosure feature true
 PASS: runtime-config executes before app.js while the event service loads without changing the diagnostic marker
@@ -763,7 +810,7 @@ PASS: secure viewer makes no ordinary games/events request
 PASS: v284 activation removes the stale v281 cache
 PASS: unknown and expired tokens remain neutral
 PASS: synthetic roster-connected game renders the real live tracker
-PASS: first live tracker button records immediately (observed 1; Ground Ball added · Q1 8:39 PM)
+PASS: first live tracker button records immediately (observed 1; Ground Ball added · Q1 9:02 AM)
 PASS: two events are recorded through the live tracking UI
 PASS: live tracker events persist locally before secure sharing
 PASS: signed-in token creation uses the approved RPC
@@ -826,8 +873,8 @@ PASS: updated client recovers secure Live Share after reconnection
 PASS: activation browser suite contacts no hosted Supabase project
 PASS: browser console and pages report no errors
 Activation browser checks passed (73/73).
-[secure-disclosure-browser +11424ms] teardown started
-[secure-disclosure-browser +11751ms] teardown complete
+[secure-disclosure-browser +11340ms] teardown started
+[secure-disclosure-browser +11627ms] teardown complete
 
 EXIT: 0
 
@@ -1078,18 +1125,17 @@ warning: in the working copy of '.github/workflows/laxhornet-regression.yml', LF
 warning: in the working copy of 'REPO_CURRENT_STATE.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'TICKETS.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'docs/LAXHORNET_ROLLOUT_CHECKLIST.md', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'docs/RELEASE_VERIFICATION_WORKFLOW.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'release/laxhornet-release-manifest.json', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'review-evidence/event-pipeline-release-control-cleanup/regression-output.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_BROWSER_REMEDIATION.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_IMPLEMENTATION.md', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'tools/r206_synthetic_disposable_adapter.mjs', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'tools/r206_synthetic_production_adapter.mjs', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'tools/r206_synthetic_runner_core.mjs', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'tools/run_r206_synthetic_verification.mjs', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'tools/run_v283_local_regression.mjs', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'tools/test_r206_synthetic_verification.mjs', LF will be replaced by CRLF the next time Git touches it
 warning: in the working copy of 'tools/validate_release_manifest.mjs', LF will be replaced by CRLF the next time Git touches it
 EXIT: 0
 
 MODE: canonical_plus_additive
-TOTAL: 46 passed, 0 failed
+TOTAL: 47 passed, 0 failed

@@ -268,6 +268,21 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   Failure cleanup now uses only the ledger-owned deletion and device
   identities. This remediation did not use production credentials, contact or
   mutate production, or advance synthetic verification, cleanup, or closeout.
+- R2-06M replaces the synthetic runner's generic browser sign-in block with a
+  shared operation-specific orchestrator. Context/page creation, navigation,
+  application and Supabase readiness, Auth submission/response, redirect
+  observation, local-storage/session/application verification, context close,
+  and profile removal now have reviewed bounded timeouts and safe
+  classifications. A credential-free loopback diagnostic executes the same
+  path without production access. Failure evidence retains exact and
+  last-completed operation, per-step timing, native class/code, browser/Auth/
+  storage state, cleanup, residue, and authorization consumption without
+  credentials or identifiers. The old production attempt's exact call site is
+  not recoverable from its sanitized `establish_sessions` /
+  `BROWSER_SESSION_FAILURE` / `TimeoutError` facts because the old catch
+  destroyed that attribution; the retained private identifier ledger remains
+  unopened. Production remains disabled and all synthetic completion and
+  release-closeout gates remain false.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The v284 cache marker remains unchanged. The updated service worker purges

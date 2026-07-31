@@ -20,6 +20,7 @@ import {
   validateProductionConfiguration,
 } from "./r206_synthetic_production_adapter.mjs";
 import { checkR206BrowserRuntime } from "./r206_browser_runtime.mjs";
+import { diagnoseR206BrowserSession } from "./r206_browser_session.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -27,6 +28,7 @@ function usage() {
   return [
     "Usage:",
     "  node tools/run_r206_synthetic_verification.mjs --check-browser-runtime",
+    "  node tools/run_r206_synthetic_verification.mjs --diagnose-browser-session",
     "  node tools/run_r206_synthetic_verification.mjs --prepare-run-directory",
     "  node tools/run_r206_synthetic_verification.mjs --dry-run [--target-ref <sha>]",
     "  node tools/run_r206_synthetic_verification.mjs --execution-mode disposable [paths]",
@@ -73,6 +75,10 @@ export function parseArgs(argv) {
     }
     if (argument === "--check-browser-runtime") {
       options.checkBrowserRuntime = true;
+      continue;
+    }
+    if (argument === "--diagnose-browser-session") {
+      options.diagnoseBrowserSession = true;
       continue;
     }
     if (argument === "--prepare-run-directory") {
@@ -151,6 +157,8 @@ export async function run(
   dependencies = {},
 ) {
   const readinessCheck = dependencies.checkBrowserRuntime || checkR206BrowserRuntime;
+  const diagnoseBrowserSession = dependencies.diagnoseBrowserSession
+    || diagnoseR206BrowserSession;
   const validateProduction = dependencies.validateProductionConfiguration
     || validateProductionConfiguration;
   const buildProductionAdapter = dependencies.createProductionAdapter
@@ -188,6 +196,34 @@ export async function run(
     }
     const readiness = await readinessCheck();
     return readiness.result;
+  }
+  if (options.diagnoseBrowserSession) {
+    if (argv.length !== 1) {
+      throw attachExecutionContext(
+        new R206StopError("--diagnose-browser-session cannot be combined with other arguments", {
+          code: "INVALID_ARGUMENT",
+        }),
+        {
+          currentOperation: "browser_session_diagnostic",
+          phase: "browser_session_diagnostic",
+          mutationStarted: false,
+          authorizationConsumed: false,
+        },
+      );
+    }
+    const readiness = await readinessCheck();
+    try {
+      return await diagnoseBrowserSession({ chromium: readiness.chromium });
+    } catch (error) {
+      throw attachExecutionContext(error, {
+        ...(error.executionContext || {}),
+        phase: "browser_session_diagnostic",
+        mutationStarted: false,
+        cleanupOnlyStarted: false,
+        cleanupCompleted: error.executionContext?.browserProfileRemoved === true,
+        authorizationConsumed: false,
+      });
+    }
   }
   if (options.dryRun) {
     if (options.executionMode && options.executionMode !== "dry-run") {

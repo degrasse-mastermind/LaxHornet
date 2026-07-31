@@ -132,6 +132,9 @@ jobs:
       - name: R2-06 browser runtime and failure-envelope contracts
         run: node tools/test_r206_browser_runtime.mjs
 
+      - name: R2-06 browser session establishment contracts
+        run: node tools/test_r206_browser_session.mjs
+
       - name: Allowlisted Pages deployment contracts
         run: node tools/test_pages_deployment.mjs
 
@@ -146,6 +149,9 @@ jobs:
 
       - name: Verify credential-free R2-06 browser readiness
         run: node tools/run_r206_synthetic_verification.mjs --check-browser-runtime
+
+      - name: Diagnose credential-free R2-06 browser session establishment
+        run: node tools/run_r206_synthetic_verification.mjs --diagnose-browser-session
 
       - name: Durable legacy game tombstone migration and rollback
         run: node tools/test_game_tombstone_migration.mjs

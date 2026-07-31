@@ -1726,6 +1726,76 @@ Starting point:
 Evidence:
 `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_PRIVATE_PATH_REMEDIATION.md`.
 
+### R2-06M — Diagnose and harden browser session establishment
+
+Status: `IMPLEMENTED — HISTORIC OPERATION ATTRIBUTION BLOCKED`
+
+Risk level: `LEVEL 3`
+
+Branch: `fix/r2-06m-session-establishment-diagnostics`
+
+Starting point:
+`3596287fbd2f44ed58e5295ccace7d594460bf71`
+
+#### Incident diagnosis and remediation
+
+- The latest authorized attempt passed repository/runtime/run-directory/
+  authorization/preflight/credential gates and created exactly two synthetic
+  users and profiles, then failed in `establish_sessions` with
+  `BROWSER_SESSION_FAILURE` / native `TimeoutError`. Cleanup returned all
+  reported production residue to zero.
+- The old adapter put `networkidle` navigation, two implicit fill waits, the
+  sign-in click, and the sign-out-control wait in one generic catch. The public
+  envelope retained no sub-operation, timing, or stack. No separately
+  sanitized trace exists in the consumed run directory, and the private
+  identifier ledger remains unopened. The exact historic call site is not
+  evidence-recoverable and must not be invented.
+- Add one shared browser-session orchestrator with explicit bounded context,
+  page, navigation, application/Supabase readiness, Auth submit/response,
+  redirect observation, storage/session/UI verification, close, and profile
+  removal operations. Remove `networkidle` and hidden implicit waits from the
+  R2-06 session/hydration path; add no full-session retry.
+- Preserve exact classified errors and safe native `TimeoutError` context
+  through adapter, core, and CLI. The failure envelope now reports exact and
+  last-completed operations, per-operation timing/limit, browser/Auth/storage/
+  cleanup state, residue, authorization consumption, and immutable false
+  release closeout without credentials or identifiers.
+- Add credential-free `--diagnose-browser-session` using loopback-only mocked
+  Auth and the exact shared orchestration. It accepts no production keys,
+  cannot contact production, and proves browser profile cleanup.
+- The three sessions remain sequential: owner direct-HTTP, challenger isolated
+  browser, and owner hydration in a second isolated browser. Browser contexts,
+  profiles, storage, and cookies are not reused.
+- Fault injection covers every browser boundary plus partial session creation.
+  Cleanup-only behavior deletes users, cascades profiles, returns sessions and
+  all mutable residue to zero, and creates no game, event, token, tombstone, or
+  operation residue.
+- No production credential, connection, Auth/data access, runner production
+  execution, cleanup, migration, deployment, or release action is authorized
+  or used. Synthetic authorization/completion, cleanup completion, and release
+  closeout remain false.
+
+#### Remaining gates
+
+- [ ] Resolve the exact historic timed-out operation from independently
+  authorized evidence, or explicitly accept that the old runner destroyed that
+  attribution. Until then the historic-operation acceptance criterion remains
+  blocked.
+- [x] Pass final focused gates and one complete canonical-plus-additive local
+  regression after the diff stabilizes. Runner/browser/session coverage passed
+  74 checks with one Windows directory-symlink permission skip; the disposable
+  integration and credential-free diagnostic passed; the corrected complete
+  regression passed `47/47`.
+- [ ] Confirm exact-head draft-PR CI.
+- [ ] Obtain independent exact-PR-SHA Level 3 review before merge.
+- [ ] Obtain a new explicit production authorization and fresh named read-only
+  preflight for any future exact reviewed runner SHA.
+- [ ] Execute production synthetic verification and cleanup.
+- [ ] Obtain separate reviewed release-closeout approval.
+
+Evidence:
+`review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_SESSION_ESTABLISHMENT_REMEDIATION.md`.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets
