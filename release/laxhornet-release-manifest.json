@@ -99,7 +99,7 @@
         "tools/test_r206_synthetic_verification_disposable.mjs": "f308f8bdd538d3b1ce90a4ceadc3653e18f5dd0facccc649c1b84c6873c4f3a7",
         "tools/fixtures/r206-synthetic-evidence-schema.json": "24a94c835bba25bd0796041b02555b4a351dd8c29a6350d3e50495ae21459990",
         "tools/run_v283_local_regression.mjs": "ff72073430d751dda35bb5471d5d35dcac875544d1f7aa3f68fb29eae6813305",
-        ".github/workflows/laxhornet-regression.yml": "bdb38915ba3a98d51e7af74d1ec67f1735a697f4a1b22b4066c2909ae884a3e4",
+        ".github/workflows/laxhornet-regression.yml": "3758c048ab79b7be72929c31bc929d82b452ff3f59ac31e4ebe06e020c77721d",
         ".github/workflows/docker-tests.yml": "c6e0ba957f10a2aa84b78937b23e5b236e3d093fced05463f81830fc940f4bbd"
       }
     },
