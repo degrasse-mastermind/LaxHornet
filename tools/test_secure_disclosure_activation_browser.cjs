@@ -1474,7 +1474,12 @@ async function newContext(browser, options = {}) {
     check(true, "updated client recovers secure Live Share after reconnection");
 
     check(hostedRequests.length === 0, "activation browser suite contacts no hosted Supabase project");
-    check(browserErrors.length === 0, "browser console and pages report no errors");
+    check(
+      browserErrors.length === 0,
+      `browser console and pages report no errors${
+        browserErrors.length ? `: ${browserErrors.join(" | ")}` : ""
+      }`,
+    );
 
     const inventory = {
       generatedAt: new Date().toISOString(),
