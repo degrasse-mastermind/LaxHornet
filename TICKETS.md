@@ -1671,6 +1671,61 @@ Starting point:
 Evidence:
 `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_BROWSER_REMEDIATION.md`.
 
+### R2-06K — Accept a reviewed run-scoped private evidence directory
+
+Status: `READY FOR INDEPENDENT REVIEW`
+
+Risk level: `LEVEL 3`
+
+Branch: `fix/r2-06k-run-scoped-private-directory`
+
+Starting point:
+`e782f4beeaf7cb6a6954e23e83328e92a5bb14d1`
+
+#### Incident remediation
+
+- The remediated runner passed repository identity, runner identity, browser
+  readiness, and isolated browser cleanup, then correctly stopped before
+  production access with `PRIVATE_EVIDENCE_DIR_UNREVIEWED`.
+- The cause was a contract mismatch: production validation accepted only the
+  fixed approved root, while the approved execution design requires one fresh
+  run-specific child below that root.
+- The approved root is now an authority boundary, not an execution directory.
+  Normal production validation accepts exactly one immediate child matching
+  `r206-YYYYMMDDTHHMMSSZ-<12 lowercase hex>`.
+- Root, grandchild, sibling, arbitrary external, traversal, invalid-name,
+  reparse-point, repository, and any-Git-worktree paths fail closed. The
+  emergency reviewed override remains separate and does not broaden normal
+  acceptance.
+- Authorization and preflight must be direct regular files in the selected
+  child. The consumption record, checkpoints/retained ledger, and cleanup
+  state remain bound to that exact child. A consumed child cannot be reused,
+  while a separate fresh child remains independent.
+- `--prepare-run-directory` is credential-free and network-free. It creates
+  one empty reviewed child with exclusive create-new semantics and does not
+  create authorization or preflight artifacts.
+- Existing private evidence was not read, moved, renamed, deleted, or changed.
+  Tests use only temporary disposable directories.
+- No production credentials were used, no production endpoint was contacted,
+  and no production mutation, migration, deployment, or release action
+  occurred.
+- Local runner/path/cleanup/authorization coverage passed 44 checks with one
+  directory-symlink permission skip; the Windows junction and native
+  reparse-point checks passed. Browser contracts passed `11/11`, pinned
+  Chromium readiness passed, disposable integration passed as non-production
+  evidence, and the complete canonical-plus-additive regression passed
+  `46/46`.
+- Draft-PR Docker and portable regression CI passed on the published R2-06K
+  implementation head; preview deployment checks passed and the Supabase
+  preview check skipped as configured.
+- Synthetic authorization/completion, cleanup completion, and release closeout
+  remain false. Exact-PR-SHA independent Level 3 review is required before
+  merge, and any future production attempt requires new authorization and a
+  fresh named read-only preflight for that reviewed SHA.
+
+Evidence:
+`review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_PRIVATE_PATH_REMEDIATION.md`.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 
 export const R206_PROJECT_REF = "ulbmjcvnyznvmjgpstno";
@@ -11,6 +13,8 @@ export const R206_RELEASE_MARKER = "v284";
 export const R206_CACHE_NAME = "laxhornet-v284";
 export const R206_PRIVATE_EVIDENCE_DIR =
   "C:\\Users\\user\\Documents\\LaxHornet-Private-Release-Evidence\\R2-06";
+export const R206_RUN_ID_MAX_LENGTH = 34;
+export const R206_RUN_ID_PATTERN = /^r206-[0-9]{8}t[0-9]{6}z-[0-9a-f]{12}$/;
 export const R206_PRIVATE_LEDGER_NAME = "R2-06_RETAINED_IDENTIFIERS.json";
 export const R206_PUBLIC_EVIDENCE_DIR =
   "review-evidence/r2-06-durable-game-tombstones-release";
@@ -361,34 +365,307 @@ export function isPathInside(parent, candidate) {
   return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
 }
 
+function pathEquals(left, right) {
+  const normalizedLeft = path.normalize(path.resolve(left));
+  const normalizedRight = path.normalize(path.resolve(right));
+  return process.platform === "win32"
+    ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+    : normalizedLeft === normalizedRight;
+}
+
+function pathSegments(target) {
+  const resolved = path.resolve(target);
+  const parsed = path.parse(resolved);
+  const segments = resolved
+    .slice(parsed.root.length)
+    .split(path.sep)
+    .filter(Boolean);
+  const result = [];
+  let current = parsed.root;
+  for (const segment of segments) {
+    current = path.join(current, segment);
+    result.push(current);
+  }
+  return result;
+}
+
+function isWindowsReparsePoint(target) {
+  const result = spawnSync(
+    "fsutil",
+    ["reparsepoint", "query", target],
+    { encoding: "utf8", windowsHide: true },
+  );
+  if (result.status === 0) return true;
+  const output = `${result.stdout || ""}\n${result.stderr || ""}`;
+  if (result.status === 1 && /\b4390\b/.test(output)) return false;
+  throw new R206StopError("Windows reparse-point status could not be verified", {
+    code: "PRIVATE_EVIDENCE_REPARSE_POINT_UNSAFE",
+    cause: result.error,
+  });
+}
+
+export function assertNoUnsafePathSegments(
+  target,
+  {
+    fsImpl = fs,
+    platform = process.platform,
+    reparsePointProbe = isWindowsReparsePoint,
+  } = {},
+) {
+  for (const segment of pathSegments(target)) {
+    let status;
+    try {
+      status = fsImpl.lstatSync(segment);
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      throw error;
+    }
+    if (
+      status.isSymbolicLink()
+      || (platform === "win32" && reparsePointProbe(segment))
+    ) {
+      throw new R206StopError("private evidence path contains a link or reparse point", {
+        code: "PRIVATE_EVIDENCE_REPARSE_POINT_UNSAFE",
+      });
+    }
+  }
+  return true;
+}
+
+export function assertValidR206RunId(runId) {
+  const value = String(runId || "");
+  if (
+    value.length > R206_RUN_ID_MAX_LENGTH
+    || !R206_RUN_ID_PATTERN.test(value)
+  ) {
+    throw new R206StopError("private evidence run directory name is invalid", {
+      code: "PRIVATE_EVIDENCE_RUN_DIR_INVALID",
+    });
+  }
+  const match = value.match(
+    /^r206-([0-9]{4})([0-9]{2})([0-9]{2})t([0-9]{2})([0-9]{2})([0-9]{2})z-/,
+  );
+  const canonicalTimestamp = match
+    ? `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}Z`
+    : "";
+  const timestamp = Date.parse(canonicalTimestamp);
+  if (
+    !Number.isFinite(timestamp)
+    || new Date(timestamp).toISOString().slice(0, 19) !== canonicalTimestamp.slice(0, 19)
+  ) {
+    throw new R206StopError("private evidence run directory timestamp is invalid", {
+      code: "PRIVATE_EVIDENCE_RUN_DIR_INVALID",
+    });
+  }
+  return value;
+}
+
+function assertOutsideWorktrees(candidate, worktreeRoots) {
+  const resolvedCandidate = path.resolve(candidate);
+  for (const root of worktreeRoots) {
+    if (isPathInside(root, resolvedCandidate)) {
+      throw new R206StopError("private evidence directory must be outside every Git worktree", {
+        code: "PRIVATE_EVIDENCE_INSIDE_WORKTREE",
+      });
+    }
+  }
+}
+
 export function assertSafePrivateEvidencePath({
   repoRoot,
   privateEvidenceDir,
   executionMode,
   reviewedOverride = false,
+  approvedPrivateRoot = R206_PRIVATE_EVIDENCE_DIR,
+  gitWorktreeRoots = [repoRoot],
+  fsImpl = fs,
+  platform = process.platform,
+  reparsePointProbe = isWindowsReparsePoint,
 }) {
-  const resolved = path.resolve(privateEvidenceDir || "");
   if (!privateEvidenceDir) {
     throw new R206StopError("private evidence directory is required", {
       code: "PRIVATE_EVIDENCE_DIR_REQUIRED",
     });
   }
-  if (isPathInside(repoRoot, resolved)) {
-    throw new R206StopError("private evidence directory must be outside the repository", {
-      code: "PRIVATE_EVIDENCE_DIR_INSIDE_REPOSITORY",
+  if (/(^|[\\/])\.\.([\\/]|$)/.test(String(privateEvidenceDir))) {
+    throw new R206StopError("private evidence path traversal is not allowed", {
+      code: "PRIVATE_EVIDENCE_PATH_ESCAPE",
     });
   }
+  const resolved = path.resolve(privateEvidenceDir);
+  const resolvedRoot = path.resolve(approvedPrivateRoot);
+  assertOutsideWorktrees(resolvedRoot, gitWorktreeRoots);
+  assertOutsideWorktrees(resolved, gitWorktreeRoots);
+
+  if (pathEquals(resolved, resolvedRoot)) {
+    throw new R206StopError("the approved private root is not an execution directory", {
+      code: "PRIVATE_EVIDENCE_RUN_DIR_INVALID",
+    });
+  }
+
+  if (executionMode === "production" && reviewedOverride !== true) {
+    const relative = path.relative(resolvedRoot, resolved);
+    if (
+      relative.startsWith(`..${path.sep}`)
+      || relative === ".."
+      || path.isAbsolute(relative)
+    ) {
+      throw new R206StopError("private evidence run directory is outside the approved root", {
+        code: "PRIVATE_EVIDENCE_ROOT_MISMATCH",
+      });
+    }
+    if (!relative || relative.includes(path.sep)) {
+      throw new R206StopError("private evidence run directory must be one immediate child", {
+        code: "PRIVATE_EVIDENCE_RUN_DIR_INVALID",
+      });
+    }
+    assertValidR206RunId(relative);
+  }
+
+  let rootStatus;
+  try {
+    rootStatus = fsImpl.lstatSync(resolvedRoot);
+  } catch {
+    rootStatus = null;
+  }
+  if (rootStatus?.isSymbolicLink()) {
+    throw new R206StopError("approved private root is a link or reparse point", {
+      code: "PRIVATE_EVIDENCE_REPARSE_POINT_UNSAFE",
+    });
+  }
+  if (!rootStatus?.isDirectory()) {
+    throw new R206StopError("approved private evidence root is unavailable", {
+      code: "PRIVATE_EVIDENCE_ROOT_MISMATCH",
+    });
+  }
+  let runStatus;
+  try {
+    runStatus = fsImpl.lstatSync(resolved);
+  } catch {
+    runStatus = null;
+  }
+  if (runStatus?.isSymbolicLink()) {
+    throw new R206StopError("private evidence run directory is a link or reparse point", {
+      code: "PRIVATE_EVIDENCE_REPARSE_POINT_UNSAFE",
+    });
+  }
+  if (!runStatus?.isDirectory()) {
+    throw new R206StopError("private evidence run directory is unavailable", {
+      code: "PRIVATE_EVIDENCE_RUN_DIR_INVALID",
+    });
+  }
+
+  assertNoUnsafePathSegments(resolvedRoot, {
+    fsImpl,
+    platform,
+    reparsePointProbe,
+  });
+  assertNoUnsafePathSegments(resolved, {
+    fsImpl,
+    platform,
+    reparsePointProbe,
+  });
+
+  const realRoot = fsImpl.realpathSync(resolvedRoot);
+  const realRunDir = fsImpl.realpathSync(resolved);
+  assertOutsideWorktrees(realRoot, gitWorktreeRoots);
+  assertOutsideWorktrees(realRunDir, gitWorktreeRoots);
   if (
-    executionMode === "production"
-    && path.normalize(resolved).toLowerCase()
-      !== path.normalize(R206_PRIVATE_EVIDENCE_DIR).toLowerCase()
-    && reviewedOverride !== true
+    reviewedOverride !== true
+    && (
+      !isPathInside(realRoot, realRunDir)
+      || !pathEquals(path.dirname(realRunDir), realRoot)
+    )
   ) {
-    throw new R206StopError("production private evidence path differs from the reviewed path", {
-      code: "PRIVATE_EVIDENCE_DIR_UNREVIEWED",
+    throw new R206StopError("private evidence run directory resolves outside the approved root", {
+      code: "PRIVATE_EVIDENCE_PATH_ESCAPE",
     });
   }
-  return resolved;
+  return realRunDir;
+}
+
+export function createR206RunId({
+  now = new Date(),
+  randomBytesImpl = randomBytes,
+} = {}) {
+  if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
+    throw new R206StopError("run-directory timestamp is invalid", {
+      code: "PRIVATE_EVIDENCE_RUN_DIR_INVALID",
+    });
+  }
+  const timestamp = now
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}Z$/, "Z")
+    .toLowerCase();
+  const suffix = randomBytesImpl(6).toString("hex");
+  return assertValidR206RunId(`r206-${timestamp}-${suffix}`);
+}
+
+export function prepareR206RunPrivateDirectory({
+  repoRoot,
+  approvedPrivateRoot = R206_PRIVATE_EVIDENCE_DIR,
+  gitWorktreeRoots = [repoRoot],
+  now = new Date(),
+  randomBytesImpl = randomBytes,
+  fsImpl = fs,
+  platform = process.platform,
+  reparsePointProbe = isWindowsReparsePoint,
+} = {}) {
+  const resolvedRoot = path.resolve(approvedPrivateRoot);
+  let rootStatus;
+  try {
+    rootStatus = fsImpl.lstatSync(resolvedRoot);
+  } catch {
+    rootStatus = null;
+  }
+  if (rootStatus?.isSymbolicLink()) {
+    throw new R206StopError("approved private root is a link or reparse point", {
+      code: "PRIVATE_EVIDENCE_REPARSE_POINT_UNSAFE",
+    });
+  }
+  if (!rootStatus?.isDirectory()) {
+    throw new R206StopError("approved private evidence root is unavailable", {
+      code: "PRIVATE_EVIDENCE_ROOT_MISMATCH",
+    });
+  }
+  assertOutsideWorktrees(resolvedRoot, gitWorktreeRoots);
+  assertNoUnsafePathSegments(resolvedRoot, {
+    fsImpl,
+    platform,
+    reparsePointProbe,
+  });
+  const runId = createR206RunId({ now, randomBytesImpl });
+  const privateEvidenceDir = path.join(resolvedRoot, runId);
+  try {
+    fsImpl.mkdirSync(privateEvidenceDir, { recursive: false, mode: 0o700 });
+  } catch (cause) {
+    throw new R206StopError("private evidence run directory could not be created exclusively", {
+      code: cause?.code === "EEXIST"
+        ? "PRIVATE_EVIDENCE_RUN_DIR_COLLISION"
+        : "PRIVATE_EVIDENCE_RUN_DIR_CREATE_FAILED",
+      cause,
+    });
+  }
+  const realRunDir = assertSafePrivateEvidencePath({
+    repoRoot,
+    privateEvidenceDir,
+    executionMode: "production",
+    approvedPrivateRoot: resolvedRoot,
+    gitWorktreeRoots,
+    fsImpl,
+    platform,
+    reparsePointProbe,
+  });
+  return {
+    ok: true,
+    code: "PRIVATE_EVIDENCE_RUN_DIR_PREPARED",
+    privateEvidenceDir: realRunDir,
+    runId,
+    networkMutationCount: 0,
+    productionCredentialsRequired: false,
+    releaseCloseoutApproved: false,
+  };
 }
 
 export function assertAllowedRpc(name, { mutation = true } = {}) {

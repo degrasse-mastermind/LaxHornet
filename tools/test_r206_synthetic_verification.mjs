@@ -19,39 +19,45 @@ import {
   R206_PAGES_RUN_ID,
   R206_PROJECT_REF,
   R206_RELEASE_MARKER,
+  R206_RUN_ID_MAX_LENGTH,
   R206_RUNTIME_SHA,
   R206StopError,
   assertAllowedRpc,
   assertPublicEvidenceSafe,
+  assertSafePrivateEvidencePath,
+  assertValidR206RunId,
   cleanupAfterFailure,
   createFailureEnvelope,
   createPublicEvidenceBundle,
   createSyntheticScope,
   dryRunPlan,
   executeSyntheticVerification,
+  prepareR206RunPrivateDirectory,
 } from "./r206_synthetic_runner_core.mjs";
 import {
   R206_AUTHORIZATION_CONSUMPTION_NAME,
   createProductionAdapter,
   validateProductionConfiguration,
 } from "./r206_synthetic_production_adapter.mjs";
-import { parseArgs } from "./run_r206_synthetic_verification.mjs";
+import { parseArgs, run } from "./run_r206_synthetic_verification.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const targetRef = "a".repeat(40);
 const fixedNow = new Date("2026-07-30T18:00:00.000Z");
+const validRunId = "r206-20260730t180000z-a1b2c3d4e5f6";
 const read = (name) => fs.readFileSync(path.join(repoRoot, "tools", name), "utf8");
 
-function createProductionFixture() {
+function createProductionFixture(runId = validRunId) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "laxhornet-r206-config-"));
-  const privateEvidenceDir = path.join(root, "private");
-  fs.mkdirSync(privateEvidenceDir);
+  const approvedPrivateRoot = path.join(root, "R2-06");
+  const privateEvidenceDir = path.join(approvedPrivateRoot, runId);
+  fs.mkdirSync(privateEvidenceDir, { recursive: true });
   const authorizationArtifact = path.join(privateEvidenceDir, "authorization.json");
   const preflightArtifact = path.join(privateEvidenceDir, "preflight.json");
   const options = {
     executionMode: "production",
     allowProduction: true,
-    reviewedPrivatePathOverride: true,
+    reviewedPrivatePathOverride: false,
     targetRef,
     projectRef: R206_PROJECT_REF,
     apiUrl: R206_API_URL,
@@ -92,7 +98,57 @@ function createProductionFixture() {
     cacheName: R206_CACHE_NAME,
     migrationVersions: R206_MIGRATION_VERSIONS,
   }));
-  return { root, options };
+  return { root, approvedPrivateRoot, options };
+}
+
+function validateProductionFixture(fixture, overrides = {}) {
+  return validateProductionConfiguration({
+    repoRoot,
+    options: fixture.options,
+    env: {},
+    now: fixedNow,
+    verifyGit: false,
+    approvedPrivateRoot: fixture.approvedPrivateRoot,
+    gitWorktreeRoots: [repoRoot],
+    pathSafetyOptions: { platform: "test" },
+    ...overrides,
+  });
+}
+
+function validatePrivatePath(fixture, candidate, overrides = {}) {
+  return assertSafePrivateEvidencePath({
+    repoRoot,
+    privateEvidenceDir: candidate,
+    executionMode: "production",
+    reviewedOverride: false,
+    approvedPrivateRoot: fixture.approvedPrivateRoot,
+    gitWorktreeRoots: [repoRoot],
+    platform: "test",
+    ...overrides,
+  });
+}
+
+function createSiblingProductionFixture(fixture, runId) {
+  const privateEvidenceDir = path.join(fixture.approvedPrivateRoot, runId);
+  fs.mkdirSync(privateEvidenceDir);
+  const authorizationArtifact = path.join(privateEvidenceDir, "authorization.json");
+  const preflightArtifact = path.join(privateEvidenceDir, "preflight.json");
+  const authorization = JSON.parse(
+    fs.readFileSync(fixture.options.authorizationArtifact, "utf8"),
+  );
+  authorization.privateEvidenceDir = privateEvidenceDir;
+  fs.writeFileSync(authorizationArtifact, JSON.stringify(authorization));
+  fs.copyFileSync(fixture.options.preflightArtifact, preflightArtifact);
+  return {
+    root: fixture.root,
+    approvedPrivateRoot: fixture.approvedPrivateRoot,
+    options: {
+      ...fixture.options,
+      privateEvidenceDir,
+      authorizationArtifact,
+      preflightArtifact,
+    },
+  };
 }
 
 function cleanupFixture(root) {
@@ -113,20 +169,365 @@ test("argument parser does not enable production implicitly", () => {
   assert.deepEqual(parseArgs(["--execution-mode", "production"]).allowProduction, false);
 });
 
+test("prepare-run-directory CLI path reads no credentials and performs no production work", async () => {
+  let credentialReads = 0;
+  let prepareCalls = 0;
+  const result = await run(
+    ["--prepare-run-directory"],
+    new Proxy({}, {
+      get() {
+        credentialReads += 1;
+        return undefined;
+      },
+    }),
+    {
+      prepareR206RunPrivateDirectory: () => {
+        prepareCalls += 1;
+        return {
+          ok: true,
+          code: "PRIVATE_EVIDENCE_RUN_DIR_PREPARED",
+          networkMutationCount: 0,
+          productionCredentialsRequired: false,
+          releaseCloseoutApproved: false,
+        };
+      },
+      checkBrowserRuntime: async () => {
+        throw new Error("browser readiness must not run");
+      },
+      validateProductionConfiguration: () => {
+        throw new Error("production validation must not run");
+      },
+      executeSyntheticVerification: async () => {
+        throw new Error("production execution must not run");
+      },
+    },
+  );
+  assert.equal(prepareCalls, 1);
+  assert.equal(credentialReads, 0);
+  assert.equal(result.networkMutationCount, 0);
+  assert.equal(result.releaseCloseoutApproved, false);
+});
+
 test("production mode fails when runtime credentials are missing", () => {
   const fixture = createProductionFixture();
   try {
     assert.throws(
-      () => validateProductionConfiguration({
-        repoRoot,
-        options: fixture.options,
-        env: {},
-        now: fixedNow,
-        verifyGit: false,
-      }),
+      () => validateProductionFixture(fixture),
       (error) => error.code === "PRODUCTION_CREDENTIALS_MISSING",
     );
   } finally {
+    cleanupFixture(fixture.root);
+  }
+});
+
+test("approved immediate run child passes without the reviewed override", () => {
+  const fixture = createProductionFixture();
+  try {
+    assert.equal(fixture.options.reviewedPrivatePathOverride, false);
+    assert.equal(
+      validatePrivatePath(fixture, fixture.options.privateEvidenceDir),
+      fs.realpathSync(fixture.options.privateEvidenceDir),
+    );
+  } finally {
+    cleanupFixture(fixture.root);
+  }
+});
+
+test("normal Windows path passes the native reparse-point probe", (context) => {
+  if (process.platform !== "win32") {
+    context.skip("Windows native reparse-point probe");
+    return;
+  }
+  const fixture = createProductionFixture();
+  try {
+    assert.equal(
+      validatePrivatePath(fixture, fixture.options.privateEvidenceDir, {
+        platform: "win32",
+      }),
+      fs.realpathSync(fixture.options.privateEvidenceDir),
+    );
+  } finally {
+    cleanupFixture(fixture.root);
+  }
+});
+
+test("approved private root itself is rejected", () => {
+  const fixture = createProductionFixture();
+  try {
+    for (const reviewedOverride of [false, true]) {
+      assert.throws(
+        () => validatePrivatePath(
+          fixture,
+          fixture.approvedPrivateRoot,
+          { reviewedOverride },
+        ),
+        (error) => error.code === "PRIVATE_EVIDENCE_RUN_DIR_INVALID",
+      );
+    }
+  } finally {
+    cleanupFixture(fixture.root);
+  }
+});
+
+test("grandchild run path is rejected", () => {
+  const fixture = createProductionFixture();
+  try {
+    const grandchild = path.join(fixture.options.privateEvidenceDir, validRunId);
+    fs.mkdirSync(grandchild);
+    assert.throws(
+      () => validatePrivatePath(fixture, grandchild),
+      (error) => error.code === "PRIVATE_EVIDENCE_RUN_DIR_INVALID",
+    );
+  } finally {
+    cleanupFixture(fixture.root);
+  }
+});
+
+test("sibling and arbitrary external paths are rejected", () => {
+  const fixture = createProductionFixture();
+  try {
+    const sibling = path.join(fixture.root, "r206-20260730t180001z-a1b2c3d4e5f7");
+    const external = fs.mkdtempSync(path.join(os.tmpdir(), "laxhornet-r206-external-"));
+    fs.mkdirSync(sibling);
+    try {
+      for (const candidate of [sibling, external]) {
+        assert.throws(
+          () => validatePrivatePath(fixture, candidate),
+          (error) => error.code === "PRIVATE_EVIDENCE_ROOT_MISMATCH",
+        );
+      }
+    } finally {
+      cleanupFixture(external);
+    }
+  } finally {
+    cleanupFixture(fixture.root);
+  }
+});
+
+test("another Git worktree path is rejected before private-root acceptance", () => {
+  const fixture = createProductionFixture();
+  try {
+    assert.throws(
+      () => validatePrivatePath(
+        fixture,
+        fixture.options.privateEvidenceDir,
+        { gitWorktreeRoots: [repoRoot, fixture.options.privateEvidenceDir] },
+      ),
+      (error) => error.code === "PRIVATE_EVIDENCE_INSIDE_WORKTREE",
+    );
+  } finally {
+    cleanupFixture(fixture.root);
+  }
+});
+
+test("dot-dot traversal is rejected even when normalization lands on the approved child", () => {
+  const fixture = createProductionFixture();
+  try {
+    const traversing = [
+      fixture.approvedPrivateRoot,
+      "discarded-segment",
+      "..",
+      validRunId,
+    ].join(path.sep);
+    assert.throws(
+      () => validatePrivatePath(fixture, traversing),
+      (error) => error.code === "PRIVATE_EVIDENCE_PATH_ESCAPE",
+    );
+  } finally {
+    cleanupFixture(fixture.root);
+  }
+});
+
+test("invalid, reserved, overlong, and non-ASCII run names are rejected", () => {
+  const invalidNames = [
+    "r206-20261340t256199z-a1b2c3d4e5f6",
+    "CON",
+    `${"r".repeat(R206_RUN_ID_MAX_LENGTH + 1)}`,
+    "r206-20260730t180000z-a1b2c3d4e5é6",
+    "r206-20260730t180000z-a1b2c3d4e5.f",
+  ];
+  for (const name of invalidNames) {
+    assert.throws(
+      () => assertValidR206RunId(name),
+      (error) => error.code === "PRIVATE_EVIDENCE_RUN_DIR_INVALID",
+    );
+  }
+});
+
+test("symlink escape is rejected where the platform permits creating it", (context) => {
+  const fixture = createProductionFixture();
+  const external = fs.mkdtempSync(path.join(os.tmpdir(), "laxhornet-r206-symlink-target-"));
+  const link = path.join(
+    fixture.approvedPrivateRoot,
+    "r206-20260730t180001z-a1b2c3d4e5f7",
+  );
+  try {
+    try {
+      fs.symlinkSync(external, link, "dir");
+    } catch (error) {
+      if (["EPERM", "EACCES", "ENOTSUP"].includes(error.code)) {
+        context.skip(`directory symlinks unsupported: ${error.code}`);
+        return;
+      }
+      throw error;
+    }
+    assert.throws(
+      () => validatePrivatePath(fixture, link),
+      (error) => error.code === "PRIVATE_EVIDENCE_REPARSE_POINT_UNSAFE",
+    );
+  } finally {
+    cleanupFixture(external);
+    cleanupFixture(fixture.root);
+  }
+});
+
+test("Windows junction escape is rejected where supported", (context) => {
+  if (process.platform !== "win32") {
+    context.skip("Windows junction test");
+    return;
+  }
+  const fixture = createProductionFixture();
+  const external = fs.mkdtempSync(path.join(os.tmpdir(), "laxhornet-r206-junction-target-"));
+  const junction = path.join(
+    fixture.approvedPrivateRoot,
+    "r206-20260730t180002z-a1b2c3d4e5f8",
+  );
+  try {
+    try {
+      fs.symlinkSync(external, junction, "junction");
+    } catch (error) {
+      if (["EPERM", "EACCES", "ENOTSUP"].includes(error.code)) {
+        context.skip(`junctions unsupported: ${error.code}`);
+        return;
+      }
+      throw error;
+    }
+    assert.throws(
+      () => validatePrivatePath(fixture, junction, {
+        platform: "win32",
+        reparsePointProbe: () => true,
+      }),
+      (error) => error.code === "PRIVATE_EVIDENCE_REPARSE_POINT_UNSAFE",
+    );
+  } finally {
+    cleanupFixture(external);
+    cleanupFixture(fixture.root);
+  }
+});
+
+test("existing unrelated files, public-result names, and nested directories are rejected", () => {
+  for (const entry of ["unrelated.txt", "SYNTHETIC_VERIFICATION_RESULT.md", "nested-run"]) {
+    const fixture = createProductionFixture();
+    try {
+      const candidate = path.join(fixture.options.privateEvidenceDir, entry);
+      if (entry === "nested-run") fs.mkdirSync(candidate);
+      else fs.writeFileSync(candidate, "synthetic test content");
+      assert.throws(
+        () => validateProductionFixture(fixture),
+        (error) => error.code === "PRIVATE_EVIDENCE_RUN_DIR_NOT_EMPTY",
+      );
+    } finally {
+      cleanupFixture(fixture.root);
+    }
+  }
+});
+
+test("authorization and preflight must be direct files in the selected child", () => {
+  for (const field of ["authorizationArtifact", "preflightArtifact"]) {
+    const fixture = createProductionFixture();
+    const outside = path.join(fixture.approvedPrivateRoot, `${field}.json`);
+    try {
+      fs.writeFileSync(outside, "{}");
+      fixture.options[field] = outside;
+      assert.throws(
+        () => validateProductionFixture(fixture),
+        (error) => error.code === "PRIVATE_ARTIFACT_PATH_UNSAFE",
+      );
+    } finally {
+      cleanupFixture(fixture.root);
+    }
+  }
+});
+
+test("prepare-run-directory creates one empty reviewed child with exclusive semantics", () => {
+  const fixture = createProductionFixture();
+  const preparedId = "r206-20260730t180000z-010203040506";
+  try {
+    fs.rmSync(fixture.options.privateEvidenceDir, { recursive: true });
+    const prepared = prepareR206RunPrivateDirectory({
+      repoRoot,
+      approvedPrivateRoot: fixture.approvedPrivateRoot,
+      gitWorktreeRoots: [repoRoot],
+      now: fixedNow,
+      randomBytesImpl: () => Buffer.from("010203040506", "hex"),
+      platform: "test",
+    });
+    assert.equal(prepared.runId, preparedId);
+    assert.equal(path.dirname(prepared.privateEvidenceDir), fixture.approvedPrivateRoot);
+    assert.deepEqual(fs.readdirSync(prepared.privateEvidenceDir), []);
+    assert.equal(prepared.networkMutationCount, 0);
+    assert.equal(prepared.productionCredentialsRequired, false);
+    assert.equal(prepared.releaseCloseoutApproved, false);
+    assert.throws(
+      () => prepareR206RunPrivateDirectory({
+        repoRoot,
+        approvedPrivateRoot: fixture.approvedPrivateRoot,
+        gitWorktreeRoots: [repoRoot],
+        now: fixedNow,
+        randomBytesImpl: () => Buffer.from("010203040506", "hex"),
+        platform: "test",
+      }),
+      (error) => error.code === "PRIVATE_EVIDENCE_RUN_DIR_COLLISION",
+    );
+  } finally {
+    cleanupFixture(fixture.root);
+  }
+});
+
+test("separate run children remain isolated and a consumed child does not block a fresh child", () => {
+  const first = createProductionFixture();
+  const second = createSiblingProductionFixture(
+    first,
+    "r206-20260730t180001z-a1b2c3d4e5f7",
+  );
+  const env = {
+    R206_SUPABASE_PUBLISHABLE_KEY: "publishable-test",
+    R206_SUPABASE_SECRET_KEY: "secret-test",
+  };
+  try {
+    fs.writeFileSync(
+      path.join(first.options.privateEvidenceDir, R206_AUTHORIZATION_CONSUMPTION_NAME),
+      "{}",
+    );
+    assert.throws(
+      () => validateProductionFixture(first, { env }),
+      (error) => error.code === "PRIVATE_EVIDENCE_RUN_ALREADY_CONSUMED",
+    );
+    const validated = validateProductionFixture(second, { env });
+    assert.equal(validated.config.privateEvidenceDir, fs.realpathSync(second.options.privateEvidenceDir));
+    assert.equal(
+      path.dirname(validated.config.authorizationConsumptionPath),
+      validated.config.privateEvidenceDir,
+    );
+  } finally {
+    cleanupFixture(first.root);
+  }
+});
+
+test("the emergency override does not broaden normal production acceptance", () => {
+  const fixture = createProductionFixture();
+  const external = fs.mkdtempSync(path.join(os.tmpdir(), "laxhornet-r206-override-"));
+  try {
+    assert.throws(
+      () => validatePrivatePath(fixture, external),
+      (error) => error.code === "PRIVATE_EVIDENCE_ROOT_MISMATCH",
+    );
+    assert.equal(
+      validatePrivatePath(fixture, external, { reviewedOverride: true }),
+      fs.realpathSync(external),
+    );
+  } finally {
+    cleanupFixture(external);
     cleanupFixture(fixture.root);
   }
 });
@@ -136,15 +537,11 @@ test("production mode fails when the authorization target ref differs", () => {
   try {
     fixture.options.targetRef = "b".repeat(40);
     assert.throws(
-      () => validateProductionConfiguration({
-        repoRoot,
-        options: fixture.options,
+      () => validateProductionFixture(fixture, {
         env: {
           R206_SUPABASE_PUBLISHABLE_KEY: "publishable-test",
           R206_SUPABASE_SECRET_KEY: "secret-test",
         },
-        now: fixedNow,
-        verifyGit: false,
       }),
       (error) => error.code === "PRODUCTION_AUTHORIZATION_ARTIFACT_MISMATCH",
     );
@@ -158,13 +555,7 @@ test("production mode refuses the wrong project reference", () => {
   try {
     fixture.options.projectRef = "wrong-project-ref";
     assert.throws(
-      () => validateProductionConfiguration({
-        repoRoot,
-        options: fixture.options,
-        env: {},
-        now: fixedNow,
-        verifyGit: false,
-      }),
+      () => validateProductionFixture(fixture),
       (error) => error.code === "PROJECT_REF_MISMATCH",
     );
   } finally {
@@ -177,14 +568,8 @@ test("private evidence inside the repository is rejected", () => {
   try {
     fixture.options.privateEvidenceDir = path.join(repoRoot, "private-evidence");
     assert.throws(
-      () => validateProductionConfiguration({
-        repoRoot,
-        options: fixture.options,
-        env: {},
-        now: fixedNow,
-        verifyGit: false,
-      }),
-      (error) => error.code === "PRIVATE_EVIDENCE_DIR_INSIDE_REPOSITORY",
+      () => validateProductionFixture(fixture),
+      (error) => error.code === "PRIVATE_EVIDENCE_INSIDE_WORKTREE",
     );
   } finally {
     cleanupFixture(fixture.root);
@@ -196,13 +581,7 @@ test("production requires an explicit separate authorization gate", () => {
   try {
     fixture.options.allowProduction = false;
     assert.throws(
-      () => validateProductionConfiguration({
-        repoRoot,
-        options: fixture.options,
-        env: {},
-        now: fixedNow,
-        verifyGit: false,
-      }),
+      () => validateProductionFixture(fixture),
       (error) => error.code === "PRODUCTION_EXECUTION_DISABLED",
     );
   } finally {
@@ -218,13 +597,7 @@ test("production refuses to overwrite retained evidence", () => {
       "{}",
     );
     assert.throws(
-      () => validateProductionConfiguration({
-        repoRoot,
-        options: fixture.options,
-        env: {},
-        now: fixedNow,
-        verifyGit: false,
-      }),
+      () => validateProductionFixture(fixture),
       (error) => error.code === "EVIDENCE_TARGET_ALREADY_EXISTS",
     );
   } finally {
@@ -245,17 +618,13 @@ test("a separate consumption record prevents authorization reuse even when autho
       }),
     );
     assert.throws(
-      () => validateProductionConfiguration({
-        repoRoot,
-        options: fixture.options,
+      () => validateProductionFixture(fixture, {
         env: {
           R206_SUPABASE_PUBLISHABLE_KEY: "publishable-test",
           R206_SUPABASE_SECRET_KEY: "secret-test",
         },
-        now: fixedNow,
-        verifyGit: false,
       }),
-      (error) => error.code === "PRODUCTION_AUTHORIZATION_ALREADY_CONSUMED",
+      (error) => error.code === "PRIVATE_EVIDENCE_RUN_ALREADY_CONSUMED",
     );
   } finally {
     cleanupFixture(fixture.root);
@@ -269,15 +638,11 @@ test("failed-unused authorization remains distinguishable before any consumption
     authorization.status = "unused";
     authorization.priorAttemptOutcome = "failed_before_execution_started";
     fs.writeFileSync(fixture.options.authorizationArtifact, JSON.stringify(authorization));
-    const validated = validateProductionConfiguration({
-      repoRoot,
-      options: fixture.options,
+    const validated = validateProductionFixture(fixture, {
       env: {
         R206_SUPABASE_PUBLISHABLE_KEY: "publishable-test",
         R206_SUPABASE_SECRET_KEY: "secret-test",
       },
-      now: fixedNow,
-      verifyGit: false,
     });
     assert.equal(
       path.basename(validated.config.authorizationConsumptionPath),
@@ -296,15 +661,11 @@ test("production execution state is recorded separately without changing authori
   const fixture = createProductionFixture();
   try {
     const authorizationBefore = fs.readFileSync(fixture.options.authorizationArtifact, "utf8");
-    const validated = validateProductionConfiguration({
-      repoRoot,
-      options: fixture.options,
+    const validated = validateProductionFixture(fixture, {
       env: {
         R206_SUPABASE_PUBLISHABLE_KEY: "publishable-test",
         R206_SUPABASE_SECRET_KEY: "secret-test",
       },
-      now: fixedNow,
-      verifyGit: false,
     });
     const adapter = createProductionAdapter({
       repoRoot,
@@ -327,6 +688,10 @@ test("production execution state is recorded separately without changing authori
       terminalOutcome: "failed",
       cleanupCompleted: true,
     });
+    const retained = await adapter.persistPrivateLedger({
+      schemaVersion: 1,
+      syntheticFixture: true,
+    });
     const consumption = JSON.parse(
       fs.readFileSync(validated.config.authorizationConsumptionPath, "utf8"),
     );
@@ -334,6 +699,12 @@ test("production execution state is recorded separately without changing authori
     assert.equal(consumption.mutationStarted, true);
     assert.equal(consumption.terminalOutcome, "failed");
     assert.equal(consumption.cleanupCompleted, true);
+    assert.equal(
+      path.dirname(validated.config.authorizationConsumptionPath),
+      validated.config.privateEvidenceDir,
+    );
+    assert.equal(path.dirname(retained.path), validated.config.privateEvidenceDir);
+    assert.equal(path.basename(retained.path), "R2-06_RETAINED_IDENTIFIERS.json");
     assert.equal(
       fs.readFileSync(fixture.options.authorizationArtifact, "utf8"),
       authorizationBefore,

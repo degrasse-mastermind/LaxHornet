@@ -13,6 +13,7 @@ import {
   createFailureEnvelope,
   dryRunPlan,
   executeSyntheticVerification,
+  prepareR206RunPrivateDirectory,
 } from "./r206_synthetic_runner_core.mjs";
 import {
   createProductionAdapter,
@@ -26,6 +27,7 @@ function usage() {
   return [
     "Usage:",
     "  node tools/run_r206_synthetic_verification.mjs --check-browser-runtime",
+    "  node tools/run_r206_synthetic_verification.mjs --prepare-run-directory",
     "  node tools/run_r206_synthetic_verification.mjs --dry-run [--target-ref <sha>]",
     "  node tools/run_r206_synthetic_verification.mjs --execution-mode disposable [paths]",
     "  node tools/run_r206_synthetic_verification.mjs --execution-mode production --allow-production [reviewed inputs]",
@@ -73,6 +75,10 @@ export function parseArgs(argv) {
       options.checkBrowserRuntime = true;
       continue;
     }
+    if (argument === "--prepare-run-directory") {
+      options.prepareRunDirectory = true;
+      continue;
+    }
     if (argument === "--reviewed-private-path-override") {
       options.reviewedPrivatePathOverride = true;
       continue;
@@ -98,6 +104,16 @@ function currentHead() {
     cwd: repoRoot,
     encoding: "utf8",
   }).trim();
+}
+
+function currentWorktreeRoots() {
+  return execFileSync("git", ["worktree", "list", "--porcelain"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  })
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("worktree "))
+    .map((line) => fs.realpathSync(path.resolve(line.slice("worktree ".length))));
 }
 
 function disposableConfiguration(options) {
@@ -141,8 +157,21 @@ export async function run(
     || createProductionAdapter;
   const executeVerification = dependencies.executeSyntheticVerification
     || executeSyntheticVerification;
+  const prepareRunDirectory = dependencies.prepareR206RunPrivateDirectory
+    || prepareR206RunPrivateDirectory;
   const options = parseArgs(argv);
   if (options.help) return { help: usage() };
+  if (options.prepareRunDirectory) {
+    if (argv.length !== 1) {
+      throw new R206StopError("--prepare-run-directory cannot be combined with other arguments", {
+        code: "INVALID_ARGUMENT",
+      });
+    }
+    return prepareRunDirectory({
+      repoRoot,
+      gitWorktreeRoots: currentWorktreeRoots(),
+    });
+  }
   if (options.checkBrowserRuntime) {
     if (argv.length !== 1) {
       throw attachExecutionContext(
@@ -216,7 +245,10 @@ export async function run(
         mutationStarted: false,
         cleanupOnlyStarted: false,
         cleanupCompleted: false,
-        authorizationConsumed: error?.code === "PRODUCTION_AUTHORIZATION_ALREADY_CONSUMED",
+        authorizationConsumed: [
+          "PRODUCTION_AUTHORIZATION_ALREADY_CONSUMED",
+          "PRIVATE_EVIDENCE_RUN_ALREADY_CONSUMED",
+        ].includes(error?.code),
         manualCleanupRequired: false,
       });
     }

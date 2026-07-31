@@ -1,4 +1,4 @@
-# R2-06E / R2-06I Synthetic Runner Implementation
+# R2-06E / R2-06I / R2-06K Synthetic Runner Implementation
 
 Status: `READY FOR INDEPENDENT REVIEW`
 
@@ -11,7 +11,7 @@ release-closeout decision.
 
 - `tools/run_r206_synthetic_verification.mjs` is the only operator entry point.
   It supports credential-free `--check-browser-runtime`, `--dry-run`,
-  `--execution-mode disposable`, and the separately gated
+  `--prepare-run-directory`, `--execution-mode disposable`, and the separately gated
   `--execution-mode production --allow-production`.
 - `tools/r206_browser_runtime.mjs` owns the pre-credential, pre-mutation
   Playwright/Chromium identity, executable, isolated-launch, and cleanup gate.
@@ -49,6 +49,20 @@ network access unless all of these inputs agree:
 Existing private-ledger or public-result targets are a stop condition. Initial
 writes use create-new semantics, so a rerun cannot silently replace retained
 evidence.
+
+R2-06K distinguishes the fixed approved private root from an execution
+directory. Normal production execution accepts only one immediate child named
+`r206-YYYYMMDDTHHMMSSZ-<12 lowercase hex>` and does not require
+`--reviewed-private-path-override`. The root itself, deeper nesting, external
+or sibling paths, traversal, links/reparse points, repository paths, and every
+Git worktree remain stop conditions. Authorization and preflight must be
+direct regular files in the selected child. Consumption and retained-ledger
+state are derived from and written only inside that exact child.
+
+The credential-free `--prepare-run-directory` command creates one empty child
+under the fixed root with exclusive create-new semantics. It reads no
+production credentials, performs no browser or network work, and creates no
+authorization or preflight artifact.
 
 R2-06I adds a separate private authorization-consumption record. It is created
 after preflight passes and before mutation, never overwrites the authorization
@@ -141,3 +155,13 @@ R2-06I added `11/11` browser/failure-envelope checks and expanded the runner
 suite to `29/29`; the disposable integration and Linux Docker surfaces passed.
 The final canonical-plus-additive local regression passed `46/46`. Exact-head
 draft-PR CI and independent Level 3 review remain required.
+
+R2-06K adds run-child, traversal, reparse-point, Git-worktree, artifact
+containment, consumption-isolation, and helper-CLI coverage. Detailed
+remediation evidence is in
+`SYNTHETIC_RUNNER_PRIVATE_PATH_REMEDIATION.md`. Production execution and
+private historical evidence remained untouched. Local runner coverage passed
+44 checks with one Windows directory-symlink permission skip; the Windows
+junction check passed. Browser contracts passed `11/11`, pinned Chromium
+readiness passed, disposable integration passed as non-production evidence,
+and the complete canonical-plus-additive regression passed `46/46`.

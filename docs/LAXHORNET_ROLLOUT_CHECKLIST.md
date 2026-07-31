@@ -487,6 +487,35 @@ Implementation evidence:
 Remediation evidence:
 `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_BROWSER_REMEDIATION.md`.
 
+### R2-06K run-scoped private-directory remediation
+
+- [x] Treat the fixed approved private path as an authority root and reject it
+  as an execution directory.
+- [x] Accept exactly one immediate child named
+  `r206-YYYYMMDDTHHMMSSZ-<12 lowercase hex>` without
+  `--reviewed-private-path-override`.
+- [x] Reject deeper nesting, siblings, arbitrary external paths, traversal,
+  invalid/non-ASCII/overlong names, symlink or junction/reparse-point paths,
+  the repository, and every Git worktree.
+- [x] Require authorization and preflight to be direct regular files in the
+  selected child and bind consumption, checkpoints, retained-ledger state, and
+  cleanup to that exact child.
+- [x] Add a credential-free, network-free `--prepare-run-directory` command
+  with exclusive create-new semantics.
+- [x] Add disposable adversarial coverage for child isolation, consumed-run
+  reuse, retained-ledger collision, artifact containment, override separation,
+  and Windows path behavior without executing production mode.
+- [x] Pass the complete canonical-plus-additive local regression (`46/46`).
+- [x] Confirm draft-PR CI passes on the exact final R2-06K head.
+- [ ] Obtain independent exact-PR-SHA Level 3 review before merge.
+- [ ] Obtain a new explicit production authorization and fresh named read-only
+  preflight for any future exact reviewed runner SHA.
+- [ ] Execute production synthetic verification and cleanup.
+- [ ] Obtain separate reviewed release-closeout approval.
+
+Remediation evidence:
+`review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_PRIVATE_PATH_REMEDIATION.md`.
+
 # 4. Planned Engineering Sequence
 
 Do not combine these into one large Codex task. Each item requires one approved ticket, one primary implementation task, and a separate independent review when warranted.
