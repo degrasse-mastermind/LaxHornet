@@ -97,6 +97,7 @@ const tests = [
     ],
   },
   { name: "release manifest reconciliation", command: process.execPath, args: ["tools/test_release_manifest_reconciliation.mjs"] },
+  { name: "R2-06Q evidence reconciliation", command: process.execPath, args: ["tools/test_r206_closeout_reconciliation.mjs"] },
   { name: "release preflight phase-aware", command: process.execPath, args: ["tools/test_release_preflight_phase_aware.mjs"] },
   { name: "release containment phase-aware", command: process.execPath, args: ["tools/test_release_containment_phase_aware.mjs"] },
   { name: "release hygiene", command: process.execPath, args: ["tools/test_release_hygiene.mjs"] },

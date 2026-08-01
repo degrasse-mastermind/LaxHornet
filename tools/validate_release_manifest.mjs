@@ -735,6 +735,108 @@ expect(
     && manifest.r206ReleaseControl?.releaseCloseoutApproved === false,
   "registering the R2-06 synthetic runner must not advance production verification or closeout",
 );
+const r206q = manifest.r206ReleaseControl?.evidenceReconciliation;
+expect(
+  manifest.r206ReleaseControl?.syntheticVerification?.completionModel
+    === "mixed_evidence_requires_independent_closeout_review"
+    && manifest.r206ReleaseControl?.syntheticVerification?.futureAuthorizationState
+      === "not_authorized"
+    && manifest.r206ReleaseControl?.syntheticVerification?.historicProductionEvidenceReconciled
+      === true,
+  "R2-06Q must preserve mixed historic evidence without authorizing a future run",
+);
+expect(
+  r206q?.status === "CLOSEOUT REVIEW REQUIRED"
+    && r206q?.independentCloseoutReviewPending === true
+    && r206q?.reviewedProductionRunnerSha
+      === "dfe8535bdfb2a1e6470573940fb43b916b9407e0"
+    && r206q?.reviewedThroughMergeSha
+      === "cdcc357db2774cf66454f0f5c0c69d87fd14187d"
+    && r206q?.r206pMergeSha === "cdcc357db2774cf66454f0f5c0c69d87fd14187d",
+  "R2-06Q closeout state must remain pending and bound to the reviewed production/remediation SHAs",
+);
+expect(
+  r206q?.historicProductionAuthorization?.state === "consumed"
+    && r206q?.historicProductionAuthorization?.reusable === false
+    && r206q?.historicProductionRunDirectory?.state === "consumed"
+    && r206q?.historicProductionRunDirectory?.reusable === false
+    && r206q?.newProductionAuthorizationCreated === false
+    && r206q?.secondProductionLifecycleExecuted === false
+    && r206q?.noSecondProductionLifecycleRequired === true,
+  "R2-06Q must not reuse or create production authorization or rerun the lifecycle",
+);
+expect(
+  r206q?.productionAccessDuringReconciliation === false
+    && r206q?.productionMutationDuringReconciliation === false
+    && r206q?.privateEvidenceOpenedDuringReconciliation === false
+    && r206q?.retainedTombstoneChangedDuringReconciliation === false,
+  "R2-06Q reconciliation must remain evidence-only and non-mutating",
+);
+expect(
+  Array.isArray(r206q?.actions)
+    && r206q.actions.length === 21
+    && r206q.actions.slice(0, 14).every(
+      (entry, index) => entry.action === index + 1 && entry.status === "PRODUCTION VERIFIED",
+    ),
+  "R2-06Q actions 1-14 must be recorded as production verified",
+);
+const r206qAction15 = r206q?.actions?.[14];
+const r206qAction16 = r206q?.actions?.[15];
+expect(
+  r206qAction15?.action === 15
+    && r206qAction15?.status === "INVALID HISTORIC VERIFIER RESULT"
+    && r206qAction15?.result === "TOMBSTONE METADATA MISCLASSIFIED AS HYDRATED GAME"
+    && r206qAction15?.originalProductionActionPassed === false
+    && r206qAction15?.correctedVerification?.status === "DISPOSABLE/REMEDIATION VERIFIED",
+  "R2-06Q action 15 must preserve the invalid historic result and separate corrected verification",
+);
+expect(
+  r206qAction16?.action === 16
+    && r206qAction16?.status === "PRODUCTION PARTIALLY VERIFIED"
+    && r206qAction16?.fullPostHydrationDisclosureSequence === "NOT REACHED"
+    && r206qAction16?.liveShareTokensCreated === 0
+    && r206qAction16?.finalLiveShareTokenCount === 0,
+  "R2-06Q action 16 must remain partial and must not overstate production disclosure coverage",
+);
+expect(
+  r206q?.actions?.slice(16).every(
+    (entry, index) => entry.action === index + 17
+      && entry.status === "INDEPENDENT CLEANUP ATTESTED",
+  ),
+  "R2-06Q actions 17-21 must remain independently cleanup-attested",
+);
+expect(
+  r206q?.cleanupAttestation?.status === "INDEPENDENT CLEANUP ATTESTED"
+    && r206q?.cleanupAttestation?.immutableConsumptionRecordCleanupCompleted === false
+    && r206q?.cleanupAttestation?.authoritativeSupplementalRecord === true
+    && r206q?.cleanupAttestation?.manualCleanupRequired === false
+    && Object.values(r206q?.cleanupAttestation?.mutableResidueCounts || {})
+      .every((count) => Number.isInteger(count) && count === 0)
+    && r206q?.cleanupAttestation?.retainedDurableTombstones === 1
+    && r206q?.cleanupAttestation?.retainedPrivateLedgers === 1,
+  "R2-06Q cleanup must preserve the immutable false record and attested zero-residue supplement",
+);
+for (const [name, evidence] of Object.entries(r206q?.evidence || {})) {
+  const absolute = path.join(root, evidence.path || "");
+  expect(fs.existsSync(absolute), `R2-06Q ${name} evidence must exist`);
+  if (fs.existsSync(absolute)) {
+    expect(
+      evidence.sha256 === repositoryTextSha256(fs.readFileSync(absolute)),
+      `R2-06Q ${name} evidence SHA-256 is stale`,
+    );
+  }
+  expect(evidence.reviewed === false, `R2-06Q ${name} must remain pending independent review`);
+}
+const r206qValidationPath = r206q?.validation?.path || "";
+const r206qValidationAbsolute = path.join(root, r206qValidationPath);
+expect(fs.existsSync(r206qValidationAbsolute), "R2-06Q validation test must exist");
+if (fs.existsSync(r206qValidationAbsolute)) {
+  expect(
+    r206q?.validation?.sha256
+      === repositoryTextSha256(fs.readFileSync(r206qValidationAbsolute)),
+    "R2-06Q validation test SHA-256 is stale",
+  );
+}
 expect(
   fs.existsSync(
     path.join(

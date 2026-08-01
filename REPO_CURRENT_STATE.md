@@ -311,6 +311,21 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   accessed; the consumed evidence and retained production tombstone were not
   changed; synthetic authorization/completion, cleanup approval, and release
   closeout remain false.
+- R2-06Q reconciles the mixed public evidence without another production
+  lifecycle. Production actions 1–14 are verified; original action 15 is an
+  invalid historic verifier result because retained tombstone metadata was
+  misclassified as a hydrated game; corrected action-15 behavior is verified
+  by reviewed disposable/browser raw-storage, application-state, rendered-UI,
+  and zero-resurrection-write evidence. Production action 16 is partial because
+  the full post-hydration disclosure sequence was not reached. Independent
+  cleanup evidence attests zero mutable/Auth/browser residue, all three
+  sessions revoked, both users deleted, profiles cascaded away, and exactly one
+  retained tombstone plus one unopened private ledger record. The immutable
+  `cleanupCompleted: false` runner record remains unchanged and is supplemented
+  by a create-new sanitized attestation. Production remains disabled; consumed
+  authorization/run paths are non-reusable; no new authorization or production
+  rerun occurred; `releaseCloseoutApproved` remains false. R2-06 now requires
+  independent closeout review, not another production attempt.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The v284 cache marker remains unchanged. The updated service worker purges
