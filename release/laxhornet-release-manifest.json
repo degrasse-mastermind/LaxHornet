@@ -147,7 +147,7 @@
         "tools/test_r206_browser_session.mjs": "01cae5cc79a843870a2b9bca56fa2e9cd52d9051ef27c4a87f52a68a9f8d9244",
         "tools/test_r206_synthetic_verification_disposable.mjs": "39d0c0dbc92f685201136945fefbb1afe5b6360246c2c74164db11dabe09130c",
         "tools/test_hydration_tombstone_suppression.mjs": "1628e8c15749720b83ba0239fe127ab11988fc5e017d988f20c747ae5e106a2d",
-        "tools/test_hydration_tombstone_browser.cjs": "8f40f7163ad00557d202c60e9562f45f364bb43b4c6fa6bc6851d66936162cba",
+        "tools/test_hydration_tombstone_browser.cjs": "547fa37f31193206caeac9cae2ef57ed2ca5566979ab79cbf5d41d37cb841f8f",
         "tools/fixtures/r206-synthetic-evidence-schema.json": "df0152e5236b49e7d85c46453d124ecbfca93375ff7472af65aeacdeb19c1c53",
         "tools/run_v283_local_regression.mjs": "8cbba5aae72637991628d7dd6b343b0410dc6fbed748bf56381ea82f729e498b",
         "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_IMPLEMENTATION.md": "79ad59dc63e89af66175a143c03db722f4a0a22c06c6c74db412667948f9d922",

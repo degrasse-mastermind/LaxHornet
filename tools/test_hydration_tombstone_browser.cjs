@@ -239,6 +239,11 @@ async function inspect(page) {
     );
     const first = await inspect(page);
     await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.waitForFunction(
+      () => Boolean(navigator.serviceWorker.controller),
+      null,
+      { timeout: 15_000 },
+    );
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForFunction(
       () => navigator.serviceWorker.controller
