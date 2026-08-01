@@ -66,6 +66,37 @@ try {
     assert.ok(jsonBlock);
     publicBundle[evidenceKeyByFile[name]] = JSON.parse(jsonBlock[1]);
   }
+  const browserSessionEvidence = publicBundle.operations.stateTransitions
+    .filter((entry) => [
+      "initial_sessions_established",
+      "hydration_session_established",
+    ].includes(entry.phase))
+    .map((entry) => (
+      entry.evidence.challengerBrowserSession
+      || entry.evidence.ownerBrowserSession
+    ));
+  assert.equal(browserSessionEvidence.length, 2);
+  for (const evidence of browserSessionEvidence) {
+    assert.deepEqual({
+      sessionConfirmed: evidence.sessionConfirmed,
+      sessionIdentityConfirmed: evidence.sessionIdentityConfirmed,
+      persistenceConfirmed: evidence.persistenceConfirmed,
+      applicationBootstrapConfirmed: evidence.applicationBootstrapConfirmed,
+      protectedCapabilityConfirmed: evidence.protectedCapabilityConfirmed,
+      authenticatedUiMarkerObserved: evidence.authenticatedUiMarkerObserved,
+      uiMarkerAbsenceAffectedExecution: evidence.uiMarkerAbsenceAffectedExecution,
+      reloadAttempted: evidence.reloadAttempted,
+    }, {
+      sessionConfirmed: true,
+      sessionIdentityConfirmed: true,
+      persistenceConfirmed: true,
+      applicationBootstrapConfirmed: true,
+      protectedCapabilityConfirmed: true,
+      authenticatedUiMarkerObserved: true,
+      uiMarkerAbsenceAffectedExecution: false,
+      reloadAttempted: false,
+    });
+  }
 
   const privateNames = fs.readdirSync(privateEvidenceDir);
   assert.deepEqual(privateNames, ["R2-06_RETAINED_IDENTIFIERS.json"]);

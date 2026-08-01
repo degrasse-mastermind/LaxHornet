@@ -608,6 +608,24 @@ expect(
   "R2-06 browser runtime reviewed paths changed",
 );
 expect(
+  JSON.stringify(syntheticRunner?.authenticationSuccessContract) === JSON.stringify({
+    requiredConditions: [
+      "supabase_browser_session",
+      "expected_synthetic_identity",
+      "browser_session_persistence",
+      "application_auth_bootstrap",
+      "account_scoped_game_state_readable",
+    ],
+    optionalUiMarker: {
+      type: "sign_out_action",
+      absenceIsFatal: false,
+    },
+    maximumNormalReloads: 1,
+    fullSessionRetries: 0,
+  }),
+  "R2-06 browser authentication success contract changed",
+);
+expect(
   JSON.stringify(syntheticRunner?.browserSessionTimeoutMilliseconds) === JSON.stringify({
     browserContextCreate: 15000,
     browserPageCreate: 5000,
@@ -618,9 +636,13 @@ expect(
     authSubmit: 5000,
     authResponseWait: 15000,
     authRedirectWait: 5000,
-    authStorageVerify: 10000,
-    authSessionVerify: 10000,
-    authenticatedAppVerify: 10000,
+    authSessionConfirm: 10000,
+    authPersistenceConfirm: 10000,
+    applicationAuthBootstrapWait: 10000,
+    applicationAuthReload: 15000,
+    applicationAuthBootstrapVerify: 10000,
+    authenticatedCapabilityVerify: 5000,
+    authenticatedUiMarkerObserve: 10000,
     browserContextClose: 10000,
     browserProfileRemove: 5000,
   }),

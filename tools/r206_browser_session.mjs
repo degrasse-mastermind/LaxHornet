@@ -15,9 +15,13 @@ export const R206_BROWSER_SESSION_TIMEOUTS = Object.freeze({
   auth_response_wait: 15_000,
   auth_redirect_wait: 5_000,
   auth_redirect_observe: 1_000,
-  auth_storage_verify: 10_000,
-  auth_session_verify: 10_000,
-  authenticated_app_verify: 10_000,
+  auth_session_confirm: 10_000,
+  auth_persistence_confirm: 10_000,
+  application_auth_bootstrap_wait: 10_000,
+  application_auth_reload: 15_000,
+  application_auth_bootstrap_verify: 10_000,
+  authenticated_capability_verify: 5_000,
+  authenticated_ui_marker_observe: 10_000,
   browser_context_close: 10_000,
   browser_profile_remove: 5_000,
 });
@@ -32,9 +36,13 @@ export const R206_BROWSER_SESSION_OPERATIONS = Object.freeze([
   "auth_submit",
   "auth_response_wait",
   "auth_redirect_observe",
-  "auth_storage_verify",
-  "auth_session_verify",
-  "authenticated_app_verify",
+  "auth_session_confirm",
+  "auth_persistence_confirm",
+  "application_auth_bootstrap_wait",
+  "application_auth_reload",
+  "application_auth_bootstrap_verify",
+  "authenticated_capability_verify",
+  "authenticated_ui_marker_observe",
   "browser_session_complete",
 ]);
 
@@ -49,9 +57,12 @@ const OPERATION_FAILURE_CODES = Object.freeze({
   auth_response_wait: "AUTH_REQUEST_FAILED",
   auth_redirect_wait: "AUTH_REDIRECT_TIMEOUT",
   auth_redirect_observe: "AUTH_REDIRECT_OBSERVATION_FAILED",
-  auth_storage_verify: "AUTH_STORAGE_NOT_ESTABLISHED",
-  auth_session_verify: "AUTH_SESSION_NOT_ESTABLISHED",
-  authenticated_app_verify: "AUTHENTICATED_APP_STATE_NOT_ESTABLISHED",
+  auth_session_confirm: "AUTH_SESSION_NOT_ESTABLISHED",
+  auth_persistence_confirm: "AUTH_PERSISTENCE_NOT_ESTABLISHED",
+  application_auth_bootstrap_wait: "APPLICATION_AUTH_BOOTSTRAP_FAILED",
+  application_auth_reload: "APPLICATION_AUTH_RELOAD_FAILED",
+  application_auth_bootstrap_verify: "APPLICATION_AUTH_BOOTSTRAP_FAILED",
+  authenticated_capability_verify: "AUTHENTICATED_CAPABILITY_UNAVAILABLE",
   browser_context_close: "BROWSER_CONTEXT_CLEANUP_FAILED",
   browser_profile_remove: "BROWSER_PROFILE_CLEANUP_FAILED",
 });
@@ -63,9 +74,12 @@ const OPERATION_TIMEOUT_CODES = Object.freeze({
   auth_ui_ready: "AUTH_UI_NOT_READY",
   auth_response_wait: "AUTH_REQUEST_TIMEOUT",
   auth_redirect_wait: "AUTH_REDIRECT_TIMEOUT",
-  auth_storage_verify: "AUTH_STORAGE_NOT_ESTABLISHED",
-  auth_session_verify: "AUTH_SESSION_VERIFICATION_TIMEOUT",
-  authenticated_app_verify: "AUTHENTICATED_APP_STATE_NOT_ESTABLISHED",
+  auth_session_confirm: "AUTH_SESSION_NOT_ESTABLISHED",
+  auth_persistence_confirm: "AUTH_PERSISTENCE_NOT_ESTABLISHED",
+  application_auth_bootstrap_wait: "APPLICATION_AUTH_BOOTSTRAP_TIMEOUT",
+  application_auth_bootstrap_verify: "APPLICATION_AUTH_BOOTSTRAP_TIMEOUT",
+  application_auth_reload: "APPLICATION_AUTH_RELOAD_FAILED",
+  authenticated_capability_verify: "AUTHENTICATED_CAPABILITY_UNAVAILABLE",
 });
 
 function safeInteger(value) {
@@ -123,10 +137,19 @@ function sessionExecutionContext(state, operation, timeoutMilliseconds, elapsedM
     browserContextExisted: state.browserContextExisted,
     pageLifecycleState: state.pageLifecycleState,
     authRequestStarted: state.authRequestStarted,
+    authResponseAccepted: state.authResponseAccepted,
     authSessionConfirmed: state.authSessionConfirmed,
+    authSessionIdentityConfirmed: state.authSessionIdentityConfirmed,
+    authPersistenceConfirmed: state.authPersistenceConfirmed,
     cookieStatePresent: state.cookieStatePresent,
     localStorageStatePresent: state.localStorageStatePresent,
-    authenticatedApplicationState: state.authenticatedApplicationState,
+    applicationAuthBootstrapConfirmed: state.applicationAuthBootstrapConfirmed,
+    authenticatedCapabilityConfirmed: state.authenticatedCapabilityConfirmed,
+    authenticatedUiMarkerObserved: state.authenticatedUiMarkerObserved,
+    authenticatedUiMarkerElapsedMilliseconds: state.authenticatedUiMarkerElapsedMilliseconds,
+    authenticatedUiMarkerType: "sign_out_action",
+    uiMarkerAbsenceAffectedExecution: false,
+    applicationAuthReloadAttempted: state.applicationAuthReloadAttempted,
   };
 }
 
@@ -167,10 +190,17 @@ function createOperationTracker({ now, timeouts }) {
     browserContextExisted: false,
     pageLifecycleState: "not_created",
     authRequestStarted: false,
+    authResponseAccepted: false,
     authSessionConfirmed: false,
+    authSessionIdentityConfirmed: false,
+    authPersistenceConfirmed: false,
     cookieStatePresent: false,
     localStorageStatePresent: false,
-    authenticatedApplicationState: false,
+    applicationAuthBootstrapConfirmed: false,
+    authenticatedCapabilityConfirmed: false,
+    authenticatedUiMarkerObserved: false,
+    authenticatedUiMarkerElapsedMilliseconds: null,
+    applicationAuthReloadAttempted: false,
     timings: [],
   };
 
@@ -213,8 +243,8 @@ function responseOk(response) {
   return typeof response.ok === "function" ? response.ok() : response.ok === true;
 }
 
-async function readStoredBrowserSession(page) {
-  return page.evaluate(() => {
+async function readStoredBrowserSession(page, expectedPrincipalId, nowEpochSeconds) {
+  return page.evaluate(({ expectedPrincipalId: expectedId, nowEpochSeconds: currentEpoch }) => {
     for (let index = 0; index < localStorage.length; index += 1) {
       const key = localStorage.key(index);
       if (!key?.startsWith("sb-") || !key.endsWith("-auth-token")) continue;
@@ -223,8 +253,11 @@ async function readStoredBrowserSession(page) {
         const container = Array.isArray(parsed) ? parsed[0] : parsed;
         const candidate = container?.currentSession ?? container?.session ?? container;
         if (candidate?.access_token && candidate?.refresh_token) {
+          const expiresAt = Number(candidate.expires_at);
           return {
             present: true,
+            notExpired: Number.isFinite(expiresAt) && expiresAt > currentEpoch,
+            identityMatch: String(candidate.user?.id || "") === expectedId,
             accessToken: candidate.access_token,
             refreshToken: candidate.refresh_token,
           };
@@ -234,11 +267,11 @@ async function readStoredBrowserSession(page) {
       }
     }
     return { present: false };
-  });
+  }, { expectedPrincipalId, nowEpochSeconds });
 }
 
-async function readSupabaseSessionAvailability(page) {
-  return page.evaluate(async () => {
+async function readSupabaseSessionAvailability(page, expectedPrincipalId, nowEpochSeconds) {
+  return page.evaluate(async ({ expectedPrincipalId: expectedId, nowEpochSeconds: currentEpoch }) => {
     try {
       if (!window.supabase?.createClient || typeof SUPABASE_CONFIG === "undefined") {
         return { available: false, clientReady: false, lookupError: false };
@@ -248,15 +281,46 @@ async function readSupabaseSessionAvailability(page) {
         SUPABASE_CONFIG.publishableKey,
       );
       const { data, error } = await client.auth.getSession();
+      const session = data?.session;
+      const expiresAt = Number(session?.expires_at);
       return {
-        available: Boolean(data?.session?.access_token && data?.session?.refresh_token),
+        available: Boolean(session?.access_token && session?.refresh_token),
+        notExpired: Number.isFinite(expiresAt) && expiresAt > currentEpoch,
+        identityMatch: String(session?.user?.id || "") === expectedId,
         clientReady: true,
         lookupError: Boolean(error),
       };
     } catch {
       return { available: false, clientReady: false, lookupError: true };
     }
-  });
+  }, { expectedPrincipalId, nowEpochSeconds });
+}
+
+async function readApplicationAuthBootstrap(page, expectedPrincipalId) {
+  return page.evaluate((expectedId) => {
+    try {
+      const requiredKeys = [
+        `laxhornet.playerSettings.user.${expectedId}`,
+        `laxhornet.syncOperations.v1.user.${expectedId}`,
+      ];
+      return {
+        recognized: requiredKeys.every((key) => localStorage.getItem(key) !== null),
+      };
+    } catch {
+      return { recognized: false };
+    }
+  }, expectedPrincipalId);
+}
+
+async function readAuthenticatedCapability(page, expectedPrincipalId) {
+  return page.evaluate((expectedId) => {
+    try {
+      const raw = localStorage.getItem(`laxhornet.games.user.${expectedId}`);
+      return { available: Array.isArray(JSON.parse(raw)) };
+    } catch {
+      return { available: false };
+    }
+  }, expectedPrincipalId);
 }
 
 async function boundedCheck(check, { timeoutMilliseconds, intervalMilliseconds = 100 }) {
@@ -321,6 +385,7 @@ export async function establishR206BrowserSession({
   applicationOrigin,
   authOrigin,
   identity,
+  expectedPrincipalId,
   expectedRedirect = false,
   fsImpl = fs,
   osImpl = os,
@@ -454,6 +519,7 @@ export async function establishR206BrowserSession({
           code: "AUTH_REQUEST_REJECTED",
         });
       }
+      state.authResponseAccepted = true;
     });
     await inject("auth_response_wait", "after");
 
@@ -468,45 +534,34 @@ export async function establishR206BrowserSession({
       await run("auth_redirect_observe", async () => ({ redirected: page.url() !== initialUrl }));
     }
 
-    await inject("auth_storage_verify", "before");
-    const storedSession = await run("auth_storage_verify", async () => {
-      const value = await boundedCheck(async () => {
-        const session = await readStoredBrowserSession(page);
-        return { ready: session.present === true, value: session };
-      }, {
-        timeoutMilliseconds: timeouts.auth_storage_verify,
-        intervalMilliseconds: Math.min(
-          100,
-          Math.max(1, Math.floor(timeouts.auth_storage_verify / 5)),
-        ),
-      });
-      state.localStorageStatePresent = true;
-      const cookies = await entry.context.cookies();
-      state.cookieStatePresent = Array.isArray(cookies) && cookies.length > 0;
-      return value;
-    });
-    await inject("auth_storage_verify", "after");
-
-    await inject("auth_session_verify", "before");
-    await run("auth_session_verify", async () => {
-      const boundedSessionTimeout = Math.max(
-        1,
-        Math.floor(timeouts.auth_session_verify * 0.5),
-      );
+    await inject("auth_session_confirm", "before");
+    await run("auth_session_confirm", async () => {
       try {
         await boundedCheck(async () => {
-          const lookup = await readSupabaseSessionAvailability(page);
+          const lookup = await readSupabaseSessionAvailability(
+            page,
+            expectedPrincipalId,
+            Math.floor(clockMilliseconds(now) / 1000),
+          );
           if (lookup.lookupError) {
             throw new R206StopError("Supabase browser session lookup failed", {
               code: "AUTH_SESSION_NOT_ESTABLISHED",
             });
           }
-          return { ready: lookup.available === true, value: lookup };
+          if (lookup.available && !lookup.identityMatch) {
+            throw new R206StopError("Supabase browser session identity did not match", {
+              code: "AUTH_SESSION_IDENTITY_MISMATCH",
+            });
+          }
+          return {
+            ready: lookup.available === true && lookup.notExpired === true,
+            value: lookup,
+          };
         }, {
-          timeoutMilliseconds: boundedSessionTimeout,
+          timeoutMilliseconds: timeouts.auth_session_confirm,
           intervalMilliseconds: Math.min(
             100,
-            Math.max(1, Math.floor(boundedSessionTimeout / 5)),
+            Math.max(1, Math.floor(timeouts.auth_session_confirm / 5)),
           ),
         });
       } catch (cause) {
@@ -517,18 +572,153 @@ export async function establishR206BrowserSession({
         });
       }
       state.authSessionConfirmed = true;
+      state.authSessionIdentityConfirmed = true;
     });
-    await inject("auth_session_verify", "after");
+    await inject("auth_session_confirm", "after");
 
-    await inject("authenticated_app_verify", "before");
-    await run("authenticated_app_verify", async () => {
-      await page.locator('[data-action="sign-out"]').waitFor({
-        state: "visible",
-        timeout: timeouts.authenticated_app_verify,
+    await inject("auth_persistence_confirm", "before");
+    const storedSession = await run("auth_persistence_confirm", async () => {
+      const value = await boundedCheck(async () => {
+        const session = await readStoredBrowserSession(
+          page,
+          expectedPrincipalId,
+          Math.floor(clockMilliseconds(now) / 1000),
+        );
+        if (session.present && !session.identityMatch) {
+          throw new R206StopError("persisted browser session identity did not match", {
+            code: "AUTH_SESSION_IDENTITY_MISMATCH",
+          });
+        }
+        return {
+          ready: session.present === true && session.notExpired === true,
+          value: session,
+        };
+      }, {
+        timeoutMilliseconds: timeouts.auth_persistence_confirm,
+        intervalMilliseconds: Math.min(
+          100,
+          Math.max(1, Math.floor(timeouts.auth_persistence_confirm / 5)),
+        ),
       });
-      state.authenticatedApplicationState = true;
+      state.localStorageStatePresent = true;
+      state.authPersistenceConfirmed = true;
+      const cookies = await entry.context.cookies();
+      state.cookieStatePresent = Array.isArray(cookies) && cookies.length > 0;
+      return value;
     });
-    await inject("authenticated_app_verify", "after");
+    await inject("auth_persistence_confirm", "after");
+
+    await inject("application_auth_bootstrap_wait", "before");
+    const bootstrapInitiallyRecognized = await run("application_auth_bootstrap_wait", async () => {
+      const boundedBootstrapTimeout = Math.max(
+        1,
+        Math.floor(timeouts.application_auth_bootstrap_wait * 0.5),
+      );
+      try {
+        await boundedCheck(async () => {
+          const bootstrap = await readApplicationAuthBootstrap(page, expectedPrincipalId);
+          return { ready: bootstrap.recognized === true, value: bootstrap };
+        }, {
+          timeoutMilliseconds: boundedBootstrapTimeout,
+          intervalMilliseconds: Math.min(
+            100,
+            Math.max(1, Math.floor(boundedBootstrapTimeout / 5)),
+          ),
+        });
+        return true;
+      } catch (cause) {
+        if (isTimeout(cause)) return false;
+        throw new R206StopError("application authentication bootstrap check failed", {
+          code: "APPLICATION_AUTH_BOOTSTRAP_FAILED",
+          cause,
+        });
+      }
+    });
+    await inject("application_auth_bootstrap_wait", "after");
+
+    if (!bootstrapInitiallyRecognized) {
+      state.applicationAuthReloadAttempted = true;
+      await inject("application_auth_reload", "before");
+      await run("application_auth_reload", async () => {
+        state.pageLifecycleState = "navigating";
+        await page.reload({
+          waitUntil: "domcontentloaded",
+          timeout: timeouts.application_auth_reload,
+        });
+        if (state.pageLifecycleState === "navigating") {
+          state.pageLifecycleState = "domcontentloaded";
+        }
+      });
+      await inject("application_auth_reload", "after");
+    }
+
+    await inject("application_auth_bootstrap_verify", "before");
+    await run("application_auth_bootstrap_verify", async () => {
+      const boundedBootstrapTimeout = Math.max(
+        1,
+        Math.floor(timeouts.application_auth_bootstrap_verify * 0.5),
+      );
+      try {
+        await boundedCheck(async () => {
+          const bootstrap = await readApplicationAuthBootstrap(page, expectedPrincipalId);
+          return { ready: bootstrap.recognized === true, value: bootstrap };
+        }, {
+          timeoutMilliseconds: boundedBootstrapTimeout,
+          intervalMilliseconds: Math.min(
+            100,
+            Math.max(1, Math.floor(boundedBootstrapTimeout / 5)),
+          ),
+        });
+      } catch (cause) {
+        if (!isTimeout(cause)) {
+          throw new R206StopError("application authentication bootstrap verification failed", {
+            code: "APPLICATION_AUTH_BOOTSTRAP_FAILED",
+            cause,
+          });
+        }
+        throw new R206StopError("application authentication bootstrap did not complete", {
+          code: "APPLICATION_AUTH_BOOTSTRAP_TIMEOUT",
+          cause,
+        });
+      }
+      state.applicationAuthBootstrapConfirmed = true;
+    });
+    await inject("application_auth_bootstrap_verify", "after");
+
+    await inject("authenticated_capability_verify", "before");
+    await run("authenticated_capability_verify", async () => {
+      const capability = await readAuthenticatedCapability(page, expectedPrincipalId);
+      if (!capability.available) {
+        throw new R206StopError("authenticated account-scoped capability is unavailable", {
+          code: "AUTHENTICATED_CAPABILITY_UNAVAILABLE",
+        });
+      }
+      state.authenticatedCapabilityConfirmed = true;
+    });
+    await inject("authenticated_capability_verify", "after");
+
+    await inject("authenticated_ui_marker_observe", "before");
+    await run("authenticated_ui_marker_observe", async () => {
+      const markerStartedAt = clockMilliseconds(now);
+      const markerObservationTimeout = Math.max(
+        1,
+        Math.floor(timeouts.authenticated_ui_marker_observe * 0.5),
+      );
+      try {
+        await page.locator('[data-action="sign-out"]').waitFor({
+          state: "visible",
+          timeout: markerObservationTimeout,
+        });
+        state.authenticatedUiMarkerObserved = true;
+        state.authenticatedUiMarkerElapsedMilliseconds = safeInteger(
+          clockMilliseconds(now) - markerStartedAt,
+        );
+      } catch {
+        state.authenticatedUiMarkerObserved = false;
+        state.authenticatedUiMarkerElapsedMilliseconds = null;
+      }
+    });
+    await inject("authenticated_ui_marker_observe", "after");
 
     state.operation = "browser_session_complete";
     state.lastCompletedOperation = "browser_session_complete";
@@ -545,10 +735,19 @@ export async function establishR206BrowserSession({
         browserContextExisted: true,
         pageLifecycleState: state.pageLifecycleState,
         authRequestStarted: state.authRequestStarted,
+        authResponseAccepted: state.authResponseAccepted,
         authSessionConfirmed: state.authSessionConfirmed,
+        authSessionIdentityConfirmed: state.authSessionIdentityConfirmed,
+        authPersistenceConfirmed: state.authPersistenceConfirmed,
         cookieStatePresent: state.cookieStatePresent,
         localStorageStatePresent: state.localStorageStatePresent,
-        authenticatedApplicationState: state.authenticatedApplicationState,
+        applicationAuthBootstrapConfirmed: state.applicationAuthBootstrapConfirmed,
+        authenticatedCapabilityConfirmed: state.authenticatedCapabilityConfirmed,
+        authenticatedUiMarkerObserved: state.authenticatedUiMarkerObserved,
+        authenticatedUiMarkerElapsedMilliseconds: state.authenticatedUiMarkerElapsedMilliseconds,
+        authenticatedUiMarkerType: "sign_out_action",
+        uiMarkerAbsenceAffectedExecution: false,
+        applicationAuthReloadAttempted: state.applicationAuthReloadAttempted,
       },
     };
   } catch (error) {
@@ -587,7 +786,7 @@ export async function establishR206BrowserSession({
   }
 }
 
-function diagnosticHtml() {
+function diagnosticHtml(scenario) {
   return `<!doctype html>
 <html><body><main id="app">
 <form data-form="auth">
@@ -596,22 +795,59 @@ function diagnosticHtml() {
 <button type="submit" value="sign-in">Log In</button>
 </form></main>
 <script>
+const DIAGNOSTIC_SCENARIO = ${JSON.stringify(scenario)};
 const SUPABASE_CONFIG = { url: location.origin, publishableKey: "diagnostic-publishable" };
 window.supabase = {
   createClient() {
     return { auth: { async getSession() {
+      if (DIAGNOSTIC_SCENARIO === "missing_session") {
+        return { data: { session: null }, error: null };
+      }
       const raw = localStorage.getItem("sb-local-auth-token");
       return { data: { session: raw ? JSON.parse(raw) : null }, error: null };
     } } };
   }
 };
+function initializeAuthenticatedApplication(session) {
+  if (["bootstrap_timeout", "cleanup_after_partial_session"].includes(DIAGNOSTIC_SCENARIO)) return;
+  const accountId = session.user.id;
+  localStorage.setItem("laxhornet.playerSettings.user." + accountId, JSON.stringify({}));
+  localStorage.setItem(
+    "laxhornet.syncOperations.v1.user." + accountId,
+    JSON.stringify({ schemaVersion: 1, operations: [], tombstones: [] }),
+  );
+  if (DIAGNOSTIC_SCENARIO !== "protected_capability_failure") {
+    localStorage.setItem("laxhornet.games.user." + accountId, JSON.stringify([]));
+  }
+}
+function renderOptionalMarker() {
+  if (DIAGNOSTIC_SCENARIO === "absent_optional_ui") return;
+  const render = () => {
+    const form = document.querySelector("form");
+    if (form) form.outerHTML = '<button data-action="sign-out">Sign Out</button>';
+  };
+  if (DIAGNOSTIC_SCENARIO === "delayed_optional_ui") setTimeout(render, 50);
+  else render();
+}
+const persisted = localStorage.getItem("sb-local-auth-token");
+if (persisted && DIAGNOSTIC_SCENARIO === "one_reload_bootstrap_recovery") {
+  const session = JSON.parse(persisted);
+  initializeAuthenticatedApplication(session);
+  renderOptionalMarker();
+}
 document.querySelector("form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  const response = await fetch("/auth/v1/token?grant_type=password", { method: "POST" });
+  const response = await fetch(
+    "/auth/v1/token?grant_type=password&scenario=" + encodeURIComponent(DIAGNOSTIC_SCENARIO),
+    { method: "POST" },
+  );
   if (!response.ok) return;
   const session = await response.json();
   localStorage.setItem("sb-local-auth-token", JSON.stringify(session));
-  document.querySelector("form").outerHTML = '<button data-action="sign-out">Sign Out</button>';
+  if (DIAGNOSTIC_SCENARIO !== "one_reload_bootstrap_recovery") {
+    initializeAuthenticatedApplication(session);
+    renderOptionalMarker();
+  }
 });
 </script></body></html>`;
 }
@@ -626,59 +862,129 @@ async function listenLoopback(server) {
 }
 
 export async function diagnoseR206BrowserSession({ chromium, timeouts } = {}) {
-  const session = {
-    access_token: ["diagnostic", "access"].join("-"),
-    refresh_token: ["diagnostic", "refresh"].join("-"),
-  };
+  const expectedPrincipalId = "00000000-0000-4000-8000-000000000001";
   const server = http.createServer((request, response) => {
-    if (request.url === "/app.html") {
+    const requestUrl = new URL(request.url, "http://127.0.0.1");
+    const applicationMatch = requestUrl.pathname.match(/^\/([a-z_]+)\/app\.html$/);
+    if (applicationMatch) {
       response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      response.end(diagnosticHtml());
+      response.end(diagnosticHtml(applicationMatch[1]));
       return;
     }
-    if (request.url === "/auth/v1/token?grant_type=password" && request.method === "POST") {
+    if (
+      requestUrl.pathname === "/auth/v1/token"
+      && requestUrl.searchParams.get("grant_type") === "password"
+      && request.method === "POST"
+    ) {
+      const responsePrincipalId = requestUrl.searchParams.get("scenario") === "wrong_session_identity"
+        ? "00000000-0000-4000-8000-000000000002"
+        : expectedPrincipalId;
       response.writeHead(200, { "content-type": "application/json" });
-      response.end(JSON.stringify(session));
+      response.end(JSON.stringify({
+        access_token: ["diagnostic", "access"].join("-"),
+        refresh_token: ["diagnostic", "refresh"].join("-"),
+        expires_at: Math.floor(Date.now() / 1000) + 3_600,
+        user: { id: responsePrincipalId },
+      }));
       return;
     }
     response.writeHead(404);
     response.end();
   });
   const origin = await listenLoopback(server);
-  let established;
+  const diagnosticTimeouts = {
+    ...timeouts,
+    application_auth_bootstrap_wait: timeouts?.application_auth_bootstrap_wait ?? 200,
+    application_auth_bootstrap_verify: timeouts?.application_auth_bootstrap_verify ?? 200,
+    authenticated_ui_marker_observe: timeouts?.authenticated_ui_marker_observe ?? 200,
+  };
+  const scenarios = [
+    { name: "normal_success", expectedCode: null },
+    { name: "delayed_optional_ui", expectedCode: null },
+    { name: "absent_optional_ui", expectedCode: null },
+    { name: "one_reload_bootstrap_recovery", expectedCode: null },
+    { name: "bootstrap_timeout", expectedCode: "APPLICATION_AUTH_BOOTSTRAP_TIMEOUT" },
+    { name: "protected_capability_failure", expectedCode: "AUTHENTICATED_CAPABILITY_UNAVAILABLE" },
+    { name: "missing_session", expectedCode: "AUTH_SESSION_NOT_ESTABLISHED" },
+    { name: "wrong_session_identity", expectedCode: "AUTH_SESSION_IDENTITY_MISMATCH" },
+    { name: "cleanup_after_partial_session", expectedCode: "APPLICATION_AUTH_BOOTSTRAP_TIMEOUT" },
+  ];
+  const results = [];
   try {
-    established = await establishR206BrowserSession({
-      chromium,
-      applicationOrigin: origin,
-      authOrigin: origin,
-      identity: {
-        email: ["diagnostic", "example.invalid"].join("@"),
-        password: ["diagnostic", "password"].join("-"),
-      },
-      timeouts,
-    });
-    const cleanup = await closeR206BrowserSession(established.entry, { timeouts });
+    for (const scenario of scenarios) {
+      let established;
+      try {
+        established = await establishR206BrowserSession({
+          chromium,
+          applicationOrigin: `${origin}/${scenario.name}`,
+          authOrigin: origin,
+          identity: {
+            email: ["diagnostic", "example.invalid"].join("@"),
+            password: ["diagnostic", "password"].join("-"),
+          },
+          expectedPrincipalId,
+          timeouts: diagnosticTimeouts,
+        });
+        const cleanup = await closeR206BrowserSession(established.entry, {
+          timeouts: diagnosticTimeouts,
+        });
+        if (scenario.expectedCode) {
+          throw new Error("diagnostic scenario unexpectedly succeeded");
+        }
+        results.push({
+          scenario: scenario.name,
+          outcome: "passed",
+          code: "BROWSER_SESSION_COMPLETE",
+          sessionConfirmed: established.diagnostics.authSessionConfirmed,
+          persistenceConfirmed: established.diagnostics.authPersistenceConfirmed,
+          bootstrapConfirmed: established.diagnostics.applicationAuthBootstrapConfirmed,
+          protectedCapabilityConfirmed:
+            established.diagnostics.authenticatedCapabilityConfirmed,
+          authenticatedUiMarkerObserved:
+            established.diagnostics.authenticatedUiMarkerObserved,
+          reloadAttempted: established.diagnostics.applicationAuthReloadAttempted,
+          contextClosed: cleanup.contextClosed,
+          profileRemoved: cleanup.profileRemoved,
+        });
+      } catch (error) {
+        if (!scenario.expectedCode || error?.code !== scenario.expectedCode) throw error;
+        results.push({
+          scenario: scenario.name,
+          outcome: "expected_failure",
+          code: error.code,
+          sessionConfirmed: error.executionContext?.authSessionConfirmed === true,
+          persistenceConfirmed: error.executionContext?.authPersistenceConfirmed === true,
+          bootstrapConfirmed:
+            error.executionContext?.applicationAuthBootstrapConfirmed === true,
+          protectedCapabilityConfirmed:
+            error.executionContext?.authenticatedCapabilityConfirmed === true,
+          authenticatedUiMarkerObserved:
+            error.executionContext?.authenticatedUiMarkerObserved === true,
+          reloadAttempted:
+            error.executionContext?.applicationAuthReloadAttempted === true,
+          contextClosed: error.executionContext?.browserContextClosed === true,
+          profileRemoved: error.executionContext?.browserProfileRemoved === true,
+        });
+      } finally {
+        if (established?.entry && !established.entry.profileRemoved) {
+          await closeR206BrowserSession(established.entry, {
+            timeouts: diagnosticTimeouts,
+          }).catch(() => {});
+        }
+      }
+    }
     return {
       ok: true,
       code: "BROWSER_SESSION_DIAGNOSTIC_READY",
-      operations: established.diagnostics.timings,
-      browserContextExisted: established.diagnostics.browserContextExisted,
-      authRequestStarted: established.diagnostics.authRequestStarted,
-      authSessionConfirmed: established.diagnostics.authSessionConfirmed,
-      localStorageStatePresent: established.diagnostics.localStorageStatePresent,
-      cookieStatePresent: established.diagnostics.cookieStatePresent,
-      authenticatedApplicationState: established.diagnostics.authenticatedApplicationState,
-      browserContextClosed: cleanup.contextClosed,
-      browserProfileRemoved: cleanup.profileRemoved,
+      scenarios: results,
+      scenarioCount: results.length,
+      allScenariosPassed: results.length === scenarios.length,
       productionCredentialsRequired: false,
       productionEndpointContacted: false,
       networkMutationCount: 0,
       releaseCloseoutApproved: false,
     };
   } finally {
-    if (established?.entry && !established.entry.profileRemoved) {
-      await closeR206BrowserSession(established.entry).catch(() => {});
-    }
     await new Promise((resolve) => server.close(resolve));
   }
 }

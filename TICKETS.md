@@ -1796,6 +1796,74 @@ Starting point:
 Evidence:
 `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_SESSION_ESTABLISHMENT_REMEDIATION.md`.
 
+### R2-06O — Decouple browser Auth confirmation from authenticated UI readiness
+
+Status: `READY FOR INDEPENDENT REVIEW`
+
+Risk level: `LEVEL 3`
+
+Branch: `fix/r2-06o-auth-session-ui-readiness-decoupling`
+
+Starting point: `401886e2f8a7023b985f6d9bae17d92705ea8f3f`
+
+#### Incident diagnosis and remediation
+
+- The latest production attempt confirmed the Supabase browser session but
+  failed the ten-second wait for the visible
+  `[data-action="sign-out"]` control. Cleanup completed and independent
+  read-only verification reported zero residue. The consumed run and
+  authorization remain non-reusable, and the retained ledger was not opened.
+- The old marker represented a render result after `handleAuthSubmit()` had
+  already called `setAuthUser()`, switched to the authenticated account
+  namespace, and then awaited profile/cloud bootstrap. It was not a sufficient
+  sole proof of browser authentication or application current-user state.
+- Require a non-expired Supabase `getSession()` result, internal expected
+  synthetic identity match, actual browser persistence, existing
+  account-scoped application bootstrap, and a harmless read of the scoped
+  local game-state container before session completion.
+- Keep the Sign Out action as an optional diagnostic marker with safe type,
+  boolean, and elapsed-time evidence. Its delay or absence cannot fail a valid
+  session after the required contract passes.
+- Permit at most one normal same-context reload only after session and
+  persistence confirmation when application bootstrap is not yet recognized.
+  Do not resubmit credentials, create another session, add a reload loop, or
+  retry the full Auth flow.
+- Preserve the owner-HTTP / challenger-browser / owner-browser sequence and
+  distinct browser contexts/profiles. Remove the redundant Sign Out selector
+  as a later hydration gate.
+- Add operation-specific bootstrap, reload, capability, identity, and
+  persistence classifications plus sanitized success/failure booleans.
+  Partial-session failure still enters cleanup-only before any game creation
+  and returns all mutable/Auth/browser residue to zero.
+- Expand the credential-free loopback diagnostic across normal, delayed UI,
+  absent UI, one-reload recovery, bootstrap timeout, capability failure,
+  missing session, wrong identity, and partial-session cleanup scenarios.
+- Keep production disabled by default. No production credentials, endpoint,
+  Auth/data operation, mutation, migration, deployment, consumed-evidence
+  change, synthetic closeout, or release closeout is authorized or performed.
+
+#### Remaining gates
+
+- [x] Implement the decoupled Auth/persistence/bootstrap/capability contract,
+  optional-marker observation, and maximum-one-reload rule.
+- [x] Add focused identity, redaction, isolation, cleanup, diagnostic, and
+  no-pre-session-mutation coverage.
+- [x] Pass final affected-surface checks and one complete
+  canonical-plus-additive regression after the diff stabilizes. Browser/Auth
+  contracts passed `30/30`; runner/path/cleanup contracts passed 44 with one
+  Windows symlink-permission skip; the nine-scenario diagnostic, disposable
+  integration, release/Pages/tombstone/concurrency gates, and complete
+  regression `47/47` passed.
+- [ ] Confirm exact-head draft-PR CI.
+- [ ] Obtain independent exact-PR-SHA Level 3 review before merge.
+- [ ] Obtain new explicit production authorization and a fresh named
+  read-only preflight before any future production attempt.
+- [ ] Execute production synthetic verification and cleanup.
+- [ ] Obtain separate reviewed release-closeout approval.
+
+Evidence:
+`review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_AUTH_UI_DECOUPLING_REMEDIATION.md`.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

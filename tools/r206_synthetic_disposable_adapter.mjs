@@ -238,13 +238,14 @@ export async function createDisposableAdapter({
       return result.rows[0].count;
     },
 
-    async signInSyntheticUser(alias, identity) {
+    async signInSyntheticUser(alias, identity, options = {}) {
       const userAlias = alias.startsWith("challenger") ? "challenger_user" : "owner_user";
       const expected = credentials.get(userAlias);
       if (
         !expected
         || expected.email !== identity.email
         || expected.password !== identity.password
+        || expected.id !== options.expectedPrincipalId
       ) {
         throw new R206StopError("disposable Auth rejected the synthetic credential", {
           code: "DISPOSABLE_AUTH_REJECTED",
@@ -261,6 +262,18 @@ export async function createDisposableAdapter({
         const profilePath = fs.mkdtempSync(path.join(os.tmpdir(), `laxhornet-${alias}-`));
         browserProfiles.add(path.resolve(profilePath));
         session.browserProfilePath = profilePath;
+        session.browserSessionEvidence = {
+          sessionConfirmed: true,
+          sessionIdentityConfirmed: true,
+          persistenceConfirmed: true,
+          applicationBootstrapConfirmed: true,
+          protectedCapabilityConfirmed: true,
+          authenticatedUiMarkerObserved: true,
+          authenticatedUiMarkerElapsedMilliseconds: 0,
+          authenticatedUiMarkerType: "sign_out_action",
+          uiMarkerAbsenceAffectedExecution: false,
+          reloadAttempted: false,
+        };
       }
       sessions.set(alias, session);
       return { ...session };

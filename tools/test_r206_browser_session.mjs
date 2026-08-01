@@ -31,6 +31,8 @@ class FakePage extends EventEmitter {
     this.currentUrl = "about:blank";
     this.storageChecks = 0;
     this.sessionChecks = 0;
+    this.bootstrapChecks = 0;
+    this.reloadCount = 0;
     this.closed = false;
   }
 
@@ -54,7 +56,13 @@ class FakePage extends EventEmitter {
     return {
       waitFor: async () => {
         if (selector === '[data-action="sign-out"]') {
-          if (!this.scenario.authenticatedApp) throw timeoutError();
+          if (this.scenario.uiMarkerAbsent) throw timeoutError();
+          if (this.scenario.uiMarkerDelayMilliseconds) {
+            await new Promise((resolve) => setTimeout(
+              resolve,
+              this.scenario.uiMarkerDelayMilliseconds,
+            ));
+          }
           return;
         }
         if (this.scenario.authUiMissing) throw timeoutError();
@@ -76,7 +84,11 @@ class FakePage extends EventEmitter {
           if (!this.scenario.authRejected) {
             this.scenario.storageAvailable = this.scenario.storageNever !== true;
             this.scenario.sessionAvailable = this.scenario.sessionNever !== true;
-            this.scenario.authenticatedApp = this.scenario.authenticatedAppMissing !== true;
+            this.scenario.bootstrapRecognized = !(
+              this.scenario.bootstrapMissing
+              || this.scenario.bootstrapAfterReload
+            );
+            this.scenario.capabilityAvailable = this.scenario.capabilityMissing !== true;
           }
         });
       },
@@ -90,18 +102,33 @@ class FakePage extends EventEmitter {
       const delayed = this.scenario.storageDelayChecks || 0;
       const present = this.scenario.storageAvailable && this.storageChecks > delayed;
       return present
-        ? { present: true, accessToken: "synthetic-access", refreshToken: "synthetic-refresh" }
+        ? {
+            present: true,
+            notExpired: this.scenario.persistenceExpired !== true,
+            identityMatch: this.scenario.persistenceIdentityMismatch !== true,
+            accessToken: "synthetic-access",
+            refreshToken: "synthetic-refresh",
+          }
         : { present: false };
     }
-    if (source.includes("createClient")) {
+    if (source.includes("client.auth.getSession")) {
       this.sessionChecks += 1;
       if (this.scenario.sessionLookupHangs) return new Promise(() => {});
       const delayed = this.scenario.sessionDelayChecks || 0;
       return {
         available: this.scenario.sessionAvailable && this.sessionChecks > delayed,
+        notExpired: this.scenario.sessionExpired !== true,
+        identityMatch: this.scenario.sessionIdentityMismatch !== true,
         clientReady: true,
         lookupError: this.scenario.sessionLookupError === true,
       };
+    }
+    if (source.includes("requiredKeys")) {
+      this.bootstrapChecks += 1;
+      return { recognized: this.scenario.bootstrapRecognized === true };
+    }
+    if (source.includes("laxhornet.games.user")) {
+      return { available: this.scenario.capabilityAvailable === true };
     }
     throw new Error("unexpected fake page evaluation");
   }
@@ -117,7 +144,14 @@ class FakePage extends EventEmitter {
     return this.currentUrl;
   }
 
-  async reload() {}
+  async reload() {
+    this.reloadCount += 1;
+    if (this.scenario.reloadFailure) throw new Error("synthetic reload failure");
+    if (this.scenario.bootstrapAfterReload && this.reloadCount === 1) {
+      this.scenario.bootstrapRecognized = true;
+    }
+    this.emit("domcontentloaded");
+  }
 }
 
 class FakeContext {
@@ -170,6 +204,7 @@ function harness(scenario = {}, overrides = {}) {
       email: "private-synthetic@example.invalid",
       password: "private-synthetic-password",
     },
+    expectedPrincipalId: "00000000-0000-4000-8000-000000000001",
     osImpl: { tmpdir: () => root },
     timeouts,
     ...overrides,
@@ -302,14 +337,14 @@ test("required redirect timeout is classified, while the current no-redirect flo
   }
 });
 
-test("storage and Supabase session checks allow one bounded delayed appearance", async () => {
+test("Supabase session and persistence checks allow one bounded delayed appearance", async () => {
   const fixture = harness({ storageDelayChecks: 2, sessionDelayChecks: 2 });
   try {
     const result = await fixture.establish({
       timeouts: {
         ...fixture.timeouts,
-        auth_storage_verify: 200,
-        auth_session_verify: 200,
+        auth_session_confirm: 200,
+        auth_persistence_confirm: 200,
       },
     });
     assert.ok(fixture.page.storageChecks >= 3);
@@ -322,8 +357,11 @@ test("storage and Supabase session checks allow one bounded delayed appearance",
   }
 });
 
-test("missing storage and missing Supabase session have separate classifications", async () => {
-  const storage = await classifiedFailure({ storageNever: true }, "AUTH_STORAGE_NOT_ESTABLISHED");
+test("missing persistence and missing Supabase session have separate classifications", async () => {
+  const storage = await classifiedFailure(
+    { storageNever: true },
+    "AUTH_PERSISTENCE_NOT_ESTABLISHED",
+  );
   try {
     assert.equal(createFailureEnvelope(storage.error).localStorageStatePresent, false);
   } finally {
@@ -333,24 +371,227 @@ test("missing storage and missing Supabase session have separate classifications
   const session = await classifiedFailure(
     { sessionNever: true },
     "AUTH_SESSION_NOT_ESTABLISHED",
-    { timeouts: { auth_session_verify: 100 } },
+    { timeouts: { auth_session_confirm: 100 } },
   );
   try {
     const envelope = createFailureEnvelope(session.error);
-    assert.equal(envelope.localStorageStatePresent, true);
+    assert.equal(envelope.localStorageStatePresent, false);
     assert.equal(envelope.authSessionConfirmed, false);
   } finally {
     removeHarness(session.fixture.root);
   }
 });
 
-test("a hanging Supabase session lookup is bounded", async () => {
+test("a hanging Supabase session lookup is bounded and specifically classified", async () => {
   const { error, fixture } = await classifiedFailure(
     { sessionLookupHangs: true },
-    "AUTH_SESSION_VERIFICATION_TIMEOUT",
+    "AUTH_SESSION_NOT_ESTABLISHED",
   );
   try {
-    assert.equal(createFailureEnvelope(error).operation, "auth_session_verify");
+    assert.equal(createFailureEnvelope(error).operation, "auth_session_confirm");
+  } finally {
+    removeHarness(fixture.root);
+  }
+});
+
+test("confirmed session with immediate authenticated UI marker succeeds", async () => {
+  const fixture = harness({});
+  try {
+    const result = await fixture.establish();
+    assert.equal(result.diagnostics.authSessionConfirmed, true);
+    assert.equal(result.diagnostics.authenticatedUiMarkerObserved, true);
+    assert.equal(result.diagnostics.applicationAuthReloadAttempted, false);
+    await closeR206BrowserSession(result.entry);
+  } finally {
+    removeHarness(fixture.root);
+  }
+});
+
+test("delayed optional UI marker succeeds after required contract passes", async () => {
+  const fixture = harness({ uiMarkerDelayMilliseconds: 5 });
+  try {
+    const result = await fixture.establish();
+    assert.equal(result.diagnostics.applicationAuthBootstrapConfirmed, true);
+    assert.equal(result.diagnostics.authenticatedCapabilityConfirmed, true);
+    assert.equal(result.diagnostics.authenticatedUiMarkerObserved, true);
+    await closeR206BrowserSession(result.entry);
+  } finally {
+    removeHarness(fixture.root);
+  }
+});
+
+test("absent optional UI marker is diagnostic only", async () => {
+  const fixture = harness({ uiMarkerAbsent: true });
+  try {
+    const result = await fixture.establish();
+    assert.equal(result.diagnostics.authSessionConfirmed, true);
+    assert.equal(result.diagnostics.authPersistenceConfirmed, true);
+    assert.equal(result.diagnostics.applicationAuthBootstrapConfirmed, true);
+    assert.equal(result.diagnostics.authenticatedCapabilityConfirmed, true);
+    assert.equal(result.diagnostics.authenticatedUiMarkerObserved, false);
+    assert.equal(result.diagnostics.uiMarkerAbsenceAffectedExecution, false);
+    await closeR206BrowserSession(result.entry);
+  } finally {
+    removeHarness(fixture.root);
+  }
+});
+
+test("UI marker presence without a valid session fails", async () => {
+  const { error, fixture } = await classifiedFailure(
+    { sessionNever: true },
+    "AUTH_SESSION_NOT_ESTABLISHED",
+  );
+  try {
+    const envelope = createFailureEnvelope(error);
+    assert.equal(envelope.operation, "auth_session_confirm");
+    assert.equal(envelope.authSessionConfirmed, false);
+  } finally {
+    removeHarness(fixture.root);
+  }
+});
+
+test("expected synthetic identity succeeds and wrong identity fails without disclosure", async () => {
+  const success = harness({});
+  try {
+    const result = await success.establish();
+    assert.equal(result.diagnostics.authSessionIdentityConfirmed, true);
+    await closeR206BrowserSession(result.entry);
+  } finally {
+    removeHarness(success.root);
+  }
+
+  const failed = await classifiedFailure(
+    { sessionIdentityMismatch: true },
+    "AUTH_SESSION_IDENTITY_MISMATCH",
+  );
+  try {
+    const serialized = JSON.stringify(createFailureEnvelope(failed.error));
+    assert.doesNotMatch(serialized, /00000000|private-synthetic|example\.invalid/i);
+    assert.equal(failed.fixture.context.closed, true);
+    assert.deepEqual(fs.readdirSync(failed.fixture.root), []);
+  } finally {
+    removeHarness(failed.fixture.root);
+  }
+});
+
+test("authenticated bootstrap succeeds without reload", async () => {
+  const fixture = harness({});
+  try {
+    const result = await fixture.establish();
+    assert.equal(result.diagnostics.applicationAuthBootstrapConfirmed, true);
+    assert.equal(result.diagnostics.applicationAuthReloadAttempted, false);
+    assert.equal(fixture.page.reloadCount, 0);
+    await closeR206BrowserSession(result.entry);
+  } finally {
+    removeHarness(fixture.root);
+  }
+});
+
+test("authenticated bootstrap recovers after exactly one normal reload", async () => {
+  const fixture = harness({ bootstrapAfterReload: true });
+  try {
+    const result = await fixture.establish({
+      timeouts: {
+        ...fixture.timeouts,
+        application_auth_bootstrap_wait: 200,
+        application_auth_bootstrap_verify: 200,
+      },
+    });
+    assert.equal(result.diagnostics.applicationAuthBootstrapConfirmed, true);
+    assert.equal(result.diagnostics.applicationAuthReloadAttempted, true);
+    assert.equal(fixture.page.reloadCount, 1);
+    assert.ok(result.diagnostics.timings.some(
+      (value) => value.operation === "application_auth_reload",
+    ));
+    await closeR206BrowserSession(result.entry);
+  } finally {
+    removeHarness(fixture.root);
+  }
+});
+
+test("bootstrap timeout is specific and a second reload is never attempted", async () => {
+  const { error, fixture } = await classifiedFailure(
+    { bootstrapMissing: true },
+    "APPLICATION_AUTH_BOOTSTRAP_TIMEOUT",
+    {
+      timeouts: {
+        application_auth_bootstrap_wait: 200,
+        application_auth_bootstrap_verify: 200,
+      },
+    },
+  );
+  try {
+    const envelope = createFailureEnvelope(error);
+    assert.equal(envelope.operation, "application_auth_bootstrap_verify");
+    assert.equal(envelope.applicationAuthReloadAttempted, true);
+    assert.equal(fixture.page.reloadCount, 1);
+  } finally {
+    removeHarness(fixture.root);
+  }
+});
+
+test("reload failure is separately classified", async () => {
+  const { error, fixture } = await classifiedFailure(
+    { bootstrapAfterReload: true, reloadFailure: true },
+    "APPLICATION_AUTH_RELOAD_FAILED",
+    { timeouts: { application_auth_bootstrap_wait: 200 } },
+  );
+  try {
+    const envelope = createFailureEnvelope(error);
+    assert.equal(envelope.operation, "application_auth_reload");
+    assert.equal(envelope.applicationAuthReloadAttempted, true);
+    assert.equal(fixture.page.reloadCount, 1);
+  } finally {
+    removeHarness(fixture.root);
+  }
+});
+
+test("protected capability succeeds and specific failure remains fail closed", async () => {
+  const success = harness({});
+  try {
+    const result = await success.establish();
+    assert.equal(result.diagnostics.authenticatedCapabilityConfirmed, true);
+    await closeR206BrowserSession(result.entry);
+  } finally {
+    removeHarness(success.root);
+  }
+
+  const failed = await classifiedFailure(
+    { capabilityMissing: true },
+    "AUTHENTICATED_CAPABILITY_UNAVAILABLE",
+  );
+  try {
+    const envelope = createFailureEnvelope(failed.error);
+    assert.equal(envelope.operation, "authenticated_capability_verify");
+    assert.equal(envelope.applicationAuthBootstrapConfirmed, true);
+    assert.equal(envelope.authenticatedCapabilityConfirmed, false);
+  } finally {
+    removeHarness(failed.fixture.root);
+  }
+});
+
+test("session success diagnostics record every required safe boolean", async () => {
+  const fixture = harness({ uiMarkerAbsent: true });
+  try {
+    const result = await fixture.establish();
+    assert.deepEqual({
+      session: result.diagnostics.authSessionConfirmed,
+      identity: result.diagnostics.authSessionIdentityConfirmed,
+      persistence: result.diagnostics.authPersistenceConfirmed,
+      bootstrap: result.diagnostics.applicationAuthBootstrapConfirmed,
+      capability: result.diagnostics.authenticatedCapabilityConfirmed,
+      marker: result.diagnostics.authenticatedUiMarkerObserved,
+      reload: result.diagnostics.applicationAuthReloadAttempted,
+    }, {
+      session: true,
+      identity: true,
+      persistence: true,
+      bootstrap: true,
+      capability: true,
+      marker: false,
+      reload: false,
+    });
+    await closeR206BrowserSession(result.entry);
   } finally {
     removeHarness(fixture.root);
   }
@@ -413,11 +654,18 @@ test("failure injection at each browser boundary removes the context and profile
     ["browser_context_create", "after"],
     ["browser_page_create", "after"],
     ["auth_submit", "before"],
-    ["auth_storage_verify", "before"],
-    ["auth_session_verify", "after"],
+    ["auth_session_confirm", "after"],
+    ["auth_persistence_confirm", "before"],
+    ["application_auth_bootstrap_wait", "after"],
+    ["application_auth_reload", "after"],
+    ["application_auth_bootstrap_verify", "after"],
+    ["authenticated_capability_verify", "after"],
+    ["authenticated_ui_marker_observe", "after"],
   ];
   for (const [operation, position] of boundaries) {
-    const fixture = harness({});
+    const fixture = harness(
+      operation === "application_auth_reload" ? { bootstrapAfterReload: true } : {},
+    );
     try {
       await assert.rejects(
         () => fixture.establish({
@@ -480,79 +728,117 @@ test("generic fallback remains only for failures without a classified operation"
   assert.equal(envelope.releaseCloseoutApproved, false);
 });
 
-test("partial session establishment after user/profile creation enters cleanup-only and returns zero residue", async () => {
-  const privateEvidenceDir = fs.mkdtempSync(path.join(os.tmpdir(), "laxhornet-r206-partial-private-"));
-  const publicEvidenceDir = fs.mkdtempSync(path.join(os.tmpdir(), "laxhornet-r206-partial-public-"));
-  const adapter = await createDisposableAdapter({
-    repoRoot: process.cwd(),
-    privateEvidenceDir,
-    publicEvidenceDir,
-  });
-  const signIn = adapter.signInSyntheticUser.bind(adapter);
-  let signInCount = 0;
-  adapter.signInSyntheticUser = async (...arguments_) => {
-    const session = await signIn(...arguments_);
-    signInCount += 1;
-    if (signInCount === 2) {
-      if (session.browserProfilePath) {
-        await adapter.clearBrowserProfile(session.browserProfilePath);
-      }
-      const error = new R206StopError("classified partial browser session failure", {
-        code: "AUTH_SESSION_NOT_ESTABLISHED",
-      });
-      error.executionContext = {
-        currentOperation: "auth_session_verify",
-        operation: "auth_session_verify",
-        lastCompletedOperation: "auth_storage_verify",
-        browserContextExisted: true,
-        authRequestStarted: true,
-        authSessionConfirmed: false,
-      };
-      throw error;
-    }
-    return session;
-  };
-  try {
-    let envelope;
-    await assert.rejects(
-      () => executeSyntheticVerification({
-        adapter,
-        config: {
-          executionMode: "disposable",
-          targetRef: "a".repeat(40),
-          projectRef: "local-r206-disposable",
-          privateEvidenceDir,
-          publicEvidenceDir,
-          credentialSource: "disposable_in_memory",
-          releaseCloseoutApproved: false,
-        },
-      }),
-      (error) => {
-        envelope = createFailureEnvelope(error);
-        return error.code === "AUTH_SESSION_NOT_ESTABLISHED";
-      },
+test("partial bootstrap and capability failures clean all Auth/browser residue before game creation", async () => {
+  const failureCases = [
+    {
+      code: "APPLICATION_AUTH_BOOTSTRAP_TIMEOUT",
+      operation: "application_auth_bootstrap_verify",
+      lastCompletedOperation: "application_auth_reload",
+      bootstrapConfirmed: false,
+      capabilityConfirmed: false,
+      reloadAttempted: true,
+    },
+    {
+      code: "AUTHENTICATED_CAPABILITY_UNAVAILABLE",
+      operation: "authenticated_capability_verify",
+      lastCompletedOperation: "application_auth_bootstrap_verify",
+      bootstrapConfirmed: true,
+      capabilityConfirmed: false,
+      reloadAttempted: false,
+    },
+  ];
+
+  for (const failure of failureCases) {
+    const privateEvidenceDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), "laxhornet-r206-partial-private-"),
     );
-    assert.equal(envelope.runnerOperation, "establish_sessions");
-    assert.equal(envelope.operation, "auth_session_verify");
-    assert.equal(envelope.mutationStarted, true);
-    assert.equal(envelope.cleanupEntered, true);
-    assert.equal(envelope.cleanupCompleted, true);
-    assert.deepEqual(envelope.residueCounts, {
-      authUsers: 0,
-      profiles: 0,
-      sessions: 0,
-      games: 0,
-      events: 0,
-      tombstones: 0,
-      liveShareTokens: 0,
-      operations: 0,
+    const publicEvidenceDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), "laxhornet-r206-partial-public-"),
+    );
+    const adapter = await createDisposableAdapter({
+      repoRoot: process.cwd(),
+      privateEvidenceDir,
+      publicEvidenceDir,
     });
-    assert.equal(envelope.authorizationState, "failed_unused");
-    assert.equal(envelope.releaseCloseoutApproved, false);
-  } finally {
-    await adapter.close().catch(() => {});
-    removeHarness(privateEvidenceDir);
-    removeHarness(publicEvidenceDir);
+    const signIn = adapter.signInSyntheticUser.bind(adapter);
+    const guardedCreate = adapter.guardedCreate.bind(adapter);
+    let signInCount = 0;
+    let guardedCreateCalled = false;
+    adapter.guardedCreate = async (...arguments_) => {
+      guardedCreateCalled = true;
+      return guardedCreate(...arguments_);
+    };
+    adapter.signInSyntheticUser = async (...arguments_) => {
+      const session = await signIn(...arguments_);
+      signInCount += 1;
+      if (signInCount === 2) {
+        if (session.browserProfilePath) {
+          await adapter.clearBrowserProfile(session.browserProfilePath);
+        }
+        const error = new R206StopError("classified partial browser session failure", {
+          code: failure.code,
+        });
+        error.executionContext = {
+          currentOperation: failure.operation,
+          operation: failure.operation,
+          lastCompletedOperation: failure.lastCompletedOperation,
+          browserContextExisted: true,
+          authRequestStarted: true,
+          authResponseAccepted: true,
+          authSessionConfirmed: true,
+          authSessionIdentityConfirmed: true,
+          authPersistenceConfirmed: true,
+          applicationAuthBootstrapConfirmed: failure.bootstrapConfirmed,
+          authenticatedCapabilityConfirmed: failure.capabilityConfirmed,
+          applicationAuthReloadAttempted: failure.reloadAttempted,
+        };
+        throw error;
+      }
+      return session;
+    };
+    try {
+      let envelope;
+      await assert.rejects(
+        () => executeSyntheticVerification({
+          adapter,
+          config: {
+            executionMode: "disposable",
+            targetRef: "a".repeat(40),
+            projectRef: "local-r206-disposable",
+            privateEvidenceDir,
+            publicEvidenceDir,
+            credentialSource: "disposable_in_memory",
+            releaseCloseoutApproved: false,
+          },
+        }),
+        (error) => {
+          envelope = createFailureEnvelope(error);
+          return error.code === failure.code;
+        },
+      );
+      assert.equal(envelope.runnerOperation, "establish_sessions");
+      assert.equal(envelope.operation, failure.operation);
+      assert.equal(envelope.mutationStarted, true);
+      assert.equal(envelope.cleanupEntered, true);
+      assert.equal(envelope.cleanupCompleted, true);
+      assert.equal(guardedCreateCalled, false);
+      assert.deepEqual(envelope.residueCounts, {
+        authUsers: 0,
+        profiles: 0,
+        sessions: 0,
+        games: 0,
+        events: 0,
+        tombstones: 0,
+        liveShareTokens: 0,
+        operations: 0,
+      });
+      assert.equal(envelope.authorizationState, "failed_unused");
+      assert.equal(envelope.releaseCloseoutApproved, false);
+    } finally {
+      await adapter.close().catch(() => {});
+      removeHarness(privateEvidenceDir);
+      removeHarness(publicEvidenceDir);
+    }
   }
 });
 

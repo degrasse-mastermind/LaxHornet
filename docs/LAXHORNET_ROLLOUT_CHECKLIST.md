@@ -556,6 +556,41 @@ Remediation evidence:
 Remediation evidence:
 `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_SESSION_ESTABLISHMENT_REMEDIATION.md`.
 
+### R2-06O Auth-session / UI-readiness decoupling
+
+- [x] Identify the exact fatal gate as the ten-second visible wait for
+  `[data-action="sign-out"]` and document that it represents a post-bootstrap
+  render detail rather than the Supabase browser session.
+- [x] Require a non-expired `getSession()` result, internal expected-principal
+  match, actual browser persistence, stable account-scoped application
+  bootstrap, and a harmless scoped local game-state capability.
+- [x] Make the reviewed Sign Out action an optional diagnostic observation;
+  delayed or absent UI does not reject a session after required conditions
+  pass.
+- [x] Permit exactly one normal same-context reload only when session and
+  persistence pass but bootstrap is not recognized; add no credential
+  resubmission, full-session retry, or reload loop.
+- [x] Add specific identity, persistence, bootstrap, reload, and protected-
+  capability classifications with sanitized success/failure evidence.
+- [x] Preserve owner-HTTP / challenger-browser / owner-browser isolation and
+  remove the redundant Sign Out selector as a hydration prerequisite.
+- [x] Expand the credential-free loopback diagnostic and focused cleanup/
+  redaction/no-pre-session-mutation coverage without production access.
+- [x] Keep production disabled and synthetic authorization, completion,
+  cleanup completion, and release closeout false.
+- [x] Pass final focused verification and one complete
+  canonical-plus-additive regression after the final diff stabilized:
+  browser/Auth `30/30`, runner/path/cleanup 44 passes plus one Windows
+  symlink-permission skip, nine-scenario diagnostic, disposable integration,
+  release/Pages/tombstone/concurrency gates, and complete regression `47/47`.
+- [ ] Confirm exact-head draft-PR CI and obtain independent exact-PR-SHA
+  Level 3 review before merge.
+- [ ] Obtain a new explicit production authorization and fresh named
+  read-only preflight before any future production attempt.
+
+Remediation evidence:
+`review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_AUTH_UI_DECOUPLING_REMEDIATION.md`.
+
 # 4. Planned Engineering Sequence
 
 Do not combine these into one large Codex task. Each item requires one approved ticket, one primary implementation task, and a separate independent review when warranted.
