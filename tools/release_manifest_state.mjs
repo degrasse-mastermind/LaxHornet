@@ -59,6 +59,7 @@ export function evaluateR206ReleaseControl(
   const control = manifest.r206ReleaseControl || {};
   const reconciliation = control.reconciliation || {};
   const synthetic = control.syntheticVerification || {};
+  const evidenceReconciliation = control.evidenceReconciliation || {};
 
   const runtimeReady = expect(
     manifest.productionApplicationSha === R206_RUNTIME_SHA
@@ -141,14 +142,62 @@ export function evaluateR206ReleaseControl(
   );
   const behaviorEvidenceReady = evidenceComplete(synthetic.evidence, evidenceExists);
   const cleanupEvidenceReady = evidenceComplete(synthetic.cleanupEvidence, evidenceExists);
+  const directProductionEvidenceReady =
+    synthetic.authorized === true
+    && authorizationEvidenceReady
+    && synthetic.completed === true
+    && behaviorEvidenceReady
+    && control.cleanupCompleted === true
+    && cleanupEvidenceReady;
+  const mixedEvidenceEntries = Object.values(evidenceReconciliation.evidence || {});
+  const mixedEvidenceReady =
+    synthetic.authorized === false
+    && synthetic.completed === false
+    && synthetic.completionModel === "approved_mixed_evidence"
+    && synthetic.futureAuthorizationState === "not_authorized"
+    && synthetic.historicProductionEvidenceReconciled === true
+    && synthetic.mixedEvidenceAccepted === true
+    && synthetic.cleanupAttested === true
+    && synthetic.syntheticVerificationCloseoutStatus === "approved_mixed_evidence"
+    && control.cleanupCompleted === false
+    && control.cleanupApproved === true
+    && evidenceReconciliation.status
+      === "R2-06 RELEASE CLOSEOUT APPROVED — MIXED EVIDENCE ACCEPTED"
+    && evidenceReconciliation.independentCloseoutReviewPending === false
+    && evidenceReconciliation.approvedCloseoutBaselineSha
+      === "adb9c4b91d9243534080f84f288d7f68bf446757"
+    && evidenceReconciliation.approvalAuthority === "David"
+    && evidenceReconciliation.approvalDate === "2026-08-01"
+    && evidenceReconciliation.newProductionAuthorizationCreated === false
+    && evidenceReconciliation.secondProductionLifecycleExecuted === false
+    && evidenceReconciliation.noSecondProductionLifecycleRequired === true
+    && evidenceReconciliation.productionAccessDuringCloseout === false
+    && evidenceReconciliation.productionMutationDuringCloseout === false
+    && evidenceReconciliation.productionRerunDuringCloseout === false
+    && evidenceReconciliation.newProductionAuthorizationCreatedDuringCloseout === false
+    && evidenceReconciliation.privateEvidenceOpenedDuringCloseout === false
+    && evidenceReconciliation.retainedTombstoneChangedDuringCloseout === false
+    && evidenceReconciliation.unrelatedRolloutStagesChangedDuringCloseout === false
+    && mixedEvidenceEntries.length === 4
+    && mixedEvidenceEntries.every((entry) => evidenceComplete(entry, evidenceExists))
+    && evidenceReconciliation.cleanupAttestation
+      ?.immutableConsumptionRecordCleanupCompleted === false
+    && evidenceReconciliation.cleanupAttestation?.manualCleanupRequired === false
+    && evidenceReconciliation.cleanupAttestation?.retainedDurableTombstones === 1
+    && evidenceReconciliation.cleanupAttestation?.retainedPrivateLedgers === 1
+    && Object.values(evidenceReconciliation.cleanupAttestation?.mutableResidueCounts || {})
+      .every((count) => Number.isInteger(count) && count === 0);
   const closeoutBlockers = [];
-  if (synthetic.authorized !== true || !authorizationEvidenceReady) {
+  if (!directProductionEvidenceReady && !mixedEvidenceReady
+      && (synthetic.authorized !== true || !authorizationEvidenceReady)) {
     closeoutBlockers.push("synthetic verification authorization evidence is absent");
   }
-  if (synthetic.completed !== true || !behaviorEvidenceReady) {
+  if (!directProductionEvidenceReady && !mixedEvidenceReady
+      && (synthetic.completed !== true || !behaviorEvidenceReady)) {
     closeoutBlockers.push("synthetic production behavior evidence is absent");
   }
-  if (control.cleanupCompleted !== true || !cleanupEvidenceReady) {
+  if (!directProductionEvidenceReady && !mixedEvidenceReady
+      && (control.cleanupCompleted !== true || !cleanupEvidenceReady)) {
     closeoutBlockers.push("synthetic cleanup evidence is absent");
   }
   if (!runtimeDatabaseReady) {
@@ -162,6 +211,9 @@ export function evaluateR206ReleaseControl(
   if (control.cleanupCompleted === true && !cleanupEvidenceReady) {
     failures.push("synthetic cleanup cannot be completed without reviewed evidence");
   }
+  if (synthetic.mixedEvidenceAccepted === true && !mixedEvidenceReady) {
+    failures.push("mixed-evidence closeout cannot be accepted without complete reviewed evidence");
+  }
   if (control.releaseCloseoutApproved === true && !closeoutReady) {
     failures.push("release closeout cannot be approved before all closeout evidence is complete");
   }
@@ -171,6 +223,9 @@ export function evaluateR206ReleaseControl(
     runtimeDatabaseReady,
     closeoutReady,
     releaseComplete: closeoutReady && control.releaseCloseoutApproved === true,
+    closeoutMode: mixedEvidenceReady
+      ? "approved_mixed_evidence"
+      : (directProductionEvidenceReady ? "direct_production_evidence" : null),
     closeoutBlockers,
   };
 }

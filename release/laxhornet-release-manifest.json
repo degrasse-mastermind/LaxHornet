@@ -30,9 +30,12 @@
       "completed": false,
       "evidence": null,
       "cleanupEvidence": null,
-      "completionModel": "mixed_evidence_requires_independent_closeout_review",
+      "completionModel": "approved_mixed_evidence",
       "futureAuthorizationState": "not_authorized",
-      "historicProductionEvidenceReconciled": true
+      "historicProductionEvidenceReconciled": true,
+      "mixedEvidenceAccepted": true,
+      "cleanupAttested": true,
+      "syntheticVerificationCloseoutStatus": "approved_mixed_evidence"
     },
     "syntheticRunner": {
       "implemented": true,
@@ -146,10 +149,10 @@
         "tools/test_r206_browser_runtime.mjs": "d9787b8317a1a748e0cbd9960ae8928e15e5fa240ab0ddf293f3ef2cb47cc69f",
         "tools/test_r206_browser_session.mjs": "01cae5cc79a843870a2b9bca56fa2e9cd52d9051ef27c4a87f52a68a9f8d9244",
         "tools/test_r206_synthetic_verification_disposable.mjs": "39d0c0dbc92f685201136945fefbb1afe5b6360246c2c74164db11dabe09130c",
-        "tools/test_hydration_tombstone_suppression.mjs": "1628e8c15749720b83ba0239fe127ab11988fc5e017d988f20c747ae5e106a2d",
+        "tools/test_hydration_tombstone_suppression.mjs": "47062867e61cd0e9dc952b4e2e98cb1da6861b6ccdad7e120a7c6c14c354284a",
         "tools/test_hydration_tombstone_browser.cjs": "547fa37f31193206caeac9cae2ef57ed2ca5566979ab79cbf5d41d37cb841f8f",
         "tools/fixtures/r206-synthetic-evidence-schema.json": "df0152e5236b49e7d85c46453d124ecbfca93375ff7472af65aeacdeb19c1c53",
-        "tools/run_v283_local_regression.mjs": "8cbba5aae72637991628d7dd6b343b0410dc6fbed748bf56381ea82f729e498b",
+        "tools/run_v283_local_regression.mjs": "0bfbc1a0a984748c67a157cd0937d4a2477716065bcf872917b050a5750e14c6",
         "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_IMPLEMENTATION.md": "79ad59dc63e89af66175a143c03db722f4a0a22c06c6c74db412667948f9d922",
         "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_HYDRATION_TOMBSTONE_REMEDIATION.md": "4e97a314a3fd7d40a6adf833867562c4c887bd5f4ceb15d72ee926a6ebcc667f",
         "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_HYDRATION_CLEANUP_ATTESTATION.json": "8967243b0739411be66b8656168f870b2e8113c7e3bbdbfbbc476ee43eaa8808",
@@ -158,12 +161,15 @@
       }
     },
     "evidenceReconciliation": {
-      "status": "CLOSEOUT REVIEW REQUIRED",
-      "independentCloseoutReviewPending": true,
+      "status": "R2-06 RELEASE CLOSEOUT APPROVED — MIXED EVIDENCE ACCEPTED",
+      "independentCloseoutReviewPending": false,
+      "approvedCloseoutBaselineSha": "adb9c4b91d9243534080f84f288d7f68bf446757",
+      "approvalAuthority": "David",
+      "approvalDate": "2026-08-01",
       "reviewedProductionRunnerSha": "dfe8535bdfb2a1e6470573940fb43b916b9407e0",
       "productionRunDate": "2026-08-01",
       "exactProductionRunTimestamp": "not_present_in_sanitized_repository_evidence",
-      "reviewedThroughMergeSha": "cdcc357db2774cf66454f0f5c0c69d87fd14187d",
+      "reviewedThroughMergeSha": "adb9c4b91d9243534080f84f288d7f68bf446757",
       "r206pMergeSha": "cdcc357db2774cf66454f0f5c0c69d87fd14187d",
       "historicProductionAuthorization": {
         "state": "consumed",
@@ -180,6 +186,13 @@
       "productionMutationDuringReconciliation": false,
       "privateEvidenceOpenedDuringReconciliation": false,
       "retainedTombstoneChangedDuringReconciliation": false,
+      "productionAccessDuringCloseout": false,
+      "productionMutationDuringCloseout": false,
+      "productionRerunDuringCloseout": false,
+      "newProductionAuthorizationCreatedDuringCloseout": false,
+      "privateEvidenceOpenedDuringCloseout": false,
+      "retainedTombstoneChangedDuringCloseout": false,
+      "unrelatedRolloutStagesChangedDuringCloseout": false,
       "actions": [
         {
           "action": 1,
@@ -328,26 +341,36 @@
         "productionReconciliation": {
           "path": "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_PRODUCTION_RECONCILIATION.md",
           "sha256": "883aba3cfe022735c5a55deb80a329f3cda943ce88c39975420d0ea8cb0a7bc8",
-          "reviewed": false
+          "reviewed": true
         },
         "closeoutReadiness": {
           "path": "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_CLOSEOUT_READINESS.md",
           "sha256": "55c0922136ee70ededdf72027d835fe22e7561a688df636d42bc5977056b5805",
-          "reviewed": false
+          "reviewed": true
         },
         "cleanupAttestation": {
           "path": "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_CLEANUP_ATTESTATION.md",
           "sha256": "e95ff04877a699efc6cb65fa9e215582a70d3dc947d804a4f83fc245983cd7d6",
-          "reviewed": false
+          "reviewed": true
+        },
+        "releaseCloseoutApproval": {
+          "path": "review-evidence/r2-06-durable-game-tombstones-release/R2-06_RELEASE_CLOSEOUT_APPROVAL.md",
+          "sha256": "790c6ef7626bab7b0a25317453dc964523ca4bc78b4070dbf670001e51a0cb72",
+          "reviewed": true
         }
       },
       "validation": {
         "path": "tools/test_r206_closeout_reconciliation.mjs",
-        "sha256": "75bf10b89a8ab36daa101b83a6984c444922dc21f6e445ffb88b905c9ae3c0ef"
+        "sha256": "5ca42fefab726a4c0c2b19ed2e0642f42aa19dcd31a255452033a8878c7a510f"
+      },
+      "finalCloseoutValidation": {
+        "path": "tools/test_r206_release_closeout.mjs",
+        "sha256": "2c7c547ef6001899b3d0830ae1141efeb9ce7d93663432fdb95801a3d88b4aee"
       }
     },
     "cleanupCompleted": false,
-    "releaseCloseoutApproved": false,
+    "cleanupApproved": true,
+    "releaseCloseoutApproved": true,
     "reconciliation": {
       "discoveredThroughReconciliation": true,
       "trackedReleaseAuthorizationRecorded": false,

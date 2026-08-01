@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
@@ -14,6 +14,13 @@ const evidenceFile =
     "event-pipeline-release-control-cleanup",
     "regression-output.txt",
   );
+const cleanOutput = (value) => (value || "")
+  .replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "")
+  .replace(/[ \t]+$/gm, "")
+  .trimEnd();
+if (existsSync(evidenceFile)) {
+  writeFileSync(evidenceFile, `${cleanOutput(readFileSync(evidenceFile, "utf8"))}\n`);
+}
 const python = process.env.LAXHORNET_PYTHON || "python";
 const failFast = process.argv.includes("--fail-fast");
 const manifest = JSON.parse(
@@ -98,6 +105,7 @@ const tests = [
   },
   { name: "release manifest reconciliation", command: process.execPath, args: ["tools/test_release_manifest_reconciliation.mjs"] },
   { name: "R2-06Q evidence reconciliation", command: process.execPath, args: ["tools/test_r206_closeout_reconciliation.mjs"] },
+  { name: "R2-06R release closeout", command: process.execPath, args: ["tools/test_r206_release_closeout.mjs"] },
   { name: "release preflight phase-aware", command: process.execPath, args: ["tools/test_release_preflight_phase_aware.mjs"] },
   { name: "release containment phase-aware", command: process.execPath, args: ["tools/test_release_containment_phase_aware.mjs"] },
   { name: "release hygiene", command: process.execPath, args: ["tools/test_release_hygiene.mjs"] },
@@ -174,16 +182,16 @@ for (const test of tests) {
     firstFailed ||= test.name;
     failureDiagnostics.push(
       `===== FAILED: ${test.name} =====`,
-      (result.stdout || "").trimEnd(),
-      (result.stderr || "").trimEnd(),
+      cleanOutput(result.stdout),
+      cleanOutput(result.stderr),
       `EXIT: ${exitCode}`,
     );
   }
   if (localServer && !localServer.killed) localServer.kill();
   log.push(
     `===== ${test.name} =====`,
-    (result.stdout || "").trimEnd(),
-    (result.stderr || "").trimEnd(),
+    cleanOutput(result.stdout),
+    cleanOutput(result.stderr),
     `EXIT: ${exitCode}`,
     "",
   );

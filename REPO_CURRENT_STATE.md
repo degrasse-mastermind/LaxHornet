@@ -2,10 +2,10 @@
 
 Last reviewed: 2026-08-01
 Baseline branch: `main`
-Baseline commit: `dfe8535bdfb2a1e6470573940fb43b916b9407e0`
+Baseline commit: `adb9c4b91d9243534080f84f288d7f68bf446757`
 Current repository release marker: `v284`
 Current production marker: `v284` at reconciled R2-06A runtime/catalog state;
-synthetic verification and release closeout remain incomplete
+R2-06 release closeout approved through reconciled mixed evidence
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
 
@@ -326,6 +326,19 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   authorization/run paths are non-reusable; no new authorization or production
   rerun occurred; `releaseCloseoutApproved` remains false. R2-06 now requires
   independent closeout review, not another production attempt.
+- R2-06R records David's final approval at the independently reviewed and
+  merged R2-06Q baseline
+  `adb9c4b91d9243534080f84f288d7f68bf446757`. The final disposition is
+  `R2-06 RELEASE CLOSEOUT APPROVED — MIXED EVIDENCE ACCEPTED`: actions 1–14
+  remain production-verified, historic action 15 remains an invalid verifier
+  result with corrected behavior disposable/remediation-verified, action 16
+  remains partially production-verified, and actions 17–21 remain independently
+  cleanup-attested. Final cleanup approval is true through the supplemental
+  attestation while immutable `cleanupCompleted: false` remains unchanged.
+  Exactly one inert tombstone and one unopened private ledger remain; mutable,
+  Auth, and browser residue is zero. Binary direct-production completion stays
+  false, production execution stays disabled, no rerun or new authorization
+  occurred, and unrelated rollout stages remain open.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The v284 cache marker remains unchanged. The updated service worker purges

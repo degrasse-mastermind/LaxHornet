@@ -194,20 +194,20 @@ test("production dependency gate passes only after both migrations are recorded 
   assert.deepEqual(dependency.pending, []);
 });
 
-test("reconciled runtime and migrations do not satisfy production closeout", () => {
+test("approved mixed evidence satisfies the production closeout gate", () => {
   const closeout = evaluateReleaseCloseoutGate(reconciledManifest, "production", {
     evidenceExists: (file) => fs.existsSync(path.join(sourceRoot, file)),
   });
   assert.equal(closeout.runtimeDatabaseReady, true);
-  assert.equal(closeout.closeoutReady, false);
-  assert.equal(closeout.status, "FAIL");
+  assert.equal(closeout.closeoutReady, true);
+  assert.equal(closeout.status, "PASS");
 });
 
-test("preparation reports incomplete closeout without treating it as activation", () => {
+test("preparation reports the approved closeout without treating it as activation", () => {
   const closeout = evaluateReleaseCloseoutGate(reconciledManifest, "preparation", {
     evidenceExists: (file) => fs.existsSync(path.join(sourceRoot, file)),
   });
-  assert.equal(closeout.closeoutReady, false);
+  assert.equal(closeout.closeoutReady, true);
   assert.equal(closeout.status, "PASS");
 });
 
