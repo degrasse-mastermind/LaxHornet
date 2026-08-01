@@ -236,3 +236,37 @@ action was used for R2-06M. Synthetic authorization, synthetic completion,
 cleanup completion, and release closeout remain false. Any future production
 attempt still requires a new authorization and fresh named read-only preflight
 bound to an independently reviewed exact SHA.
+
+## Subsequent R2-06O Auth / UI decoupling
+
+A later sanitized production attempt attributed the new failure exactly: the
+Supabase browser session was confirmed, but `authenticated_app_verify` timed
+out while waiting ten seconds for visible selector
+`[data-action="sign-out"]`. Cleanup again completed with independently
+verified zero residue. That later evidence resolves the new incident's gate;
+it does not change this document's limitation on attributing the older
+pre-R2-06M generic timeout.
+
+Repository inspection showed that the Sign Out control is rendered only after
+`handleAuthSubmit()` has accepted the session, called `setAuthUser()`, switched
+the account namespace, and awaited profile/cloud bootstrap. R2-06O therefore
+replaces historical post-response operations 10-12 with:
+
+1. `auth_session_confirm`;
+2. `auth_persistence_confirm`;
+3. `application_auth_bootstrap_wait`;
+4. optional one-time `application_auth_reload`;
+5. `application_auth_bootstrap_verify`;
+6. `authenticated_capability_verify`;
+7. diagnostic-only `authenticated_ui_marker_observe`.
+
+The stable bootstrap signal uses the application's existing account-scoped
+player-settings and durable-sync-operation containers. The protected
+capability reads only whether the synthetic account's scoped local game-state
+container has the required array shape. No values or identifiers enter public
+evidence. A missing UI marker is no longer fatal after the required conditions
+pass; genuine session, identity, persistence, bootstrap, reload, or capability
+failure remains specifically classified and fail closed.
+
+Detailed evidence:
+`SYNTHETIC_RUNNER_AUTH_UI_DECOUPLING_REMEDIATION.md`.

@@ -373,10 +373,26 @@ export function createFailureEnvelope(error, context = {}) {
     browserContextExisted: execution.browserContextExisted === true,
     pageLifecycleState: sanitizedOperation(execution.pageLifecycleState, "unknown"),
     authRequestStarted: execution.authRequestStarted === true,
+    authResponseAccepted: execution.authResponseAccepted === true,
     authSessionConfirmed: execution.authSessionConfirmed === true,
+    authSessionIdentityConfirmed: execution.authSessionIdentityConfirmed === true,
+    authPersistenceConfirmed: execution.authPersistenceConfirmed === true,
     cookieStatePresent: execution.cookieStatePresent === true,
     localStorageStatePresent: execution.localStorageStatePresent === true,
-    authenticatedApplicationState: execution.authenticatedApplicationState === true,
+    applicationAuthBootstrapConfirmed:
+      execution.applicationAuthBootstrapConfirmed === true,
+    authenticatedCapabilityConfirmed:
+      execution.authenticatedCapabilityConfirmed === true,
+    authenticatedUiMarkerObserved: execution.authenticatedUiMarkerObserved === true,
+    authenticatedUiMarkerElapsedMilliseconds: sanitizedMilliseconds(
+      execution.authenticatedUiMarkerElapsedMilliseconds,
+    ),
+    authenticatedUiMarkerType: sanitizedOperation(
+      execution.authenticatedUiMarkerType,
+      "sign_out_action",
+    ),
+    uiMarkerAbsenceAffectedExecution: false,
+    applicationAuthReloadAttempted: execution.applicationAuthReloadAttempted === true,
     browserCleanupEntered: execution.browserCleanupEntered === true,
     browserContextClosed: execution.browserContextClosed === true,
     browserProfileRemoved: execution.browserProfileRemoved === true,
@@ -1534,12 +1550,15 @@ export async function executeSyntheticVerification({
     await machine.advance("users_created", { users: 2, profiles });
 
     currentOperation = "establish_sessions";
-    const ownerInitial = await adapter.signInSyntheticUser("owner_initial", scope.owner);
+    const ownerInitial = await adapter.signInSyntheticUser("owner_initial", scope.owner, {
+      expectedPrincipalId: ledger.users.get("owner_user").id,
+    });
     limits.add("sessionsCreated", 1);
     ledger.recordSession("owner_initial", { userAlias: "owner_user", ...ownerInitial });
     const challengerInitial = await adapter.signInSyntheticUser(
       "challenger_initial",
       scope.challenger,
+      { expectedPrincipalId: ledger.users.get("challenger_user").id },
     );
     limits.add("sessionsCreated", 1);
     ledger.recordSession("challenger_initial", {
@@ -1552,7 +1571,10 @@ export async function executeSyntheticVerification({
     scope.challenger.password = null;
     scope.challenger.email = null;
     completeAction("establish_sessions");
-    await machine.advance("initial_sessions_established", { sessions: 2 });
+    await machine.advance("initial_sessions_established", {
+      sessions: 2,
+      challengerBrowserSession: challengerInitial.browserSessionEvidence || null,
+    });
 
     currentOperation = "guarded_create";
     const t1 = new Date(now().getTime() + 1_000).toISOString();
@@ -1729,7 +1751,9 @@ export async function executeSyntheticVerification({
     currentOperation = "clean_session_hydration";
     await adapter.revokeSession("owner_initial", ledger.sessions.get("owner_initial"));
     ledger.markSessionRevoked("owner_initial");
-    const ownerHydration = await adapter.signInSyntheticUser("owner_hydration", scope.owner);
+    const ownerHydration = await adapter.signInSyntheticUser("owner_hydration", scope.owner, {
+      expectedPrincipalId: ledger.users.get("owner_user").id,
+    });
     limits.add("sessionsCreated", 1);
     ledger.recordSession("owner_hydration", { userAlias: "owner_user", ...ownerHydration });
     if (ownerHydration.browserProfilePath) {
@@ -1737,7 +1761,10 @@ export async function executeSyntheticVerification({
     }
     scope.owner.password = null;
     scope.owner.email = null;
-    await machine.advance("hydration_session_established", { sessionsCreated: 3 });
+    await machine.advance("hydration_session_established", {
+      sessionsCreated: 3,
+      ownerBrowserSession: ownerHydration.browserSessionEvidence || null,
+    });
 
     const hydration = await adapter.verifyHydration({
       session: ledger.sessions.get("owner_hydration"),
@@ -1983,11 +2010,27 @@ export async function executeSyntheticVerification({
       browserContextExisted: error.executionContext?.browserContextExisted === true,
       pageLifecycleState: error.executionContext?.pageLifecycleState || "unknown",
       authRequestStarted: error.executionContext?.authRequestStarted === true,
+      authResponseAccepted: error.executionContext?.authResponseAccepted === true,
       authSessionConfirmed: error.executionContext?.authSessionConfirmed === true,
+      authSessionIdentityConfirmed:
+        error.executionContext?.authSessionIdentityConfirmed === true,
+      authPersistenceConfirmed:
+        error.executionContext?.authPersistenceConfirmed === true,
       cookieStatePresent: error.executionContext?.cookieStatePresent === true,
       localStorageStatePresent: error.executionContext?.localStorageStatePresent === true,
-      authenticatedApplicationState:
-        error.executionContext?.authenticatedApplicationState === true,
+      applicationAuthBootstrapConfirmed:
+        error.executionContext?.applicationAuthBootstrapConfirmed === true,
+      authenticatedCapabilityConfirmed:
+        error.executionContext?.authenticatedCapabilityConfirmed === true,
+      authenticatedUiMarkerObserved:
+        error.executionContext?.authenticatedUiMarkerObserved === true,
+      authenticatedUiMarkerElapsedMilliseconds:
+        error.executionContext?.authenticatedUiMarkerElapsedMilliseconds ?? null,
+      authenticatedUiMarkerType:
+        error.executionContext?.authenticatedUiMarkerType || "sign_out_action",
+      uiMarkerAbsenceAffectedExecution: false,
+      applicationAuthReloadAttempted:
+        error.executionContext?.applicationAuthReloadAttempted === true,
       phase: machine.phase,
       lastSuccessfullyCompletedPhase,
       completedActionCount: completedActions.size,

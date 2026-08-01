@@ -530,7 +530,7 @@ export function createProductionAdapter({
     return result.body;
   };
 
-  const signInViaHttp = async (identity) => {
+  const signInViaHttp = async (identity, expectedPrincipalId) => {
     const result = await request(
       `${R206_API_URL}/auth/v1/token?grant_type=password`,
       {
@@ -540,7 +540,12 @@ export function createProductionAdapter({
       },
       "synthetic sign-in",
     );
-    if (!result.ok || !result.body?.access_token || !result.body?.refresh_token) {
+    if (
+      !result.ok
+      || !result.body?.access_token
+      || !result.body?.refresh_token
+      || result.body?.user?.id !== expectedPrincipalId
+    ) {
       throw safeHttpError("synthetic sign-in", result);
     }
     return {
@@ -550,7 +555,7 @@ export function createProductionAdapter({
     };
   };
 
-  const signInViaIsolatedBrowser = async (identity, alias) => {
+  const signInViaIsolatedBrowser = async (identity, alias, expectedPrincipalId) => {
     if (!chromium) {
       throw new R206StopError("the preflight-verified Chromium runtime is unavailable", {
         code: "BROWSER_RUNTIME_UNAVAILABLE",
@@ -563,6 +568,7 @@ export function createProductionAdapter({
         applicationOrigin: R206_APPLICATION_ORIGIN,
         authOrigin: R206_API_URL,
         identity,
+        expectedPrincipalId,
         expectedRedirect: false,
         onContextCreated(entry) {
           browserEntry = entry;
@@ -595,6 +601,23 @@ export function createProductionAdapter({
         accessToken: established.session.accessToken,
         refreshToken: established.session.refreshToken,
         browserProfilePath: browserEntry.profilePath,
+        browserSessionEvidence: {
+          sessionConfirmed: established.diagnostics.authSessionConfirmed === true,
+          sessionIdentityConfirmed:
+            established.diagnostics.authSessionIdentityConfirmed === true,
+          persistenceConfirmed: established.diagnostics.authPersistenceConfirmed === true,
+          applicationBootstrapConfirmed:
+            established.diagnostics.applicationAuthBootstrapConfirmed === true,
+          protectedCapabilityConfirmed:
+            established.diagnostics.authenticatedCapabilityConfirmed === true,
+          authenticatedUiMarkerObserved:
+            established.diagnostics.authenticatedUiMarkerObserved === true,
+          authenticatedUiMarkerElapsedMilliseconds:
+            established.diagnostics.authenticatedUiMarkerElapsedMilliseconds,
+          authenticatedUiMarkerType: established.diagnostics.authenticatedUiMarkerType,
+          uiMarkerAbsenceAffectedExecution: false,
+          reloadAttempted: established.diagnostics.applicationAuthReloadAttempted === true,
+        },
       };
     } catch (cause) {
       if (browserEntry?.profileRemoved) {
@@ -736,11 +759,12 @@ export function createProductionAdapter({
       return rows.length;
     },
 
-    async signInSyntheticUser(alias, identity) {
+    async signInSyntheticUser(alias, identity, options = {}) {
+      const expectedPrincipalId = options.expectedPrincipalId;
       if (alias === "owner_hydration" || alias === "challenger_initial") {
-        return signInViaIsolatedBrowser(identity, alias);
+        return signInViaIsolatedBrowser(identity, alias, expectedPrincipalId);
       }
-      return signInViaHttp(identity);
+      return signInViaHttp(identity, expectedPrincipalId);
     },
 
     async guardedCreate({ session, operation, ledger }) {
@@ -945,10 +969,6 @@ export function createProductionAdapter({
         });
       }
       const { page, network, consoleClasses, profilePath } = hydrationBrowser;
-      await page.locator('[data-action="sign-out"]').waitFor({
-        state: "visible",
-        timeout: 10_000,
-      });
       let hydrationRequestsReady = false;
       for (let attempt = 0; attempt < 100; attempt += 1) {
         hydrationRequestsReady = network.some(
@@ -977,10 +997,6 @@ export function createProductionAdapter({
       const firstPassVisible = body.includes(ledger.game.id) || localEvidence;
       const beforeRefreshRequests = network.length;
       await page.reload({ waitUntil: "domcontentloaded", timeout: 15_000 });
-      await page.locator('[data-action="sign-out"]').waitFor({
-        state: "visible",
-        timeout: 10_000,
-      });
       const afterBody = await page.locator("body").innerText();
       const afterRefreshVisible = afterBody.includes(ledger.game.id);
       const refreshRequests = network.slice(beforeRefreshRequests);

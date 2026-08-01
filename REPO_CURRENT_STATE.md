@@ -283,6 +283,19 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   destroyed that attribution; the retained private identifier ledger remains
   unopened. Production remains disabled and all synthetic completion and
   release-closeout gates remain false.
+- R2-06O separates Supabase browser-session proof from application bootstrap,
+  the matrix-required protected capability, and the optional rendered Sign
+  Out action. Browser success now requires a non-expired `getSession()` value,
+  internal expected-principal match, actual local persistence, existing
+  account-scoped application-state initialization, and a harmless structural
+  read of the synthetic account's scoped game-state container. The Sign Out
+  action is diagnostic only. Bootstrap may use at most one normal same-context
+  reload without credential resubmission or full-session retry. Failure
+  evidence records safe booleans and specific identity/persistence/bootstrap/
+  reload/capability classifications. The owner-HTTP/challenger-browser/owner-
+  browser isolation and cleanup-only boundary remain unchanged, production is
+  disabled, and synthetic authorization/completion/cleanup and release
+  closeout remain false.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The v284 cache marker remains unchanged. The updated service worker purges

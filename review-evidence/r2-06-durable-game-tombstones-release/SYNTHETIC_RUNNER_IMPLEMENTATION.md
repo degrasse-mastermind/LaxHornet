@@ -1,4 +1,4 @@
-# R2-06E / R2-06I / R2-06K Synthetic Runner Implementation
+# R2-06E / R2-06I / R2-06K / R2-06M / R2-06O Synthetic Runner Implementation
 
 Status: `READY FOR INDEPENDENT REVIEW`
 
@@ -128,6 +128,9 @@ Detailed remediation evidence:
 R2-06M session-establishment remediation evidence:
 `SYNTHETIC_RUNNER_SESSION_ESTABLISHMENT_REMEDIATION.md`.
 
+R2-06O Auth-session / UI-readiness decoupling evidence:
+`SYNTHETIC_RUNNER_AUTH_UI_DECOUPLING_REMEDIATION.md`.
+
 ## Evidence and credential handling
 
 Passwords, email addresses, access tokens, refresh tokens, key material,
@@ -181,3 +184,19 @@ disposable integration, release/Pages/tombstone/concurrency gates, and the
 complete canonical-plus-additive regression `47/47`. The old attempt's exact
 timeout call site remains unrecoverable from its sanitized public evidence;
 this limitation is not treated as resolved or as production authorization.
+
+R2-06O replaces the fatal Sign Out-control wait with independent required
+checks for a non-expired Supabase browser session, expected synthetic identity,
+actual browser persistence, existing account-scoped application bootstrap, and
+a harmless scoped local game-state capability. The Sign Out action remains a
+safe optional observation. Bootstrap may use at most one normal reload in the
+same isolated context, with no credential resubmission or full-session retry.
+The loopback diagnostic now exercises nine success/failure scenarios, and
+success/failure evidence contains only safe contract booleans and timing/state
+categories. Production remains disabled and no production or private retained
+evidence was accessed during implementation.
+Final local verification passed the nine-scenario pinned-browser diagnostic,
+`30/30` browser Auth contracts, 44 runner/path/cleanup checks with one Windows
+symlink-permission skip, disposable integration, all focused release/Pages/
+tombstone/concurrency gates, and the complete canonical-plus-additive
+regression `47/47`.
