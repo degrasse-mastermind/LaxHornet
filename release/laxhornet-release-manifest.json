@@ -29,7 +29,10 @@
       "authorizationEvidence": null,
       "completed": false,
       "evidence": null,
-      "cleanupEvidence": null
+      "cleanupEvidence": null,
+      "completionModel": "mixed_evidence_requires_independent_closeout_review",
+      "futureAuthorizationState": "not_authorized",
+      "historicProductionEvidenceReconciled": true
     },
     "syntheticRunner": {
       "implemented": true,
@@ -146,12 +149,201 @@
         "tools/test_hydration_tombstone_suppression.mjs": "1628e8c15749720b83ba0239fe127ab11988fc5e017d988f20c747ae5e106a2d",
         "tools/test_hydration_tombstone_browser.cjs": "8f40f7163ad00557d202c60e9562f45f364bb43b4c6fa6bc6851d66936162cba",
         "tools/fixtures/r206-synthetic-evidence-schema.json": "df0152e5236b49e7d85c46453d124ecbfca93375ff7472af65aeacdeb19c1c53",
-        "tools/run_v283_local_regression.mjs": "45f298e78e05d0eb5a8ae775bc6cefc094f887643800bae494a2cb6f23aa5221",
+        "tools/run_v283_local_regression.mjs": "8cbba5aae72637991628d7dd6b343b0410dc6fbed748bf56381ea82f729e498b",
         "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_IMPLEMENTATION.md": "79ad59dc63e89af66175a143c03db722f4a0a22c06c6c74db412667948f9d922",
         "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_HYDRATION_TOMBSTONE_REMEDIATION.md": "4e97a314a3fd7d40a6adf833867562c4c887bd5f4ceb15d72ee926a6ebcc667f",
         "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_HYDRATION_CLEANUP_ATTESTATION.json": "8967243b0739411be66b8656168f870b2e8113c7e3bbdbfbbc476ee43eaa8808",
         ".github/workflows/laxhornet-regression.yml": "3758c048ab79b7be72929c31bc929d82b452ff3f59ac31e4ebe06e020c77721d",
         ".github/workflows/docker-tests.yml": "c6e0ba957f10a2aa84b78937b23e5b236e3d093fced05463f81830fc940f4bbd"
+      }
+    },
+    "evidenceReconciliation": {
+      "status": "CLOSEOUT REVIEW REQUIRED",
+      "independentCloseoutReviewPending": true,
+      "reviewedProductionRunnerSha": "dfe8535bdfb2a1e6470573940fb43b916b9407e0",
+      "productionRunDate": "2026-08-01",
+      "exactProductionRunTimestamp": "not_present_in_sanitized_repository_evidence",
+      "reviewedThroughMergeSha": "cdcc357db2774cf66454f0f5c0c69d87fd14187d",
+      "r206pMergeSha": "cdcc357db2774cf66454f0f5c0c69d87fd14187d",
+      "historicProductionAuthorization": {
+        "state": "consumed",
+        "reusable": false
+      },
+      "historicProductionRunDirectory": {
+        "state": "consumed",
+        "reusable": false
+      },
+      "newProductionAuthorizationCreated": false,
+      "secondProductionLifecycleExecuted": false,
+      "noSecondProductionLifecycleRequired": true,
+      "productionAccessDuringReconciliation": false,
+      "productionMutationDuringReconciliation": false,
+      "privateEvidenceOpenedDuringReconciliation": false,
+      "retainedTombstoneChangedDuringReconciliation": false,
+      "actions": [
+        {
+          "action": 1,
+          "status": "PRODUCTION VERIFIED",
+          "result": "browser_readiness_passed"
+        },
+        {
+          "action": 2,
+          "status": "PRODUCTION VERIFIED",
+          "result": "two_synthetic_auth_users_created"
+        },
+        {
+          "action": 3,
+          "status": "PRODUCTION VERIFIED",
+          "result": "two_automatic_profiles_created"
+        },
+        {
+          "action": 4,
+          "status": "PRODUCTION VERIFIED",
+          "result": "three_sequential_sessions_verified"
+        },
+        {
+          "action": 5,
+          "status": "PRODUCTION VERIFIED",
+          "result": "one_isolated_personal_game_created"
+        },
+        {
+          "action": 6,
+          "status": "PRODUCTION VERIFIED",
+          "result": "anonymous_denial_passed"
+        },
+        {
+          "action": 7,
+          "status": "PRODUCTION VERIFIED",
+          "result": "wrong_account_denial_passed"
+        },
+        {
+          "action": 8,
+          "status": "PRODUCTION VERIFIED",
+          "result": "guarded_update_passed"
+        },
+        {
+          "action": 9,
+          "status": "PRODUCTION VERIFIED",
+          "result": "newer_game_revision"
+        },
+        {
+          "action": 10,
+          "status": "PRODUCTION VERIFIED",
+          "result": "game_deleted"
+        },
+        {
+          "action": 11,
+          "status": "PRODUCTION VERIFIED",
+          "result": "tombstones_0_to_1"
+        },
+        {
+          "action": 12,
+          "status": "PRODUCTION VERIFIED",
+          "result": "game_delete_replayed"
+        },
+        {
+          "action": 13,
+          "status": "PRODUCTION VERIFIED",
+          "result": "game_already_deleted"
+        },
+        {
+          "action": 14,
+          "status": "PRODUCTION VERIFIED",
+          "result": "game_deleted"
+        },
+        {
+          "action": 15,
+          "status": "INVALID HISTORIC VERIFIER RESULT",
+          "result": "TOMBSTONE METADATA MISCLASSIFIED AS HYDRATED GAME",
+          "originalProductionActionPassed": false,
+          "correctedVerification": {
+            "status": "DISPOSABLE/REMEDIATION VERIFIED",
+            "mergeSha": "cdcc357db2774cf66454f0f5c0c69d87fd14187d",
+            "evidencePath": "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_HYDRATION_TOMBSTONE_REMEDIATION.md",
+            "verificationLayers": [
+              "raw_canonical_persistence",
+              "application_state",
+              "rendered_ui",
+              "zero_resurrection_writes"
+            ]
+          }
+        },
+        {
+          "action": 16,
+          "status": "PRODUCTION PARTIALLY VERIFIED",
+          "combinedStatus": "PARTIALLY VERIFIED IN PRODUCTION — COMPLETED BY REVIEWED DISPOSABLE DISCLOSURE AND THREE-LAYER HYDRATION EVIDENCE",
+          "anonymousDenialPassed": true,
+          "wrongAccountDenialPassed": true,
+          "liveShareTokensCreated": 0,
+          "finalLiveShareTokenCount": 0,
+          "unauthorizedGameDisclosureObserved": false,
+          "fullPostHydrationDisclosureSequence": "NOT REACHED",
+          "completionEvidence": "DISPOSABLE/REMEDIATION VERIFIED"
+        },
+        {
+          "action": 17,
+          "status": "INDEPENDENT CLEANUP ATTESTED",
+          "result": "three_sessions_revoked"
+        },
+        {
+          "action": 18,
+          "status": "INDEPENDENT CLEANUP ATTESTED",
+          "result": "two_synthetic_users_deleted"
+        },
+        {
+          "action": 19,
+          "status": "INDEPENDENT CLEANUP ATTESTED",
+          "result": "two_profiles_cascaded_away"
+        },
+        {
+          "action": 20,
+          "status": "INDEPENDENT CLEANUP ATTESTED",
+          "result": "zero_mutable_auth_browser_residue"
+        },
+        {
+          "action": 21,
+          "status": "INDEPENDENT CLEANUP ATTESTED",
+          "result": "one_retained_tombstone_and_one_private_ledger"
+        }
+      ],
+      "cleanupAttestation": {
+        "status": "INDEPENDENT CLEANUP ATTESTED",
+        "immutableConsumptionRecordCleanupCompleted": false,
+        "authoritativeSupplementalRecord": true,
+        "manualCleanupRequired": false,
+        "exactObservationTimestamp": "not_present_in_sanitized_repository_evidence",
+        "mutableResidueCounts": {
+          "syntheticUsers": 0,
+          "profiles": 0,
+          "activeSessions": 0,
+          "games": 0,
+          "events": 0,
+          "liveShareTokens": 0,
+          "operationsAndRecoveries": 0
+        },
+        "retainedDurableTombstones": 1,
+        "retainedPrivateLedgers": 1
+      },
+      "evidence": {
+        "productionReconciliation": {
+          "path": "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_PRODUCTION_RECONCILIATION.md",
+          "sha256": "883aba3cfe022735c5a55deb80a329f3cda943ce88c39975420d0ea8cb0a7bc8",
+          "reviewed": false
+        },
+        "closeoutReadiness": {
+          "path": "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_CLOSEOUT_READINESS.md",
+          "sha256": "55c0922136ee70ededdf72027d835fe22e7561a688df636d42bc5977056b5805",
+          "reviewed": false
+        },
+        "cleanupAttestation": {
+          "path": "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_CLEANUP_ATTESTATION.md",
+          "sha256": "e95ff04877a699efc6cb65fa9e215582a70d3dc947d804a4f83fc245983cd7d6",
+          "reviewed": false
+        }
+      },
+      "validation": {
+        "path": "tools/test_r206_closeout_reconciliation.mjs",
+        "sha256": "75bf10b89a8ab36daa101b83a6984c444922dc21f6e445ffb88b905c9ae3c0ef"
       }
     },
     "cleanupCompleted": false,

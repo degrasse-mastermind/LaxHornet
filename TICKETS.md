@@ -1866,7 +1866,7 @@ Evidence:
 
 ### R2-06P — Hydration tombstone suppression and three-layer verification
 
-Status: `IMPLEMENTED — INDEPENDENT REVIEW REQUIRED`
+Status: `MERGED — RECONCILED BY R2-06Q`
 
 Risk level: `LEVEL 3`
 
@@ -1916,16 +1916,91 @@ Starting point: `dfe8535bdfb2a1e6470573940fb43b916b9407e0`
   mutate production or consumed private evidence.
 - [x] Pass the complete canonical-plus-additive regression (`49/49`) after the final diff
   stabilizes.
-- [ ] Confirm exact-head draft-PR CI.
-- [ ] Obtain independent exact-PR-SHA Level 3 review before merge.
-- [ ] Obtain a new explicit production authorization and fresh named read-only
-  preflight before any future production attempt.
-- [ ] Execute any future production synthetic verification only under that new
-  reviewed authorization and fresh run directory.
-- [ ] Obtain separate cleanup-completion and release-closeout approval.
+- [x] Confirm exact-head draft-PR CI.
+- [x] Obtain independent exact-PR-SHA Level 3 review before merge.
+- [x] Reconcile the invalid historic verifier result through R2-06Q without a
+  second production lifecycle. Any unrelated future production attempt would
+  still require a new authorization, fresh named read-only preflight, and
+  fresh run directory.
+- [x] Record independent cleanup attestation without changing the immutable
+  consumption record.
+- [ ] Obtain independent R2-06 closeout review and separate closeout approval.
 
 Evidence:
 `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_HYDRATION_TOMBSTONE_REMEDIATION.md`.
+
+### R2-06Q — Reconcile production verification and remediation evidence
+
+Status: `IMPLEMENTED — INDEPENDENT CLOSEOUT REVIEW REQUIRED`
+
+Risk level: `LEVEL 3`
+
+Branch: `release/r2-06q-evidence-reconciliation`
+
+Starting point:
+`cdcc357db2774cf66454f0f5c0c69d87fd14187d` (merged R2-06P)
+
+#### Evidence-only scope
+
+- Reconcile the completed sanitized production record, independent cleanup
+  attestation, and reviewed R2-06P disposable/browser evidence without
+  production access, credentials, Supabase queries, mutation, deployment,
+  migration, configuration change, or private-evidence access.
+- Preserve source-specific statuses instead of collapsing production,
+  remediation, cleanup, invalid-verifier, and unreached evidence into a binary
+  pass/fail.
+- Bind the public reconciliation, cleanup attestation, and closeout-readiness
+  records to hashes in the release manifest while keeping future production
+  authorization, binary synthetic completion, cleanup approval, and release
+  closeout false.
+
+#### Reconciled disposition
+
+- Actions 1–14 are `PRODUCTION VERIFIED` for browser readiness, bounded
+  synthetic setup, authorization denials, guarded update, stale/current
+  durable-delete behavior, tombstone creation, replay/conflict classification,
+  and stale-write rejection.
+- Original action 15 is `INVALID HISTORIC VERIFIER RESULT`: the old substring
+  scan mistook legitimate tombstone metadata for a hydrated game. It did not
+  prove a server row, canonical client game, or rendered visibility.
+- Corrected action-15 behavior is `DISPOSABLE/REMEDIATION VERIFIED` through
+  merged PR #57 at
+  `cdcc357db2774cf66454f0f5c0c69d87fd14187d`, including raw canonical storage,
+  application state, rendered UI, and zero-resurrection-write checks.
+- Action 16 is `PRODUCTION PARTIALLY VERIFIED`: production proved anonymous and
+  wrong-account denial, zero token creation/final token count, and no observed
+  unauthorized disclosure before the stop. The full post-hydration sequence
+  was not reached; reviewed disposable disclosure and three-layer hydration
+  evidence complete the bounded behavior record.
+- Actions 17–21 are `INDEPENDENT CLEANUP ATTESTED`: all three sessions were
+  revoked, both users were deleted, profiles cascaded away, mutable/Auth/browser
+  residue is zero, and exactly one inert tombstone plus one unopened private
+  ledger record remain.
+- The immutable consumption record remains `cleanupCompleted: false`. It was
+  not updated after independent verification; the create-new public cleanup
+  attestation is the authoritative supplemental record. No manual cleanup was
+  required.
+
+#### Release and review controls
+
+- No second production lifecycle was required or performed.
+- The consumed authorization and run directory remain non-reusable; no new
+  production authorization was created.
+- Production execution remains disabled by default.
+- Earlier migration-application attribution remains unresolved and is not
+  retroactively approved.
+- Exact-head CI and independent exact-PR-SHA Level 3 closeout review are
+  required before merge.
+- `releaseCloseoutApproved: false`.
+
+Evidence:
+
+- `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_PRODUCTION_RECONCILIATION.md`
+- `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_CLOSEOUT_READINESS.md`
+- `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_CLEANUP_ATTESTATION.md`
+
+Next step: independent exact-PR-SHA Level 3 closeout review. Do not rerun
+production, merge, deploy, or approve release closeout from this task.
 
 ## Ticket template
 

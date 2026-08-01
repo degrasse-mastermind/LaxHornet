@@ -621,13 +621,43 @@ Remediation evidence:
   completion, cleanup approval, and release closeout false.
 - [x] Pass the complete canonical-plus-additive regression (`49/49`) after the final diff
   stabilizes.
-- [ ] Confirm exact-head draft-PR CI and obtain independent exact-PR-SHA Level 3
+- [x] Confirm exact-head draft-PR CI and obtain independent exact-PR-SHA Level 3
   review before merge.
-- [ ] Obtain a new explicit production authorization and fresh named read-only
-  preflight before any future production attempt.
+- [x] Reconcile action 15 through R2-06Q without another production lifecycle;
+  preserve the rule that any unrelated future attempt requires new authority,
+  preflight, credentials, and a fresh run directory.
 
 Remediation evidence:
 `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_HYDRATION_TOMBSTONE_REMEDIATION.md`.
+
+### R2-06Q production-evidence reconciliation
+
+- [x] Record actions 1–14 as `PRODUCTION VERIFIED` with their exact sanitized
+  results.
+- [x] Classify original action 15 as `INVALID HISTORIC VERIFIER RESULT` without
+  claiming the production action passed or proved a product failure.
+- [x] Bind corrected action-15 behavior to merged PR #57 disposable/browser
+  raw-storage, application-state, rendered-UI, reload, and zero-write evidence.
+- [x] Keep action 16 `PRODUCTION PARTIALLY VERIFIED`; record the supported
+  denial/zero-token facts and the unreached post-hydration sequence.
+- [x] Record actions 17–21 as `INDEPENDENT CLEANUP ATTESTED`, including three
+  revoked sessions, two deleted users, cascaded profiles, zero mutable/Auth/
+  browser residue, one retained tombstone, and one unopened private ledger.
+- [x] Preserve the immutable `cleanupCompleted: false` consumption record and
+  add a create-new authoritative supplemental public cleanup attestation.
+- [x] Register reconciliation/readiness/cleanup evidence paths and hashes in
+  the manifest; preserve disabled production, non-reusable authorization/run
+  state, false binary completion, and `releaseCloseoutApproved: false`.
+- [x] Record that no second production lifecycle is required or performed.
+- [ ] Confirm exact-head draft-PR CI and obtain independent exact-PR-SHA Level 3
+  closeout review before merge.
+- [ ] Approve R2-06 release closeout in a separate authorized decision.
+
+Evidence:
+
+- `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_PRODUCTION_RECONCILIATION.md`
+- `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_CLOSEOUT_READINESS.md`
+- `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_CLEANUP_ATTESTATION.md`
 
 # 4. Planned Engineering Sequence
 
