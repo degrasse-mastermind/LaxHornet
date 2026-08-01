@@ -158,6 +158,11 @@
   const RETRY_BASE_MS = 2000;
   const RETRY_MAX_MS = 5 * 60 * 1000;
   const MAX_ACKNOWLEDGMENTS = 100;
+  const normalizedGameIdentity = (value) => String(value ?? "").trim().toLowerCase();
+  const sameGameIdentity = (left, right) => {
+    const normalizedLeft = normalizedGameIdentity(left);
+    return Boolean(normalizedLeft) && normalizedLeft === normalizedGameIdentity(right);
+  };
   const FAILURE_CATEGORIES = Object.freeze({
     retryableTransport: "retryable_transport",
     authenticationRequired: "authentication_required",
@@ -756,7 +761,7 @@
       const state = supportedState();
       if (!state || !accountId || !gameId) return null;
       return state.tombstones.find((tombstone) =>
-        tombstone.accountId === accountId && tombstone.gameId === gameId) || null;
+        tombstone.accountId === accountId && sameGameIdentity(tombstone.gameId, gameId)) || null;
     }
 
     function isTombstoned(accountId, gameId) {
@@ -768,7 +773,7 @@
       if (!state || !accountId || !gameId) return null;
       const recovery = (state.deleteRecoveries || []).find((candidate) =>
         candidate.accountId === accountId
-        && candidate.gameId === gameId
+        && sameGameIdentity(candidate.gameId, gameId)
         && (!deletionId || candidate.deletionId === deletionId));
       return recovery ? copy(recovery) : null;
     }
@@ -777,8 +782,8 @@
       next.operations = next.operations.map((operation) => {
         if (
           operation.accountId !== accountId
-          || operation.gameId !== gameId
-          || operation.operationType !== OPERATION_TYPES.game
+          || !sameGameIdentity(operation.gameId, gameId)
+          || ![OPERATION_TYPES.game, OPERATION_TYPES.clock].includes(operation.operationType)
           || operation.state === "accepted"
         ) {
           return operation;
@@ -813,9 +818,9 @@
       const accountId = String(options.accountId || currentAccountId() || "").trim();
       if (!state || !accountId || !gameId || !isObject(payload)) return null;
       if (
-        operationType === OPERATION_TYPES.game
+        [OPERATION_TYPES.game, OPERATION_TYPES.clock].includes(operationType)
         && state.tombstones.some((tombstone) =>
-          tombstone.accountId === accountId && tombstone.gameId === gameId)
+          tombstone.accountId === accountId && sameGameIdentity(tombstone.gameId, gameId))
       ) {
         return null;
       }
@@ -920,12 +925,12 @@
       const scopedGameId = String(gameId || "").trim();
       if (!state || !scopedAccountId || !scopedGameId) return null;
       const existing = state.tombstones.find((tombstone) =>
-        tombstone.accountId === scopedAccountId && tombstone.gameId === scopedGameId);
+        tombstone.accountId === scopedAccountId && sameGameIdentity(tombstone.gameId, scopedGameId));
       if (existing) {
         const operation = state.operations.find((candidate) =>
           candidate.operationType === OPERATION_TYPES.gameDelete
           && candidate.accountId === scopedAccountId
-          && candidate.gameId === scopedGameId);
+          && sameGameIdentity(candidate.gameId, scopedGameId));
         return {
           operationId: operation?.operationId || existing.deletionId,
           deletionId: existing.deletionId,
@@ -1020,13 +1025,13 @@
       if (!state || !scopedAccountId || !scopedGameId) return null;
       const tombstone = state.tombstones.find((candidate) =>
         candidate.accountId === scopedAccountId
-        && candidate.gameId === scopedGameId
+        && sameGameIdentity(candidate.gameId, scopedGameId)
         && candidate.state === "accepted"
         && candidate.receipt);
       if (!tombstone) return null;
       const index = (state.deleteRecoveries || []).findIndex((candidate) =>
         candidate.accountId === scopedAccountId
-        && candidate.gameId === scopedGameId
+        && sameGameIdentity(candidate.gameId, scopedGameId)
         && (!deletionId || candidate.deletionId === deletionId));
       if (index < 0) return null;
       const recovery = copy(state.deleteRecoveries[index]);
@@ -1045,7 +1050,7 @@
       const scopedGameId = String(gameId || "").trim();
       if (!state || !scopedAccountId || !scopedGameId) return null;
       const existing = state.tombstones.find((tombstone) =>
-        tombstone.accountId === scopedAccountId && tombstone.gameId === scopedGameId);
+        tombstone.accountId === scopedAccountId && sameGameIdentity(tombstone.gameId, scopedGameId));
       if (existing) return copy(existing);
       const timestamp = isoTimestamp(deletedAt || now());
       const next = copy(state);
@@ -1086,7 +1091,7 @@
         );
         if (!incoming || incoming.accountId !== scopedAccountId) continue;
         const index = next.tombstones.findIndex((tombstone) =>
-          tombstone.accountId === scopedAccountId && tombstone.gameId === incoming.gameId);
+          tombstone.accountId === scopedAccountId && sameGameIdentity(tombstone.gameId, incoming.gameId));
         if (
           index >= 0
           && next.tombstones[index].deletionId === incoming.deletionId
@@ -1220,7 +1225,7 @@
       if (operation.operationType === OPERATION_TYPES.gameDelete) {
         const tombstoneIndex = next.tombstones.findIndex((tombstone) =>
           tombstone.accountId === operation.accountId
-          && tombstone.gameId === operation.gameId
+          && sameGameIdentity(tombstone.gameId, operation.gameId)
           && tombstone.deletionId === operation.operationId);
         if (tombstoneIndex >= 0) {
           next.tombstones[tombstoneIndex] = {
@@ -1265,7 +1270,7 @@
           candidate.operationType === OPERATION_TYPES.gameDelete
           && candidate.operationId === tombstone.deletionId
           && candidate.accountId === tombstone.accountId
-          && candidate.gameId === tombstone.gameId);
+          && sameGameIdentity(candidate.gameId, tombstone.gameId));
         if (!operation || operation.accountId !== accountId || !states.includes(
           state.operations.find((candidate) => candidate.operationId === operation.operationId)?.state,
         )) {
@@ -1364,10 +1369,11 @@
       next.acknowledgments = trimAcknowledgments(next.acknowledgments);
       const payloadStillCurrent = current.payloadHash === attempted.payloadHash
         && current.payloadRevision === attempted.payloadRevision;
-      const deletionDominatesWrite = attempted.operationType === OPERATION_TYPES.game
+      const deletionDominatesWrite = [OPERATION_TYPES.game, OPERATION_TYPES.clock]
+        .includes(attempted.operationType)
         && next.tombstones.some((tombstone) =>
           tombstone.accountId === attempted.accountId
-          && tombstone.gameId === attempted.gameId);
+          && sameGameIdentity(tombstone.gameId, attempted.gameId));
       next.operations[index] = {
         ...current,
         state: deletionDominatesWrite
@@ -1383,7 +1389,7 @@
       if (attempted.operationType === OPERATION_TYPES.gameDelete) {
         const tombstoneIndex = next.tombstones.findIndex((tombstone) =>
           tombstone.accountId === attempted.accountId
-          && tombstone.gameId === attempted.gameId
+          && sameGameIdentity(tombstone.gameId, attempted.gameId)
           && tombstone.deletionId === attempted.operationId);
         if (tombstoneIndex >= 0) {
           next.tombstones[tombstoneIndex] = {

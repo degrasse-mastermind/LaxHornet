@@ -436,10 +436,16 @@ export async function createDisposableAdapter({
         outcome: "verified",
         code: "clean_hydration_verified",
         gameVisible: gamesResult.rows.length > 0,
+        rawPersistenceGameVisible: false,
+        applicationStateGameVisible: gamesResult.rows.length > 0,
+        renderedGameVisible: false,
         tombstoneBeforeMerge:
           order.indexOf("tombstones") < order.indexOf("games")
           && tombstonesResult.rows.length === 1,
+        tombstoneSuppressionComplete:
+          tombstonesResult.rows.length === 1 && gamesResult.rows.length === 0,
         retryStorm: false,
+        resurrectionWriteRequests: 0,
         applicationConsoleErrors: 0,
         browserProfilePath: session.browserProfilePath,
       };

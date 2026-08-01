@@ -985,7 +985,14 @@ let durableSyncOperationService = null;
 let trackedPlayingTimeService = null;
 let trackedPlayingTimeCloudAvailability = "unknown";
 let cloudGameHydrationGeneration = 0;
+let cloudGameHydrationDiagnostics = null;
 const cloudGameHydrationMetadata = new WeakMap();
+const HYDRATION_FAILURE_CODES = Object.freeze({
+  tombstoneLoadFailed: "TOMBSTONE_LOAD_FAILED",
+  tombstoneSuppressionIncomplete: "TOMBSTONE_SUPPRESSION_INCOMPLETE",
+  staleHydrationCommitRejected: "STALE_HYDRATION_COMMIT_REJECTED",
+  deletedGameReintroduced: "DELETED_GAME_REINTRODUCED",
+});
 let backendCapabilityState = {
   value: null,
   checkedAt: 0,
@@ -1086,6 +1093,11 @@ recoverTrackedClockOnLoad(state.activeGame);
 mergePlayersFromGames([state.activeGame, ...state.games].filter(Boolean));
 persistAll();
 
+window.LAXHORNET_HYDRATION_INSPECTOR = Object.freeze({
+  diagnostics: () => ({ ...(cloudGameHydrationDiagnostics || {}) }),
+  gamePresence: (gameId) => hydrationGamePresence(gameId),
+});
+
 function loadJSON(key, fallback) {
   const definition = STORAGE_DOMAIN_DEFINITIONS.get(key) || {
     domain: key,
@@ -1136,6 +1148,49 @@ function saveJSONVerified(key, value) {
 
 function scopedStorageKey(key) {
   return activeStorageUserId ? `${key}.user.${activeStorageUserId}` : key;
+}
+
+function normalizedHydrationGameId(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function tombstonedHydrationGameIds(rows = []) {
+  return new Set(
+    (Array.isArray(rows) ? rows : [])
+      .map((row) => normalizedHydrationGameId(row?.game_id ?? row?.gameId))
+      .filter(Boolean),
+  );
+}
+
+function hydrationCandidateIsTombstoned(game, tombstonedIds = new Set()) {
+  return tombstonedIds.has(normalizedHydrationGameId(game?.id ?? game?.gameId));
+}
+
+function filterTombstonedHydrationCandidates(candidates = [], tombstonedIds = new Set()) {
+  return (Array.isArray(candidates) ? candidates : [])
+    .filter((candidate) => !hydrationCandidateIsTombstoned(candidate, tombstonedIds));
+}
+
+function publishHydrationDiagnostics(values = {}) {
+  const safeInteger = (value) => Math.max(0, Number.isFinite(Number(value)) ? Math.trunc(Number(value)) : 0);
+  cloudGameHydrationDiagnostics = Object.freeze({
+    tombstonesLoaded: values.tombstonesLoaded === true,
+    tombstoneCount: safeInteger(values.tombstoneCount),
+    localCandidatesCount: safeInteger(values.localCandidatesCount),
+    remoteCandidatesCount: safeInteger(values.remoteCandidatesCount),
+    suppressedLocalCount: safeInteger(values.suppressedLocalCount),
+    suppressedRemoteCount: safeInteger(values.suppressedRemoteCount),
+    suppressedRecoveryCount: safeInteger(values.suppressedRecoveryCount),
+    finalHydratedCount: safeInteger(values.finalHydratedCount),
+    hydrationGeneration: safeInteger(values.hydrationGeneration),
+    staleHydrationDiscarded: values.staleHydrationDiscarded === true,
+    tombstoneSuppressionComplete: values.tombstoneSuppressionComplete === true,
+    failureCode: Object.values(HYDRATION_FAILURE_CODES).includes(values.failureCode)
+      ? values.failureCode
+      : "",
+  });
+  window.LAXHORNET_HYDRATION_DIAGNOSTICS = cloudGameHydrationDiagnostics;
+  return cloudGameHydrationDiagnostics;
 }
 
 function storageHealthNotice(items = []) {
@@ -2760,12 +2815,15 @@ function forgetDeletedEvents(eventIds = []) {
 
 function isDeletedGame(gameId) {
   const accountId = currentUserId();
-  return state.deletedGameIds.includes(gameId)
+  const normalizedGameId = normalizedHydrationGameId(gameId);
+  return uniqueIds(state.deletedGameIds).some(
+    (deletedGameId) => normalizedHydrationGameId(deletedGameId) === normalizedGameId,
+  )
     || Boolean(
       accountId
       && state.syncOperations?.tombstones?.some((tombstone) =>
         tombstone.accountId === accountId
-        && tombstone.gameId === gameId
+        && normalizedHydrationGameId(tombstone.gameId) === normalizedGameId
         && !["rejected", "conflicted"].includes(tombstone.state)),
     );
 }
@@ -2939,15 +2997,173 @@ function reconcileDurableDeleteRecoveries() {
   return changed;
 }
 
-function removeTombstonedGamesFromLocalState() {
-  state.games = state.games.filter((game) => !isDeletedGame(game.id));
+function currentAccountTombstonedGameIds() {
+  const accountId = currentUserId();
+  if (!accountId) return new Set();
+  return tombstonedHydrationGameIds(
+    (state.syncOperations?.tombstones || []).filter((tombstone) =>
+      tombstone.accountId === accountId
+      && !["rejected", "conflicted"].includes(tombstone.state)),
+  );
+}
+
+function removeTombstonedGamesFromLocalState(tombstonedIds = currentAccountTombstonedGameIds()) {
+  const ids = tombstonedIds instanceof Set
+    ? tombstonedIds
+    : tombstonedHydrationGameIds(tombstonedIds);
+  const localCandidatesCount = state.games.length + (state.activeGame ? 1 : 0);
+  const beforeGameCount = state.games.length;
+  let suppressedRecoveryCount = 0;
+  state.games = filterTombstonedHydrationCandidates(state.games, ids);
   if (state.activeGame && isDeletedGame(state.activeGame.id)) {
     state.activeGame = null;
     state.trackingSession = null;
+    suppressedRecoveryCount += 1;
+    clearLiveTrackingTransientState();
+  } else if (
+    state.trackingSession
+    && ids.has(normalizedHydrationGameId(state.trackingSession.gameId))
+  ) {
+    state.trackingSession = null;
+    suppressedRecoveryCount += 1;
   }
   if (state.reviewGameId && isDeletedGame(state.reviewGameId)) {
     state.reviewGameId = state.games[0]?.id || null;
+    suppressedRecoveryCount += 1;
   }
+  for (const key of ["pendingDeleteGameId", "gameSavedSummaryId", "liveSharePromptGameId"]) {
+    if (state[key] && ids.has(normalizedHydrationGameId(state[key]))) {
+      state[key] = "";
+      suppressedRecoveryCount += 1;
+    }
+  }
+  if (state.sharedGame && ids.has(normalizedHydrationGameId(state.sharedGame.id))) {
+    state.sharedGame = null;
+    suppressedRecoveryCount += 1;
+  }
+  if (Array.isArray(state.pendingImport?.games)) {
+    const before = state.pendingImport.games.length;
+    state.pendingImport.games = filterTombstonedHydrationCandidates(state.pendingImport.games, ids);
+    suppressedRecoveryCount += before - state.pendingImport.games.length;
+  }
+  if (state.trustSpineSync?.gameScopes && state.trustSpineSync?.events) {
+    for (const gameId of Object.keys(state.trustSpineSync.gameScopes)) {
+      if (!ids.has(normalizedHydrationGameId(gameId))) continue;
+      delete state.trustSpineSync.gameScopes[gameId];
+      suppressedRecoveryCount += 1;
+    }
+    for (const [eventId, record] of Object.entries(state.trustSpineSync.events)) {
+      if (!ids.has(normalizedHydrationGameId(record?.gameId))) continue;
+      delete state.trustSpineSync.events[eventId];
+      suppressedRecoveryCount += 1;
+    }
+  }
+  return {
+    localCandidatesCount,
+    suppressedLocalCount: beforeGameCount - state.games.length,
+    suppressedRecoveryCount,
+  };
+}
+
+function rewriteHydrationStorageJSON(storageKey, transform) {
+  const raw = localStorage.getItem(storageKey);
+  if (raw === null) return false;
+  try {
+    const parsed = JSON.parse(raw);
+    const transformed = transform(parsed);
+    if (transformed === undefined) return false;
+    if (transformed === null) localStorage.removeItem(storageKey);
+    else localStorage.setItem(storageKey, JSON.stringify(transformed));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function sanitizeHydrationStorageFamily(primaryKey, transform) {
+  const keys = storageSupportKeys(primaryKey);
+  [primaryKey, keys.backup, keys.staging].forEach((key) => {
+    rewriteHydrationStorageJSON(key, transform);
+  });
+  rewriteHydrationStorageJSON(keys.quarantine, (quarantine) => {
+    if (!isStorageObject(quarantine) || typeof quarantine.raw !== "string") return undefined;
+    try {
+      const parsed = JSON.parse(quarantine.raw);
+      const transformed = transform(parsed);
+      if (transformed === undefined) return undefined;
+      return { ...quarantine, raw: JSON.stringify(transformed ?? null) };
+    } catch {
+      return undefined;
+    }
+  });
+}
+
+function purgeTombstonedGamesFromLocalStorage(tombstonedIds = currentAccountTombstonedGameIds()) {
+  const ids = tombstonedIds instanceof Set
+    ? tombstonedIds
+    : tombstonedHydrationGameIds(tombstonedIds);
+  if (!ids.size) return;
+  const isSuppressedId = (value) => ids.has(normalizedHydrationGameId(value));
+  sanitizeHydrationStorageFamily(scopedStorageKey(STORAGE_KEYS.games), (value) =>
+    Array.isArray(value)
+      ? value.filter((game) => !isSuppressedId(game?.id))
+      : undefined);
+  sanitizeHydrationStorageFamily(scopedStorageKey(STORAGE_KEYS.activeGame), (value) =>
+    isStorageObject(value) && isSuppressedId(value.id) ? null : undefined);
+  sanitizeHydrationStorageFamily(scopedStorageKey(STORAGE_KEYS.trackingSession), (value) =>
+    isStorageObject(value) && isSuppressedId(value.gameId) ? null : undefined);
+  sanitizeHydrationStorageFamily(scopedStorageKey(STORAGE_KEYS.reviewGameId), (value) =>
+    isSuppressedId(value) ? null : undefined);
+  sanitizeHydrationStorageFamily(scopedStorageKey(STORAGE_KEYS.trustSpineSync), (value) => {
+    if (!isStorageObject(value)) return undefined;
+    const next = normalizeTrustSpineSyncState(value);
+    next.gameScopes = Object.fromEntries(
+      Object.entries(next.gameScopes).filter(([gameId]) => !isSuppressedId(gameId)),
+    );
+    next.events = Object.fromEntries(
+      Object.entries(next.events).filter(([, record]) => !isSuppressedId(record?.gameId)),
+    );
+    return next;
+  });
+
+  const familyPrefix = `${STORAGE_KEYS.familyRecapFocus}.`;
+  Object.keys(localStorage)
+    .filter((key) => key.startsWith(familyPrefix))
+    .forEach((key) => {
+      rewriteHydrationStorageJSON(key, (value) =>
+        isStorageObject(value) && isSuppressedId(value.gameId) ? null : undefined);
+    });
+}
+
+function hydrationGamePresence(gameId) {
+  const normalizedGameId = normalizedHydrationGameId(gameId);
+  const matches = (value) => normalizedHydrationGameId(value) === normalizedGameId;
+  const storedGames = loadJSON(STORAGE_KEYS.games, []);
+  const storedActiveGame = loadJSON(STORAGE_KEYS.activeGame, null);
+  const storedTrackingSession = loadJSON(STORAGE_KEYS.trackingSession, null);
+  const storedReviewGameId = loadJSON(STORAGE_KEYS.reviewGameId, null);
+  const trustRecords = Object.values(state.trustSpineSync?.events || {});
+  const queuedMutations = (state.syncOperations?.operations || []).filter((operation) =>
+    matches(operation.gameId)
+    && ["legacy_game_write", "tracked_clock_write"].includes(operation.operationType)
+    && ["pending", "syncing", "retryable"].includes(operation.state));
+  return Object.freeze({
+    savedGameState: state.games.some((game) => matches(game.id)),
+    activeGameState: matches(state.activeGame?.id),
+    recoveryState: matches(state.trackingSession?.gameId),
+    derivedState: matches(state.reviewGameId)
+      || matches(state.pendingDeleteGameId)
+      || matches(state.gameSavedSummaryId)
+      || matches(state.liveSharePromptGameId),
+    importState: (state.pendingImport?.games || []).some((game) => matches(game.id)),
+    sharedState: matches(state.sharedGame?.id),
+    queuedMutationState: queuedMutations.length > 0,
+    trustSpineState: trustRecords.some((record) => matches(record?.gameId)),
+    storedSavedGame: storedGames.some((game) => matches(game?.id)),
+    storedActiveGame: matches(storedActiveGame?.id),
+    storedRecovery: matches(storedTrackingSession?.gameId),
+    storedDerived: matches(storedReviewGameId),
+  });
 }
 
 function normalizeEvent(event = {}, gameId = "") {
@@ -3052,6 +3268,8 @@ function normalizeGame(game = {}, fallbackPlayer = null) {
 
 function persistAll() {
   localStorageSafety.beginBatch();
+  const tombstonedIds = currentAccountTombstonedGameIds();
+  removeTombstonedGamesFromLocalState(tombstonedIds);
   recoverAdminTeamContext();
   pruneLocalOnlyCloudState();
   mergeRosterPlayersIntoPlayers();
@@ -3088,6 +3306,7 @@ function persistAll() {
     removeStoredItem(STORAGE_KEYS.trackingSession);
   }
   saveJSON(STORAGE_KEYS.reviewGameId, state.reviewGameId);
+  purgeTombstonedGamesFromLocalStorage(tombstonedIds);
   scheduleStorageHealthNotice(localStorageSafety.endBatch());
 }
 
@@ -3152,6 +3371,7 @@ function resetCloudAccountState() {
 function setAuthUser(user) {
   const nextUserId = user?.id || "";
   if (nextUserId !== state.authUserId) {
+    cloudGameHydrationGeneration += 1;
     if (!nextUserId && state.authUserId && activeStorageUserId === state.authUserId) {
       durableSyncService().rejectAuthentication(state.authUserId);
     }
@@ -5586,10 +5806,10 @@ function cloudGameHydrationIsCurrent(generation, userId) {
     && userId === currentUserId();
 }
 
-function gameTombstoneFromSupabaseRow(row = {}) {
+function gameTombstoneFromSupabaseRow(row = {}, accountId = currentUserId()) {
   return {
     gameId: row.game_id,
-    accountId: currentUserId(),
+    accountId,
     deletionId: row.deletion_id,
     deviceId: row.device_id || "",
     deletedAt: row.deleted_at,
@@ -5607,14 +5827,19 @@ function gameTombstoneFromSupabaseRow(row = {}) {
   };
 }
 
-async function fetchAuthorizedGameTombstones() {
-  if (!supabaseClient || !currentUserId()) return { data: [], error: null };
-  return supabaseClient
+async function fetchAuthorizedGameTombstones(accountId = currentUserId()) {
+  if (!supabaseClient || !accountId || accountId !== currentUserId()) {
+    return { data: [], error: null, stale: Boolean(accountId) };
+  }
+  const result = await supabaseClient
     .from("legacy_game_tombstones")
     .select(
       "game_id,deletion_id,device_id,deleted_at,known_game_saved_at,created_at,updated_at",
     )
     .order("deleted_at", { ascending: false });
+  return accountId === currentUserId()
+    ? result
+    : { data: [], error: null, stale: true };
 }
 
 function applyAuthorizedGameTombstones(rows, generation, accountId) {
@@ -5626,17 +5851,17 @@ function applyAuthorizedGameTombstones(rows, generation, accountId) {
   }
   durableSyncService().mergeServerTombstones(
     accountId,
-    rows.map(gameTombstoneFromSupabaseRow),
+    rows.map((row) => gameTombstoneFromSupabaseRow(row, accountId)),
   );
-  const tombstonedIds = new Set(rows.map((row) => String(row.game_id || "")).filter(Boolean));
+  const tombstonedIds = tombstonedHydrationGameIds(rows);
   if (tombstonedIds.size) {
     state.deletedGameIds = uniqueIds(state.deletedGameIds)
-      .filter((gameId) => !tombstonedIds.has(gameId));
+      .filter((gameId) => !tombstonedIds.has(normalizedHydrationGameId(gameId)));
   }
   reconcileDurableDeleteRecoveries();
-  removeTombstonedGamesFromLocalState();
+  const cleanup = removeTombstonedGamesFromLocalState(tombstonedIds);
   persistAll();
-  return true;
+  return { ...cleanup, tombstonedIds };
 }
 
 function teamFromSupabaseRows(memberRow = {}) {
@@ -5693,7 +5918,11 @@ function playerClaimFromSupabaseRow(row = {}) {
   });
 }
 
-async function fetchVisibleCloudTeams() {
+function accountLoadIsCurrent(options = {}) {
+  return !options.accountId || options.accountId === currentUserId();
+}
+
+async function fetchVisibleCloudTeams(accountId = currentUserId()) {
   const rpcResult = await supabaseClient.rpc("laxhornet_my_teams");
   if (!rpcResult.error && Array.isArray(rpcResult.data)) {
     return {
@@ -5709,7 +5938,7 @@ async function fetchVisibleCloudTeams() {
   const { data: memberRows, error: memberError } = await supabaseClient
     .from("team_members")
     .select("team_id, role, teams(id,name,invite_code,tracker_code,created_by,created_at)")
-    .eq("user_id", currentUserId());
+    .eq("user_id", accountId);
 
   if (memberError) return { teams: [], error: memberError, source: "tables" };
 
@@ -5718,7 +5947,7 @@ async function fetchVisibleCloudTeams() {
     const { data: ownedTeams, error: ownedTeamsError } = await supabaseClient
       .from("teams")
       .select("id,name,invite_code,tracker_code,created_by,created_at")
-      .eq("created_by", currentUserId());
+      .eq("created_by", accountId);
     if (ownedTeamsError) return { teams, error: ownedTeamsError, source: "tables" };
     if (Array.isArray(ownedTeams)) {
       teams = normalizeTeams([
@@ -5759,9 +5988,12 @@ async function fetchVisibleCloudRosterPlayers(teamIdsForSync = []) {
 }
 
 async function loadCloudTeams(options = {}) {
-  if (!supabaseClient || !currentUserId()) return;
+  const accountId = options.accountId || currentUserId();
+  if (!supabaseClient || !accountId || !accountLoadIsCurrent({ accountId })) return;
   const localAdminTeams = locallyManagedAdminTeams();
-  const { teams: cloudTeams, error: teamReadError } = await fetchVisibleCloudTeams();
+  const { teams: cloudTeams, error: teamReadError } = await fetchVisibleCloudTeams(accountId);
+
+  if (!accountLoadIsCurrent({ accountId })) return;
 
   if (teamReadError) {
     if (!options.silent) reportTeamSetupError(teamReadError);
@@ -5770,7 +6002,8 @@ async function loadCloudTeams(options = {}) {
 
   state.teams = normalizeTeams([...localAdminTeams, ...cloudTeams]);
 
-  await loadTeamAccessRequests({ silent: true });
+  await loadTeamAccessRequests({ silent: true, accountId });
+  if (!accountLoadIsCurrent({ accountId })) return;
   // Do not auto-repair player claims during routine sync. If a parent removes a
   // verified player from their account, an old approved request should not
   // recreate that player claim on the next sync.
@@ -5794,6 +6027,8 @@ async function loadCloudTeams(options = {}) {
   if (ids.length) {
     const { rosterPlayers: cloudRosterPlayers, error: rosterError } = await fetchVisibleCloudRosterPlayers(ids);
 
+    if (!accountLoadIsCurrent({ accountId })) return;
+
     if (rosterError) {
       if (!options.silent) reportTeamSetupError(rosterError);
       return;
@@ -5810,11 +6045,14 @@ async function loadCloudTeams(options = {}) {
       ...preservedRosterPlayers,
       ...cloudRosterPlayers,
     ]);
-    await loadEditableTeamAccessCodes();
+    await loadEditableTeamAccessCodes({ accountId });
+    if (!accountLoadIsCurrent({ accountId })) return;
   }
 
-  await loadPlayerClaims({ silent: true });
-  await loadClaimedRosterPlayers({ silent: true });
+  await loadPlayerClaims({ silent: true, accountId });
+  if (!accountLoadIsCurrent({ accountId })) return;
+  await loadClaimedRosterPlayers({ silent: true, accountId });
+  if (!accountLoadIsCurrent({ accountId })) return;
 
   mergeRosterPlayersIntoPlayers();
   ensureActiveTeamRosterPlayer();
@@ -5829,10 +6067,12 @@ async function loadCloudTeams(options = {}) {
   }
 }
 
-async function loadEditableTeamAccessCodes() {
-  if (!supabaseClient || !currentUserId()) return;
+async function loadEditableTeamAccessCodes(options = {}) {
+  const accountId = options.accountId || currentUserId();
+  if (!supabaseClient || !accountId || !accountLoadIsCurrent({ accountId })) return;
   for (const team of state.teams.filter((item) => canEditTeam(item.id))) {
-  const { data, error } = await supabaseClient.rpc("laxhornet_team_access_codes", { check_team_id: team.id });
+    const { data, error } = await supabaseClient.rpc("laxhornet_team_access_codes", { check_team_id: team.id });
+    if (!accountLoadIsCurrent({ accountId })) return;
     if (error || !Array.isArray(data) || !data[0]) continue;
     state.teams = normalizeTeams([
       ...state.teams,
@@ -5846,9 +6086,11 @@ async function loadEditableTeamAccessCodes() {
 }
 
 async function loadTeamAccessRequests(options = {}) {
-  if (!supabaseClient || !currentUserId()) return [];
+  const accountId = options.accountId || currentUserId();
+  if (!supabaseClient || !accountId || !accountLoadIsCurrent({ accountId })) return [];
   const requestRows = [];
   const { data: myRequests, error: myRequestsError } = await supabaseClient.rpc("laxhornet_my_team_access_requests");
+  if (!accountLoadIsCurrent({ accountId })) return [];
   if (myRequestsError) {
     if (!options.silent) reportTeamSetupError(myRequestsError);
   } else {
@@ -5858,6 +6100,7 @@ async function loadTeamAccessRequests(options = {}) {
   const editableTeamIds = state.teams.filter((team) => canManageRoster(team.id)).map((team) => team.id);
   if (editableTeamIds.length || isPlatformReviewer()) {
     const { data, error } = await supabaseClient.rpc("laxhornet_pending_team_access_requests");
+    if (!accountLoadIsCurrent({ accountId })) return [];
     if (error) {
       if (!options.silent) reportTeamSetupError(error);
     } else {
@@ -5886,8 +6129,10 @@ async function repairApprovedPlayerClaims(options = {}) {
 }
 
 async function loadPlayerClaims(options = {}) {
-  if (!supabaseClient || !currentUserId()) return [];
+  const accountId = options.accountId || currentUserId();
+  if (!supabaseClient || !accountId || !accountLoadIsCurrent({ accountId })) return [];
   const { data, error } = await supabaseClient.rpc("laxhornet_my_player_claims");
+  if (!accountLoadIsCurrent({ accountId })) return [];
   if (error) {
     if (!options.silent) reportTeamSetupError(error);
     return [];
@@ -5899,8 +6144,10 @@ async function loadPlayerClaims(options = {}) {
 }
 
 async function loadClaimedRosterPlayers(options = {}) {
-  if (!supabaseClient || !currentUserId()) return [];
+  const accountId = options.accountId || currentUserId();
+  if (!supabaseClient || !accountId || !accountLoadIsCurrent({ accountId })) return [];
   const { data, error } = await supabaseClient.rpc("laxhornet_my_roster_players");
+  if (!accountLoadIsCurrent({ accountId })) return [];
   if (error) {
     if (!options.silent) reportTeamSetupError(error);
     return [];
@@ -5931,35 +6178,94 @@ async function loadCloudGames(options = {}) {
   const hydrationUserId = currentUserId();
   if (!supabaseClient || !hydrationUserId) return;
   const hydrationGeneration = ++cloudGameHydrationGeneration;
-  await loadCloudTeams({ silent: true });
-  const tombstonePreflight = await fetchAuthorizedGameTombstones();
+  const localCandidatesCount = state.games.length + (state.activeGame ? 1 : 0);
+  const discardStaleHydration = () => {
+    const latestDiagnostics = cloudGameHydrationDiagnostics || {};
+    const newerHydrationAlreadyReported = Number(latestDiagnostics.hydrationGeneration || 0)
+      > hydrationGeneration;
+    publishHydrationDiagnostics({
+      ...latestDiagnostics,
+      hydrationGeneration: newerHydrationAlreadyReported
+        ? latestDiagnostics.hydrationGeneration
+        : hydrationGeneration,
+      staleHydrationDiscarded: true,
+      tombstoneSuppressionComplete: newerHydrationAlreadyReported
+        ? latestDiagnostics.tombstoneSuppressionComplete
+        : false,
+      failureCode: HYDRATION_FAILURE_CODES.staleHydrationCommitRejected,
+    });
+    return undefined;
+  };
+  publishHydrationDiagnostics({
+    hydrationGeneration,
+    localCandidatesCount,
+  });
+  await loadCloudTeams({ silent: true, accountId: hydrationUserId });
+  if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) {
+    return discardStaleHydration();
+  }
+  const tombstonePreflight = await fetchAuthorizedGameTombstones(hydrationUserId);
+  if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId) || tombstonePreflight.stale) {
+    return discardStaleHydration();
+  }
   if (tombstonePreflight.error) {
+    publishHydrationDiagnostics({
+      hydrationGeneration,
+      localCandidatesCount,
+      failureCode: HYDRATION_FAILURE_CODES.tombstoneLoadFailed,
+    });
     if (cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId) && !options.silent) {
       reportSyncError(tombstonePreflight.error);
     }
     return;
   }
-  if (!applyAuthorizedGameTombstones(
-    tombstonePreflight.data || [],
+  const initialTombstones = tombstonePreflight.data || [];
+  const initialSuppression = applyAuthorizedGameTombstones(
+    initialTombstones,
     hydrationGeneration,
     hydrationUserId,
-  )) {
-    return;
+  );
+  if (!initialSuppression) {
+    return discardStaleHydration();
+  }
+  publishHydrationDiagnostics({
+    hydrationGeneration,
+    tombstonesLoaded: true,
+    tombstoneCount: initialSuppression.tombstonedIds.size,
+    localCandidatesCount,
+    suppressedLocalCount: initialSuppression.suppressedLocalCount,
+    suppressedRecoveryCount: initialSuppression.suppressedRecoveryCount,
+  });
+  if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) {
+    return discardStaleHydration();
   }
   await flushDeletedCloudRecords({ quiet: Boolean(options.silent) });
+  if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) {
+    return discardStaleHydration();
+  }
   await processDurableSyncOperations();
+  if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) {
+    return discardStaleHydration();
+  }
   const uploadedCount = await syncLocalGamesToCloud();
+  if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) {
+    return discardStaleHydration();
+  }
   await processDurableSyncOperations();
+  if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) {
+    return discardStaleHydration();
+  }
   const { data: ownData, error } = await supabaseClient
     .from("games")
     .select("*, events(*)")
     .eq("user_id", hydrationUserId)
     .order("game_date", { ascending: false });
 
+  if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) {
+    return discardStaleHydration();
+  }
   if (error) {
-    if (cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId) && !options.silent) {
-      reportSyncError(error);
-    }
+    if (!options.silent) reportSyncError(error);
     return;
   }
 
@@ -5977,31 +6283,51 @@ async function loadCloudGames(options = {}) {
     }
   }
 
-  if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) return;
-  const finalTombstones = await fetchAuthorizedGameTombstones();
+  if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) {
+    return discardStaleHydration();
+  }
+  const finalTombstones = await fetchAuthorizedGameTombstones(hydrationUserId);
+  if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId) || finalTombstones.stale) {
+    return discardStaleHydration();
+  }
   if (finalTombstones.error) {
+    publishHydrationDiagnostics({
+      ...(cloudGameHydrationDiagnostics || {}),
+      hydrationGeneration,
+      failureCode: HYDRATION_FAILURE_CODES.tombstoneLoadFailed,
+    });
     if (!options.silent) reportSyncError(finalTombstones.error);
     return;
   }
-  if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) return;
+  const finalRows = finalTombstones.data || [];
+  const finalSuppression = applyAuthorizedGameTombstones(
+    finalRows,
+    hydrationGeneration,
+    hydrationUserId,
+  );
+  if (!finalSuppression) return discardStaleHydration();
+  const tombstonedIds = new Set([
+    ...initialSuppression.tombstonedIds,
+    ...finalSuppression.tombstonedIds,
+  ]);
 
   const rowsById = new Map([...(ownData || []), ...teamData].map((game) => [game.id, game]));
-  const cloudGames = [...rowsById.values()]
+  const remoteCandidates = [...rowsById.values()]
     .map((game) => gameFromSupabaseRow(
       game,
       Array.isArray(game.events) ? game.events : null,
     ))
     .filter(canShowGameForCurrentAccess);
+  const cloudGames = filterTombstonedHydrationCandidates(remoteCandidates, tombstonedIds);
+  const localCandidates = filterTombstonedHydrationCandidates(state.games, tombstonedIds);
   state.games = mergeGames(
-    state.games,
+    localCandidates,
     cloudGames,
     { activeGame: state.activeGame },
-  ).filter(canShowGameForCurrentAccess);
-  applyAuthorizedGameTombstones(
-    finalTombstones.data || [],
-    hydrationGeneration,
-    hydrationUserId,
-  );
+  )
+    .filter(canShowGameForCurrentAccess)
+    .filter((game) => !hydrationCandidateIsTombstoned(game, tombstonedIds));
+  const finalCleanup = removeTombstonedGamesFromLocalState(tombstonedIds);
   mergePlayersFromGames(state.games);
   const newestCloudGame = cloudGames.find((game) => !isDeletedGame(game.id));
   if (!options.silent && newestCloudGame) {
@@ -6013,6 +6339,34 @@ async function loadCloudGames(options = {}) {
     }
   }
   persistAll();
+  const deletedGameReintroduced = [...tombstonedIds].some((gameId) =>
+    Object.values(hydrationGamePresence(gameId)).some(Boolean));
+  const tombstoneSuppressionComplete = !deletedGameReintroduced;
+  publishHydrationDiagnostics({
+    hydrationGeneration,
+    tombstonesLoaded: true,
+    tombstoneCount: tombstonedIds.size,
+    localCandidatesCount,
+    remoteCandidatesCount: remoteCandidates.length,
+    suppressedLocalCount:
+      initialSuppression.suppressedLocalCount + finalSuppression.suppressedLocalCount
+      + finalCleanup.suppressedLocalCount,
+    suppressedRemoteCount: remoteCandidates.length - cloudGames.length,
+    suppressedRecoveryCount:
+      initialSuppression.suppressedRecoveryCount + finalSuppression.suppressedRecoveryCount
+      + finalCleanup.suppressedRecoveryCount,
+    finalHydratedCount: state.games.length,
+    tombstoneSuppressionComplete,
+    failureCode: deletedGameReintroduced
+      ? HYDRATION_FAILURE_CODES.deletedGameReintroduced
+      : "",
+  });
+  if (!tombstoneSuppressionComplete) {
+    if (!options.silent) {
+      reportSyncError({ code: HYDRATION_FAILURE_CODES.tombstoneSuppressionIncomplete });
+    }
+    return;
+  }
   const operationStatus = durableSyncStatus();
   state.syncStatus = operationStatus
     || (cloudGames.length || uploadedCount ? "Synced" : "No saved account games yet");

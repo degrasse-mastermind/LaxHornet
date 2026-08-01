@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "attestationType": "sanitized_independent_cleanup_observation",
+  "incidentWorkPackage": "R2-06P",
+  "immutableConsumptionRecordChanged": false,
+  "privateIdentifierLedgerOpened": false,
+  "mutableResidue": {
+    "syntheticUsers": 0,
+    "profiles": 0,
+    "activeSessions": 0,
+    "games": 0,
+    "events": 0,
+    "liveShareTokens": 0,
+    "operationsAndRecoveries": 0
+  },
+  "retainedDurableTombstones": 1,
+  "cleanupCompletedControl": false,
+  "syntheticVerificationCompleted": false,
+  "releaseCloseoutApproved": false,
+  "productionRetryAuthorized": false
+}

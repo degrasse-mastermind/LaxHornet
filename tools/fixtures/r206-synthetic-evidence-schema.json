@@ -32,6 +32,41 @@
     "evidenceType": {
       "enum": ["authorization", "operation_results", "cleanup_results"]
     },
+    "results": {
+      "type": ["array", "object", "null"],
+      "items": {
+        "type": "object",
+        "required": ["action", "outcome", "code"],
+        "properties": {
+          "action": { "type": "string" },
+          "outcome": { "type": "string" },
+          "code": { "type": "string" },
+          "hydrationVerification": {
+            "type": "object",
+            "required": [
+              "rawPersistenceGameVisible",
+              "applicationStateGameVisible",
+              "renderedGameVisible",
+              "tombstoneBeforeMerge",
+              "tombstoneSuppressionComplete",
+              "resurrectionWriteRequests",
+              "retryStorm"
+            ],
+            "properties": {
+              "rawPersistenceGameVisible": { "const": false },
+              "applicationStateGameVisible": { "const": false },
+              "renderedGameVisible": { "const": false },
+              "tombstoneBeforeMerge": { "const": true },
+              "tombstoneSuppressionComplete": { "const": true },
+              "resurrectionWriteRequests": { "const": 0 },
+              "retryStorm": { "const": false }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": true
+      }
+    },
     "productionExecutionDefault": { "const": "disabled" },
     "finalCloseoutApproval": { "const": false },
     "releaseCloseoutApproved": { "const": false }

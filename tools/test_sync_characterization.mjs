@@ -789,10 +789,22 @@ function loadCloudGamesHarness(initialGames = [], options = {}) {
     state,
     supabaseClient,
     cloudGameHydrationGeneration: 0,
+    cloudGameHydrationDiagnostics: null,
+    HYDRATION_FAILURE_CODES: {
+      tombstoneLoadFailed: "TOMBSTONE_LOAD_FAILED",
+      tombstoneSuppressionIncomplete: "TOMBSTONE_SUPPRESSION_INCOMPLETE",
+      staleHydrationCommitRejected: "STALE_HYDRATION_COMMIT_REJECTED",
+      deletedGameReintroduced: "DELETED_GAME_REINTRODUCED",
+    },
+    publishHydrationDiagnostics: () => ({}),
     currentUserId: () => currentAccountId,
     loadCloudTeams: async () => [],
     fetchAuthorizedGameTombstones: async () => ({ data: [], error: null }),
-    applyAuthorizedGameTombstones: () => true,
+    applyAuthorizedGameTombstones: () => ({
+      tombstonedIds: new Set(),
+      suppressedLocalCount: 0,
+      suppressedRecoveryCount: 0,
+    }),
     flushDeletedCloudRecords: async () => {},
     syncLocalGamesToCloud: async () => 0,
     processDurableSyncOperations: async () => false,
@@ -800,6 +812,13 @@ function loadCloudGamesHarness(initialGames = [], options = {}) {
     teamIds: () => [],
     gameFromSupabaseRow: mapper.gameFromSupabaseRow,
     canShowGameForCurrentAccess: () => true,
+    filterTombstonedHydrationCandidates: (games) => games,
+    hydrationCandidateIsTombstoned: () => false,
+    removeTombstonedGamesFromLocalState: () => ({
+      suppressedLocalCount: 0,
+      suppressedRecoveryCount: 0,
+    }),
+    hydrationGamePresence: () => ({}),
     mergeGames: mapper.mergeGames,
     mergePlayersFromGames: () => {},
     isDeletedGame: () => false,
@@ -1666,6 +1685,7 @@ test(
     const contextGlobals = {
       state,
       activeStorageUserId: "",
+      cloudGameHydrationGeneration: 0,
       persistAll: () => {},
     };
     const harness = appHarness(
@@ -1880,6 +1900,9 @@ test(
       saveScopedNextGameFocus: () => {},
       uniqueIds: (values = []) => [...new Set(values)],
       normalizeTrackingSession: (value) => value,
+      currentAccountTombstonedGameIds: () => new Set(),
+      removeTombstonedGamesFromLocalState: () => ({}),
+      purgeTombstonedGamesFromLocalStorage: () => {},
       scheduleStorageHealthNotice: () => {},
     });
     harness.get("persistAll")();

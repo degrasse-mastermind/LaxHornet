@@ -1,8 +1,8 @@
 # LaxHornet Repository Current State
 
-Last reviewed: 2026-07-30
+Last reviewed: 2026-08-01
 Baseline branch: `main`
-Baseline commit: `bf72d740960bb2947aecb8724de8c27aa7d2181b`
+Baseline commit: `dfe8535bdfb2a1e6470573940fb43b916b9407e0`
 Current repository release marker: `v284`
 Current production marker: `v284` at reconciled R2-06A runtime/catalog state;
 synthetic verification and release closeout remain incomplete
@@ -295,6 +295,21 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   reload/capability classifications. The owner-HTTP/challenger-browser/owner-
   browser isolation and cleanup-only boundary remain unchanged, production is
   disabled, and synthetic authorization/completion/cleanup and release
+  closeout remain false.
+- R2-06P diagnoses the action-15 `HYDRATION_REVEALED_GAME` stop as a verifier
+  false positive: the old all-local-storage substring scan found the synthetic
+  game ID inside the authoritative retained tombstone and treated that metadata
+  as a game. The verifier now proves raw canonical storage, live application
+  state, and rendered game elements independently and requires zero deleted-game
+  resurrection writes. Client hydration now normalizes tombstone identity,
+  applies both tombstone reads before final merge/commit, filters local and
+  remote candidates before merge, invalidates obsolete generations immediately
+  on account changes, supersedes queued game/clock writes, and purges matching
+  canonical and safety-backup/recovery/derived state while preserving unrelated
+  games and the durable tombstone. A credential-free disposable browser journey
+  repeats the three-layer proof under service-worker control. Production was not
+  accessed; the consumed evidence and retained production tombstone were not
+  changed; synthetic authorization/completion, cleanup approval, and release
   closeout remain false.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.

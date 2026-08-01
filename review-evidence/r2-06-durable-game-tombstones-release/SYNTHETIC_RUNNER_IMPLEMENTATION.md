@@ -131,6 +131,9 @@ R2-06M session-establishment remediation evidence:
 R2-06O Auth-session / UI-readiness decoupling evidence:
 `SYNTHETIC_RUNNER_AUTH_UI_DECOUPLING_REMEDIATION.md`.
 
+R2-06P hydration tombstone suppression evidence:
+`SYNTHETIC_HYDRATION_TOMBSTONE_REMEDIATION.md`.
+
 ## Evidence and credential handling
 
 Passwords, email addresses, access tokens, refresh tokens, key material,
@@ -200,3 +203,19 @@ Final local verification passed the nine-scenario pinned-browser diagnostic,
 symlink-permission skip, disposable integration, all focused release/Pages/
 tombstone/concurrency gates, and the complete canonical-plus-additive
 regression `47/47`.
+
+R2-06P replaces the production hydration verifier's all-local-storage
+substring scan with independent canonical-storage, live-application-state, and
+rendered-game checks. The old scan treated the authoritative retained
+tombstone's game ID as if it were a hydrated game, so action 15 did not prove a
+server-row or client-game resurrection. R2-06P also makes the client invariant
+explicit before final merge, purges stale structurally parseable safety backup
+and recovery state, supersedes game/clock writes, and rejects obsolete account
+or generation completions. The disposable browser journey proves the three
+layers and zero deleted-game writes before and after a service-worker-controlled
+reload. Production remains disabled; the consumed evidence and retained
+production tombstone were not accessed or changed; synthetic authorization,
+completion, cleanup approval, and release closeout remain false.
+
+The final R2-06P canonical-plus-additive regression passed `49/49` on the
+stabilized implementation diff.

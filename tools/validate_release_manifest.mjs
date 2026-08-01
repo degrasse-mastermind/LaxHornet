@@ -575,6 +575,8 @@ expect(
 );
 const syntheticRunner = manifest.r206ReleaseControl?.syntheticRunner;
 const expectedRunnerPaths = [
+  "app.js",
+  "event-operation-service.js",
   "tools/run_r206_synthetic_verification.mjs",
   "tools/r206_browser_runtime.mjs",
   "tools/r206_browser_session.mjs",
@@ -587,8 +589,13 @@ const expectedRunnerPaths = [
   "tools/test_r206_browser_runtime.mjs",
   "tools/test_r206_browser_session.mjs",
   "tools/test_r206_synthetic_verification_disposable.mjs",
+  "tools/test_hydration_tombstone_suppression.mjs",
+  "tools/test_hydration_tombstone_browser.cjs",
   "tools/fixtures/r206-synthetic-evidence-schema.json",
   "tools/run_v283_local_regression.mjs",
+  "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_IMPLEMENTATION.md",
+  "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_HYDRATION_TOMBSTONE_REMEDIATION.md",
+  "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_HYDRATION_CLEANUP_ATTESTATION.json",
   ".github/workflows/laxhornet-regression.yml",
   ".github/workflows/docker-tests.yml",
 ];
@@ -647,6 +654,36 @@ expect(
     browserProfileRemove: 5000,
   }),
   "R2-06 browser session timeout policy changed",
+);
+expect(
+  JSON.stringify(syntheticRunner?.hydrationSuppressionContract) === JSON.stringify({
+    invariant: "durable_tombstone_wins_over_every_game_representation",
+    ordering: [
+      "authenticated_account_namespace",
+      "authorized_tombstones",
+      "normalized_tombstoned_game_ids",
+      "local_and_remote_candidates",
+      "pre_merge_suppression",
+      "canonical_merge",
+      "recovery_and_queue_cleanup",
+      "filtered_persistence",
+      "derived_views",
+      "three_layer_verification",
+    ],
+    verificationLayers: [
+      "raw_canonical_persistence",
+      "application_state",
+      "rendered_ui",
+      "zero_resurrection_writes",
+    ],
+    focusedTestPath: "tools/test_hydration_tombstone_suppression.mjs",
+    disposableBrowserTestPath: "tools/test_hydration_tombstone_browser.cjs",
+    remediationEvidence:
+      "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_HYDRATION_TOMBSTONE_REMEDIATION.md",
+    cleanupAttestation:
+      "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_HYDRATION_CLEANUP_ATTESTATION.json",
+  }),
+  "R2-06P hydration tombstone suppression contract changed",
 );
 expect(
   syntheticRunner?.playwrightVersion === "1.61.1"

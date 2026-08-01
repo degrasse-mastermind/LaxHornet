@@ -61,6 +61,8 @@ const tests = [
   { name: "event-operation service contracts", command: process.execPath, args: ["tools/test_event_operation_service.mjs"] },
   { name: "durable game and clock operation contracts", command: process.execPath, args: ["tools/test_durable_sync_operations.mjs"] },
   { name: "durable legacy game tombstone contracts", command: process.execPath, args: ["tools/test_game_tombstones.mjs"] },
+  { name: "R2-06P hydration tombstone suppression contracts", command: process.execPath, args: ["tools/test_hydration_tombstone_suppression.mjs"] },
+  { name: "R2-06P disposable browser hydration", command: process.execPath, args: ["tools/test_hydration_tombstone_browser.cjs"] },
   { name: "durable legacy game tombstone migration", command: process.execPath, args: ["tools/test_game_tombstone_migration.mjs"] },
   { name: "durable legacy game tombstone concurrency", command: process.execPath, args: ["tools/test_game_tombstone_concurrency.mjs"] },
   { name: "sync error classification contracts", command: process.execPath, args: ["tools/test_sync_error_classification.mjs"] },
