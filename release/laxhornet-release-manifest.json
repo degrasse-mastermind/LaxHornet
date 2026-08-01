@@ -55,6 +55,31 @@
         "maximumNormalReloads": 1,
         "fullSessionRetries": 0
       },
+      "hydrationSuppressionContract": {
+        "invariant": "durable_tombstone_wins_over_every_game_representation",
+        "ordering": [
+          "authenticated_account_namespace",
+          "authorized_tombstones",
+          "normalized_tombstoned_game_ids",
+          "local_and_remote_candidates",
+          "pre_merge_suppression",
+          "canonical_merge",
+          "recovery_and_queue_cleanup",
+          "filtered_persistence",
+          "derived_views",
+          "three_layer_verification"
+        ],
+        "verificationLayers": [
+          "raw_canonical_persistence",
+          "application_state",
+          "rendered_ui",
+          "zero_resurrection_writes"
+        ],
+        "focusedTestPath": "tools/test_hydration_tombstone_suppression.mjs",
+        "disposableBrowserTestPath": "tools/test_hydration_tombstone_browser.cjs",
+        "remediationEvidence": "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_HYDRATION_TOMBSTONE_REMEDIATION.md",
+        "cleanupAttestation": "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_HYDRATION_CLEANUP_ATTESTATION.json"
+      },
       "browserRuntimePackagePath": "tools/r206-browser-runtime/package.json",
       "browserRuntimeLockPath": "tools/r206-browser-runtime/package-lock.json",
       "playwrightVersion": "1.61.1",
@@ -104,20 +129,27 @@
         "privateIdentifierRecords": 1
       },
       "sha256": {
+        "app.js": "3d0c731dc48159a6859baec276ca4cf3e2b86b299158fb0a335cc6c486eedec9",
+        "event-operation-service.js": "57b59d3cdefa863d511a3137162ff32628d72dfe1113c70f91f162b1dc4306e6",
         "tools/run_r206_synthetic_verification.mjs": "39f19de0250e3be1d8423ed3ce64e8cc62a19892dd650055bb0890b7fa3f1842",
         "tools/r206_browser_runtime.mjs": "15f20a4f7856515432dc2ad91c8d4a53d7d2fcb251e2e93291773940bdde7419",
         "tools/r206_browser_session.mjs": "1f6722f466a7ae9a1c31421a6691d7610645d88d47e3e49a15124f9bfe90bd33",
         "tools/r206-browser-runtime/package.json": "109627cde851dbfc9150e61c7934dc6b8e56b8d98fa5029e0cdb3292f68b3ee5",
         "tools/r206-browser-runtime/package-lock.json": "d457b5dfb53fdf104396e8a4156fab151ddd130e0f45e9985b19710c70f3a0ef",
-        "tools/r206_synthetic_runner_core.mjs": "3fdff3fcef959c1114e184f9818dcee68a936f9aa10b7fd3c182467f96fb0778",
-        "tools/r206_synthetic_production_adapter.mjs": "007184d339c94760f89174b39a6aeac26e616678b5a044d243f8d5647ea15bec",
-        "tools/r206_synthetic_disposable_adapter.mjs": "ecd6a81de5643e4262de5295f22d34fd9c44c4d1fbd818e7a7cff60fdb4a1b21",
+        "tools/r206_synthetic_runner_core.mjs": "d179332a5c9e8ee607d12ed7b46e6ef8860ad83ae91497d611cab4f4af03c075",
+        "tools/r206_synthetic_production_adapter.mjs": "fa4d08c98764e730481a478aea2eb12651abb6ebb073f8fee5c41a713e92774a",
+        "tools/r206_synthetic_disposable_adapter.mjs": "0f0f59fa3c5a5845e0fe935bd9b21df4e1c39dd9e32f2a6f6adab340639483a5",
         "tools/test_r206_synthetic_verification.mjs": "9c2e410f4c3de15fc12af181a94a5ce47cbeceefa1f93a71fdc208789215ebe1",
         "tools/test_r206_browser_runtime.mjs": "d9787b8317a1a748e0cbd9960ae8928e15e5fa240ab0ddf293f3ef2cb47cc69f",
         "tools/test_r206_browser_session.mjs": "01cae5cc79a843870a2b9bca56fa2e9cd52d9051ef27c4a87f52a68a9f8d9244",
         "tools/test_r206_synthetic_verification_disposable.mjs": "39d0c0dbc92f685201136945fefbb1afe5b6360246c2c74164db11dabe09130c",
-        "tools/fixtures/r206-synthetic-evidence-schema.json": "24a94c835bba25bd0796041b02555b4a351dd8c29a6350d3e50495ae21459990",
-        "tools/run_v283_local_regression.mjs": "ff72073430d751dda35bb5471d5d35dcac875544d1f7aa3f68fb29eae6813305",
+        "tools/test_hydration_tombstone_suppression.mjs": "1628e8c15749720b83ba0239fe127ab11988fc5e017d988f20c747ae5e106a2d",
+        "tools/test_hydration_tombstone_browser.cjs": "8f40f7163ad00557d202c60e9562f45f364bb43b4c6fa6bc6851d66936162cba",
+        "tools/fixtures/r206-synthetic-evidence-schema.json": "df0152e5236b49e7d85c46453d124ecbfca93375ff7472af65aeacdeb19c1c53",
+        "tools/run_v283_local_regression.mjs": "45f298e78e05d0eb5a8ae775bc6cefc094f887643800bae494a2cb6f23aa5221",
+        "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_IMPLEMENTATION.md": "79ad59dc63e89af66175a143c03db722f4a0a22c06c6c74db412667948f9d922",
+        "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_HYDRATION_TOMBSTONE_REMEDIATION.md": "4e97a314a3fd7d40a6adf833867562c4c887bd5f4ceb15d72ee926a6ebcc667f",
+        "review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_HYDRATION_CLEANUP_ATTESTATION.json": "8967243b0739411be66b8656168f870b2e8113c7e3bbdbfbbc476ee43eaa8808",
         ".github/workflows/laxhornet-regression.yml": "3758c048ab79b7be72929c31bc929d82b452ff3f59ac31e4ebe06e020c77721d",
         ".github/workflows/docker-tests.yml": "c6e0ba957f10a2aa84b78937b23e5b236e3d093fced05463f81830fc940f4bbd"
       }

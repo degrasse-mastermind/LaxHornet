@@ -37,6 +37,94 @@ const FUTURE_CLOCK_SKEW_MS = 5 * 60 * 1000;
 export const R206_AUTHORIZATION_CONSUMPTION_NAME =
   "R2-06_AUTHORIZATION_CONSUMPTION.json";
 
+export async function inspectR206HydrationLayers({ page, accountId, gameId }) {
+  if (!page || !accountId || !gameId) {
+    throw new R206StopError("hydration layer inspection is missing its bounded synthetic identity", {
+      code: "HYDRATION_INSPECTION_SCOPE_INVALID",
+    });
+  }
+  const layers = await page.evaluate(({ accountId: scopedAccountId, gameId: scopedGameId }) => {
+    const normalized = (value) => String(value ?? "").trim().toLowerCase();
+    const expected = normalized(scopedGameId);
+    const matches = (value) => normalized(value) === expected;
+    const parse = (raw) => {
+      try {
+        return raw === null ? null : JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    };
+    const supportKeys = (primary) => [
+      primary,
+      `${primary}.safety.backup`,
+      `${primary}.safety.staging`,
+      `${primary}.safety.quarantine`,
+    ];
+    const containsSavedGame = (value) => {
+      if (Array.isArray(value)) return value.some((item) => matches(item?.id));
+      if (value && typeof value === "object" && typeof value.raw === "string") {
+        return containsSavedGame(parse(value.raw));
+      }
+      return false;
+    };
+    const containsObjectGame = (value, fields) => {
+      if (value && typeof value === "object" && typeof value.raw === "string") {
+        return containsObjectGame(parse(value.raw), fields);
+      }
+      return Boolean(value && typeof value === "object" && fields.some((field) => matches(value[field])));
+    };
+    const containsScalarGame = (value) => {
+      if (value && typeof value === "object" && typeof value.raw === "string") {
+        return containsScalarGame(parse(value.raw));
+      }
+      return matches(value);
+    };
+    const scoped = (base) => `${base}.user.${scopedAccountId}`;
+    const savedGameStorage = supportKeys(scoped("laxhornet.games"))
+      .some((key) => containsSavedGame(parse(localStorage.getItem(key))));
+    const activeGameStorage = supportKeys(scoped("laxhornet.activeGame"))
+      .some((key) => containsObjectGame(parse(localStorage.getItem(key)), ["id"]));
+    const recoveryStorage = supportKeys(scoped("laxhornet.trackingSession"))
+      .some((key) => containsObjectGame(parse(localStorage.getItem(key)), ["gameId", "game_id"]));
+    const derivedStorage = supportKeys(scoped("laxhornet.reviewGameId"))
+      .some((key) => containsScalarGame(parse(localStorage.getItem(key))));
+    const recapStorage = Object.keys(localStorage)
+      .filter((key) => key.startsWith("laxhornet.familyRecapFocus."))
+      .some((key) => containsObjectGame(parse(localStorage.getItem(key)), ["gameId", "game_id"]));
+    const applicationPresence = window.LAXHORNET_HYDRATION_INSPECTOR?.gamePresence?.(scopedGameId) || {};
+    const diagnostics = window.LAXHORNET_HYDRATION_INSPECTOR?.diagnostics?.() || {};
+    const renderedGame = [...document.querySelectorAll("[data-game-id]")]
+      .some((node) => matches(node.dataset.gameId));
+    return {
+      rawPersistenceGameVisible:
+        savedGameStorage || activeGameStorage || recoveryStorage || derivedStorage || recapStorage,
+      applicationStateGameVisible: Object.values(applicationPresence).some(Boolean),
+      renderedGameVisible: renderedGame,
+      tombstonesLoaded: diagnostics.tombstonesLoaded === true,
+      tombstoneSuppressionComplete: diagnostics.tombstoneSuppressionComplete === true,
+      staleHydrationDiscarded: diagnostics.staleHydrationDiscarded === true,
+      sanitizedDiagnostics: {
+        tombstoneCount: Number(diagnostics.tombstoneCount || 0),
+        localCandidatesCount: Number(diagnostics.localCandidatesCount || 0),
+        remoteCandidatesCount: Number(diagnostics.remoteCandidatesCount || 0),
+        suppressedLocalCount: Number(diagnostics.suppressedLocalCount || 0),
+        suppressedRemoteCount: Number(diagnostics.suppressedRemoteCount || 0),
+        suppressedRecoveryCount: Number(diagnostics.suppressedRecoveryCount || 0),
+        finalHydratedCount: Number(diagnostics.finalHydratedCount || 0),
+        hydrationGeneration: Number(diagnostics.hydrationGeneration || 0),
+        failureCode: String(diagnostics.failureCode || ""),
+      },
+    };
+  }, { accountId, gameId });
+  return {
+    ...layers,
+    gameVisible:
+      layers.rawPersistenceGameVisible
+      || layers.applicationStateGameVisible
+      || layers.renderedGameVisible,
+  };
+}
+
 function readJson(file, label) {
   let raw;
   try {
@@ -986,31 +1074,53 @@ export function createProductionAdapter({
         (entry) => entry.pathname.endsWith("/legacy_game_tombstones"),
       );
       const gameIndex = network.findIndex((entry) => entry.pathname.endsWith("/games"));
-      const localEvidence = await page.evaluate((gameId) => {
-        const values = [];
-        for (let index = 0; index < localStorage.length; index += 1) {
-          values.push(localStorage.getItem(localStorage.key(index)) || "");
-        }
-        return values.some((value) => value.includes(gameId));
-      }, ledger.game.id);
-      const body = await page.locator("body").innerText();
-      const firstPassVisible = body.includes(ledger.game.id) || localEvidence;
+      const accountId = ledger.users.get("owner_user")?.id;
+      const firstPass = await inspectR206HydrationLayers({
+        page,
+        accountId,
+        gameId: ledger.game.id,
+      });
       const beforeRefreshRequests = network.length;
       await page.reload({ waitUntil: "domcontentloaded", timeout: 15_000 });
-      const afterBody = await page.locator("body").innerText();
-      const afterRefreshVisible = afterBody.includes(ledger.game.id);
+      await page.waitForFunction(
+        () => window.LAXHORNET_HYDRATION_DIAGNOSTICS?.tombstoneSuppressionComplete === true,
+        null,
+        { timeout: 10_000 },
+      );
+      const afterRefresh = await inspectR206HydrationLayers({
+        page,
+        accountId,
+        gameId: ledger.game.id,
+      });
       const refreshRequests = network.slice(beforeRefreshRequests);
       const mutationRequests = refreshRequests.filter(
         (entry) =>
           entry.pathname.endsWith("/rpc/laxhornet_sync_game")
           || entry.pathname.endsWith("/rpc/laxhornet_delete_game_durable"),
       );
+      const hydrationMutationRequests = network.slice(Math.max(0, tombstoneIndex)).filter(
+        (entry) => entry.pathname.endsWith("/rpc/laxhornet_sync_game"),
+      );
       return {
         outcome: "verified",
         code: "clean_hydration_verified",
-        gameVisible: firstPassVisible || afterRefreshVisible,
-        tombstoneBeforeMerge: tombstoneIndex >= 0 && gameIndex >= 0 && tombstoneIndex < gameIndex,
-        retryStorm: mutationRequests.length > 0,
+        gameVisible: firstPass.gameVisible || afterRefresh.gameVisible,
+        rawPersistenceGameVisible:
+          firstPass.rawPersistenceGameVisible || afterRefresh.rawPersistenceGameVisible,
+        applicationStateGameVisible:
+          firstPass.applicationStateGameVisible || afterRefresh.applicationStateGameVisible,
+        renderedGameVisible: firstPass.renderedGameVisible || afterRefresh.renderedGameVisible,
+        tombstoneBeforeMerge:
+          tombstoneIndex >= 0
+          && gameIndex >= 0
+          && tombstoneIndex < gameIndex
+          && firstPass.tombstonesLoaded
+          && firstPass.tombstoneSuppressionComplete,
+        retryStorm: mutationRequests.length > 0 || hydrationMutationRequests.length > 0,
+        resurrectionWriteRequests: hydrationMutationRequests.length,
+        tombstoneSuppressionComplete:
+          firstPass.tombstoneSuppressionComplete && afterRefresh.tombstoneSuppressionComplete,
+        sanitizedDiagnostics: afterRefresh.sanitizedDiagnostics,
         applicationConsoleErrors: consoleClasses.filter((type) => type === "error").length,
         browserProfilePath: profilePath,
       };

@@ -1497,11 +1497,23 @@ export async function executeSyntheticVerification({
   });
 
   const record = (action, result) => {
-    operationResults.push({
+    const entry = {
       action,
       outcome: result?.outcome || "verified",
       code: result?.code || "verified",
-    });
+    };
+    if (action === "clean_session_hydration") {
+      entry.hydrationVerification = {
+        rawPersistenceGameVisible: result?.rawPersistenceGameVisible === true,
+        applicationStateGameVisible: result?.applicationStateGameVisible === true,
+        renderedGameVisible: result?.renderedGameVisible === true,
+        tombstoneBeforeMerge: result?.tombstoneBeforeMerge === true,
+        tombstoneSuppressionComplete: result?.tombstoneSuppressionComplete === true,
+        resurrectionWriteRequests: Number(result?.resurrectionWriteRequests || 0),
+        retryStorm: result?.retryStorm === true,
+      };
+    }
+    operationResults.push(entry);
     logger({ action, status: "verified" });
   };
 
@@ -1774,7 +1786,12 @@ export async function executeSyntheticVerification({
     });
     if (
       hydration?.gameVisible !== false
+      || hydration?.rawPersistenceGameVisible !== false
+      || hydration?.applicationStateGameVisible !== false
+      || hydration?.renderedGameVisible !== false
       || hydration?.tombstoneBeforeMerge !== true
+      || hydration?.tombstoneSuppressionComplete !== true
+      || hydration?.resurrectionWriteRequests !== 0
       || hydration?.retryStorm !== false
       || hydration?.applicationConsoleErrors !== 0
     ) {

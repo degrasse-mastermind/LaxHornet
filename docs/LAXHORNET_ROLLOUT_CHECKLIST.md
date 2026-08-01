@@ -591,6 +591,44 @@ Remediation evidence:
 Remediation evidence:
 `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_AUTH_UI_DECOUPLING_REMEDIATION.md`.
 
+### R2-06P hydration tombstone suppression
+
+- [x] Diagnose action 15 without opening the private identifier ledger: the old
+  verifier scanned every local-storage value and mistook the retained
+  tombstone's game ID for a hydrated game.
+- [x] Confirm from sanitized incident facts that the server game row was absent,
+  mutable cleanup residue was zero, and exactly one tombstone remained.
+- [x] Load and apply account-authorized tombstones before uploads and before the
+  final local/remote merge; normalize suppression identity and filter both
+  candidate sets before canonical merge and derived calculation.
+- [x] Remove matching saved, active, recovery, review, import, Trust Spine,
+  derived, and structurally parseable safety-backup state without removing
+  unrelated games or the durable tombstone.
+- [x] Supersede queued game and tracked-clock writes and prevent later writes
+  from being queued for a tombstoned game.
+- [x] Invalidate obsolete hydration immediately on account changes and check the
+  captured account/generation after every awaited hydration boundary.
+- [x] Add count-only diagnostics and explicit tombstone-load, incomplete-
+  suppression, stale-commit, and reintroduction classifications without private
+  identifiers.
+- [x] Replace the all-storage substring check with independent raw canonical
+  persistence, application-state, and rendered-UI proof plus zero resurrection
+  writes.
+- [x] Pass the credential-free disposable journey with stale primary/backup/
+  recovery/queue/remote state, an unrelated active game, and a
+  service-worker-controlled reload.
+- [x] Preserve production-disabled defaults and keep synthetic authorization,
+  completion, cleanup approval, and release closeout false.
+- [x] Pass the complete canonical-plus-additive regression (`49/49`) after the final diff
+  stabilizes.
+- [ ] Confirm exact-head draft-PR CI and obtain independent exact-PR-SHA Level 3
+  review before merge.
+- [ ] Obtain a new explicit production authorization and fresh named read-only
+  preflight before any future production attempt.
+
+Remediation evidence:
+`review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_HYDRATION_TOMBSTONE_REMEDIATION.md`.
+
 # 4. Planned Engineering Sequence
 
 Do not combine these into one large Codex task. Each item requires one approved ticket, one primary implementation task, and a separate independent review when warranted.

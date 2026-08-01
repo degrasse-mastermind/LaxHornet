@@ -1864,6 +1864,69 @@ Starting point: `401886e2f8a7023b985f6d9bae17d92705ea8f3f`
 Evidence:
 `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_RUNNER_AUTH_UI_DECOUPLING_REMEDIATION.md`.
 
+### R2-06P — Hydration tombstone suppression and three-layer verification
+
+Status: `IMPLEMENTED — INDEPENDENT REVIEW REQUIRED`
+
+Risk level: `LEVEL 3`
+
+Branch: `fix/r2-06p-hydration-tombstone-suppression`
+
+Starting point: `dfe8535bdfb2a1e6470573940fb43b916b9407e0`
+
+#### Incident diagnosis and remediation
+
+- The reviewed production matrix passed through action 14 and stopped at
+  action 15 with `HYDRATION_REVEALED_GAME`; independent cleanup established
+  zero mutable residue, an absent server game row, and exactly one retained
+  tombstone.
+- The exact action-15 classifier scanned every local-storage value for the game
+  ID. The retained durable tombstone legitimately contained that ID, so the
+  verifier conflated authoritative deletion metadata with a game
+  representation. It did not prove canonical storage, application state, or
+  rendered visibility.
+- Make tombstone authority explicit: normalize suppression identity, apply both
+  tombstone reads before merge/commit, filter local and remote candidates
+  before merge, defensively filter the final state, and prohibit queued game or
+  tracked-clock writes for tombstoned games.
+- Purge matching active/recovery/review/import/Trust Spine/derived state and
+  structurally parseable saved-game safety artifacts while preserving unrelated
+  games and the durable tombstone.
+- Invalidate older hydration generations immediately on account changes and
+  check account/generation after every awaited hydration boundary.
+- Replace the all-storage substring scan with separate raw canonical storage,
+  live application-state, and rendered `data-game-id` checks. Require zero
+  deleted-game resurrection writes and repeat after a service-worker-controlled
+  reload.
+- Keep count-only diagnostics and specific invariant codes. Do not include
+  private identifiers, game contents, names, or record timestamps.
+- Preserve the immutable consumed evidence and add a separate sanitized cleanup
+  attestation. Keep synthetic authorization/completion, cleanup approval, and
+  release closeout false.
+
+#### Acceptance and remaining gates
+
+- [x] Identify the exact action-15 false-positive source and confirm the server
+  game row was absent from the sanitized incident facts.
+- [x] Implement tombstone-first, pre-merge filtering, storage/recovery cleanup,
+  queued-write suppression, generation guards, and account isolation.
+- [x] Add at least 30 focused hydration scenarios and three-layer disposable
+  browser verification with controlled reload and no resurrection write.
+- [x] Preserve production-disabled and false-closeout controls; do not access or
+  mutate production or consumed private evidence.
+- [x] Pass the complete canonical-plus-additive regression (`49/49`) after the final diff
+  stabilizes.
+- [ ] Confirm exact-head draft-PR CI.
+- [ ] Obtain independent exact-PR-SHA Level 3 review before merge.
+- [ ] Obtain a new explicit production authorization and fresh named read-only
+  preflight before any future production attempt.
+- [ ] Execute any future production synthetic verification only under that new
+  reviewed authorization and fresh run directory.
+- [ ] Obtain separate cleanup-completion and release-closeout approval.
+
+Evidence:
+`review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_HYDRATION_TOMBSTONE_REMEDIATION.md`.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets
