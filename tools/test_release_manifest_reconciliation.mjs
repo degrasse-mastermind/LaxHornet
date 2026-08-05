@@ -27,15 +27,19 @@ function test(name, callback) {
 
 const evaluate = (manifest) =>
   evaluateR206ReleaseControl(manifest, {
-    evidenceExists: (file) => file.startsWith("test-fixtures/"),
+    evidenceExists: (file) => file.startsWith("test-fixtures/")
+      || fs.existsSync(path.join(root, file)),
   });
 
-test("runtime and migrations are accepted while absent synthetic evidence blocks closeout", () => {
+test("reviewed mixed evidence advances the approved closeout without binary production completion", () => {
   const result = evaluate(sourceManifest);
   assert.equal(result.runtimeDatabaseReady, true);
-  assert.equal(result.closeoutReady, false);
-  assert.equal(result.releaseComplete, false);
-  assert.match(result.closeoutBlockers.join("; "), /synthetic production behavior evidence/);
+  assert.equal(result.closeoutReady, true);
+  assert.equal(result.releaseComplete, true);
+  assert.equal(result.closeoutMode, "approved_mixed_evidence");
+  assert.equal(sourceManifest.r206ReleaseControl.syntheticVerification.completed, false);
+  assert.equal(sourceManifest.r206ReleaseControl.cleanupCompleted, false);
+  assert.deepEqual(result.closeoutBlockers, []);
 });
 
 test("runtime present with one migration missing is blocked", () => {
@@ -89,6 +93,15 @@ test("synthetic verification completion without required evidence is blocked", (
   assert.equal(result.releaseComplete, false);
   assert.match(result.failures.join("; "), /cannot be completed without reviewed evidence/);
   assert.match(result.failures.join("; "), /closeout cannot be approved/);
+});
+
+test("mixed-evidence approval with a stale baseline is blocked", () => {
+  const manifest = clone(sourceManifest);
+  manifest.r206ReleaseControl.evidenceReconciliation.approvedCloseoutBaselineSha = "0".repeat(40);
+  const result = evaluate(manifest);
+  assert.equal(result.closeoutReady, false);
+  assert.equal(result.releaseComplete, false);
+  assert.match(result.failures.join("; "), /mixed-evidence closeout/);
 });
 
 test("unreviewed production state is blocked", () => {

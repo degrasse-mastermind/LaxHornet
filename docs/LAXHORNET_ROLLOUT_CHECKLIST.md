@@ -649,15 +649,42 @@ Remediation evidence:
   the manifest; preserve disabled production, non-reusable authorization/run
   state, false binary completion, and `releaseCloseoutApproved: false`.
 - [x] Record that no second production lifecycle is required or performed.
-- [ ] Confirm exact-head draft-PR CI and obtain independent exact-PR-SHA Level 3
+- [x] Confirm exact-head draft-PR CI and obtain independent exact-PR-SHA Level 3
   closeout review before merge.
-- [ ] Approve R2-06 release closeout in a separate authorized decision.
+- [x] Approve R2-06 release closeout in a separate authorized decision.
 
 Evidence:
 
 - `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_PRODUCTION_RECONCILIATION.md`
 - `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_CLOSEOUT_READINESS.md`
 - `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_CLEANUP_ATTESTATION.md`
+
+### R2-06R final release closeout
+
+- [x] Record David's 2026-08-01 final approval against merged baseline
+  `adb9c4b91d9243534080f84f288d7f68bf446757`.
+- [x] Set the final disposition to
+  `R2-06 RELEASE CLOSEOUT APPROVED — MIXED EVIDENCE ACCEPTED` without claiming
+  a direct 21-of-21 production pass.
+- [x] Preserve actions 1–14 as production-verified, historic action 15 as an
+  invalid verifier result, corrected action 15 as disposable/remediation-
+  verified, action 16 as partially production-verified, and actions 17–21 as
+  independently cleanup-attested.
+- [x] Approve cleanup through the independent attestation while preserving the
+  immutable `cleanupCompleted: false` runner record, one retained tombstone,
+  one unopened private ledger, and zero mutable/Auth/browser residue.
+- [x] Preserve disabled production execution, consumed non-reusable authority,
+  no new authorization, and no production rerun.
+- [x] Mark R2-06 implementation, evidence reconciliation, cleanup approval,
+  and release closeout complete. No further R2-06 production run is required.
+- [x] Keep every unrelated rollout stage unchanged; future unrelated
+  production work requires new authorization and evidence.
+- [ ] Confirm exact-head draft-PR CI and obtain independent exact-PR-SHA Level 3
+  review before merge.
+
+Evidence:
+
+- `review-evidence/r2-06-durable-game-tombstones-release/R2-06_RELEASE_CLOSEOUT_APPROVAL.md`
 
 # 4. Planned Engineering Sequence
 

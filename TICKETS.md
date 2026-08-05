@@ -1931,7 +1931,7 @@ Evidence:
 
 ### R2-06Q — Reconcile production verification and remediation evidence
 
-Status: `IMPLEMENTED — INDEPENDENT CLOSEOUT REVIEW REQUIRED`
+Status: `MERGED — INDEPENDENT EXACT-HEAD REVIEW PASSED`
 
 Risk level: `LEVEL 3`
 
@@ -1989,9 +1989,11 @@ Starting point:
 - Production execution remains disabled by default.
 - Earlier migration-application attribution remains unresolved and is not
   retroactively approved.
-- Exact-head CI and independent exact-PR-SHA Level 3 closeout review are
-  required before merge.
-- `releaseCloseoutApproved: false`.
+- Exact-head CI and independent exact-PR-SHA Level 3 review passed on PR #58
+  head `71d2aaeb7766624e89a246ed2957242dc90c5d1d`; the reconciliation merged at
+  `adb9c4b91d9243534080f84f288d7f68bf446757`.
+- R2-06R subsequently records `releaseCloseoutApproved: true` through the
+  separately authorized mixed-evidence decision.
 
 Evidence:
 
@@ -1999,8 +2001,49 @@ Evidence:
 - `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_CLOSEOUT_READINESS.md`
 - `review-evidence/r2-06-durable-game-tombstones-release/SYNTHETIC_CLEANUP_ATTESTATION.md`
 
-Next step: independent exact-PR-SHA Level 3 closeout review. Do not rerun
-production, merge, deploy, or approve release closeout from this task.
+Next step completed by R2-06R. No production rerun is required.
+
+### R2-06R — Final release-closeout approval
+
+Status: `IMPLEMENTED — INDEPENDENT EXACT-HEAD REVIEW REQUIRED`
+
+Risk level: `LEVEL 3`
+
+Branch: `release/r2-06r-final-closeout`
+
+Starting point:
+`adb9c4b91d9243534080f84f288d7f68bf446757` (independently reviewed and
+merged R2-06Q reconciliation)
+
+#### Authorized closeout
+
+- David approved the exact disposition
+  `R2-06 RELEASE CLOSEOUT APPROVED — MIXED EVIDENCE ACCEPTED` on 2026-08-01.
+- Actions 1–14 remain `PRODUCTION VERIFIED`; historic action 15 remains
+  `INVALID HISTORIC VERIFIER RESULT`; corrected action 15 remains
+  `DISPOSABLE/REMEDIATION VERIFIED`; action 16 remains
+  `PRODUCTION PARTIALLY VERIFIED`; actions 17–21 remain
+  `INDEPENDENT CLEANUP ATTESTED`.
+- Mixed-evidence acceptance, final cleanup approval, and release closeout are
+  true. Binary direct-production completion remains false.
+- The independent cleanup attestation is the approval basis for zero mutable,
+  Auth, and browser residue and no manual cleanup. The immutable historical
+  runner record remains `cleanupCompleted: false`.
+- Exactly one inert durable tombstone and one unopened private ledger remain
+  intentionally. Neither was opened or changed.
+- No production access, mutation, rerun, Supabase query, credential use,
+  private-evidence access, or new production authorization occurred.
+- Production execution remains disabled by default. Any future unrelated
+  production work requires new authorization and evidence.
+- R2-06 is closed. No unrelated rollout stage is approved or completed by this
+  decision.
+
+Evidence:
+
+- `review-evidence/r2-06-durable-game-tombstones-release/R2-06_RELEASE_CLOSEOUT_APPROVAL.md`
+
+Required before merge: exact-head CI and independent exact-PR-SHA Level 3
+review of the R2-06R closeout pull request.
 
 ## Ticket template
 

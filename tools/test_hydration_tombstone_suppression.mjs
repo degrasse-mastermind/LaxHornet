@@ -393,10 +393,12 @@ test("31 production hydration inspection uses scoped keys rather than an all-sto
   assert.doesNotMatch(adapterSource, /values\.some\(\(value\) => value\.includes\(gameId\)\)/);
 });
 
-test("32 production execution and release closeout remain disabled", () => {
+test("32 production stays disabled while mixed-evidence closeout is approved", () => {
   assert.equal(manifest.r206ReleaseControl.syntheticRunner.productionExecutionDefault, "disabled");
   assert.equal(manifest.r206ReleaseControl.syntheticVerification.authorized, false);
   assert.equal(manifest.r206ReleaseControl.syntheticVerification.completed, false);
+  assert.equal(manifest.r206ReleaseControl.syntheticVerification.mixedEvidenceAccepted, true);
   assert.equal(manifest.r206ReleaseControl.cleanupCompleted, false);
-  assert.equal(manifest.r206ReleaseControl.releaseCloseoutApproved, false);
+  assert.equal(manifest.r206ReleaseControl.cleanupApproved, true);
+  assert.equal(manifest.r206ReleaseControl.releaseCloseoutApproved, true);
 });

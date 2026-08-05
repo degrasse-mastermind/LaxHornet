@@ -732,28 +732,37 @@ expect(
   manifest.r206ReleaseControl?.syntheticVerification?.authorized === false
     && manifest.r206ReleaseControl?.syntheticVerification?.completed === false
     && manifest.r206ReleaseControl?.cleanupCompleted === false
-    && manifest.r206ReleaseControl?.releaseCloseoutApproved === false,
-  "registering the R2-06 synthetic runner must not advance production verification or closeout",
+    && manifest.r206ReleaseControl?.cleanupApproved === true
+    && manifest.r206ReleaseControl?.releaseCloseoutApproved === true,
+  "R2-06R must approve cleanup and closeout without rewriting binary production history",
 );
 const r206q = manifest.r206ReleaseControl?.evidenceReconciliation;
 expect(
   manifest.r206ReleaseControl?.syntheticVerification?.completionModel
-    === "mixed_evidence_requires_independent_closeout_review"
+    === "approved_mixed_evidence"
     && manifest.r206ReleaseControl?.syntheticVerification?.futureAuthorizationState
       === "not_authorized"
     && manifest.r206ReleaseControl?.syntheticVerification?.historicProductionEvidenceReconciled
-      === true,
-  "R2-06Q must preserve mixed historic evidence without authorizing a future run",
+      === true
+    && manifest.r206ReleaseControl?.syntheticVerification?.mixedEvidenceAccepted === true
+    && manifest.r206ReleaseControl?.syntheticVerification?.cleanupAttested === true
+    && manifest.r206ReleaseControl?.syntheticVerification
+      ?.syntheticVerificationCloseoutStatus === "approved_mixed_evidence",
+  "R2-06R must accept reconciled mixed evidence without authorizing a future run",
 );
 expect(
-  r206q?.status === "CLOSEOUT REVIEW REQUIRED"
-    && r206q?.independentCloseoutReviewPending === true
+  r206q?.status === "R2-06 RELEASE CLOSEOUT APPROVED — MIXED EVIDENCE ACCEPTED"
+    && r206q?.independentCloseoutReviewPending === false
+    && r206q?.approvedCloseoutBaselineSha
+      === "adb9c4b91d9243534080f84f288d7f68bf446757"
+    && r206q?.approvalAuthority === "David"
+    && r206q?.approvalDate === "2026-08-01"
     && r206q?.reviewedProductionRunnerSha
       === "dfe8535bdfb2a1e6470573940fb43b916b9407e0"
     && r206q?.reviewedThroughMergeSha
-      === "cdcc357db2774cf66454f0f5c0c69d87fd14187d"
+      === "adb9c4b91d9243534080f84f288d7f68bf446757"
     && r206q?.r206pMergeSha === "cdcc357db2774cf66454f0f5c0c69d87fd14187d",
-  "R2-06Q closeout state must remain pending and bound to the reviewed production/remediation SHAs",
+  "R2-06R closeout must be approved by David and bound to the reviewed Q baseline",
 );
 expect(
   r206q?.historicProductionAuthorization?.state === "consumed"
@@ -769,8 +778,15 @@ expect(
   r206q?.productionAccessDuringReconciliation === false
     && r206q?.productionMutationDuringReconciliation === false
     && r206q?.privateEvidenceOpenedDuringReconciliation === false
-    && r206q?.retainedTombstoneChangedDuringReconciliation === false,
-  "R2-06Q reconciliation must remain evidence-only and non-mutating",
+    && r206q?.retainedTombstoneChangedDuringReconciliation === false
+    && r206q?.productionAccessDuringCloseout === false
+    && r206q?.productionMutationDuringCloseout === false
+    && r206q?.productionRerunDuringCloseout === false
+    && r206q?.newProductionAuthorizationCreatedDuringCloseout === false
+    && r206q?.privateEvidenceOpenedDuringCloseout === false
+    && r206q?.retainedTombstoneChangedDuringCloseout === false
+    && r206q?.unrelatedRolloutStagesChangedDuringCloseout === false,
+  "R2-06Q reconciliation and R2-06R closeout must remain evidence-only and non-mutating",
 );
 expect(
   Array.isArray(r206q?.actions)
@@ -825,7 +841,7 @@ for (const [name, evidence] of Object.entries(r206q?.evidence || {})) {
       `R2-06Q ${name} evidence SHA-256 is stale`,
     );
   }
-  expect(evidence.reviewed === false, `R2-06Q ${name} must remain pending independent review`);
+  expect(evidence.reviewed === true, `R2-06R ${name} must be reviewed closeout evidence`);
 }
 const r206qValidationPath = r206q?.validation?.path || "";
 const r206qValidationAbsolute = path.join(root, r206qValidationPath);
@@ -835,6 +851,16 @@ if (fs.existsSync(r206qValidationAbsolute)) {
     r206q?.validation?.sha256
       === repositoryTextSha256(fs.readFileSync(r206qValidationAbsolute)),
     "R2-06Q validation test SHA-256 is stale",
+  );
+}
+const r206rValidationPath = r206q?.finalCloseoutValidation?.path || "";
+const r206rValidationAbsolute = path.join(root, r206rValidationPath);
+expect(fs.existsSync(r206rValidationAbsolute), "R2-06R final closeout validation test must exist");
+if (fs.existsSync(r206rValidationAbsolute)) {
+  expect(
+    r206q?.finalCloseoutValidation?.sha256
+      === repositoryTextSha256(fs.readFileSync(r206rValidationAbsolute)),
+    "R2-06R final closeout validation test SHA-256 is stale",
   );
 }
 expect(

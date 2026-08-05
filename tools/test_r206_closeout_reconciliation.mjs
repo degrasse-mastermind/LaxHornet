@@ -25,14 +25,22 @@ const textSha256 = (file) => createHash("sha256")
   .update(Buffer.from(fs.readFileSync(file, "utf8").replace(/\r\n/g, "\n"), "utf8"))
   .digest("hex");
 
-test("reconciliation keeps production and closeout controls fail-closed", () => {
+test("closeout accepts mixed evidence without rewriting production history", () => {
   assert.equal(manifest.r206ReleaseControl.syntheticRunner.productionExecutionDefault, "disabled");
   assert.equal(manifest.r206ReleaseControl.syntheticVerification.authorized, false);
   assert.equal(manifest.r206ReleaseControl.syntheticVerification.completed, false);
   assert.equal(manifest.r206ReleaseControl.cleanupCompleted, false);
-  assert.equal(manifest.r206ReleaseControl.releaseCloseoutApproved, false);
-  assert.equal(reconciliation?.status, "CLOSEOUT REVIEW REQUIRED");
-  assert.equal(reconciliation?.independentCloseoutReviewPending, true);
+  assert.equal(manifest.r206ReleaseControl.cleanupApproved, true);
+  assert.equal(manifest.r206ReleaseControl.releaseCloseoutApproved, true);
+  assert.equal(
+    reconciliation?.status,
+    "R2-06 RELEASE CLOSEOUT APPROVED — MIXED EVIDENCE ACCEPTED",
+  );
+  assert.equal(reconciliation?.independentCloseoutReviewPending, false);
+  assert.equal(
+    reconciliation?.approvedCloseoutBaselineSha,
+    "adb9c4b91d9243534080f84f288d7f68bf446757",
+  );
 });
 
 test("historic authorization and run directory are consumed and non-reusable", () => {
@@ -139,7 +147,7 @@ test("public reconciliation evidence contains no obvious private identifiers or 
   assert.doesNotMatch(publicEvidence, /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i);
 });
 
-test("evidence documents preserve the mixed status and false closeout", () => {
+test("R2-06Q source documents preserve mixed status and their pre-approval state", () => {
   const production = fs.readFileSync(
     path.join(root, reconciliation.evidence.productionReconciliation.path),
     "utf8",
@@ -153,6 +161,15 @@ test("evidence documents preserve the mixed status and false closeout", () => {
   assert.match(production, /releaseCloseoutApproved: false/);
   assert.match(readiness, /This document does not approve release closeout\./);
   assert.match(readiness, /R2-06Q EVIDENCE RECONCILIATION READY FOR INDEPENDENT CLOSEOUT REVIEW/);
+  const approval = fs.readFileSync(
+    path.join(root, reconciliation.evidence.releaseCloseoutApproval.path),
+    "utf8",
+  );
+  assert.match(approval, /R2-06 RELEASE CLOSEOUT APPROVED — MIXED EVIDENCE ACCEPTED/);
+  assert.doesNotMatch(
+    approval,
+    /\b(?:all )?21(?:\/21| of 21|-of-21) (?:actions )?(?:passed|pass) directly in production\b/i,
+  );
 });
 
 const failures = tests.filter((entry) => entry.status === "FAIL");
