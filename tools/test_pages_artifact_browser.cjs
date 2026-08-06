@@ -6,11 +6,15 @@ const { chromium } = require("playwright");
 
 const root = path.resolve(__dirname, "..");
 const artifactRoot = path.join(root, ".pages-artifact");
+const currentVersion = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8")).version;
+const currentCacheName = `laxhornet-${currentVersion}`;
+const priorVersion = `v${Number(currentVersion.replace(/^v/, "")) - 1}`;
+const priorCacheName = `laxhornet-${priorVersion}`;
 const host = "127.0.0.1";
 const configuredOrigin = String(process.env.LAXHORNET_PAGES_BASE_URL || "").replace(/\/+$/, "");
 let serveLegacyWorker = false;
-const legacyV284Worker = `
-const CACHE_NAME = "laxhornet-v284";
+const legacyPriorWorker = `
+const CACHE_NAME = "${priorCacheName}";
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(["/", "/app.html", "/version.json"])).then(() => self.skipWaiting()));
 });
@@ -50,7 +54,7 @@ function startServer() {
         "Cache-Control": "no-store",
         "Content-Type": "application/javascript; charset=utf-8",
       });
-      response.end(legacyV284Worker);
+      response.end(legacyPriorWorker);
       return;
     }
     const file = artifactFile(request.url);
@@ -109,18 +113,18 @@ async function run() {
   });
 
   try {
-    console.log(configuredOrigin ? "STEP seed cache" : "STEP install legacy v284 worker");
+    console.log(configuredOrigin ? "STEP seed cache" : `STEP install legacy ${priorVersion} worker`);
     serveLegacyWorker = !configuredOrigin;
     await page.goto(`${origin}/version.json`, { waitUntil: "domcontentloaded" });
     if (configuredOrigin) {
-      await page.evaluate(async () => {
-        const current = await caches.open("laxhornet-v284");
+      await page.evaluate(async ({ currentCacheName, priorCacheName }) => {
+        const current = await caches.open(currentCacheName);
         await current.put("/tools/internal-probe.mjs", new Response("internal"));
-        const previous = await caches.open("laxhornet-v283");
+        const previous = await caches.open(priorCacheName);
         await previous.put("/legacy", new Response("legacy"));
         await navigator.serviceWorker.register("/service-worker.js", { updateViaCache: "none" });
         await navigator.serviceWorker.ready;
-      });
+      }, { currentCacheName, priorCacheName });
       await page.reload({ waitUntil: "domcontentloaded" });
     } else {
       await page.evaluate(async () => {
@@ -129,33 +133,42 @@ async function run() {
       });
       await page.reload({ waitUntil: "domcontentloaded" });
       assert.equal(await page.evaluate(() => Boolean(navigator.serviceWorker.controller)), true);
-      await page.evaluate(async () => {
-        const current = await caches.open("laxhornet-v284");
+      await page.evaluate(async ({ currentCacheName, priorCacheName }) => {
+        const current = await caches.open(priorCacheName);
         await current.put("/tools/internal-probe.mjs", new Response("internal"));
-        const previous = await caches.open("laxhornet-v283");
+        const previous = await caches.open(`laxhornet-v${Number(priorCacheName.replace(/^laxhornet-v/, "")) - 1}`);
         await previous.put("/legacy", new Response("legacy"));
-      });
-      console.log("STEP upgrade legacy v284 worker to hardened v284 worker");
+      }, { currentCacheName, priorCacheName });
+      console.log(`STEP upgrade legacy ${priorVersion} worker to ${currentVersion} worker`);
       serveLegacyWorker = false;
       await page.evaluate(async () => {
         const registration = await navigator.serviceWorker.getRegistration();
         await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error("same-version worker did not activate")), 10_000);
+          const timeout = setTimeout(() => reject(new Error("new release worker did not activate")), 10_000);
           navigator.serviceWorker.addEventListener("controllerchange", () => {
             clearTimeout(timeout);
             resolve();
           }, { once: true });
-          registration.update().catch(reject);
+          registration.update().then(async () => {
+            const waiting = registration.waiting || registration.installing;
+            if (!waiting) throw new Error("new release worker was not installed");
+            if (waiting.state !== "installed") {
+              await new Promise((installed) => waiting.addEventListener("statechange", () => {
+                if (waiting.state === "installed") installed();
+              }));
+            }
+            waiting.postMessage({ type: "SKIP_WAITING" });
+          }).catch(reject);
         });
       });
     }
-    await page.waitForFunction(async () => {
+    await page.waitForFunction(async (currentCacheName) => {
       const keys = await caches.keys();
-      const current = await caches.open("laxhornet-v284");
+      const current = await caches.open(currentCacheName);
       return keys.length === 1
-        && keys[0] === "laxhornet-v284"
+        && keys[0] === currentCacheName
         && !(await current.match("/tools/internal-probe.mjs"));
-    });
+    }, currentCacheName);
     failures.length = 0;
 
     console.log("STEP online app");
@@ -166,7 +179,7 @@ async function run() {
       true,
       "service worker must control the artifact app",
     );
-    assert.match(await page.locator("body").innerText(), /App version:\s*v284/i);
+    assert.match(await page.locator("body").innerText(), new RegExp(`App version:\\s*${currentVersion}`, "i"));
     assert.equal(await page.getByRole("button", { name: "Watch Live" }).isVisible(), true);
     assert.equal(
       await page.evaluate(() => typeof window.trackedTimeSummary === "function"),

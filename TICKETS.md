@@ -2045,6 +2045,95 @@ Evidence:
 Required before merge: exact-head CI and independent exact-PR-SHA Level 3
 review of the R2-06R closeout pull request.
 
+### QA-R2-06-S — Post-R2-06 user-centered stabilization
+
+Status: `QA-S1 INTEGRATED AT V285 — EXACT-HEAD REVIEW PENDING`
+
+Risk level: `LEVEL 3`
+
+Branch: `qa/post-r2-06-user-centered-audit`
+
+Starting point: `f5c8ca214ba3fcf5b30d5bf506517ad7a414fa37`
+
+#### Goal and scope
+
+Audit the complete disposable user journey after R2-06 closeout, correct only
+reproducible Important continuity regressions, retain lower-severity findings
+as backlog, and leave production and closed R2-06 evidence untouched.
+
+#### Confirmed Important fixes
+
+- Home now identifies an existing active game and offers `Resume Live Game`
+  with its actual player, period, and opponent instead of offering a misleading
+  new-game action.
+- Opening the just-saved review now selects the player attached to that game,
+  preventing an empty review and zero-game season after a mid-game player
+  selection change.
+- A repeatable isolated browser journey covers startup, two-player selection,
+  setup, event capture, Undo, recovery, offline reload, save/end/review,
+  season totals, account isolation, durable local deletion, Live Share
+  non-creation, sign-out, and reopen; final result is `41/41`.
+
+Evidence:
+
+- `review-evidence/post-r2-06-user-centered-qa/USER_CENTERED_QA_AUDIT.md`
+- `review-evidence/post-r2-06-user-centered-qa/QA_FINDINGS_BACKLOG.md`
+
+QA-S1 separates immutable historical R2-06 evidence from the latest product
+runtime. The repository runtime/cache identity advances together to `v285` /
+`laxhornet-v285`, while production remains `v284` and deployment is not
+authorized. The historical `r206ReleaseControl` object remains unchanged; the
+new `postR206Stabilization` manifest section records exact current hashes.
+
+Verification: focused user journey `41/41`, browser runtime `11/11`, browser
+session `30/30`, hydration `32/32` plus disposable browser pass, tombstones
+`33/33`, concurrency `8/8`, sync characterization `32/32`, local storage
+`28/28`, tracked-time browser `33/33`, and Pages contracts `21/21` passed.
+QA-S1 focused gates and the final canonical-plus-additive regression (`52/52`)
+pass. Exact-head portable/Docker CI must pass before independent exact-PR-SHA
+review. R2-06 remains closed. R2-07 remains proposed, unapproved, and unstarted.
+
+Release integration evidence:
+
+- `review-evidence/post-r2-06-user-centered-qa/STABILIZATION_RELEASE_INTEGRATION.md`
+
+### R2-07 — Add game-field versions and conflict records
+
+Status: `PROPOSED — RECOMMENDED NEXT ROLLOUT TICKET`
+
+Risk level: `LEVEL 3`
+
+Branch: `feature/r2-07-game-field-versions-conflicts`
+
+#### Goal
+
+Detect concurrent edits to score, game status, game metadata, and tracked clock
+without silent last-write-wins behavior, while preserving the completed local-
+first, hydration, durable-operation, and tombstone guarantees.
+
+#### In scope
+
+- Server game version and client base-version write contract.
+- Deterministic merge rules for non-overlapping fields.
+- Immutable, account-scoped conflict records and bounded resolution contract.
+- Two-device score/status/clock, reconnect, and out-of-order request tests.
+
+#### Out of scope
+
+- Automated conflict adjudication, broad UI redesign, R2-08 sync-status UI,
+  R2-09 end-to-end certification, and production activation.
+
+#### Acceptance criteria
+
+- Same-field stale writes produce an explicit conflict instead of silently
+  replacing newer evidence.
+- Approved non-overlapping changes merge deterministically.
+- Offline capture remains local-first and no completed R2-03 through R2-06
+  guarantee regresses.
+- Migration, rollback/recovery, exact-PR-SHA review, synthetic non-production
+  evidence, and separate production-release authority are complete before any
+  activation.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

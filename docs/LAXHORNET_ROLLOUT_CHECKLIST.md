@@ -141,6 +141,41 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
 
 # 3. Active Work Package
 
+## Post-R2-06 User-Centered Stabilization Checkpoint
+
+**Status:** [~] Stabilization integrated at v285; exact-head CI and independent review pending
+
+**Risk level:** Level 3
+
+**Branch:** `qa/post-r2-06-user-centered-audit`
+
+**Audited baseline:** `f5c8ca214ba3fcf5b30d5bf506517ad7a414fa37`
+
+- [x] R2-06 remained closed and production execution remained disabled.
+- [x] Local/disposable startup, player/team selection, tracking, Undo,
+  interruption recovery, offline reload, reconnect, save/end, Review, Season,
+  account isolation, durable local deletion, Live Share non-creation, sign-out,
+  and reopen were exercised.
+- [x] Narrow phone, standard phone, mobile landscape, and desktop viewports were
+  inspected with retained screenshots.
+- [x] Blocker count: `0`.
+- [x] Important count: `2`, both corrected on the QA branch.
+- [x] Unresolved Important user risk: `0`.
+- [x] Unresolved backlog: `2` Polish, `1` Future; none blocks the next rollout phase.
+- [x] Repeatable disposable browser journey: `41/41` passed.
+- [x] QA-S1 integrates both Important fixes under repository runtime marker
+  `v285` and cache marker `laxhornet-v285`; production remains at `v284` and
+  deployment is not authorized.
+- [x] Closed R2-06 historical controls remain immutable while the separate
+  post-R2-06 manifest section records exact stabilization runtime hashes.
+- [x] Complete canonical-plus-additive regression passed `52/52`.
+- [~] Exact-head portable/Docker CI is required before independent exact-PR-SHA
+  review.
+- [ ] Recommended next rollout ticket: approve and execute proposed R2-07,
+  Add game-field versions and conflict records, as a separate Level 3 ticket.
+- [x] No production access, deployment, migration, Supabase mutation, retained
+  tombstone change, or unrelated rollout-stage advancement occurred.
+
 ## R2-04 — Durable Game and Clock Operation States
 
 **Status:** [x] Complete

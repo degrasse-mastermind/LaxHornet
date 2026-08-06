@@ -1,5 +1,5 @@
-const CACHE_NAME = "laxhornet-v284";
-const RUNTIME_CONFIG_ASSET = "./runtime-config.js?v=284";
+const CACHE_NAME = "laxhornet-v285";
+const RUNTIME_CONFIG_ASSET = "./runtime-config.js?v=285";
 const PUBLIC_PATH_ALLOWLIST = new Set([
   "/",
   "/CNAME",
@@ -68,16 +68,16 @@ const APP_ASSETS = [
   "./launch-kit/parent-email.html",
   "./launch-kit/admin-launch-checklist.html",
   "./launch-kit/laxhornet-qr.png",
-  "./landing.css?v=284",
-  "./styles.css?v=284",
+  "./landing.css?v=285",
+  "./styles.css?v=285",
   "./assets/supabase.min.js?v=253",
   RUNTIME_CONFIG_ASSET,
-  "./event-operation-service.js?v=284",
-  "./next-focus-recommendation.js?v=284",
-  "./tracked-playing-time-service.js?v=284",
-  "./public-event-semantics.js?v=284",
-  "./app.js?v=284",
-  "./manifest.json?v=284",
+  "./event-operation-service.js?v=285",
+  "./next-focus-recommendation.js?v=285",
+  "./tracked-playing-time-service.js?v=285",
+  "./public-event-semantics.js?v=285",
+  "./app.js?v=285",
+  "./manifest.json?v=285",
   "./assets/LHicon.png?v=1",
   "./assets/LHbanner.png?v=3",
   "./assets/honeycombblack.png?v=1",

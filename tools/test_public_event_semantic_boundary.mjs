@@ -107,14 +107,16 @@ for (const poisonedEvidence of [
 const app = read("app.js");
 const appHtml = read("app.html");
 const worker = read("service-worker.js");
+const releaseVersion = JSON.parse(read("version.json")).version;
+const releaseQuery = releaseVersion.replace(/^v/, "v=");
 const migration = read("supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql");
 const rollback = read("supabase/rollback/20260728193942_v284_public_event_semantic_boundary_rollback.sql");
 
 assert.ok(
-  appHtml.indexOf("public-event-semantics.js?v=284") < appHtml.indexOf("app.js?v=284"),
+  appHtml.indexOf(`public-event-semantics.js?${releaseQuery}`) < appHtml.indexOf(`app.js?${releaseQuery}`),
   "semantic resolver loads before app.js",
 );
-assert.match(worker, /\.\/public-event-semantics\.js\?v=284/);
+assert.match(worker, new RegExp(`\\./public-event-semantics\\.js\\?${releaseQuery}`));
 assert.match(app, /if \(!evidence\) return null;/);
 assert.match(app, /const eventCount = publicEvents\.length;/);
 assert.match(app, /suppressPrivateTrustSpineRecord/);

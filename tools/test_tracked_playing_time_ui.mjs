@@ -23,6 +23,7 @@ const app = source("app.js");
 const appHtml = source("app.html");
 const styles = source("styles.css");
 const worker = source("service-worker.js");
+const releaseVersion = JSON.parse(source("version.json")).version;
 const migration = source("supabase/migrations/20260727000000_tracked_playing_time_operations.sql");
 const results = [];
 
@@ -371,15 +372,15 @@ test("existing Game Review keeps its prior sections", () => {
   assert.match(app, /renderTrackedPlayingTimeReview/);
 });
 
-test("service worker caches the tracked-time script with the v284 release cache", () => {
-  assert.match(worker, /\.\/tracked-playing-time-service\.js\?v=284/);
-  assert.match(worker, /const CACHE_NAME = "laxhornet-v284"/);
+test("service worker caches the tracked-time script with the current release cache", () => {
+  assert.match(worker, new RegExp(`\\./tracked-playing-time-service\\.js\\?${releaseVersion.replace(/^v/, "v=")}`));
+  assert.match(worker, new RegExp(`const CACHE_NAME = "laxhornet-${releaseVersion}"`));
 });
 
 test("tracked-time service loads before app.js", () => {
   assert.ok(
-    appHtml.indexOf("tracked-playing-time-service.js?v=284")
-      < appHtml.indexOf("app.js?v=284"),
+    appHtml.indexOf(`tracked-playing-time-service.js?${releaseVersion.replace(/^v/, "v=")}`)
+      < appHtml.indexOf(`app.js?${releaseVersion.replace(/^v/, "v=")}`),
   );
 });
 

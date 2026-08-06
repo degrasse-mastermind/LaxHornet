@@ -131,7 +131,10 @@ function startServer() {
       }
       let body = fs.readFileSync(resolved.target);
       if (resolved.missingConfig && resolved.target.endsWith("app.html")) {
-        body = Buffer.from(body.toString("utf8").replace(/\s*<script src="runtime-config\.js\?v=284" defer><\/script>/, ""));
+        body = Buffer.from(body.toString("utf8").replace(
+          `<script src="runtime-config.js?${releaseVersion.replace(/^v/, "v=")}" defer></script>`,
+          "",
+        ));
       }
       response.writeHead(200, {
         "Cache-Control": "no-store",

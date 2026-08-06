@@ -432,7 +432,7 @@ const GAME_SCOPE_TYPES = Object.freeze({
 const PUBLIC_LIVE_SHARE_POLL_MS = 4000;
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v284";
+const APP_VERSION = "v285";
 window.LAXHORNET_DISCLOSURE_STATUS = Object.freeze({
   appVersion: APP_VERSION,
   ready: SECURE_DISCLOSURE_RUNTIME_READY,
@@ -2207,6 +2207,15 @@ function playerHasAnyGames(player = state.player) {
   const normalized = normalizePlayer(player);
   const matchesPlayer = (game) => gameBelongsToPlayer(game, normalized);
   return Boolean((state.activeGame && matchesPlayer(state.activeGame)) || state.games.some(matchesPlayer));
+}
+
+function selectPlayerForGame(game = {}) {
+  const player = state.players.find((item) => gameBelongsToPlayer(game, item));
+  if (!player) return false;
+  state.activePlayerId = player.id;
+  syncActivePlayer();
+  if (state.player.teamId) state.activeTeamId = state.player.teamId;
+  return true;
 }
 
 function setActivePlayer(playerId, message = "") {
@@ -10559,7 +10568,7 @@ function operationalHealthSnapshot() {
     exportAuditReady: Boolean(TRUSTED_DISCLOSURE_FEATURES.exportAuditRpc && capabilities?.exportAudit),
     anonymousTables: "Denied by release contract",
     legacyCompatibility: "Present",
-    manifestRelease: "v284",
+    manifestRelease: APP_VERSION,
   };
 }
 
@@ -10735,15 +10744,17 @@ function renderNoApprovedPlayerHome() {
 
 function renderHomeReadyCard() {
   const lastGame = latestVisibleGame();
-  const playerName = normalizePlayer(state.player).name || playerTitle(state.player);
+  const activeGame = state.activeGame;
+  const player = activeGame ? gamePlayerSnapshot(activeGame) : state.player;
+  const playerName = normalizePlayer(player).name || playerTitle(player);
   return `
     <section class="card pad home-next-card">
       <div>
-        <h3>Ready to track ${escapeHTML(playerName)}?</h3>
-        <p class="muted small">${escapeHTML(playerReadySubcopy(state.player))}</p>
+        <h3>${activeGame ? `${escapeHTML(playerName)}&apos;s game is in progress` : `Ready to track ${escapeHTML(playerName)}?`}</h3>
+        <p class="muted small">${activeGame ? `${escapeHTML(activeGame.currentQuarter)} vs ${escapeHTML(activeGame.opponent || "Opponent")}` : escapeHTML(playerReadySubcopy(state.player))}</p>
       </div>
       <div class="action-grid compact">
-        <button class="btn brand positive" type="button" data-nav="start">Start New Game</button>
+        <button class="btn brand positive" type="button" data-nav="${activeGame ? "live" : "start"}">${activeGame ? "Resume Live Game" : "Start New Game"}</button>
         <button class="btn brand neutral" type="button" ${lastGame ? `data-review="${escapeHTML(lastGame.id)}"` : `data-nav="past"`}>Review Last Game</button>
       </div>
     </section>
@@ -15446,8 +15457,11 @@ function handleClick(event) {
     }
     if (action.dataset.action === "confirm-end-game") confirmEndGame();
     if (action.dataset.action === "open-saved-review") {
+      const game = state.games.find((item) => item.id === action.dataset.gameId);
+      if (game) selectPlayerForGame(game);
       state.reviewGameId = action.dataset.gameId;
       state.gameSavedSummaryId = "";
+      persistAll();
       navigate("review");
     }
     if (action.dataset.action === "copy-family-summary") copyFamilySummary(action.dataset.gameId);

@@ -1,9 +1,9 @@
 # LaxHornet Repository Current State
 
-Last reviewed: 2026-08-01
-Baseline branch: `main`
-Baseline commit: `adb9c4b91d9243534080f84f288d7f68bf446757`
-Current repository release marker: `v284`
+Last reviewed: 2026-08-05
+Baseline branch: `qa/post-r2-06-user-centered-audit`
+Baseline commit: `c956c025e99f97cffae7814bdcd741b1b52764b6`
+Current repository release marker: `v285`
 Current production marker: `v284` at reconciled R2-06A runtime/catalog state;
 R2-06 release closeout approved through reconciled mixed evidence
 
@@ -339,12 +339,35 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   Auth, and browser residue is zero. Binary direct-production completion stays
   false, production execution stays disabled, no rerun or new authorization
   occurred, and unrelated rollout stages remain open.
+- The 2026-08-05 post-R2-06 user-centered stabilization checkpoint audited
+  baseline `f5c8ca214ba3fcf5b30d5bf506517ad7a414fa37` entirely with local,
+  disposable, isolated browser and PGlite environments. The final disposable
+  journey passes `41/41`: startup, player/team selection, setup, common event
+  capture, Undo, player switching without game reassignment, active-game
+  recovery, service-worker-controlled offline reload, reconnect, save/end,
+  review, season totals, account isolation, durable local deletion, Live Share
+  non-creation, sign-out, and reopen. No production access or credential use
+  occurred, R2-06 remained closed, and no unrelated rollout stage advanced.
+- Two Important continuity regressions are corrected on branch
+  `qa/post-r2-06-user-centered-audit`: Home exposes the actual active game with
+  `Resume Live Game`, and the saved-review CTA selects the game owner before
+  opening Review. There are zero Blocker findings and zero unresolved Important
+  user findings; two Polish items and one Future coverage item are backlogged.
+  QA-S1 integrates those fixes under repository runtime marker `v285` and cache
+  marker `laxhornet-v285`. A separate manifest section owns current runtime
+  hashes while the closed R2-06 control object and historical hashes remain
+  unchanged. Production remains `v284`; deployment is not authorized.
+  Focused QA-S1 gates and complete canonical-plus-additive regression (`52/52`)
+  pass; exact-head portable/Docker CI and independent review remain required.
+- The recommended next rollout ticket is proposed R2-07, game-field versions
+  and conflict records. It remains Level 3 and does not receive migration,
+  production, merge, or deployment authority from the QA checkpoint.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
-- The v284 cache marker remains unchanged. The updated service worker purges
+- The repository cache marker is `laxhornet-v285`. The updated service worker purges
   previously cached non-allowlisted same-origin paths during activation and
   no longer caches unknown paths. A same-release replacement worker activates
-  immediately when the existing v284 cache proves an older v284 worker is
+  immediately when the existing cache proves an older worker is
   already installed.
 
 ## Local development
