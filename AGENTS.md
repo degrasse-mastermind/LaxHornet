@@ -48,6 +48,18 @@
 
 - Treat the existing Supabase project as production-connected.
 - The project-scoped Supabase MCP configuration is read-only. Never use MCP to apply migrations, deploy functions, alter production data, or change configuration.
+- An authorized pull request may trigger the configured GitHub integration to
+  apply repository migrations automatically to a temporary Supabase Preview
+  branch. Treat that as allowed CI verification only when the branch is
+  isolated from production, contains no copied production data, uses separate
+  credentials, changes no production migration history, performs no production
+  deployment, follows the pull-request lifecycle, and retains no secrets in
+  evidence. Report it as
+  `AUTOMATIC ISOLATED SUPABASE PREVIEW MIGRATION — ACCEPTED CI VERIFICATION`.
+  This does not authorize local/manual application, Supabase CLI application to
+  a linked main or production project, Dashboard application, persistent shared
+  environments, migration-history repair, deployment/activation, production
+  data, or production credentials.
 - Database changes must be represented by reviewed, timestamped SQL files under `supabase/migrations/`, with rollback or recovery documentation when appropriate.
 - Preserve migration provenance and the release manifest. Never rewrite or reorder historical migrations.
 - Never place service-role keys, database passwords, access tokens, refresh tokens, private JWTs, or other secrets in browser code, committed files, prompts, logs, fixtures, screenshots, or evidence packages.

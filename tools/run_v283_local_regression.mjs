@@ -55,6 +55,8 @@ const additivePaths = [
   "supabase/migrations/20260730151714_durable_game_tombstone_concurrency.sql",
   "supabase/rollback/20260730151714_durable_game_tombstone_concurrency_rollback.sql",
   "supabase/tests/durable_game_tombstone_concurrency.sql",
+  "supabase/migrations/20260806143128_r207a_dormant_concurrency_foundation.sql",
+  "supabase/rollback/20260806143128_r207a_dormant_concurrency_foundation_rollback.sql",
 ].join(",");
 
 const rootJavaScript = readdirSync(root)
@@ -72,6 +74,7 @@ const tests = [
   { name: "R2-06P disposable browser hydration", command: process.execPath, args: ["tools/test_hydration_tombstone_browser.cjs"] },
   { name: "durable legacy game tombstone migration", command: process.execPath, args: ["tools/test_game_tombstone_migration.mjs"] },
   { name: "durable legacy game tombstone concurrency", command: process.execPath, args: ["tools/test_game_tombstone_concurrency.mjs"] },
+  { name: "R2-07A dormant concurrency foundation", command: process.execPath, args: ["tools/test_r207a_dormant_concurrency.mjs"] },
   { name: "sync error classification contracts", command: process.execPath, args: ["tools/test_sync_error_classification.mjs"] },
   { name: "sync characterization contracts", command: process.execPath, args: ["tools/test_sync_characterization.mjs"] },
   { name: "tracked playing time service contracts", command: process.execPath, args: ["tools/test_tracked_playing_time_service.mjs"] },

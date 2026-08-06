@@ -1,13 +1,13 @@
 # LaxHornet Repository Current State
 
-Last reviewed: 2026-08-05
+Last reviewed: 2026-08-06
 Baseline branch: `main`
-Baseline commit: `730655eb8e98ed02eddf2d04d0ca1e7a5438905e`
+Baseline commit: `75acbd1d7ee1204d450b3715e41b53ebc6081b37`
 Current repository release marker: `v285`
 Current production marker: `v285` from Pages run `31061426334` at approved SHA
 `9e434e33534a1b348b19e2081b91d7e0724299fc`;
 R2-06 release closeout approved through reconciled mixed evidence;
-R2-07 designed, implementation authorization pending
+R2-07 design closed; R2-07A dormant foundation authorized on a feature branch
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
 
@@ -399,9 +399,34 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   game tombstone/current-authority checks; atomic mutation/identity/result/
   history; and explicit cross-game, uniqueness, atomicity, independence, and
   deadlock tests. No clean independent Level 3 PASS exists until review of the
-  new exact remediation PR head. R2-07A, implementation,
-  migration, production, merge, deployment, and activation remain unauthorized.
-  Repository and production runtime remain v285.
+  exact PR #63 head, which merged as
+  `75acbd1d7ee1204d450b3715e41b53ebc6081b37`. David authorized only R2-07A
+  with direct aggregate score, idempotent delta/correction operations, proven
+  non-overlap/commutative merges, bounded completed-game factual metadata
+  correction, no reopen, optimistic clock revision with immutable command
+  history, no device lease, unchanged v1, and no approved retention deletion.
+  The R2-07A feature branch adds repository-only dormant migration/RPC/test
+  assets: global actor/operation serialization before the R2-06A game lock,
+  six field-group/game revisions, private append-only operation/change/
+  conflict/resolution/clock-command history, forced RLS, inert public v2
+  signatures, disabled retention control, and refusal-based pre-activation
+  rollback. Exact head `b071dc6ffc09e2f28f965bcdabe6a4b4d632d89b` failed
+  independent implementation review because completed games accepted ordinary
+  score deltas and copied owner identity disclosed team tombstones. The feature
+  branch remediation now rejects ordinary completed-game score/clock writes,
+  requires current lifecycle/status/score bases plus an allowlisted correction
+  reason for private completed-game correction, and requires current
+  roster-tracking authority before team tombstone disclosure. Its disposable
+  PostgreSQL matrix passes all original `49` checks plus `22` adversarial
+  remediation assertions (`71/71`) with zero residue. A fresh exact-head Level
+  3 review remains required. No local, manual, CLI, linked-main, or production
+  migration was applied. The configured GitHub integration automatically applied the
+  migration to an isolated, data-less, separately credentialed ephemeral
+  Supabase Preview branch for PR #64 validation; this is
+  `AUTOMATIC ISOLATED SUPABASE PREVIEW MIGRATION — ACCEPTED CI VERIFICATION`.
+  Production migration history and deployment remain unchanged. R2-07B+,
+  production, deployment, activation, release/cache changes, and merge remain
+  unauthorized. Repository and production runtime remain v285.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The repository cache marker is `laxhornet-v285`. The updated service worker purges
