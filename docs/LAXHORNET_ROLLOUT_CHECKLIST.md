@@ -143,7 +143,7 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
 
 ## Post-R2-06 User-Centered Stabilization Checkpoint
 
-**Status:** [~] V285 production reconciled; exact-head CI and independent review pending
+**Status:** [x] V285 production reconciled; exact-head CI and independent review passed; merged
 
 **Risk level:** Level 3
 
@@ -179,12 +179,64 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
 - [x] Closed R2-06 historical controls remain immutable while the separate
   post-R2-06 manifest section records exact stabilization runtime hashes.
 - [x] Complete canonical-plus-additive regression passed `52/52`.
-- [~] Exact-head portable/Docker CI is required before independent exact-PR-SHA
-  review.
-- [ ] Recommended next rollout ticket: approve and execute proposed R2-07,
-  Add game-field versions and conflict records, as a separate Level 3 ticket.
+- [x] Exact-head portable/Docker CI and independent exact-PR-SHA Level 3 review
+  passed at `1ddb31b58bd7eab88abcd2fd7fe508a291212fd9`; PR #61 merged as
+  `730655eb8e98ed02eddf2d04d0ca1e7a5438905e`.
+- [x] Historical checkpoint: Recommended next rollout ticket: proposed R2-07,
+  game-field versions and conflict records; this describes the pre-design
+  v285 closeout state and is superseded by the design record below.
+- [x] Complete R2-07 design as a separate Level 3 planning task.
+- [ ] Obtain exact design-head independent Level 3 review and David's decision
+  before authorizing any R2-07 implementation phase.
 - [x] Production access was limited to public static reads and isolated local
   browser fixtures; no real account or production credentials were used.
+
+## R2-07 — Game-Field Versions and Conflict Records Design
+
+**Status:** [~] Designed — implementation authorization pending
+
+**Risk level:** Level 3 — synchronization, schema/RPC, conflict, offline,
+authorization, and release semantics
+
+**Design branch:** `design/r2-07-game-field-versions-conflicts`
+
+**Design baseline:** `730655eb8e98ed02eddf2d04d0ca1e7a5438905e`
+
+- [x] Inventory identity, metadata, live state, score, event-derived state,
+  tracked clock, lifecycle, sharing, and deletion authority.
+- [x] Evaluate game-wide revision, field-group revisions, and full
+  operation/event sourcing.
+- [x] Recommend server-assigned field-group revisions plus immutable
+  operation/change history and an aggregate game revision.
+- [x] Define deterministic non-overlap, score, status, clock, event, deletion,
+  queue-blocking, and resolution rules.
+- [x] Define immutable private conflicts, append-only resolutions, privacy
+  allowlists, RLS/grants, idempotency, observability, and retention proposal.
+- [x] Define dormant v2 RPCs and an atomic legacy-client upgrade-required
+  cutover that never treats missing bases as current.
+- [x] Define populated-data migration, pre-activation rollback, post-activation
+  fail-closed recovery, two-device tests, and bounded phases R2-07A–R2-07F.
+- [x] Preserve local-first tracking, R2-03 hydration, R2-04/R2-05 durable
+  operation/error behavior, R2-06 tombstones, Live Share privacy, and v285 PWA
+  behavior in the design.
+- [ ] Obtain independent Level 3 review against the exact design PR SHA.
+- [ ] Obtain David's explicit decisions on score authority, allowed merges,
+  post-completion edits, no initial reopen, clock authority, legacy cutover,
+  minimum resolution UX, retention, and phase authorization.
+- [ ] Authorize and implement any phase. No implementation is started by this
+  design record.
+
+Design artifacts:
+
+- `review-evidence/r2-07-game-field-versions-conflicts/R2-07_DESIGN.md`
+- `review-evidence/r2-07-game-field-versions-conflicts/R2-07_CONFLICT_MATRIX.md`
+- `review-evidence/r2-07-game-field-versions-conflicts/R2-07_MIGRATION_AND_ROLLBACK_PLAN.md`
+- `review-evidence/r2-07-game-field-versions-conflicts/R2-07_TEST_PLAN.md`
+- `review-evidence/r2-07-game-field-versions-conflicts/R2-07_IMPLEMENTATION_SEQUENCE.md`
+
+Planning boundary: no application code, SQL migration, RPC, release marker,
+production access, Supabase mutation, deployment, production verification, or
+activation is authorized.
 
 ## R2-04 — Durable Game and Clock Operation States
 
@@ -774,6 +826,11 @@ Do not combine these into one large Codex task. Each item requires one approved 
 - [x] Keep production mutation and release out of the R2-05 feature ticket.
 - [x] Keep production mutation, migration application, and release out of the
   R2-06 feature ticket.
+- [x] Complete an implementation-ready R2-07 design for field-group versions,
+  immutable conflict evidence, deterministic merging, clock/event concurrency,
+  legacy compatibility, migration/rollback, and two-device certification.
+- [ ] Independently review the exact R2-07 design head and obtain David's
+  approval before authorizing R2-07A or any later implementation/release phase.
 
 **Gate to advance:** No silent local overwrite; offline operations replay exactly once where server contracts support it; conflicts are detectable and unresolved evidence remains recoverable.
 

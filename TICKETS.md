@@ -2047,7 +2047,7 @@ review of the R2-06R closeout pull request.
 
 ### QA-R2-06-S — Post-R2-06 user-centered stabilization
 
-Status: `V285 PRODUCTION RECONCILED — EVIDENCE REVIEW PENDING`
+Status: `V285 PRODUCTION RECONCILED — MERGED; INDEPENDENT EXACT-HEAD REVIEW PASSED`
 
 Risk level: `LEVEL 3`
 
@@ -2121,15 +2121,21 @@ Evidence:
 - `review-evidence/post-r2-06-user-centered-qa/V285_PRODUCTION_DEPLOYMENT.md`
 - `review-evidence/post-r2-06-user-centered-qa/V285_PRODUCTION_RECONCILIATION.json`
 
-Exact-head CI and independent Level 3 review remain required before merge.
+PR #61 passed exact-head portable/Docker CI and independent Level 3 review at
+head `1ddb31b58bd7eab88abcd2fd7fe508a291212fd9`, then merged to `main` as
+`730655eb8e98ed02eddf2d04d0ca1e7a5438905e`. The merge records the completed
+v285 reconciliation and authorizes no R2-07 implementation.
 
 ### R2-07 — Add game-field versions and conflict records
 
-Status: `PROPOSED — RECOMMENDED NEXT ROLLOUT TICKET`
+Status: `DESIGNED — IMPLEMENTATION AUTHORIZATION PENDING`
 
 Risk level: `LEVEL 3`
 
-Branch: `feature/r2-07-game-field-versions-conflicts`
+Design branch: `design/r2-07-game-field-versions-conflicts`
+
+Implementation branches: separate bounded branches for R2-07A through R2-07F;
+none authorized by the design task.
 
 #### Goal
 
@@ -2159,6 +2165,35 @@ first, hydration, durable-operation, and tombstone guarantees.
 - Migration, rollback/recovery, exact-PR-SHA review, synthetic non-production
   evidence, and separate production-release authority are complete before any
   activation.
+
+#### Design decision
+
+Recommend field-group optimistic concurrency with server-assigned monotonic
+game/metadata/score/status/roster-context/sharing revisions, an aggregate game
+revision, immutable operation/change history for proven non-overlap merges, the
+existing independently versioned clock/event authorities, immutable private
+conflicts, and append-only resolutions. Score is a directly stored aggregate
+with idempotent delta/correction operations because current player events do
+not constitute a complete scoreboard ledger.
+
+v285 clients have no truthful base versions. The proposed migration path adds
+dormant versioned RPCs, deploys a compatible client, then under separate
+production authorization atomically enables v2 and turns the legacy v1 write
+RPC into an actionable upgrade-required stub. Missing bases are never treated
+as current.
+
+Design artifacts:
+
+- `review-evidence/r2-07-game-field-versions-conflicts/R2-07_DESIGN.md`
+- `review-evidence/r2-07-game-field-versions-conflicts/R2-07_CONFLICT_MATRIX.md`
+- `review-evidence/r2-07-game-field-versions-conflicts/R2-07_MIGRATION_AND_ROLLBACK_PLAN.md`
+- `review-evidence/r2-07-game-field-versions-conflicts/R2-07_TEST_PLAN.md`
+- `review-evidence/r2-07-game-field-versions-conflicts/R2-07_IMPLEMENTATION_SEQUENCE.md`
+
+Design task boundaries: no application code, SQL migration, RPC change,
+release marker, production access, Supabase mutation, deployment, or rollout
+activation. Exact design-head independent Level 3 review is required before
+David decides whether to authorize any implementation phase.
 
 ## Ticket template
 
