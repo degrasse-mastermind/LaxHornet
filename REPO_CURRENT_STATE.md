@@ -339,6 +339,26 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   Auth, and browser residue is zero. Binary direct-production completion stays
   false, production execution stays disabled, no rerun or new authorization
   occurred, and unrelated rollout stages remain open.
+- The 2026-08-05 post-R2-06 user-centered stabilization checkpoint audited
+  baseline `f5c8ca214ba3fcf5b30d5bf506517ad7a414fa37` entirely with local,
+  disposable, isolated browser and PGlite environments. The final disposable
+  journey passes `41/41`: startup, player/team selection, setup, common event
+  capture, Undo, player switching without game reassignment, active-game
+  recovery, service-worker-controlled offline reload, reconnect, save/end,
+  review, season totals, account isolation, durable local deletion, Live Share
+  non-creation, sign-out, and reopen. No production access or credential use
+  occurred, R2-06 remained closed, and no unrelated rollout stage advanced.
+- Two Important continuity regressions are corrected on branch
+  `qa/post-r2-06-user-centered-audit`: Home exposes the actual active game with
+  `Resume Live Game`, and the saved-review CTA selects the game owner before
+  opening Review. There are zero Blocker findings and zero unresolved Important
+  user findings; two Polish items and one Future coverage item are backlogged.
+  The closed R2-06 release manifest still pins the baseline `app.js` hash, so
+  the QA branch is not merge/release ready until a separate release-scoped
+  integration decision reconciles that pin and coordinated PWA cache markers.
+- The recommended next rollout ticket is proposed R2-07, game-field versions
+  and conflict records. It remains Level 3 and does not receive migration,
+  production, merge, or deployment authority from the QA checkpoint.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The v284 cache marker remains unchanged. The updated service worker purges

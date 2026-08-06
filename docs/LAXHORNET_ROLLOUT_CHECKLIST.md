@@ -141,6 +141,40 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
 
 # 3. Active Work Package
 
+## Post-R2-06 User-Centered Stabilization Checkpoint
+
+**Status:** [~] Product QA complete; release-scoped integration pending
+
+**Risk level:** Level 2
+
+**Branch:** `qa/post-r2-06-user-centered-audit`
+
+**Audited baseline:** `f5c8ca214ba3fcf5b30d5bf506517ad7a414fa37`
+
+- [x] R2-06 remained closed and production execution remained disabled.
+- [x] Local/disposable startup, player/team selection, tracking, Undo,
+  interruption recovery, offline reload, reconnect, save/end, Review, Season,
+  account isolation, durable local deletion, Live Share non-creation, sign-out,
+  and reopen were exercised.
+- [x] Narrow phone, standard phone, mobile landscape, and desktop viewports were
+  inspected with retained screenshots.
+- [x] Blocker count: `0`.
+- [x] Important count: `2`, both corrected on the QA branch.
+- [x] Unresolved Important user risk: `0`.
+- [x] Unresolved backlog: `2` Polish, `1` Future; none blocks the next rollout phase.
+- [x] Repeatable disposable browser journey: `41/41` passed.
+- [~] Canonical-plus-additive regression: `49` passed, `2` release-control
+  checks remain intentionally unresolved pending the separate integration
+  decision; all product, browser, offline, hydration, isolation, disclosure,
+  Pages, syntax, secret/host, and diff-hygiene checks passed.
+- [!] Rollout continuation is conditional on release-scoped integration of the
+  runtime fixes because the closed R2-06 manifest pins the baseline `app.js`
+  hash and v284 cache/release markers remain coordinated.
+- [ ] Recommended next rollout ticket: approve and execute proposed R2-07,
+  Add game-field versions and conflict records, as a separate Level 3 ticket.
+- [x] No production access, deployment, migration, Supabase mutation, retained
+  tombstone change, or unrelated rollout-stage advancement occurred.
+
 ## R2-04 — Durable Game and Clock Operation States
 
 **Status:** [x] Complete
