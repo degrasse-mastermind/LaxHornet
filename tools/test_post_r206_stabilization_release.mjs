@@ -1,0 +1,140 @@
+import assert from "node:assert/strict";
+import crypto from "node:crypto";
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+
+const root = path.resolve(import.meta.dirname, "..");
+const historicalSha = "f5c8ca214ba3fcf5b30d5bf506517ad7a414fa37";
+const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+const manifest = JSON.parse(read("release/laxhornet-release-manifest.json"));
+const historicalManifest = JSON.parse(execFileSync(
+  "git",
+  ["show", `${historicalSha}:release/laxhornet-release-manifest.json`],
+  { cwd: root, encoding: "utf8" },
+));
+const stabilization = manifest.postR206Stabilization;
+const control = manifest.r206ReleaseControl;
+const reconciliation = control.evidenceReconciliation;
+const checklist = read("docs/LAXHORNET_ROLLOUT_CHECKLIST.md");
+const tickets = read("TICKETS.md");
+const app = read("app.js");
+const worker = read("service-worker.js");
+const evidence = read(stabilization.releaseEvidence);
+const audit = read(stabilization.auditEvidence);
+const tests = [];
+
+function test(name, callback) {
+  try {
+    callback();
+    tests.push({ name, status: "PASS" });
+    console.log(`PASS ${name}`);
+  } catch (error) {
+    tests.push({ name, status: "FAIL" });
+    console.error(`FAIL ${name}: ${error.message}`);
+  }
+}
+
+function normalizedSha(file) {
+  const normalized = read(file).replace(/\r\n/g, "\n");
+  return crypto.createHash("sha256").update(normalized, "utf8").digest("hex");
+}
+
+function protectedR206FactsMatch(candidate) {
+  return JSON.stringify(candidate.r206ReleaseControl) === JSON.stringify(historicalManifest.r206ReleaseControl);
+}
+
+test("historical R2-06 evidence and hashes remain unchanged", () => {
+  assert.deepEqual(control, historicalManifest.r206ReleaseControl);
+});
+
+test("R2-06 remains closed", () => {
+  assert.equal(control.releaseCloseoutApproved, true);
+  assert.match(checklist, /Mark R2-06 implementation[\s\S]*?release closeout complete/);
+});
+
+test("R2-06 closeout remains approved with mixed evidence", () => {
+  assert.equal(reconciliation.status, "R2-06 RELEASE CLOSEOUT APPROVED — MIXED EVIDENCE ACCEPTED");
+  assert.equal(control.cleanupApproved, true);
+});
+
+test("no new R2-06 production authorization exists", () => {
+  assert.equal(control.syntheticVerification.authorized, false);
+  assert.equal(reconciliation.newProductionAuthorizationCreated, false);
+  assert.equal(reconciliation.newProductionAuthorizationCreatedDuringCloseout, false);
+});
+
+test("latest runtime identity points to the new app runtime", () => {
+  assert.equal(manifest.release, "v285");
+  assert.equal(stabilization.releaseMarker, "v285");
+  assert.match(app, /const APP_VERSION = "v285";/);
+  assert.equal(stabilization.runtimeSha256["app.js"], normalizedSha("app.js"));
+});
+
+test("PWA cache marker matches the latest runtime marker", () => {
+  assert.equal(stabilization.cacheMarker, `laxhornet-${stabilization.releaseMarker}`);
+  assert.match(worker, /const CACHE_NAME = "laxhornet-v285";/);
+});
+
+test("service-worker assets carry the current release inventory marker", () => {
+  assert.match(worker, /\.\/app\.js\?v=285/);
+  assert.match(worker, /\.\/styles\.css\?v=285/);
+  assert.doesNotMatch(worker, /\.\/(?:app|styles)\.(?:js|css)\?v=284/);
+});
+
+test("both Important QA fixes are represented in release evidence", () => {
+  assert.deepEqual(stabilization.importantFixes, [
+    "active_game_recovery_from_home",
+    "saved_review_player_alignment",
+  ]);
+  assert.match(evidence, /Resume Live Game/);
+  assert.match(evidence, /saved[- ]review player alignment/i);
+  assert.match(audit, /41\/41/);
+});
+
+test("append-only post-closeout checklist work is allowed", () => {
+  assert.match(checklist, /## Post-R2-06 User-Centered Stabilization Checkpoint/);
+  assert.equal(protectedR206FactsMatch(manifest), true);
+});
+
+test("removal or mutation of protected R2-06 facts is detected", () => {
+  const mutated = structuredClone(manifest);
+  mutated.r206ReleaseControl.releaseCloseoutApproved = false;
+  assert.equal(protectedR206FactsMatch(mutated), false);
+});
+
+test("production deployment remains unauthorized", () => {
+  assert.equal(stabilization.productionDeploymentAuthorized, false);
+  assert.equal(stabilization.productionDeployed, false);
+  assert.equal(manifest.productionRelease, "v284");
+});
+
+test("proposed R2-07 remains proposed and unstarted", () => {
+  assert.match(tickets, /R2-07[\s\S]*?(?:Proposed|proposed)/);
+  assert.doesNotMatch(tickets, /R2-07[\s\S]{0,160}\*\*Status:\*\* (?:Approved|In progress|Complete)/);
+  assert.match(checklist, /Recommended next rollout ticket:[\s\S]*?proposed R2-07/);
+});
+
+test("no unrelated rollout stage is advanced", () => {
+  assert.equal(reconciliation.unrelatedRolloutStagesChangedDuringCloseout, false);
+  assert.match(evidence, /No unrelated rollout stage (?:was |is )?advanced/i);
+});
+
+test("the new runtime is not claimed as deployed", () => {
+  assert.equal(stabilization.productionAccessed, false);
+  assert.match(evidence, /Deployment status:[^\r\n]*not authorized/i);
+  assert.match(evidence, /Production status:[^\r\n]*not accessed/i);
+});
+
+test("exact stabilization runtime and control hashes match the working tree", () => {
+  for (const inventory of [stabilization.runtimeSha256, stabilization.controlSha256]) {
+    assert.ok(Object.keys(inventory).length > 0);
+    for (const [file, expected] of Object.entries(inventory)) {
+      assert.equal(normalizedSha(file), expected, file);
+    }
+  }
+});
+
+const failures = tests.filter((entry) => entry.status === "FAIL");
+console.log(`\n${tests.length - failures.length}/${tests.length} post-R2-06 stabilization release tests passed.`);
+if (failures.length) process.exitCode = 1;

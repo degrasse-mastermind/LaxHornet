@@ -574,6 +574,8 @@ expect(
   "R2-06 closeout approval must agree with the complete release-control state",
 );
 const syntheticRunner = manifest.r206ReleaseControl?.syntheticRunner;
+const stabilization = manifest.postR206Stabilization;
+const historicalR206CloseoutSha = stabilization?.historicalR206CloseoutSha || "";
 const expectedRunnerPaths = [
   "app.js",
   "event-operation-service.js",
@@ -713,13 +715,15 @@ expect(
   "R2-06 synthetic runner hard limits changed",
 );
 for (const file of expectedRunnerPaths) {
-  const absolute = path.join(root, file);
-  expect(fs.existsSync(absolute), `R2-06 synthetic runner file is missing: ${file}`);
-  if (fs.existsSync(absolute)) {
-    const actual = repositoryTextSha256(fs.readFileSync(absolute));
+  expect(
+    historicalR206CloseoutSha && existsAt(historicalR206CloseoutSha, file),
+    `R2-06 historical synthetic runner file is missing: ${file}`,
+  );
+  if (historicalR206CloseoutSha && existsAt(historicalR206CloseoutSha, file)) {
+    const actual = repositoryTextSha256(gitBuffer("show", `${historicalR206CloseoutSha}:${file}`));
     expect(
       syntheticRunner?.sha256?.[file] === actual,
-      `R2-06 synthetic runner SHA-256 mismatch: ${file}`,
+      `R2-06 historical synthetic runner SHA-256 mismatch: ${file}`,
     );
   }
 }
@@ -728,6 +732,93 @@ expect(
     === [...expectedRunnerPaths].sort().join("\n"),
   "R2-06 synthetic runner hash inventory changed",
 );
+if (historicalR206CloseoutSha && existsAt(historicalR206CloseoutSha, "release/laxhornet-release-manifest.json")) {
+  const historicalManifest = JSON.parse(
+    gitFile(historicalR206CloseoutSha, "release/laxhornet-release-manifest.json"),
+  );
+  expect(
+    JSON.stringify(manifest.r206ReleaseControl) === JSON.stringify(historicalManifest.r206ReleaseControl),
+    "R2-06 historical release-control evidence changed after closeout",
+  );
+}
+
+const expectedStabilizationRuntimePaths = [
+  "access-and-trust.html",
+  "app.html",
+  "app.js",
+  "coach-alignment.html",
+  "index.html",
+  "parent-experience.html",
+  "player-development.html",
+  "privacy.html",
+  "program-value.html",
+  "rollout-guide.html",
+  "service-worker.js",
+  "terms.html",
+  "tracking-framework.html",
+  "version.json",
+];
+const expectedStabilizationControlPaths = [
+  ".github/workflows/docker-tests.yml",
+  ".github/workflows/laxhornet-regression.yml",
+  "review-evidence/post-r2-06-user-centered-qa/STABILIZATION_RELEASE_INTEGRATION.md",
+  "review-evidence/post-r2-06-user-centered-qa/USER_CENTERED_QA_AUDIT.md",
+  "tools/run_v283_local_regression.mjs",
+  "tools/test_pages_artifact_browser.cjs",
+  "tools/test_pages_deployment.mjs",
+  "tools/test_post_r206_stabilization_release.mjs",
+  "tools/test_post_r206_user_journey_browser.cjs",
+  "tools/test_public_event_semantic_boundary.mjs",
+  "tools/test_r206_release_closeout.mjs",
+  "tools/test_secure_disclosure_activation_browser.cjs",
+  "tools/test_tracked_playing_time_ui.mjs",
+  "tools/validate_release_manifest.mjs",
+];
+expect(stabilization?.status === "ready_for_independent_review", "stabilization status must require independent review");
+expect(stabilization?.releaseMarker === "v285", "stabilization release marker must be v285");
+expect(stabilization?.previousReleaseMarker === "v284", "stabilization previous release marker must remain v284");
+expect(stabilization?.cacheMarker === "laxhornet-v285", "stabilization cache marker must match v285");
+expect(stabilization?.previousCacheMarker === "laxhornet-v284", "stabilization previous cache marker must remain v284");
+expect(stabilization?.sourcePr === 60, "stabilization must identify PR 60");
+expect(stabilization?.sourceBranch === "qa/post-r2-06-user-centered-audit", "stabilization branch changed");
+expect(stabilization?.auditedBaselineSha === "f5c8ca214ba3fcf5b30d5bf506517ad7a414fa37", "stabilization audited baseline changed");
+expect(stabilization?.integrationStartingSha === "c956c025e99f97cffae7814bdcd741b1b52764b6", "stabilization starting SHA changed");
+expect(historicalR206CloseoutSha === "f5c8ca214ba3fcf5b30d5bf506517ad7a414fa37", "R2-06 historical closeout SHA changed");
+expect(
+  JSON.stringify(stabilization?.importantFixes) === JSON.stringify([
+    "active_game_recovery_from_home",
+    "saved_review_player_alignment",
+  ]),
+  "stabilization Important-fix inventory changed",
+);
+expect(
+  stabilization?.schemaChanged === false
+    && stabilization?.backendChanged === false
+    && stabilization?.productionAccessed === false
+    && stabilization?.productionDeploymentAuthorized === false
+    && stabilization?.productionDeployed === false
+    && stabilization?.independentExactHeadReviewRequired === true,
+  "stabilization release boundary changed",
+);
+for (const [label, expectedPaths, hashes] of [
+  ["runtime", expectedStabilizationRuntimePaths, stabilization?.runtimeSha256],
+  ["control", expectedStabilizationControlPaths, stabilization?.controlSha256],
+]) {
+  expect(
+    Object.keys(hashes || {}).sort().join("\n") === [...expectedPaths].sort().join("\n"),
+    `stabilization ${label} hash inventory changed`,
+  );
+  for (const file of expectedPaths) {
+    const absolute = path.join(root, file);
+    expect(fs.existsSync(absolute), `stabilization ${label} file is missing: ${file}`);
+    if (fs.existsSync(absolute)) {
+      expect(
+        hashes?.[file] === repositoryTextSha256(fs.readFileSync(absolute)),
+        `stabilization ${label} SHA-256 mismatch: ${file}`,
+      );
+    }
+  }
+}
 expect(
   manifest.r206ReleaseControl?.syntheticVerification?.authorized === false
     && manifest.r206ReleaseControl?.syntheticVerification?.completed === false
@@ -856,11 +947,11 @@ if (fs.existsSync(r206qValidationAbsolute)) {
 const r206rValidationPath = r206q?.finalCloseoutValidation?.path || "";
 const r206rValidationAbsolute = path.join(root, r206rValidationPath);
 expect(fs.existsSync(r206rValidationAbsolute), "R2-06R final closeout validation test must exist");
-if (fs.existsSync(r206rValidationAbsolute)) {
+if (historicalR206CloseoutSha && existsAt(historicalR206CloseoutSha, r206rValidationPath)) {
   expect(
     r206q?.finalCloseoutValidation?.sha256
-      === repositoryTextSha256(fs.readFileSync(r206rValidationAbsolute)),
-    "R2-06R final closeout validation test SHA-256 is stale",
+      === repositoryTextSha256(gitBuffer("show", `${historicalR206CloseoutSha}:${r206rValidationPath}`)),
+    "R2-06R historical final closeout validation SHA-256 changed",
   );
 }
 expect(

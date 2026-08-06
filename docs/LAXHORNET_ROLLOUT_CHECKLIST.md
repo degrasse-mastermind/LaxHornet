@@ -143,9 +143,9 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
 
 ## Post-R2-06 User-Centered Stabilization Checkpoint
 
-**Status:** [~] Product QA complete; release-scoped integration pending
+**Status:** [~] Stabilization integrated at v285; exact-head CI and independent review pending
 
-**Risk level:** Level 2
+**Risk level:** Level 3
 
 **Branch:** `qa/post-r2-06-user-centered-audit`
 
@@ -163,13 +163,14 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
 - [x] Unresolved Important user risk: `0`.
 - [x] Unresolved backlog: `2` Polish, `1` Future; none blocks the next rollout phase.
 - [x] Repeatable disposable browser journey: `41/41` passed.
-- [~] Canonical-plus-additive regression: `49` passed, `2` release-control
-  checks remain intentionally unresolved pending the separate integration
-  decision; all product, browser, offline, hydration, isolation, disclosure,
-  Pages, syntax, secret/host, and diff-hygiene checks passed.
-- [!] Rollout continuation is conditional on release-scoped integration of the
-  runtime fixes because the closed R2-06 manifest pins the baseline `app.js`
-  hash and v284 cache/release markers remain coordinated.
+- [x] QA-S1 integrates both Important fixes under repository runtime marker
+  `v285` and cache marker `laxhornet-v285`; production remains at `v284` and
+  deployment is not authorized.
+- [x] Closed R2-06 historical controls remain immutable while the separate
+  post-R2-06 manifest section records exact stabilization runtime hashes.
+- [x] Complete canonical-plus-additive regression passed `52/52`.
+- [~] Exact-head portable/Docker CI is required before independent exact-PR-SHA
+  review.
 - [ ] Recommended next rollout ticket: approve and execute proposed R2-07,
   Add game-field versions and conflict records, as a separate Level 3 ticket.
 - [x] No production access, deployment, migration, Supabase mutation, retained

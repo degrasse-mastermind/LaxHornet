@@ -123,6 +123,12 @@ jobs:
       - name: Release manifest reconciliation contracts
         run: node tools/test_release_manifest_reconciliation.mjs
 
+      - name: Historical R2-06 closeout preservation
+        run: node tools/test_r206_release_closeout.mjs
+
+      - name: Post-R2-06 stabilization release contracts
+        run: node tools/test_post_r206_stabilization_release.mjs
+
       - name: Release hygiene
         run: node tools/test_release_hygiene.mjs
 

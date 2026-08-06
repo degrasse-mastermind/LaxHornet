@@ -99,29 +99,29 @@ block the next rollout phase.
 - Tracked-playing-time browser: `33/33` passed.
 - Pages deployment contracts: `21/21` passed.
 - Pages artifact validation and service-worker browser check: passed for the audited baseline artifact.
-- Release-manifest validation after the product fix: expected fail because the closed R2-06 synthetic-runner inventory pins the baseline `app.js` hash. The manifest was not altered because this Level 2 checkpoint is not a release ticket.
+- Before QA-S1, release-manifest validation failed because the closed R2-06
+  synthetic-runner inventory was incorrectly validated as the latest `app.js`.
 - Pages, preflight, containment, secret/host, changed-JavaScript syntax, and
   `git diff --check` gates passed. The complete canonical-plus-additive run
-  finished `49 passed, 2 failed`; both failures are the known closed-R2-06
-  integration boundary: the pinned baseline `app.js` hash and the closeout
-  contract that requires every non-R2-06 checklist byte to remain unchanged.
-  Full output is retained in `full-regression-output.txt`.
-- Exact-head CI: pending commit, push, and draft PR; it is expected to report
-  the same two release-control failures until the separate integration decision.
+  finished `49 passed, 2 failed`; those historical audit failures diagnosed the
+  historical-hash/latest-runtime conflation and whole-checklist freeze. Full
+  output is retained in `full-regression-output.txt`.
+- QA-S1 exact-head CI is required to pass after commit and push; no release-
+  control failure is accepted on the integrated v285 head.
 
 ## Remaining risks and recommendation
 
-The product journey has no unresolved Blocker or Important user finding. The
-branch must not merge or deploy until a separately authorized release-scoped
-decision reconciles the closed R2-06 `app.js` hash inventory and coordinated
-PWA cache/release markers. That release-control constraint is not evidence of a
-user-journey failure and was deliberately not expanded inside this checkpoint.
+The product journey has no unresolved Blocker or Important user finding. QA-S1
+integrates the reviewed fixes under repository runtime marker `v285` and cache
+marker `laxhornet-v285`, while preserving closed R2-06 historical evidence in
+its original control object. Production remains `v284`; merge and deployment
+remain unauthorized pending the required exact-head gates and independent
+exact-PR-SHA review.
 
 Recommended next rollout ticket after this stabilization is safely integrated:
 R2-07, Add game-field versions and conflict records. It should remain a
 separate Level 3 ticket with its own migration, review, and production authority.
 
-QA recommendation: `QA CONDITIONAL PASS — CONTINUE AFTER LISTED IMPORTANT FIXES`.
-The Important product fixes are implemented on this branch; continuation is
-conditional only on their coordinated release integration and green exact-head
-gates.
+QA recommendation: `QA PASS — STABILIZATION INTEGRATED; EXACT-HEAD REVIEW REQUIRED`.
+The Important product fixes and their coordinated release integration are on
+this branch. Proposed R2-07 remains unapproved and unstarted.

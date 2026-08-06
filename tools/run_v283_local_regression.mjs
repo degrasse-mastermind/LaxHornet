@@ -94,7 +94,7 @@ const tests = [
   { name: "team members RLS remediation", command: process.execPath, args: ["tools/test_team_members_rls_remediation.mjs"] },
   { name: "team members State C bindings", command: process.execPath, args: ["tools/test_team_members_state_c.mjs"] },
   { name: "game scope and capability contracts", command: process.execPath, args: ["tools/test_game_scope_capabilities.mjs"] },
-  { name: "v284 update release", command: process.execPath, args: ["tools/test_update_release.mjs"] },
+  { name: "current update release", command: process.execPath, args: ["tools/test_update_release.mjs"] },
   {
     name: "release manifest validation",
     command: process.execPath,
@@ -106,6 +106,7 @@ const tests = [
   { name: "release manifest reconciliation", command: process.execPath, args: ["tools/test_release_manifest_reconciliation.mjs"] },
   { name: "R2-06Q evidence reconciliation", command: process.execPath, args: ["tools/test_r206_closeout_reconciliation.mjs"] },
   { name: "R2-06R release closeout", command: process.execPath, args: ["tools/test_r206_release_closeout.mjs"] },
+  { name: "post-R2-06 stabilization release", command: process.execPath, args: ["tools/test_post_r206_stabilization_release.mjs"] },
   { name: "release preflight phase-aware", command: process.execPath, args: ["tools/test_release_preflight_phase_aware.mjs"] },
   { name: "release containment phase-aware", command: process.execPath, args: ["tools/test_release_containment_phase_aware.mjs"] },
   { name: "release hygiene", command: process.execPath, args: ["tools/test_release_hygiene.mjs"] },

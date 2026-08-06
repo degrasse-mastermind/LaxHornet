@@ -2047,9 +2047,9 @@ review of the R2-06R closeout pull request.
 
 ### QA-R2-06-S — Post-R2-06 user-centered stabilization
 
-Status: `IMPLEMENTED — DRAFT CLOSEOUT PENDING`
+Status: `QA-S1 INTEGRATED AT V285 — EXACT-HEAD REVIEW PENDING`
 
-Risk level: `LEVEL 2`
+Risk level: `LEVEL 3`
 
 Branch: `qa/post-r2-06-user-centered-audit`
 
@@ -2079,20 +2079,23 @@ Evidence:
 - `review-evidence/post-r2-06-user-centered-qa/USER_CENTERED_QA_AUDIT.md`
 - `review-evidence/post-r2-06-user-centered-qa/QA_FINDINGS_BACKLOG.md`
 
-Remaining merge constraint: the closed R2-06 release manifest intentionally
-pins the audited baseline `app.js` hash. This Level 2 checkpoint does not alter
-that release manifest or coordinated v284 PWA cache markers. The product fix
-therefore requires a separate release-scoped integration decision before merge
-or deployment. R2-06 remains closed and production execution remains disabled.
+QA-S1 separates immutable historical R2-06 evidence from the latest product
+runtime. The repository runtime/cache identity advances together to `v285` /
+`laxhornet-v285`, while production remains `v284` and deployment is not
+authorized. The historical `r206ReleaseControl` object remains unchanged; the
+new `postR206Stabilization` manifest section records exact current hashes.
 
 Verification: focused user journey `41/41`, browser runtime `11/11`, browser
 session `30/30`, hydration `32/32` plus disposable browser pass, tombstones
 `33/33`, concurrency `8/8`, sync characterization `32/32`, local storage
 `28/28`, tracked-time browser `33/33`, and Pages contracts `21/21` passed.
-Canonical-plus-additive regression completed `49 passed, 2 failed`; the only
-failures are the intentionally unreconciled R2-06 `app.js` manifest pin and the
-R2-06R byte-for-byte non-R2-06 checklist invariant required to be updated by
-this checkpoint. Secret/host scan and `git diff --check` pass.
+QA-S1 focused gates and the final canonical-plus-additive regression (`52/52`)
+pass. Exact-head portable/Docker CI must pass before independent exact-PR-SHA
+review. R2-06 remains closed. R2-07 remains proposed, unapproved, and unstarted.
+
+Release integration evidence:
+
+- `review-evidence/post-r2-06-user-centered-qa/STABILIZATION_RELEASE_INTEGRATION.md`
 
 ### R2-07 — Add game-field versions and conflict records
 

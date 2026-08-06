@@ -17,6 +17,7 @@ const root = path.resolve(path.dirname(modulePath), "..");
 const specPath = path.join(root, "release", "pages-deployment-allowlist.json");
 const workflowPath = path.join(root, ".github", "workflows", "pages-deployment.yml");
 const spec = loadAllowlist(specPath);
+const releaseVersion = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8")).version;
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "laxhornet-pages-contracts-"));
 let passed = 0;
 
@@ -138,7 +139,7 @@ try {
   test("real artifact builds and validates", () => {
     const result = buildArtifact(first);
     assert.equal(result.fileCount, 47);
-    assert.equal(result.releaseVersion, "v284");
+    assert.equal(result.releaseVersion, releaseVersion);
     assert.ok(result.references > 0);
   });
 
@@ -254,9 +255,9 @@ try {
     assert.throws(() => validateArtifact(options), /credential-shaped/);
   });
 
-  test("service worker keeps v284 and purges non-allowlisted cached requests", () => {
+  test("service worker uses the current release cache and purges non-allowlisted cached requests", () => {
     const source = fs.readFileSync(path.join(root, "service-worker.js"), "utf8");
-    assert.match(source, /CACHE_NAME = "laxhornet-v284"/);
+    assert.match(source, new RegExp(`CACHE_NAME = "laxhornet-${releaseVersion}"`));
     assert.match(source, /PUBLIC_PATH_ALLOWLIST/);
     assert.match(source, /!PUBLIC_PATH_ALLOWLIST\.has\(requestUrl\.pathname\)/);
     assert.match(source, /fetch\(event\.request, \{ cache: "no-store" \}\)/);

@@ -25,6 +25,14 @@ const checklist = fs.readFileSync(
   path.join(root, "docs", "LAXHORNET_ROLLOUT_CHECKLIST.md"),
   "utf8",
 );
+const historicalCloseoutSha = "f5c8ca214ba3fcf5b30d5bf506517ad7a414fa37";
+const historicalManifest = JSON.parse(
+  execFileSync(
+    "git",
+    ["show", `${historicalCloseoutSha}:release/laxhornet-release-manifest.json`],
+    { cwd: root, encoding: "utf8" },
+  ),
+);
 const tests = [];
 
 function test(name, callback) {
@@ -169,18 +177,23 @@ test("closeout records no production access, mutation, private access, or rerun"
   assert.equal(reconciliation.noSecondProductionLifecycleRequired, true);
 });
 
-test("unrelated rollout stages remain byte-for-byte unchanged", () => {
+test("historical R2-06 facts remain immutable while post-closeout work is append-only", () => {
   const checklistPath = "docs/LAXHORNET_ROLLOUT_CHECKLIST.md";
   const baseline = execFileSync("git", ["show", `${baselineSha}:${checklistPath}`], {
     cwd: root,
     encoding: "utf8",
   });
   const current = fs.readFileSync(path.join(root, checklistPath), "utf8");
-  const withoutR206 = (text) => text.replace(
-    /## R2-06 —[\s\S]*?(?=# 4\. Planned Engineering Sequence)/,
-    "",
-  ).replace(/\r\n/g, "\n");
-  assert.equal(withoutR206(current), withoutR206(baseline));
+  assert.deepEqual(manifest.r206ReleaseControl, historicalManifest.r206ReleaseControl);
+  assert.match(current, /### R2-06R final release closeout[\s\S]*?Mark R2-06 implementation[\s\S]*?release closeout complete/);
+  assert.match(current, /R2-06 RELEASE CLOSEOUT APPROVED[^\r\n]*MIXED EVIDENCE ACCEPTED/);
+  assert.equal(actions.find((entry) => entry.action === 15)?.status, "INVALID HISTORIC VERIFIER RESULT");
+  assert.equal(actions.find((entry) => entry.action === 16)?.status, "PRODUCTION PARTIALLY VERIFIED");
+  assert.equal(reconciliation.cleanupAttestation.retainedDurableTombstones, 1);
+  assert.equal(reconciliation.cleanupAttestation.mutableResidueCounts.activeSessions, 0);
+  assert.equal(reconciliation.noSecondProductionLifecycleRequired, true);
+  assert.match(current, /## Post-R2-06 User-Centered Stabilization Checkpoint/);
+  assert.notEqual(current.replace(/\r\n/g, "\n"), baseline.replace(/\r\n/g, "\n"));
   assert.equal(reconciliation.unrelatedRolloutStagesChangedDuringCloseout, false);
 });
 
