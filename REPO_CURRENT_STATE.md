@@ -1,10 +1,11 @@
 # LaxHornet Repository Current State
 
 Last reviewed: 2026-08-05
-Baseline branch: `qa/post-r2-06-user-centered-audit`
-Baseline commit: `c956c025e99f97cffae7814bdcd741b1b52764b6`
+Baseline branch: `release/v285-post-deploy-reconciliation`
+Baseline commit: `9e434e33534a1b348b19e2081b91d7e0724299fc` plus pending reconciliation evidence
 Current repository release marker: `v285`
-Current production marker: `v284` at reconciled R2-06A runtime/catalog state;
+Current production marker: `v285` from Pages run `31061426334` at approved SHA
+`9e434e33534a1b348b19e2081b91d7e0724299fc`;
 R2-06 release closeout approved through reconciled mixed evidence
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
@@ -215,23 +216,38 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   secrets, symlinks, path traversal, custom-domain identity, and exact output
   membership, then uploads only that generated directory.
 - The workflow fails closed unless Pages uses Actions and the custom domain,
-  HTTPS enforcement, approved certificate, and v284 production marker remain
-  intact before and after deployment.
+  HTTPS enforcement, and approved certificate remain intact. Settings-only
+  preflight is distinct from release-sensitive live verification. Post-deploy
+  verification requires explicit runtime, cache, source-SHA, and deployment-
+  manifest expectations and reconciles the complete public artifact.
+- A `main` push whose live runtime already matches is verification-only and
+  cannot invoke the Pages deploy job. A production change requires an explicit
+  manual dispatch with matching reviewed SHA, runtime/cache markers, and
+  authorization confirmation.
 - Repository-root and `/docs` branch publishing are prohibited. Internal
   tools, documentation, SQL, tests, release controls, and review evidence are
   not production assets.
 - Custom domain: `laxhornet.mybranford.com`.
 - Release coordination includes `version.json`, service-worker/cache markers, script query versions, and `release/laxhornet-release-manifest.json`.
-- Current repository and production release marker is `v284`. Public Live Share
-  is active through the corrected public-safe RPC. GitHub Pages deploys only
-  the explicit 47-file allowlisted artifact.
-- The reconciled production application source is
-  `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3`, from Pages run
-  `30559099199`. The manifest records R2-06 then R2-06A as present and the
+- Current repository and production release marker is `v285`, with cache marker
+  `laxhornet-v285`. Public Live Share remains active through the corrected
+  public-safe RPC. GitHub Pages deploys only the explicit 47-file allowlisted
+  artifact.
+- The current reconciled production application source is
+  `9e434e33534a1b348b19e2081b91d7e0724299fc`, from Pages run
+  `31061426334`. Its deployment job succeeded; the original workflow failed
+  only when the stale post-deploy verifier expected `v284`. Independent
+  reconciliation matched all 47 files, clean-install and v284-client upgrade
+  checks passed, both stabilization smokes passed, and no hosted Supabase or
+  mutation request occurred. No second deployment occurred and rollback is not
+  required.
+- Historical R2-06 production application source
+  `2fcc446d5f3d06ca6d24c69bc4466a13794e02b3` and Pages run `30559099199`
+  remain immutable inside `r206ReleaseControl`. The manifest records R2-06 then R2-06A as present and the
   bounded production catalog as verified, while preserving the prior rollback
   and blocked-runtime sources as incident history. The observed advancement
   lacked tracked release authorization and is not approved retroactively.
-  Synthetic production verification and release closeout remain incomplete.
+  R2-06 release closeout remains approved through mixed evidence.
 - R2-06C freshly reconfirmed the 47-file production artifact, both ordered
   migrations, definition-equivalent catalog/RLS/grant/function/trigger/lock
   state, zero tombstones, and zero `r206-smoke-*` aggregate residue from merged
@@ -356,9 +372,10 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   QA-S1 integrates those fixes under repository runtime marker `v285` and cache
   marker `laxhornet-v285`. A separate manifest section owns current runtime
   hashes while the closed R2-06 control object and historical hashes remain
-  unchanged. Production remains `v284`; deployment is not authorized.
-  Focused QA-S1 gates and complete canonical-plus-additive regression (`52/52`)
-  pass; exact-head portable/Docker CI and independent review remain required.
+  unchanged. The exact approved v285 SHA was automatically deployed by Pages
+  run `31061426334`; V285-R1 reconciles that deployment without redeploying.
+  Its 47-file, PWA upgrade, production-local smoke, and request-absence checks
+  pass. Exact-head portable/Docker CI and independent review remain required.
 - The recommended next rollout ticket is proposed R2-07, game-field versions
   and conflict records. It remains Level 3 and does not receive migration,
   production, merge, or deployment authority from the QA checkpoint.

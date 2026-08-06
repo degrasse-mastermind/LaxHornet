@@ -269,6 +269,10 @@ try {
     const workflow = fs.readFileSync(workflowPath, "utf8");
     assert.match(workflow, /push:\s*\n\s*branches:\s*\n\s*- main/);
     assert.match(workflow, /workflow_dispatch:/);
+    assert.match(workflow, /authorized_source_sha:[\s\S]*required: true/);
+    assert.match(workflow, /expected_runtime_marker:[\s\S]*required: true/);
+    assert.match(workflow, /expected_cache_marker:[\s\S]*required: true/);
+    assert.match(workflow, /deployment_authorized:[\s\S]*type: boolean/);
     assert.match(workflow, /group: laxhornet-pages-production/);
     assert.match(workflow, /cancel-in-progress: false/);
     assert.match(workflow, /permissions:\s*\n\s*contents: read/);
@@ -279,9 +283,29 @@ try {
     assert.match(workflow, /node tools\/build_pages_artifact\.mjs/);
     assert.match(workflow, /node tools\/validate_pages_artifact\.mjs/);
     assert.match(workflow, /node tools\/verify_pages_settings\.mjs/);
-    assert.match(workflow, /node tools\/verify_pages_settings\.mjs --production/);
+    assert.match(workflow, /--expected-runtime-marker=\$\{\{ needs\.build\.outputs\.release_marker \}\}/);
+    assert.match(workflow, /--expected-cache-marker=\$\{\{ needs\.build\.outputs\.cache_marker \}\}/);
+    assert.match(workflow, /--expected-source-sha=\$\{\{ needs\.build\.outputs\.production_source_sha \}\}/);
+    assert.match(workflow, /node tools\/verify_pages_production\.mjs/);
     assert.match(workflow, /uses: actions\/upload-pages-artifact@v4[\s\S]*path: \.pages-artifact/);
     assert.doesNotMatch(workflow, /upload-pages-artifact@v4[\s\S]{0,200}path:\s*[.'"]+\s*$/m);
+  });
+
+  test("main reconciliation cannot redeploy and a new release requires explicit dispatch authorization", () => {
+    const workflow = fs.readFileSync(workflowPath, "utf8");
+    assert.match(workflow, /AUTOMATIC_DEPLOYMENT_NOT_AUTHORIZED/);
+    assert.match(workflow, /deployment_required=false/);
+    assert.match(workflow, /deployment_required=true/);
+    assert.match(workflow, /if: needs\.build\.outputs\.deployment_required == 'true'/);
+    assert.match(workflow, /DEPLOYMENT_AUTHORIZATION_REQUIRED/);
+    assert.match(workflow, /AUTHORIZED_SOURCE_SHA_MISMATCH/);
+  });
+
+  test("deployment success and post-deploy verification are distinct workflow results", () => {
+    const workflow = fs.readFileSync(workflowPath, "utf8");
+    assert.match(workflow, /deploy:[\s\S]*Deploy to GitHub Pages/);
+    assert.match(workflow, /verify:[\s\S]*needs:[\s\S]*- deploy/);
+    assert.match(workflow, /needs\.deploy\.result == 'success' \|\| needs\.deploy\.result == 'skipped'/);
   });
 
   test("validation precedes artifact upload and deployment", () => {
@@ -289,13 +313,15 @@ try {
     const validateIndex = workflow.indexOf("node tools/validate_pages_artifact.mjs");
     const uploadIndex = workflow.indexOf("uses: actions/upload-pages-artifact@v4");
     const deployIndex = workflow.indexOf("uses: actions/deploy-pages@v4");
-    const productionVerifyIndex = workflow.indexOf("node tools/verify_pages_settings.mjs --production");
+    const productionVerifyIndex = workflow.indexOf("--expected-runtime-marker=${{ needs.build.outputs.release_marker }}");
+    const productionReconcileIndex = workflow.indexOf("node tools/verify_pages_production.mjs");
     assert.ok(
       validateIndex > 0
       && uploadIndex > validateIndex
       && deployIndex > uploadIndex
       && productionVerifyIndex > deployIndex,
     );
+    assert.ok(productionReconcileIndex > productionVerifyIndex);
   });
 } finally {
   fs.rmSync(tempRoot, { recursive: true, force: true });

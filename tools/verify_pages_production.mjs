@@ -41,6 +41,19 @@ const additionalProbes = [
   "tools/v284_local_disclosure_fixture.mjs",
   "tools/v284_production_disclosure_fixture.mjs",
 ];
+const expectedContentTypes = new Map([
+  [".css", ["text/css"]],
+  [".html", ["text/html"]],
+  [".js", ["application/javascript", "text/javascript"]],
+  [".json", ["application/json"]],
+  [".mp4", ["video/mp4"]],
+  [".pdf", ["application/pdf"]],
+  [".png", ["image/png"]],
+]);
+
+function expectedContentType(relativePath) {
+  return expectedContentTypes.get(path.extname(relativePath).toLowerCase()) || [];
+}
 
 function publicUrl(relativePath, cacheBust = false) {
   const encoded = relativePath
@@ -80,23 +93,35 @@ async function mapLimit(values, concurrency, callback) {
 }
 
 const deployedFiles = await mapLimit(manifest.files, 8, async (entry) => {
-  const response = await request(publicUrl(entry.path, true));
+  const requestedUrl = publicUrl(entry.path, true);
+  const response = await request(requestedUrl);
   const bytes = Buffer.from(await response.arrayBuffer());
+  const contentType = (response.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
+  const expectedTypes = expectedContentType(entry.path);
+  const text = /\.(?:css|html|js|json)$/i.test(entry.path) ? bytes.toString("utf8") : "";
   return {
     path: entry.path,
     status: response.status,
-    contentType: response.headers.get("content-type") || "",
+    contentType,
+    expectedContentTypes: expectedTypes,
+    redirected: response.status >= 300 && response.status < 400,
+    responsePath: new URL(response.url || requestedUrl).pathname,
     size: bytes.length,
     sha256: crypto.createHash("sha256").update(bytes).digest("hex"),
     expectedSize: entry.size,
     expectedSha256: entry.sha256,
+    staleV284QueryMarker: /[?&]v=284(?:\b|["'])/.test(text),
   };
 });
 const deployedFailures = deployedFiles.filter(
   (entry) =>
     entry.status !== 200
+    || entry.redirected
+    || entry.responsePath !== `/${entry.path}`
     || entry.size !== entry.expectedSize
-    || entry.sha256 !== entry.expectedSha256,
+    || entry.sha256 !== entry.expectedSha256
+    || (entry.expectedContentTypes.length > 0 && !entry.expectedContentTypes.includes(entry.contentType))
+    || entry.staleV284QueryMarker,
 );
 assert.deepEqual(deployedFailures, [], `deployed artifact mismatch:\n${JSON.stringify(deployedFailures, null, 2)}`);
 

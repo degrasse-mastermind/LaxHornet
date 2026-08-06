@@ -2047,7 +2047,7 @@ review of the R2-06R closeout pull request.
 
 ### QA-R2-06-S — Post-R2-06 user-centered stabilization
 
-Status: `QA-S1 INTEGRATED AT V285 — EXACT-HEAD REVIEW PENDING`
+Status: `V285 PRODUCTION RECONCILED — EVIDENCE REVIEW PENDING`
 
 Risk level: `LEVEL 3`
 
@@ -2080,22 +2080,48 @@ Evidence:
 - `review-evidence/post-r2-06-user-centered-qa/QA_FINDINGS_BACKLOG.md`
 
 QA-S1 separates immutable historical R2-06 evidence from the latest product
-runtime. The repository runtime/cache identity advances together to `v285` /
-`laxhornet-v285`, while production remains `v284` and deployment is not
-authorized. The historical `r206ReleaseControl` object remains unchanged; the
-new `postR206Stabilization` manifest section records exact current hashes.
+runtime. The repository runtime/cache identity advanced together to `v285` /
+`laxhornet-v285`. The historical `r206ReleaseControl` object remains unchanged;
+the separate `postR206Stabilization` manifest section records the exact deployed
+runtime hashes and current production disposition.
 
 Verification: focused user journey `41/41`, browser runtime `11/11`, browser
 session `30/30`, hydration `32/32` plus disposable browser pass, tombstones
 `33/33`, concurrency `8/8`, sync characterization `32/32`, local storage
 `28/28`, tracked-time browser `33/33`, and Pages contracts `21/21` passed.
-QA-S1 focused gates and the final canonical-plus-additive regression (`52/52`)
-pass. Exact-head portable/Docker CI must pass before independent exact-PR-SHA
+QA-S1 focused gates and the original canonical-plus-additive regression
+(`52/52`) passed. V285-R1 records the completed automatic deployment and must
+pass its final exact-head regression and CI before independent exact-PR-SHA
 review. R2-06 remains closed. R2-07 remains proposed, unapproved, and unstarted.
 
 Release integration evidence:
 
 - `review-evidence/post-r2-06-user-centered-qa/STABILIZATION_RELEASE_INTEGRATION.md`
+
+#### V285-R1 production deployment reconciliation
+
+Branch: `release/v285-post-deploy-reconciliation`
+
+The exact approved merge `9e434e33534a1b348b19e2081b91d7e0724299fc`
+was automatically deployed by GitHub Pages run `31061426334`. The deployment
+job succeeded. The original workflow concluded `failure` only because its
+post-deploy verifier still expected historical marker `v284` after production
+had correctly advanced to `v285`.
+
+V285-R1 corrects that phase conflation with explicit runtime, cache, source-SHA,
+and deployment-manifest expectations. It reconciles all 47 production files,
+proves clean install and a controlled v284-to-v285 upgrade, exercises both
+Important fixes using isolated browser-local fixtures, and records zero hosted
+Supabase requests and zero production mutation requests. No second deployment,
+rollback, migration, backend/configuration change, or production-data mutation
+occurred. Rollback is not required.
+
+Evidence:
+
+- `review-evidence/post-r2-06-user-centered-qa/V285_PRODUCTION_DEPLOYMENT.md`
+- `review-evidence/post-r2-06-user-centered-qa/V285_PRODUCTION_RECONCILIATION.json`
+
+Exact-head CI and independent Level 3 review remain required before merge.
 
 ### R2-07 — Add game-field versions and conflict records
 

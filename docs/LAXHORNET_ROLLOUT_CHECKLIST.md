@@ -143,7 +143,7 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
 
 ## Post-R2-06 User-Centered Stabilization Checkpoint
 
-**Status:** [~] Stabilization integrated at v285; exact-head CI and independent review pending
+**Status:** [~] V285 production reconciled; exact-head CI and independent review pending
 
 **Risk level:** Level 3
 
@@ -164,8 +164,18 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
 - [x] Unresolved backlog: `2` Polish, `1` Future; none blocks the next rollout phase.
 - [x] Repeatable disposable browser journey: `41/41` passed.
 - [x] QA-S1 integrates both Important fixes under repository runtime marker
-  `v285` and cache marker `laxhornet-v285`; production remains at `v284` and
-  deployment is not authorized.
+  `v285` and cache marker `laxhornet-v285`.
+- [x] GitHub Pages run `31061426334` deployed exact approved SHA
+  `9e434e33534a1b348b19e2081b91d7e0724299fc`; the deployment job succeeded and
+  the original workflow failed only on its stale post-deploy `v284` expectation.
+- [x] All 47 allowlisted production files match the reviewed deployment
+  manifest; production runtime/cache markers are `v285` / `laxhornet-v285`.
+- [x] Clean install and controlled v284-to-v285 upgrade pass, including v284
+  cache removal, v285 control, current JavaScript, and offline reload.
+- [x] Isolated production-local active-game recovery and saved-review alignment
+  pass with zero hosted Supabase requests and zero production mutation requests.
+- [x] No second deployment, rollback, migration, backend/Supabase configuration
+  change, production-data mutation, or retained tombstone change occurred.
 - [x] Closed R2-06 historical controls remain immutable while the separate
   post-R2-06 manifest section records exact stabilization runtime hashes.
 - [x] Complete canonical-plus-additive regression passed `52/52`.
@@ -173,8 +183,8 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
   review.
 - [ ] Recommended next rollout ticket: approve and execute proposed R2-07,
   Add game-field versions and conflict records, as a separate Level 3 ticket.
-- [x] No production access, deployment, migration, Supabase mutation, retained
-  tombstone change, or unrelated rollout-stage advancement occurred.
+- [x] Production access was limited to public static reads and isolated local
+  browser fixtures; no real account or production credentials were used.
 
 ## R2-04 — Durable Game and Clock Operation States
 

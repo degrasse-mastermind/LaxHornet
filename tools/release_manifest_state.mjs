@@ -62,11 +62,10 @@ export function evaluateR206ReleaseControl(
   const evidenceReconciliation = control.evidenceReconciliation || {};
 
   const runtimeReady = expect(
-    manifest.productionApplicationSha === R206_RUNTIME_SHA
-      && control.runtimeDeployed === true
+    control.runtimeDeployed === true
       && control.runtimeSourceSha === R206_RUNTIME_SHA
       && control.pagesRunId === "30559099199",
-    "R2-06 runtime must identify verified Pages run 30559099199 at the reviewed merge",
+    "Historical R2-06 runtime must identify verified Pages run 30559099199 at the reviewed merge",
   );
 
   let identitiesReady = true;

@@ -18,7 +18,6 @@ import {
 } from "./release_containment.mjs";
 import {
   R206_MIGRATIONS,
-  R206_RUNTIME_SHA,
   evaluateR206ReleaseControl,
 } from "./release_manifest_state.mjs";
 
@@ -104,9 +103,10 @@ expect(
   "incidentRemediationMergeSha must identify the approved PR #30 merge",
 );
 expect(
-  manifest.productionApplicationSha === R206_RUNTIME_SHA,
-  "productionApplicationSha must identify the reconciled R2-06A production runtime",
+  manifest.productionApplicationSha === "9e434e33534a1b348b19e2081b91d7e0724299fc",
+  "productionApplicationSha must identify the approved and deployed v285 runtime",
 );
+expect(manifest.productionRelease === "v285", "productionRelease must identify the reconciled v285 runtime");
 expect(
   manifest.productionRollbackSourceSha === "44f0510d3bde18f459e78f570efd27b72dc2a989",
   "productionRollbackSourceSha must preserve the historical R2-05 rollback source",
@@ -129,12 +129,12 @@ expect(
 );
 expect(
   manifest.productionSmokeEvidence
-    === "review-evidence/v284-tracked-playing-time-production/production-smoke-results.json",
-  "productionSmokeEvidence must identify the sanitized closeout result",
+    === "review-evidence/post-r2-06-user-centered-qa/V285_PRODUCTION_RECONCILIATION.json",
+  "productionSmokeEvidence must identify the sanitized v285 reconciliation result",
 );
 expect(
-  manifest.productionVerifiedAt === "2026-07-30",
-  "productionVerifiedAt must record the completed application rollback date",
+  manifest.productionVerifiedAt === "2026-08-06T02:13:34.778Z",
+  "productionVerifiedAt must record the completed v285 reconciliation",
 );
 expect(
   fs.existsSync(path.join(root, manifest.productionSmokeEvidence || "")),
@@ -774,7 +774,10 @@ const expectedStabilizationControlPaths = [
   "tools/test_tracked_playing_time_ui.mjs",
   "tools/validate_release_manifest.mjs",
 ];
-expect(stabilization?.status === "ready_for_independent_review", "stabilization status must require independent review");
+expect(
+  stabilization?.status === "production_reconciled_evidence_review_required",
+  "stabilization status must record production reconciliation and require evidence review",
+);
 expect(stabilization?.releaseMarker === "v285", "stabilization release marker must be v285");
 expect(stabilization?.previousReleaseMarker === "v284", "stabilization previous release marker must remain v284");
 expect(stabilization?.cacheMarker === "laxhornet-v285", "stabilization cache marker must match v285");
@@ -794,9 +797,22 @@ expect(
 expect(
   stabilization?.schemaChanged === false
     && stabilization?.backendChanged === false
-    && stabilization?.productionAccessed === false
-    && stabilization?.productionDeploymentAuthorized === false
-    && stabilization?.productionDeployed === false
+    && stabilization?.productionAccessed === true
+    && stabilization?.productionDeploymentAuthorized === true
+    && stabilization?.productionDeployed === true
+    && stabilization?.approvedAndDeployedSha === "9e434e33534a1b348b19e2081b91d7e0724299fc"
+    && stabilization?.deploymentProvider === "GitHub Pages"
+    && stabilization?.deploymentRunId === "31061426334"
+    && stabilization?.deploymentJobResult === "success"
+    && stabilization?.originalWorkflowConclusion === "failure"
+    && stabilization?.secondDeploymentPerformed === false
+    && stabilization?.productionRuntimeMarker === "v285"
+    && stabilization?.productionCacheMarker === "laxhornet-v285"
+    && stabilization?.productionVerificationStatus === "PASS"
+    && stabilization?.rollbackRequired === false
+    && stabilization?.productionDataMutated === false
+    && stabilization?.migrationOccurred === false
+    && stabilization?.backendOrSupabaseConfigurationChanged === false
     && stabilization?.independentExactHeadReviewRequired === true,
   "stabilization release boundary changed",
 );
@@ -809,16 +825,41 @@ for (const [label, expectedPaths, hashes] of [
     `stabilization ${label} hash inventory changed`,
   );
   for (const file of expectedPaths) {
-    const absolute = path.join(root, file);
-    expect(fs.existsSync(absolute), `stabilization ${label} file is missing: ${file}`);
-    if (fs.existsSync(absolute)) {
+    const releaseRef = stabilization?.approvedAndDeployedSha || "";
+    expect(releaseRef && existsAt(releaseRef, file), `stabilization ${label} file is missing at deployed SHA: ${file}`);
+    if (releaseRef && existsAt(releaseRef, file)) {
       expect(
-        hashes?.[file] === repositoryTextSha256(fs.readFileSync(absolute)),
-        `stabilization ${label} SHA-256 mismatch: ${file}`,
+        hashes?.[file] === repositoryTextSha256(gitBuffer("show", `${releaseRef}:${file}`)),
+        `stabilization ${label} deployed SHA-256 mismatch: ${file}`,
       );
     }
   }
 }
+const v285ProductionReconciliation = stabilization?.productionReconciliation || {};
+for (const [label, evidence] of [
+  ["deployment", v285ProductionReconciliation.deploymentEvidence],
+  ["machine", v285ProductionReconciliation.machineEvidence],
+]) {
+  const absolute = path.join(root, evidence?.path || "");
+  expect(Boolean(evidence?.path) && fs.existsSync(absolute), `v285 ${label} reconciliation evidence must exist`);
+  if (evidence?.path && fs.existsSync(absolute)) {
+    expect(
+      evidence.sha256 === repositoryTextSha256(fs.readFileSync(absolute)),
+      `v285 ${label} reconciliation evidence SHA-256 mismatch`,
+    );
+  }
+}
+expect(
+  v285ProductionReconciliation.deployableFileCount === 47
+    && v285ProductionReconciliation.matchedFileCount === 47
+    && v285ProductionReconciliation.cleanInstallStatus === "PASS"
+    && v285ProductionReconciliation.existingV284ClientUpgradeStatus === "PASS"
+    && v285ProductionReconciliation.activeGameRecoveryStatus === "PASS"
+    && v285ProductionReconciliation.savedReviewPlayerAlignmentStatus === "PASS"
+    && v285ProductionReconciliation.productionMutationRequests === 0
+    && v285ProductionReconciliation.hostedSupabaseRequests === 0,
+  "v285 production reconciliation summary is incomplete",
+);
 expect(
   manifest.r206ReleaseControl?.syntheticVerification?.authorized === false
     && manifest.r206ReleaseControl?.syntheticVerification?.completed === false
