@@ -139,6 +139,37 @@ Using local Git and GitHub only to push the authorized feature branch and
 create or update its draft pull request is not treated as a write-capable
 external-connector exception.
 
+### Supabase Preview classification
+
+When an authorized pull request containing migrations triggers the configured
+GitHub integration, automatic application to its temporary isolated Supabase
+Preview branch is CI verification, not a manual or production migration. This
+classification applies only when the preview is isolated from production,
+contains no copied production data, uses separate credentials, changes no
+production migration history, performs no production deployment, is tied to
+the pull-request lifecycle, and exposes no secrets in evidence.
+
+Record the applicable status as:
+
+```text
+AUTOMATIC ISOLATED SUPABASE PREVIEW MIGRATION — ACCEPTED CI VERIFICATION
+```
+
+Do not use the absolute statement `No migration was applied` when Preview ran.
+Instead report:
+
+```text
+No local, manual, CLI, linked-main, or production migration was applied.
+The configured GitHub integration automatically applied the migration to an
+isolated ephemeral Supabase Preview branch for PR validation.
+```
+
+Preview CI does not authorize local/manual migration application, Supabase CLI
+application to a linked main or production project, manual Dashboard
+application, production or persistent shared-environment application,
+migration-history repair, deployment/activation, production data, or production
+credentials.
+
 ## Implementation workflow
 
 ### 1. Inspect and classify
@@ -285,9 +316,10 @@ Database schema and migration work is Level 3. It must use reviewed,
 timestamped SQL under `supabase/migrations/` and preserve historical migration
 identity. Local validation must not contact or mutate production.
 
-Applying a migration, changing production data or configuration, deploying an
-Edge Function, changing GitHub Pages settings, merging, deploying, or
-publishing a release requires separate explicit authorization and the
+Applying a migration outside the allowed automatic isolated Supabase Preview
+classification, changing production data or configuration, deploying an Edge
+Function, changing GitHub Pages settings, merging, deploying, or publishing a
+release requires separate explicit authorization and the
 repository's applicable release or operations procedure.
 
 The project-scoped Supabase configuration is read-only. A connector session is

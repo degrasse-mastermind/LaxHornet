@@ -15,6 +15,7 @@ Focused checks:
 Broad checks or CI:
 Known limitations:
 Production or external state changed: NO
+Supabase Preview: NOT APPLICABLE / AUTOMATIC ISOLATED SUPABASE PREVIEW MIGRATION — ACCEPTED CI VERIFICATION
 Next step:
 ```
 
@@ -23,7 +24,14 @@ state did change under separate explicit authorization, replace `NO` with the
 exact authorized action and its durable evidence.
 
 The normal feature-branch push and draft pull request are recorded in their
-own fields and do not change the production-or-external-state field.
+own fields and do not change the production-or-external-state field. When the
+configured GitHub integration automatically applies migrations to an isolated,
+data-less, separately credentialed, PR-lifecycle Supabase Preview branch,
+record that in the Preview field as accepted CI verification. Do not report
+`No migration was applied`; state that no local, manual, CLI, linked-main, or
+production migration was applied and that the isolated Preview application was
+automatic. Preview CI does not authorize manual, persistent shared-environment,
+production, migration-history repair, deployment, or activation actions.
 
 ## Level 3 additions when relevant
 

@@ -410,9 +410,14 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   six field-group/game revisions, private append-only operation/change/
   conflict/resolution/clock-command history, forced RLS, inert public v2
   signatures, disabled retention control, and refusal-based pre-activation
-  rollback. No migration has been applied and R2-07B+, production, deployment,
-  activation, release/cache changes, and merge remain unauthorized. Repository
-  and production runtime remain v285.
+  rollback. No local, manual, CLI, linked-main, or production migration was
+  applied. The configured GitHub integration automatically applied the
+  migration to an isolated, data-less, separately credentialed ephemeral
+  Supabase Preview branch for PR #64 validation; this is
+  `AUTOMATIC ISOLATED SUPABASE PREVIEW MIGRATION — ACCEPTED CI VERIFICATION`.
+  Production migration history and deployment remain unchanged. R2-07B+,
+  production, deployment, activation, release/cache changes, and merge remain
+  unauthorized. Repository and production runtime remain v285.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The repository cache marker is `laxhornet-v285`. The updated service worker purges

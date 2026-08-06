@@ -13,9 +13,11 @@ Branch: `feature/r2-07a-dormant-concurrency-foundation`
 This implementation contains only repository migration, rollback, private
 certification, disposable PostgreSQL test, ticket, rollout, and current-state
 artifacts. It does not add a client caller, change a v1 function, apply a
-migration, contact Supabase, alter production, deploy, change a release/cache
-marker, change Live Share/public disclosure, enable retention deletion, merge,
-or begin R2-07B or any later phase.
+migration locally/manually/by CLI/to linked main or production, alter
+production, deploy, change a release/cache marker, change Live Share/public
+disclosure, enable retention deletion, merge, or begin R2-07B or any later
+phase. The configured GitHub integration's automatic migration application to
+the isolated PR #64 Supabase Preview branch is accepted CI verification.
 
 The implemented founder decisions are direct aggregate score authority;
 idempotent score deltas/corrections; automatic merge only for proven
@@ -160,7 +162,17 @@ Final result: `TOTAL: 56 passed, 0 failed`.
 
 ## Production statement
 
-No migration was applied. No Supabase connector or project was accessed or
-mutated. No deployment, release, cache, Live Share, public disclosure, or
-production state changed. v1 behavior and the v285 runtime boundary remain
-unchanged.
+`AUTOMATIC ISOLATED SUPABASE PREVIEW MIGRATION — ACCEPTED CI VERIFICATION`
+
+No local, manual, CLI, linked-main, or production migration was applied. The
+configured GitHub integration automatically applied the migration to an
+isolated ephemeral Supabase Preview branch for PR validation. The Preview
+branch is separate from production, contains no copied production data, uses
+separate credentials, changes no production migration history, performs no
+production deployment, is tied to the PR lifecycle, and retained no secrets in
+evidence.
+
+No manual Dashboard application, persistent shared-environment application,
+migration-history repair, activation, production data/credentials, deployment,
+release, cache, Live Share, public disclosure, or production state change
+occurred. v1 behavior and the v285 runtime boundary remain unchanged.

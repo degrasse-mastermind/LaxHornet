@@ -2261,9 +2261,16 @@ the migration.
 
 #### Explicit exclusions
 
-- No Supabase command, migration application, production access or mutation,
-  deployment, release/cache marker change, Live Share/public disclosure change,
-  client call, v1 change, retention deletion, merge, or R2-07B+ work.
+- No local/manual migration application; no Supabase CLI application to a
+  linked main or production project; no manual Dashboard, production, or
+  persistent shared-environment application; and no migration-history repair,
+  deployment/activation, production data/credentials, release/cache marker
+  change, Live Share/public disclosure change, client call, v1 change,
+  retention deletion, merge, or R2-07B+ work.
+- Automatic application by the configured GitHub integration to the temporary,
+  isolated, data-less, separately credentialed Supabase Preview branch tied to
+  PR #64 is authorized CI verification and is not production migration
+  application.
 
 #### Acceptance record
 
@@ -2278,6 +2285,8 @@ the migration.
 - [x] Retention execution is structurally disabled with no duration, purge
   routine, trigger, cron, or job.
 - [x] The zero-evidence rollback succeeds and refuses after any R2-07 evidence.
+- [x] `AUTOMATIC ISOLATED SUPABASE PREVIEW MIGRATION — ACCEPTED CI
+  VERIFICATION`; no production migration history or deployment changed.
 - [ ] Exact-head independent Level 3 review passes before merge.
 
 Evidence:

@@ -287,11 +287,18 @@ review required
 - [x] Pass the deterministic disposable PostgreSQL concurrency, authorization,
   disclosure, append-only, atomicity, and rollback matrix with zero container
   residue.
+- [x] Classify the configured GitHub integration's automatic application to the
+  isolated, data-less, separately credentialed PR #64 Supabase Preview branch
+  as `AUTOMATIC ISOLATED SUPABASE PREVIEW MIGRATION — ACCEPTED CI
+  VERIFICATION`.
 - [ ] Pass exact-head independent Level 3 review before merge.
 
-R2-07A does not authorize migration application, client cutover, deployment,
-production access, activation, merge, or R2-07B through R2-07F. Production and
-the active runtime remain at v285.
+R2-07A does not authorize local/manual migration application, Supabase CLI
+application to linked main/production, manual Dashboard application,
+persistent shared-environment or production application, migration-history
+repair, client cutover, deployment, production access, activation, merge, or
+R2-07B through R2-07F. The automatic PR-lifecycle Preview application is
+accepted CI verification. Production and the active runtime remain at v285.
 
 ## R2-04 — Durable Game and Clock Operation States
 
