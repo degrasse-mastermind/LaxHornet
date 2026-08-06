@@ -40,6 +40,12 @@ function normalizedSha(file) {
   return crypto.createHash("sha256").update(normalized, "utf8").digest("hex");
 }
 
+function normalizedShaAtRef(ref, file) {
+  const normalized = execFileSync("git", ["show", `${ref}:${file}`], { cwd: root, encoding: "utf8" })
+    .replace(/\r\n/g, "\n");
+  return crypto.createHash("sha256").update(normalized, "utf8").digest("hex");
+}
+
 function protectedR206FactsMatch(candidate) {
   return JSON.stringify(candidate.r206ReleaseControl) === JSON.stringify(historicalManifest.r206ReleaseControl);
 }
@@ -103,10 +109,15 @@ test("removal or mutation of protected R2-06 facts is detected", () => {
   assert.equal(protectedR206FactsMatch(mutated), false);
 });
 
-test("production deployment remains unauthorized", () => {
-  assert.equal(stabilization.productionDeploymentAuthorized, false);
-  assert.equal(stabilization.productionDeployed, false);
-  assert.equal(manifest.productionRelease, "v284");
+test("authorized automatic v285 deployment is reconciled without a second deployment", () => {
+  assert.equal(stabilization.productionDeploymentAuthorized, true);
+  assert.equal(stabilization.productionDeployed, true);
+  assert.equal(stabilization.approvedAndDeployedSha, "9e434e33534a1b348b19e2081b91d7e0724299fc");
+  assert.equal(stabilization.deploymentRunId, "31061426334");
+  assert.equal(stabilization.deploymentJobResult, "success");
+  assert.equal(stabilization.originalWorkflowConclusion, "failure");
+  assert.equal(stabilization.secondDeploymentPerformed, false);
+  assert.equal(manifest.productionRelease, "v285");
 });
 
 test("proposed R2-07 remains proposed and unstarted", () => {
@@ -120,19 +131,30 @@ test("no unrelated rollout stage is advanced", () => {
   assert.match(evidence, /No unrelated rollout stage (?:was |is )?advanced/i);
 });
 
-test("the new runtime is not claimed as deployed", () => {
-  assert.equal(stabilization.productionAccessed, false);
+test("the pre-deployment integration evidence remains immutable historical context", () => {
   assert.match(evidence, /Deployment status:[^\r\n]*not authorized/i);
   assert.match(evidence, /Production status:[^\r\n]*not accessed/i);
+  assert.equal(stabilization.productionAccessed, true);
+  assert.equal(stabilization.productionVerificationStatus, "PASS");
 });
 
-test("exact stabilization runtime and control hashes match the working tree", () => {
+test("exact stabilization runtime and control hashes remain bound to the deployed SHA", () => {
   for (const inventory of [stabilization.runtimeSha256, stabilization.controlSha256]) {
     assert.ok(Object.keys(inventory).length > 0);
     for (const [file, expected] of Object.entries(inventory)) {
-      assert.equal(normalizedSha(file), expected, file);
+      assert.equal(normalizedShaAtRef(stabilization.approvedAndDeployedSha, file), expected, file);
     }
   }
+});
+
+test("v285 reconciliation records no backend, migration, production mutation, or rollback", () => {
+  assert.equal(stabilization.backendOrSupabaseConfigurationChanged, false);
+  assert.equal(stabilization.migrationOccurred, false);
+  assert.equal(stabilization.productionDataMutated, false);
+  assert.equal(stabilization.rollbackRequired, false);
+  assert.equal(stabilization.productionReconciliation.deployableFileCount, 47);
+  assert.equal(stabilization.productionReconciliation.matchedFileCount, 47);
+  assert.equal(stabilization.productionReconciliation.productionMutationRequests, 0);
 });
 
 const failures = tests.filter((entry) => entry.status === "FAIL");

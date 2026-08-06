@@ -53,11 +53,19 @@ test("runtime present with one migration missing is blocked", () => {
 
 test("both migrations present with an old runtime is blocked", () => {
   const manifest = clone(sourceManifest);
-  manifest.productionApplicationSha = manifest.productionRollbackSourceSha;
   manifest.r206ReleaseControl.runtimeSourceSha = manifest.productionRollbackSourceSha;
   const result = evaluate(manifest);
   assert.equal(result.runtimeDatabaseReady, false);
-  assert.notEqual(manifest.productionApplicationSha, R206_RUNTIME_SHA);
+  assert.notEqual(manifest.r206ReleaseControl.runtimeSourceSha, R206_RUNTIME_SHA);
+});
+
+test("latest production runtime may advance without rewriting historical R2-06 identity", () => {
+  const manifest = clone(sourceManifest);
+  manifest.productionApplicationSha = "9e434e33534a1b348b19e2081b91d7e0724299fc";
+  manifest.productionRelease = "v285";
+  const result = evaluate(manifest);
+  assert.equal(result.runtimeDatabaseReady, true);
+  assert.equal(manifest.r206ReleaseControl.runtimeSourceSha, R206_RUNTIME_SHA);
 });
 
 test("wrong migration order is blocked", () => {

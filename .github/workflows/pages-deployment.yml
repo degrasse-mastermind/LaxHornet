@@ -7,9 +7,26 @@ on:
   workflow_dispatch:
     inputs:
       deployment_ref:
-        description: Existing allowlisted main commit to redeploy for rollback
-        required: false
+        description: Exact reviewed main commit authorized for deployment
+        required: true
         type: string
+      authorized_source_sha:
+        description: Full reviewed SHA authorized for deployment
+        required: true
+        type: string
+      expected_runtime_marker:
+        description: Expected live runtime marker after deployment
+        required: true
+        type: string
+      expected_cache_marker:
+        description: Expected live service-worker cache marker after deployment
+        required: true
+        type: string
+      deployment_authorized:
+        description: Confirm separate production deployment authorization exists
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -28,34 +45,58 @@ jobs:
       pages: read
     outputs:
       source_sha: ${{ steps.source.outputs.sha }}
+      production_source_sha: ${{ steps.source.outputs.production_source_sha }}
+      release_marker: ${{ steps.source.outputs.release_marker }}
+      cache_marker: ${{ steps.source.outputs.cache_marker }}
+      deployment_required: ${{ steps.source.outputs.deployment_required }}
 
     steps:
       - name: Check out exact deployment source
         uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.deployment_ref || github.sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.deployment_ref || github.sha }}
           fetch-depth: 0
-
-      - name: Verify approved main ancestry
-        id: source
-        shell: bash
-        run: |
-          set -euo pipefail
-          source_sha="$(git rev-parse HEAD)"
-          git fetch --no-tags origin main
-          git merge-base --is-ancestor "$source_sha" origin/main
-          if [[ "${{ github.event_name }}" == "push" && "$source_sha" != "$GITHUB_SHA" ]]; then
-            echo "Push deployment source differs from the triggering commit." >&2
-            exit 1
-          fi
-          echo "sha=$source_sha" >> "$GITHUB_OUTPUT"
-          echo "Deploying source commit: $source_sha"
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "22"
           package-manager-cache: false
+
+      - name: Verify source identity and deployment authorization
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_sha="$(git rev-parse HEAD)"
+          release_marker="$(node -p "JSON.parse(require('fs').readFileSync('version.json', 'utf8')).version")"
+          cache_marker="$(node -e "const source=require('fs').readFileSync('service-worker.js','utf8'); const match=source.match(/const CACHE_NAME = \"([^\"]+)\"/); if(!match) process.exit(1); process.stdout.write(match[1]);")"
+          production_source_sha="$(node -p "JSON.parse(require('fs').readFileSync('release/laxhornet-release-manifest.json', 'utf8')).productionApplicationSha")"
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$source_sha" origin/main
+          if [[ "${{ github.event_name }}" == "push" && "$source_sha" != "$GITHUB_SHA" ]]; then
+            echo "Push deployment source differs from the triggering commit." >&2
+            exit 1
+          fi
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            [[ "${{ inputs.deployment_authorized }}" == "true" ]] || { echo "DEPLOYMENT_AUTHORIZATION_REQUIRED: explicit confirmation is false." >&2; exit 1; }
+            [[ "${{ inputs.authorized_source_sha }}" == "$source_sha" ]] || { echo "AUTHORIZED_SOURCE_SHA_MISMATCH: reviewed SHA does not match checkout." >&2; exit 1; }
+            [[ "${{ inputs.expected_runtime_marker }}" == "$release_marker" ]] || { echo "EXPECTED_RUNTIME_MARKER_MISMATCH: authorization does not match version.json." >&2; exit 1; }
+            [[ "${{ inputs.expected_cache_marker }}" == "$cache_marker" ]] || { echo "EXPECTED_CACHE_MARKER_MISMATCH: authorization does not match service-worker.js." >&2; exit 1; }
+            deployment_required=true
+            production_source_sha="$source_sha"
+          else
+            live_marker="$(node -e "fetch('https://laxhornet.mybranford.com/version.json?pages-preflight=' + Date.now(), {cache:'no-store'}).then(async response => { if(!response.ok) throw new Error(String(response.status)); process.stdout.write((await response.json()).version); })")"
+            [[ "$live_marker" == "$release_marker" ]] || { echo "AUTOMATIC_DEPLOYMENT_NOT_AUTHORIZED: production differs from the repository; use an explicitly authorized workflow dispatch." >&2; exit 1; }
+            deployment_required=false
+          fi
+          echo "sha=$source_sha" >> "$GITHUB_OUTPUT"
+          echo "production_source_sha=$production_source_sha" >> "$GITHUB_OUTPUT"
+          echo "release_marker=$release_marker" >> "$GITHUB_OUTPUT"
+          echo "cache_marker=$cache_marker" >> "$GITHUB_OUTPUT"
+          echo "deployment_required=$deployment_required" >> "$GITHUB_OUTPUT"
+          echo "Validated source commit: $source_sha"
+          echo "Deployment required: $deployment_required"
 
       - name: Verify Pages source and custom-domain gate
         env:
@@ -107,6 +148,7 @@ jobs:
   deploy:
     name: Deploy allowlisted artifact
     needs: build
+    if: needs.build.outputs.deployment_required == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -123,6 +165,10 @@ jobs:
 
   verify:
     name: Verify Pages production boundary
+    if: >-
+      always()
+      && needs.build.result == 'success'
+      && (needs.deploy.result == 'success' || needs.deploy.result == 'skipped')
     needs:
       - build
       - deploy
@@ -135,8 +181,13 @@ jobs:
     steps:
       - name: Check out exact deployed source
         uses: actions/checkout@v5
+
+      - name: Check out production bundle source
+        uses: actions/checkout@v5
         with:
-          ref: ${{ needs.build.outputs.source_sha }}
+          ref: ${{ needs.build.outputs.production_source_sha }}
+          path: deployed-source
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -144,7 +195,21 @@ jobs:
           node-version: "22"
           package-manager-cache: false
 
-      - name: Verify Pages source, custom domain, HTTPS, and release marker
+      - name: Rebuild reviewed production manifest without deploying
+        working-directory: deployed-source
+        run: node tools/build_pages_artifact.mjs --source-sha=${{ needs.build.outputs.production_source_sha }}
+
+      - name: Verify Pages source, custom domain, HTTPS, runtime, and cache markers
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node tools/verify_pages_settings.mjs --production
+        run: >-
+          node tools/verify_pages_settings.mjs
+          --expected-runtime-marker=${{ needs.build.outputs.release_marker }}
+          --expected-cache-marker=${{ needs.build.outputs.cache_marker }}
+          --expected-source-sha=${{ needs.build.outputs.production_source_sha }}
+          --deployment-manifest=deployed-source/.pages-artifact-metadata/pages-deployment-manifest.json
+
+      - name: Reconcile all allowlisted production files
+        run: >-
+          node tools/verify_pages_production.mjs
+          --manifest=deployed-source/.pages-artifact-metadata/pages-deployment-manifest.json
