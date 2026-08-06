@@ -385,10 +385,23 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   history, independently versioned clock/event authorities, immutable private
   conflicts, and append-only resolutions. v285 clients are protected through
   dormant versioned RPCs and a separately authorized atomic upgrade-required
-  cutover; missing versions are never treated as current. Implementation,
-  migration, production, merge, deployment, and activation remain
-  unauthorized pending David's decision and exact design-head independent
-  Level 3 review.
+  cutover; missing versions are never treated as current. PR #62 received an
+  exact-head PASS at `df458789bc3f45e4f01cf31cc0ed10716dd9e2a6` on 2026-08-06 at 03:11:56Z.
+  Replay-disclosure P1 was posted at 03:11:35Z and remained unresolved at merge
+  at 03:12:48Z; team-authority P1 and post-lock concurrent-first-seen P2 were
+  posted after merge at 03:17:29Z against the same head. All three remained
+  unresolved when PR #63 began, so the historical PASS is not a clean gate.
+  PR #63 head `53e934a80500f6987a724993ce6f8cc47df1529e` then failed independent
+  review because globally unique actor/operation identity was serialized only
+  per game and because that chronology was inaccurate. The re-remediated design
+  requires global actor/operation serialization before at most one game lock,
+  never in reverse order; non-disclosing cross-game mismatch after requested-
+  game tombstone/current-authority checks; atomic mutation/identity/result/
+  history; and explicit cross-game, uniqueness, atomicity, independence, and
+  deadlock tests. No clean independent Level 3 PASS exists until review of the
+  new exact remediation PR head. R2-07A, implementation,
+  migration, production, merge, deployment, and activation remain unauthorized.
+  Repository and production runtime remain v285.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The repository cache marker is `laxhornet-v285`. The updated service worker purges

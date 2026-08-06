@@ -1,10 +1,10 @@
 # R2-07 Migration and Rollback Plan
 
-Status: `DESIGNED — IMPLEMENTATION AUTHORIZATION PENDING`
+Status: `RE-REMEDIATED — NEW EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`
 
 Risk level: `LEVEL 3 — SCHEMA, RLS, RPC, SYNCHRONIZATION, RECOVERY`
 
-Baseline: `730655eb8e98ed02eddf2d04d0ca1e7a5438905e`
+Remediation baseline: `0e90e3b4017d65ef35bdf95fc165b3379a4c6844`
 
 This document describes future migration work. No migration file was created or
 applied by the design task.
@@ -143,8 +143,9 @@ Append-only trigger; no direct client access.
 Recommended columns:
 
 - `conflict_id uuid primary key`;
-- `account_id uuid not null` copied from canonical game owner without an
-  `auth.users` cascade;
+- `account_id uuid not null` copied from canonical personal owner/account for
+  retention/audit scope without an `auth.users` cascade; the copy is not an
+  authorization grant, especially for a team-scoped game;
 - game ID, optional team ID and roster player ID snapshots;
 - actor user ID and canonical operation ID;
 - optional parent conflict ID with `on delete restrict`;
@@ -220,10 +221,33 @@ All functions default to `r207_not_activated` until the activation gate is
 enabled. The dormant state must be a committed server-side control, not merely
 a client flag.
 
-Use the existing R2-06 namespaced per-game transaction lock. Every game, clock,
-status, event-boundary, resolution, and delete function acquires it before
-tombstone/game/clock reads. The universal row order is tombstone, game,
-clock, then operation/conflict append. No function takes two game locks.
+R2-07 contracts use two distinct serialization domains. Operation identity is
+global for `(actor_user_id, client_operation_id)` and is independent of game ID;
+game mutation uses the existing R2-06 namespaced per-game transaction lock.
+R2-07A may implement operation identity with a collision-safe transaction
+advisory lock or an atomic blocking reservation row. Either mechanism must
+serialize before game-domain mutation, retain the identity boundary through
+transaction end, and never commit a reservation separately from the semantic
+mutation and canonical result.
+
+The universal R2-07 order is: validate and derive actor/hash/requested scope;
+acquire operation identity; perform a non-disclosing operation lookup; resolve
+and acquire at most one requested-game lock while retaining operation identity;
+recheck operation; then read tombstone, lock game and clock rows, validate
+current authority, classify replay/scope/payload mismatch, and perform semantic
+processing. No R2-07 path acquires a game lock and then operation identity.
+Existing R2-06 functions that remain per-game-only must never subsequently take
+the operation lock, so opposing requests cannot form a lock cycle.
+
+The first simultaneous valid request stores exactly one mutation and canonical
+result atomically with the operation row and append-only evidence. An identical
+waiter returns that replay without semantic mutation or a raw unique-constraint
+error. A same-actor/same-ID request for another game cannot enter semantic
+processing and, after requested-game tombstone/current-authority checks, returns
+safe `duplicate_operation_id_scope_mismatch`. A same-game different hash
+returns `duplicate_operation_id_payload_mismatch`. Neither mismatch discloses
+the stored canonical game ID, request/result, or conflict existence; unauthorized
+or tombstoned requested-game outcomes retain precedence.
 
 Keep the R2-06 tombstone trigger. Add no trigger that mutates versions behind a
 v2 function's accounting. Defense-in-depth direct-write triggers may reject
@@ -238,12 +262,27 @@ For every new public table:
 3. Grant no client DML on operation/change/attempt tables.
 4. If direct conflict reading is retained, grant `SELECT` to `authenticated`
    only and add a policy permitting:
-   - canonical owner/account;
-   - current authorized team/roster tracker;
-   - bounded platform reviewer.
+   - for a personal game, current canonical personal-game owner/account
+     authority;
+   - for a team-scoped game, current canonical team/roster tracking authority,
+     including `laxhornet_can_track_roster_player` where applicable; copied or
+     historical creator/owner/account identity alone is insufficient;
+   - the already justified, explicitly allowlisted, non-public, audited bounded
+     platform reviewer predicate;
+   - no app-role direct conflict row when an authoritative game tombstone
+     exists; the row remains retained but its private values are not disclosed.
 5. Grant no conflict access to `anon`; public/Live Share functions select none
    of the new tables.
 6. Conflict insert/resolution occurs only through reviewed RPCs.
+
+The same personal-versus-team rule applies in conflict read, replay,
+resolution, and retention-list RPCs. Loss/revocation of current authority
+returns a non-enumerating denial and discloses no conflict existence, stored
+canonical result, raw request, current value, or proposed value. Live Share and
+anonymous access remain excluded. Retention eligibility is a maintenance fact,
+not an access grant. Conflict read/replay/resolution RPCs acquire the shared
+game lock and check the tombstone before returning private content; an
+authorized deleted-game request returns only `game_deleted`.
 
 Privileged helpers belong in an existing or new non-exposed private schema.
 Every privileged function sets an empty search path, fully qualifies objects,
@@ -274,8 +313,30 @@ The schema/contract PR must prove on a disposable production-shaped dataset:
 - public wrappers expose only intended functions;
 - conflict JSON allowlists and 4 KiB limits fail closed;
 - operation ID/hash replay and mismatch behave deterministically;
-- shared advisory-lock key and lock-before-read ordering match R2-06A;
+- the global actor/operation boundary serializes before the requested-game lock;
+  preliminary lookup never discloses stored scope or content, and the operation
+  is rechecked with both serialization domains held;
+- same actor/same ID/same game identical concurrency produces one mutation and
+  one replay; same actor/same ID/different games produces one semantic winner
+  and one safe scope mismatch; same game/different hashes produces one safe
+  payload mismatch; different actors with the same client ID remain independent;
+- no scenario exposes a raw unique-constraint error, creates more than one
+  semantic mutation, or creates duplicate conflict/attempt evidence beyond the
+  approved bounded security-attempt row;
+- operation identity, semantic mutation, canonical result, and append-only
+  evidence commit atomically or all roll back;
+- lock instrumentation proves the universal operation-then-game order and no
+  deadlock under opposing requests; unrelated operation IDs remain independent;
+- the requested-game lock and lock-before-tombstone ordering match R2-06A;
 - existing tombstone/write/delete behavior remains byte/semantics compatible;
+- accepted/conflict replay after deletion returns only authorized
+  `game_deleted`, while revoked personal or team authority returns only
+  non-enumerating denial;
+- direct conflict SELECT after deletion returns no row to app roles, and the
+  bounded read RPC returns only authorized `game_deleted` with no old values;
+- personal and team conflict RLS/RPC tests prove that historical creator or
+  copied owner/account identity cannot preserve team-game access after current
+  roster authority is revoked;
 - no migration assumes an empty table.
 
 ## 6. Client/data cutover prerequisites
@@ -381,4 +442,4 @@ migration, a Supabase command, a linked local reset, production preflight,
 production verification, runtime deployment, or release marker change.
 
 Final migration design disposition:
-`R2-07 DESIGN READY FOR INDEPENDENT REVIEW`.
+`R2-07 DESIGN RE-REMEDIATED — NEW EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`.

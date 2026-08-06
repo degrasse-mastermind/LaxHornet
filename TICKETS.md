@@ -2128,11 +2128,13 @@ v285 reconciliation and authorizes no R2-07 implementation.
 
 ### R2-07 — Add game-field versions and conflict records
 
-Status: `DESIGNED — IMPLEMENTATION AUTHORIZATION PENDING`
+Status: `RE-REMEDIATED — NEW EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`
 
 Risk level: `LEVEL 3`
 
-Design branch: `design/r2-07-game-field-versions-conflicts`
+Historical design branch: `design/r2-07-game-field-versions-conflicts`
+
+Review-remediation branch: `design/r2-07-review-remediation`
 
 Implementation branches: separate bounded branches for R2-07A through R2-07F;
 none authorized by the design task.
@@ -2182,6 +2184,34 @@ production authorization atomically enables v2 and turns the legacy v1 write
 RPC into an actionable upgrade-required stub. Missing bases are never treated
 as current.
 
+PR #62 received exact-head PASS at design head
+`df458789bc3f45e4f01cf31cc0ed10716dd9e2a6` on 2026-08-06 at 03:11:56Z. The
+replay-disclosure P1 was posted at 03:11:35Z and remained unresolved when PR #62
+merged at 03:12:48Z. The team-authority P1 and post-lock concurrent-first-seen
+P2 were posted after merge at 03:17:29Z against that same head. All three
+remained unresolved when PR #63 began. Preserve the historical PASS, but do not
+treat it as a clean gate.
+
+PR #63 exact head `53e934a80500f6987a724993ce6f8cc47df1529e` then failed independent
+Level 3 review because the globally unique `(actor_user_id,
+client_operation_id)` identity was still serialized only by game ID and because
+the chronology above was inaccurate. The re-remediated contract acquires global
+actor/operation identity before at most one requested-game lock, never in
+reverse order; makes same-ID cross-game scope mismatch non-disclosing; preserves
+tombstone/current-authority precedence; commits identity, semantic mutation,
+canonical result, and history atomically; and requires cross-game, atomicity,
+raw-unique, independence, and deadlock probes. The failed review is
+`https://github.com/degrasse-mastermind/LaxHornet/pull/63#pullrequestreview-4874918869`.
+
+The corrected design is re-remediated. No clean independent Level 3 PASS exists
+until a reviewer returns PASS against the new exact remediation PR
+head. The product choices above, bounded post-completion correction, no initial
+reopen, server-anchored clock without a device lease, minimum R2-07D Needs
+Attention UX, provisional 180-day resolved-conflict retention subject to
+privacy/legal review, and the R2-07A–R2-07F sequence remain provisionally
+approved recommendations for David's decision. They do not authorize R2-07A.
+Repository and production runtime remain at the documented v285 state.
+
 Design artifacts:
 
 - `review-evidence/r2-07-game-field-versions-conflicts/R2-07_DESIGN.md`
@@ -2189,11 +2219,12 @@ Design artifacts:
 - `review-evidence/r2-07-game-field-versions-conflicts/R2-07_MIGRATION_AND_ROLLBACK_PLAN.md`
 - `review-evidence/r2-07-game-field-versions-conflicts/R2-07_TEST_PLAN.md`
 - `review-evidence/r2-07-game-field-versions-conflicts/R2-07_IMPLEMENTATION_SEQUENCE.md`
+- `review-evidence/r2-07-game-field-versions-conflicts/R2-07_REVIEW_REMEDIATION_EVIDENCE.md`
 
 Design task boundaries: no application code, SQL migration, RPC change,
 release marker, production access, Supabase mutation, deployment, or rollout
-activation. Exact design-head independent Level 3 review is required before
-David decides whether to authorize any implementation phase.
+activation. A new exact remediation-head independent Level 3 PASS is required
+before David decides whether to authorize R2-07A or any implementation phase.
 
 ## Ticket template
 
