@@ -1,12 +1,13 @@
 # LaxHornet Repository Current State
 
 Last reviewed: 2026-08-05
-Baseline branch: `release/v285-post-deploy-reconciliation`
-Baseline commit: `9e434e33534a1b348b19e2081b91d7e0724299fc` plus pending reconciliation evidence
+Baseline branch: `main`
+Baseline commit: `730655eb8e98ed02eddf2d04d0ca1e7a5438905e`
 Current repository release marker: `v285`
 Current production marker: `v285` from Pages run `31061426334` at approved SHA
 `9e434e33534a1b348b19e2081b91d7e0724299fc`;
-R2-06 release closeout approved through reconciled mixed evidence
+R2-06 release closeout approved through reconciled mixed evidence;
+R2-07 designed, implementation authorization pending
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
 
@@ -375,10 +376,19 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   unchanged. The exact approved v285 SHA was automatically deployed by Pages
   run `31061426334`; V285-R1 reconciles that deployment without redeploying.
   Its 47-file, PWA upgrade, production-local smoke, and request-absence checks
-  pass. Exact-head portable/Docker CI and independent review remain required.
-- The recommended next rollout ticket is proposed R2-07, game-field versions
-  and conflict records. It remains Level 3 and does not receive migration,
-  production, merge, or deployment authority from the QA checkpoint.
+  pass. PR #61 passed exact-head portable/Docker CI and independent Level 3
+  review at `1ddb31b58bd7eab88abcd2fd7fe508a291212fd9`, then merged to `main` as
+  `730655eb8e98ed02eddf2d04d0ca1e7a5438905e`.
+- R2-07 game-field versions and conflict records is designed at
+  `review-evidence/r2-07-game-field-versions-conflicts/`. The recommendation is
+  server-assigned field-group revisions plus immutable operation/change
+  history, independently versioned clock/event authorities, immutable private
+  conflicts, and append-only resolutions. v285 clients are protected through
+  dormant versioned RPCs and a separately authorized atomic upgrade-required
+  cutover; missing versions are never treated as current. Implementation,
+  migration, production, merge, deployment, and activation remain
+  unauthorized pending David's decision and exact design-head independent
+  Level 3 review.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The repository cache marker is `laxhornet-v285`. The updated service worker purges
