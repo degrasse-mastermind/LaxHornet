@@ -200,7 +200,7 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
 
 ## R2-07 — Game-Field Versions and Conflict Records Design
 
-**Status:** [!] Re-remediated — new exact-head independent Level 3 review pending
+**Status:** [x] Design closed and merged; R2-07A only is authorized
 
 **Risk level:** Level 3 — synchronization, schema/RPC, conflict, offline,
 authorization, and release semantics
@@ -247,12 +247,14 @@ authorization, and release semantics
   exactly one semantic mutation, opposing-request deadlock probes, unrelated-ID
   independence, and the full same-/cross-game concurrency matrix.
 - [x] Correct the PR #62 review chronology across all durable records.
-- [ ] Obtain independent Level 3 PASS against the new exact remediation PR SHA.
-- [ ] Obtain David's explicit decisions on score authority, allowed merges,
+- [x] Obtain independent Level 3 PASS against the exact PR #63 remediation head
+  and merge the approved design as
+  `75acbd1d7ee1204d450b3715e41b53ebc6081b37`.
+- [x] Obtain David's explicit decisions on score authority, allowed merges,
   post-completion edits, no initial reopen, clock authority, legacy cutover,
-  minimum resolution UX, retention, and phase authorization.
-- [ ] Authorize and implement any phase. No implementation is started by this
-  design record.
+  minimum resolution UX, and phase authorization. The proposed 180-day
+  retention period remains unapproved.
+- [x] Authorize R2-07A only. R2-07B and later phases remain unauthorized.
 
 Design artifacts:
 
@@ -263,13 +265,33 @@ Design artifacts:
 - `review-evidence/r2-07-game-field-versions-conflicts/R2-07_IMPLEMENTATION_SEQUENCE.md`
 - `review-evidence/r2-07-game-field-versions-conflicts/R2-07_REVIEW_REMEDIATION_EVIDENCE.md`
 
-Planning boundary: no application code, SQL migration, RPC, release marker,
-production access, Supabase mutation, deployment, production verification, or
-activation is authorized.
+### R2-07A — Dormant Concurrency Foundation
 
-PR #62 is historical planning documentation, not implementation authority.
-Production remains at v285. R2-07A remains unauthorized until the remediation
-is committed, reviewed at the exact PR head, and separately approved by David.
+**Status:** [!] Implemented on feature branch; draft PR and exact-head Level 3
+review required
+
+**Branch:** `feature/r2-07a-dormant-concurrency-foundation`
+
+- [x] Add a dormant additive migration and zero-evidence-only rollback.
+- [x] Add field-group/game revisions, lifecycle and score state, compatible
+  clock anchors, and bigint clock revision.
+- [x] Add immutable private operation, attempt, field-change, conflict,
+  resolution, and clock-command history with forced RLS and explicit grants.
+- [x] Serialize global actor/operation identity before the existing R2-06A
+  per-game lock and recheck replay only after requested-game tombstone and
+  current-authority checks.
+- [x] Keep all public v2 signatures inert with `r207_not_activated`; leave v1,
+  runtime, release markers, Live Share, and production unchanged.
+- [x] Keep retention deletion disabled and unimplemented pending separate
+  privacy/legal authorization.
+- [x] Pass the deterministic disposable PostgreSQL concurrency, authorization,
+  disclosure, append-only, atomicity, and rollback matrix with zero container
+  residue.
+- [ ] Pass exact-head independent Level 3 review before merge.
+
+R2-07A does not authorize migration application, client cutover, deployment,
+production access, activation, merge, or R2-07B through R2-07F. Production and
+the active runtime remain at v285.
 
 ## R2-04 — Durable Game and Clock Operation States
 

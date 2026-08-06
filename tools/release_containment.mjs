@@ -49,6 +49,11 @@ export const DURABLE_GAME_TOMBSTONE_CONCURRENCY_REVIEW_DB_PATHS = Object.freeze(
   "supabase/tests/durable_game_tombstone_concurrency.sql",
 ]);
 
+export const R207A_DORMANT_CONCURRENCY_REVIEW_DB_PATHS = Object.freeze([
+  "supabase/migrations/20260806143128_r207a_dormant_concurrency_foundation.sql",
+  "supabase/rollback/20260806143128_r207a_dormant_concurrency_foundation_rollback.sql",
+]);
+
 export const APPROVED_HISTORICAL_PROVENANCE_PATHS = Object.freeze([
   "supabase/migrations/20260723010607_remote_schema.sql",
   "supabase/production-history/20260723010607_remote_schema.sql",
