@@ -73,6 +73,7 @@ create table public.game_sync_operations (
   conflict_id uuid,
   result_versions jsonb not null default '{}'::jsonb,
   canonical_result jsonb not null,
+  correction_reason text,
   client_created_at timestamptz,
   server_received_at timestamptz not null default statement_timestamp(),
   constraint game_sync_operations_actor_client_r207_key
@@ -97,7 +98,13 @@ create table public.game_sync_operations (
   constraint game_sync_operations_versions_r207_check
     check (jsonb_typeof(result_versions) = 'object' and pg_column_size(result_versions) <= 2048),
   constraint game_sync_operations_result_r207_check
-    check (jsonb_typeof(canonical_result) = 'object' and pg_column_size(canonical_result) <= 4096)
+    check (jsonb_typeof(canonical_result) = 'object' and pg_column_size(canonical_result) <= 4096),
+  constraint game_sync_operations_correction_reason_r207_check check (
+    correction_reason is null
+    or correction_reason in (
+      'scoreboard_correction', 'official_result_correction', 'data_entry_correction'
+    )
+  )
 );
 
 create index game_sync_operations_game_received_r207_idx
@@ -362,7 +369,10 @@ as $function$
   select p_actor is not null
     and p_actor = (select auth.uid())
     and (
-      p_tombstone.owner_user_id = p_actor
+      (
+        p_tombstone.team_id is null
+        and p_tombstone.owner_user_id = p_actor
+      )
       or (
         p_tombstone.team_id is not null
         and (select public.laxhornet_can_track_roster_player(
@@ -395,10 +405,13 @@ declare
   operation_type text := btrim(coalesce(p_operation ->> 'operation_type', ''));
   field_group text := btrim(coalesce(p_operation ->> 'field_group', ''));
   base_version bigint;
+  status_base_version bigint;
   current_version bigint;
   result_version bigint;
   changed_fields text[];
   changes jsonb := coalesce(p_operation -> 'changes', '{}'::jsonb);
+  expected_lifecycle text := nullif(btrim(coalesce(p_operation ->> 'expected_lifecycle', '')), '');
+  correction_reason text := nullif(btrim(coalesce(p_operation ->> 'correction_reason', '')), '');
   stored_operation public.game_sync_operations%rowtype;
   target_game public.games%rowtype;
   tombstone public.legacy_game_tombstones%rowtype;
@@ -522,6 +535,58 @@ begin
       actor_id, client_id, stored_operation.operation_id, 'idempotent_replay'
     );
     return stored_operation.canonical_result || jsonb_build_object('replay', true);
+  end if;
+
+  if operation_type in ('score_delta', 'score_correction', 'status_transition') then
+    if expected_lifecycle is null then
+      return jsonb_build_object('outcome', 'rejected', 'code', 'missing_expected_lifecycle');
+    end if;
+    if expected_lifecycle not in ('active', 'paused', 'completed') then
+      return jsonb_build_object('outcome', 'rejected', 'code', 'invalid_expected_lifecycle');
+    end if;
+    if not (p_operation ? 'status_base_version') then
+      return jsonb_build_object('outcome', 'rejected', 'code', 'missing_status_base_version');
+    end if;
+    begin
+      status_base_version := (p_operation ->> 'status_base_version')::bigint;
+    exception when invalid_text_representation or numeric_value_out_of_range then
+      return jsonb_build_object('outcome', 'rejected', 'code', 'invalid_status_base_version');
+    end;
+    if status_base_version is null or status_base_version < 1 then
+      return jsonb_build_object('outcome', 'rejected', 'code', 'invalid_status_base_version');
+    end if;
+    if expected_lifecycle <> target_game.lifecycle_state then
+      return jsonb_build_object('outcome', 'rejected', 'code', 'stale_lifecycle_state');
+    end if;
+    if status_base_version <> target_game.status_version then
+      return jsonb_build_object('outcome', 'rejected', 'code', 'stale_status_version');
+    end if;
+  end if;
+
+  if target_game.lifecycle_state = 'completed' and operation_type = 'score_delta' then
+    return jsonb_build_object(
+      'outcome', 'rejected', 'code', 'completed_game_score_correction_required'
+    );
+  end if;
+
+  if target_game.lifecycle_state = 'completed' and operation_type = 'score_correction' then
+    if correction_reason is null then
+      return jsonb_build_object(
+        'outcome', 'rejected', 'code', 'completed_game_score_correction_reason_required'
+      );
+    end if;
+    if correction_reason not in (
+      'scoreboard_correction', 'official_result_correction', 'data_entry_correction'
+    ) then
+      return jsonb_build_object(
+        'outcome', 'rejected', 'code', 'invalid_completed_game_score_correction_reason'
+      );
+    end if;
+    if base_version <> target_game.score_version then
+      return jsonb_build_object('outcome', 'rejected', 'code', 'stale_score_version');
+    end if;
+  else
+    correction_reason := null;
   end if;
 
   current_version := case field_group
@@ -725,11 +790,11 @@ begin
   insert into public.game_sync_operations(
     operation_id, actor_user_id, client_operation_id, game_id, operation_type,
     request_hash, changed_fields, outcome_class, outcome_code,
-    result_versions, canonical_result
+    result_versions, canonical_result, correction_reason
   ) values (
     operation_uuid, actor_id, client_id, target_game_id, operation_type,
     request_hash, changed_fields, outcome_class, outcome_code,
-    lh_sync_private.r207_game_versions(target_game), result
+    lh_sync_private.r207_game_versions(target_game), result, correction_reason
   );
   insert into public.game_field_changes(
     operation_id, game_id, field_group, base_version, result_version, changed_fields
@@ -755,7 +820,9 @@ declare
   target_game_id text := btrim(coalesce(p_operation ->> 'game_id', ''));
   request_hash text := lower(btrim(coalesce(p_operation ->> 'request_hash', '')));
   command_name text := btrim(coalesce(p_operation ->> 'command', ''));
+  expected_lifecycle text := nullif(btrim(coalesce(p_operation ->> 'expected_lifecycle', '')), '');
   base_version bigint;
+  status_base_version bigint;
   target_game public.games%rowtype;
   target_clock public.lh_game_clock_states%rowtype;
   tombstone public.legacy_game_tombstones%rowtype;
@@ -817,6 +884,33 @@ begin
     insert into public.game_sync_operation_attempts(actor_user_id, client_operation_id, canonical_operation_id, attempt_code)
     values (actor_id, client_id, stored_operation.operation_id, 'idempotent_replay');
     return stored_operation.canonical_result || jsonb_build_object('replay', true);
+  end if;
+
+  if expected_lifecycle is null then
+    return jsonb_build_object('outcome', 'rejected', 'code', 'missing_expected_lifecycle');
+  end if;
+  if expected_lifecycle not in ('active', 'paused', 'completed') then
+    return jsonb_build_object('outcome', 'rejected', 'code', 'invalid_expected_lifecycle');
+  end if;
+  if not (p_operation ? 'status_base_version') then
+    return jsonb_build_object('outcome', 'rejected', 'code', 'missing_status_base_version');
+  end if;
+  begin
+    status_base_version := (p_operation ->> 'status_base_version')::bigint;
+  exception when invalid_text_representation or numeric_value_out_of_range then
+    return jsonb_build_object('outcome', 'rejected', 'code', 'invalid_status_base_version');
+  end;
+  if status_base_version is null or status_base_version < 1 then
+    return jsonb_build_object('outcome', 'rejected', 'code', 'invalid_status_base_version');
+  end if;
+  if expected_lifecycle <> target_game.lifecycle_state then
+    return jsonb_build_object('outcome', 'rejected', 'code', 'stale_lifecycle_state');
+  end if;
+  if status_base_version <> target_game.status_version then
+    return jsonb_build_object('outcome', 'rejected', 'code', 'stale_status_version');
+  end if;
+  if target_game.lifecycle_state = 'completed' then
+    return jsonb_build_object('outcome', 'rejected', 'code', 'completed_game_clock_change_forbidden');
   end if;
 
   select * into target_clock from public.lh_game_clock_states

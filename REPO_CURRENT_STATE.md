@@ -410,8 +410,17 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   six field-group/game revisions, private append-only operation/change/
   conflict/resolution/clock-command history, forced RLS, inert public v2
   signatures, disabled retention control, and refusal-based pre-activation
-  rollback. No local, manual, CLI, linked-main, or production migration was
-  applied. The configured GitHub integration automatically applied the
+  rollback. Exact head `b071dc6ffc09e2f28f965bcdabe6a4b4d632d89b` failed
+  independent implementation review because completed games accepted ordinary
+  score deltas and copied owner identity disclosed team tombstones. The feature
+  branch remediation now rejects ordinary completed-game score/clock writes,
+  requires current lifecycle/status/score bases plus an allowlisted correction
+  reason for private completed-game correction, and requires current
+  roster-tracking authority before team tombstone disclosure. Its disposable
+  PostgreSQL matrix passes all original `49` checks plus `22` adversarial
+  remediation assertions (`71/71`) with zero residue. A fresh exact-head Level
+  3 review remains required. No local, manual, CLI, linked-main, or production
+  migration was applied. The configured GitHub integration automatically applied the
   migration to an isolated, data-less, separately credentialed ephemeral
   Supabase Preview branch for PR #64 validation; this is
   `AUTOMATIC ISOLATED SUPABASE PREVIEW MIGRATION — ACCEPTED CI VERIFICATION`.

@@ -2229,7 +2229,7 @@ unauthorized.
 
 ### R2-07A — Dormant concurrency foundation
 
-Status: `IMPLEMENTED — DRAFT PR AND EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
+Status: `MATERIAL REVIEW FINDINGS REMEDIATED — NEW EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
 
 Risk level: `LEVEL 3`
 
@@ -2285,9 +2285,21 @@ the migration.
 - [x] Retention execution is structurally disabled with no duration, purge
   routine, trigger, cron, or job.
 - [x] The zero-evidence rollback succeeds and refuses after any R2-07 evidence.
+- [x] Preserve failed exact-head review
+  `https://github.com/degrasse-mastermind/LaxHornet/pull/64#issuecomment-5207402351`
+  against `b071dc6ffc09e2f28f965bcdabe6a4b4d632d89b`.
+- [x] Reject ordinary completed-game score/clock writes before mutation or
+  evidence; require current lifecycle, status, and score bases plus an
+  allowlisted minimum-necessary reason for private completed-game correction.
+- [x] Require current roster-tracking authority for team tombstone disclosure;
+  copied owner, untracked/former member, revoked replay, and unauthorized
+  cross-game mismatch receive bounded `authorization_denied`.
+- [x] Pass the expanded disposable PostgreSQL matrix: all original `49` checks
+  plus `22` remediation assertions, `71/71` total, with zero residue.
 - [x] `AUTOMATIC ISOLATED SUPABASE PREVIEW MIGRATION — ACCEPTED CI
   VERIFICATION`; no production migration history or deployment changed.
-- [ ] Exact-head independent Level 3 review passes before merge.
+- [ ] Fresh exact-head independent Level 3 review passes before merge; the
+  failed `b071dc6...` review is not approval for the remediation head.
 
 Evidence:
 

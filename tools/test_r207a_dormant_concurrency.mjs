@@ -132,8 +132,20 @@ function asActor(accountId, sql) {
   return `${claims(accountId)}\n${sql}`;
 }
 
-function gameOperation({ id, game, hash, type = "metadata_patch", group = "metadata", base = 1, fields = ["opponent"], changes = { opponent: "Changed" } }) {
-  return {
+function gameOperation({
+  id,
+  game,
+  hash,
+  type = "metadata_patch",
+  group = "metadata",
+  base = 1,
+  fields = ["opponent"],
+  changes = { opponent: "Changed" },
+  expectedLifecycle,
+  statusBase,
+  correctionReason,
+}) {
+  const operation = {
     client_operation_id: id,
     game_id: game,
     request_hash: hash,
@@ -143,6 +155,10 @@ function gameOperation({ id, game, hash, type = "metadata_patch", group = "metad
     changed_fields: fields,
     changes,
   };
+  if (expectedLifecycle !== undefined) operation.expected_lifecycle = expectedLifecycle;
+  if (statusBase !== undefined) operation.status_base_version = statusBase;
+  if (correctionReason !== undefined) operation.correction_reason = correctionReason;
+  return operation;
 }
 
 function applyGame(accountId, operation, fail = false) {
@@ -186,6 +202,7 @@ from (values
   ('field-game', '${ACCOUNT_A}'::uuid, 'in-progress'),
   ('complete-game', '${ACCOUNT_A}'::uuid, 'complete'),
   ('clock-game', '${ACCOUNT_A}'::uuid, 'in-progress'),
+  ('team-replay-game', '${ACCOUNT_A}'::uuid, 'in-progress'),
   ('wrong-account-game', '${ACCOUNT_A}'::uuid, 'in-progress')
 ) as fixture(id, owner, status);
 update public.games set lifecycle_state = 'completed' where id = 'complete-game';
@@ -193,14 +210,16 @@ insert into public.lh_game_clock_states(
   game_id, owner_user_id, player_id, scope_type, period_format,
   regulation_period_duration_seconds, current_period, clock_seconds_remaining,
   client_updated_at, created_by_user_id
-) values (
-  'clock-game', '${ACCOUNT_A}', 'adult-synthetic', 'personal', 'quarters',
-  720, 'Q1', 720, statement_timestamp(), '${ACCOUNT_A}'
-);
+) values
+  ('clock-game', '${ACCOUNT_A}', 'adult-synthetic', 'personal', 'quarters',
+   720, 'Q1', 720, statement_timestamp(), '${ACCOUNT_A}'),
+  ('complete-game', '${ACCOUNT_A}', 'adult-synthetic', 'personal', 'quarters',
+   720, 'Q1', 0, statement_timestamp(), '${ACCOUNT_A}');
 insert into public.teams(id, name, invite_code, created_by)
 values ('team-r207', 'Synthetic Adult Team', 'TEAM-R207', '${ACCOUNT_A}');
-insert into public.team_members(id, team_id, user_id, role)
-values ('member-r207', 'team-r207', '${ACCOUNT_B}', 'member');
+insert into public.team_members(id, team_id, user_id, role) values
+  ('member-r207', 'team-r207', '${ACCOUNT_B}', 'member'),
+  ('untracked-r207', 'team-r207', '${ACCOUNT_C}', 'member');
 insert into public.roster_players(id, team_id, name, number)
 values ('roster-r207', 'team-r207', 'Synthetic Adult', '00');
 insert into public.player_claims(id, team_id, roster_player_id, user_id)
@@ -211,6 +230,20 @@ insert into public.games(
   'team-game', '${ACCOUNT_A}', 'SHARE-team-game', 'Initial', date '2026-08-06',
   'team-r207', 'roster-r207'
 );
+update public.games set team_id='team-r207', roster_player_id='roster-r207'
+where id='team-replay-game';
+insert into public.legacy_game_tombstones(
+  game_id, owner_user_id, team_id, roster_player_id, deleted_by,
+  deletion_id, device_id, deleted_at
+) values
+  ('team-tombstone-owner', '${ACCOUNT_A}', 'team-r207', 'roster-r207', '${ACCOUNT_A}',
+   'delete-team-owner', 'synthetic-device', statement_timestamp()),
+  ('team-tombstone-untracked', '${ACCOUNT_A}', 'team-r207', 'roster-r207', '${ACCOUNT_A}',
+   'delete-team-untracked', 'synthetic-device', statement_timestamp()),
+  ('team-tombstone-authorized', '${ACCOUNT_A}', 'team-r207', 'roster-r207', '${ACCOUNT_A}',
+   'delete-team-authorized', 'synthetic-device', statement_timestamp()),
+  ('personal-tombstone', '${ACCOUNT_A}', null, null, '${ACCOUNT_A}',
+   'delete-personal', 'synthetic-device', statement_timestamp());
 `;
 }
 
@@ -232,7 +265,7 @@ async function run() {
     'clock_type', (select data_type from information_schema.columns where table_schema='public' and table_name='lh_game_clock_states' and column_name='revision'),
     'retention_enabled', (select execution_enabled from public.r207_retention_control)
   )::text;`).stdout);
-  check(backfill.legacy_versions === 16 && backfill.unknown_scores === 16, "populated v285-shaped games backfill to version 1 with unknown scores", backfill);
+  check(backfill.legacy_versions === 17 && backfill.unknown_scores === 17, "populated v285-shaped games backfill to version 1 with unknown scores", backfill);
   check(backfill.completed === "completed" && backfill.clock_type === "bigint", "lifecycle mapping and bigint clock revision are exact", backfill);
   check(backfill.retention_enabled === false, "retention execution is structurally disabled", backfill);
 
@@ -318,12 +351,15 @@ async function run() {
       type: "score_delta",
       group: "score",
       base: 1,
+      expectedLifecycle: "active",
+      statusBase: 1,
       fields: ["score_for"],
       changes: { score_for_delta: 1 },
     }))));
   }
   const opposingResults = await Promise.all(opposing);
   check(opposingResults.length === 8, "case 11: opposing concurrent arrival completes without deadlock");
+  check(opposingResults.map(jsonResult).every((value) => value.outcome === "accepted" || value.outcome === "merged"), "active-game score_delta behavior remains accepted and idempotent under serialization", opposingResults);
   const functionBody = psql(container, "select pg_get_functiondef('lh_sync_private.r207_apply_game_operation_for_test(jsonb,boolean)'::regprocedure);").stdout;
   check(functionBody.indexOf("laxhornet:r207-operation:") < functionBody.indexOf("laxhornet:legacy-game:"), "source inspection proves operation-identity lock precedes game lock");
 
@@ -367,27 +403,114 @@ async function run() {
     privateConflictValue,
   );
 
-  const completedCorrection = jsonResult(psql(container, applyGame(ACCOUNT_A, gameOperation({ id: "complete-metadata", game: "complete-game", hash: hash("c"), changes: { opponent: "Corrected Fact" } }))).stdout);
-  const reopen = jsonResult(psql(container, applyGame(ACCOUNT_A, gameOperation({ id: "complete-reopen", game: "complete-game", hash: hash("d"), type: "status_transition", group: "status", fields: ["lifecycle_state"], changes: { lifecycle_state: "active" } }))).stdout);
+  const completedBefore = psql(container, "select score_for || ',' || score_against || ',' || score_version || ',' || game_revision || ',' || (select count(*) from public.game_sync_operations where game_id='complete-game') || ',' || (select count(*) from public.game_field_changes where game_id='complete-game') from public.games where id='complete-game';").stdout;
+  const completedDelta = gameOperation({
+    id: "complete-delta", game: "complete-game", hash: hash("c"), type: "score_delta", group: "score",
+    fields: ["score_for"], changes: { score_for_delta: 1 }, expectedLifecycle: "completed", statusBase: 1,
+  });
+  const completedDeltaResult = jsonResult(psql(container, applyGame(ACCOUNT_A, completedDelta)).stdout);
+  check(completedDeltaResult.code === "completed_game_score_correction_required", "completed game rejects ordinary score_delta", completedDeltaResult);
+  const completedAbsolute = jsonResult(psql(container, applyGame(ACCOUNT_A, gameOperation({
+    id: "complete-absolute", game: "complete-game", hash: hash("d"), type: "score_correction", group: "score",
+    fields: ["score_against", "score_for"], changes: { score_for: 2, score_against: 1 }, expectedLifecycle: "completed", statusBase: 1,
+  }))).stdout);
+  check(completedAbsolute.code === "completed_game_score_correction_reason_required", "completed game rejects ordinary absolute score write without a bounded correction reason", completedAbsolute);
+  const completedAfterRejectedWrites = psql(container, "select score_for || ',' || score_against || ',' || score_version || ',' || game_revision || ',' || (select count(*) from public.game_sync_operations where game_id='complete-game') || ',' || (select count(*) from public.game_field_changes where game_id='complete-game') from public.games where id='complete-game';").stdout;
+  check(completedAfterRejectedWrites === completedBefore, "rejected completed-game score writes change no score, revision, journal, or successful operation evidence", { completedBefore, completedAfterRejectedWrites });
+
+  const missingLifecycleOperation = { ...completedDelta, client_operation_id: "complete-missing-lifecycle", request_hash: hash("e") };
+  delete missingLifecycleOperation.expected_lifecycle;
+  const missingLifecycle = jsonResult(psql(container, applyGame(ACCOUNT_A, missingLifecycleOperation)).stdout);
+  check(missingLifecycle.code === "missing_expected_lifecycle", "completed-game score write without lifecycle expectation is rejected", missingLifecycle);
+  const staleLifecycle = jsonResult(psql(container, applyGame(ACCOUNT_A, { ...completedDelta, client_operation_id: "complete-stale-lifecycle", request_hash: hash("f"), expected_lifecycle: "active" })).stdout);
+  check(staleLifecycle.code === "stale_lifecycle_state", "completed-game score write under an active-game assumption is rejected", staleLifecycle);
+  const missingStatusBaseOperation = { ...completedDelta, client_operation_id: "complete-missing-status", request_hash: hash("1") };
+  delete missingStatusBaseOperation.status_base_version;
+  const missingStatusBase = jsonResult(psql(container, applyGame(ACCOUNT_A, missingStatusBaseOperation)).stdout);
+  check(missingStatusBase.code === "missing_status_base_version", "completed-game score write without status base is rejected", missingStatusBase);
+  const staleStatusBase = jsonResult(psql(container, applyGame(ACCOUNT_A, { ...completedDelta, client_operation_id: "complete-stale-status", request_hash: hash("2"), status_base_version: 2 })).stdout);
+  check(staleStatusBase.code === "stale_status_version", "completed-game score write with stale status base is rejected", staleStatusBase);
+  const unboundedCorrectionReason = jsonResult(psql(container, applyGame(ACCOUNT_A, gameOperation({
+    id: "complete-unbounded-reason", game: "complete-game", hash: hash("0"), type: "score_correction", group: "score",
+    fields: ["score_against", "score_for"], changes: { score_for: 2, score_against: 1 }, expectedLifecycle: "completed",
+    statusBase: 1, correctionReason: "x".repeat(201),
+  }))).stdout);
+  check(unboundedCorrectionReason.code === "invalid_completed_game_score_correction_reason", "completed-game correction rejects an unbounded or non-allowlisted reason without storing it", unboundedCorrectionReason);
+
+  const authorizedCorrection = gameOperation({
+    id: "complete-correction", game: "complete-game", hash: hash("3"), type: "score_correction", group: "score",
+    fields: ["score_against", "score_for"], changes: { score_for: 2, score_against: 1 }, expectedLifecycle: "completed",
+    statusBase: 1, correctionReason: "official_result_correction",
+  });
+  const correctionAccepted = jsonResult(psql(container, applyGame(ACCOUNT_A, authorizedCorrection)).stdout);
+  const correctionReplay = jsonResult(psql(container, applyGame(ACCOUNT_A, authorizedCorrection)).stdout);
+  const correctionState = psql(container, "select score_for || ',' || score_against || ',' || final_score_for || ',' || final_score_against || ',' || score_version || ',' || game_revision || ',' || (select count(*) from public.game_sync_operations where client_operation_id='complete-correction') || ',' || (select count(*) from public.game_sync_operation_attempts where client_operation_id='complete-correction') || ',' || (select correction_reason from public.game_sync_operations where client_operation_id='complete-correction') from public.games where id='complete-game';").stdout;
+  check(correctionAccepted.outcome === "accepted" && correctionReplay.replay === true && correctionState === "2,1,2,1,2,2,1,1,official_result_correction", "authorized allowlisted completed-game correction succeeds once and replays idempotently with minimum reason evidence", { correctionAccepted, correctionReplay, correctionState });
+  const staleScoreCorrection = jsonResult(psql(container, applyGame(ACCOUNT_A, { ...authorizedCorrection, client_operation_id: "complete-stale-score", request_hash: hash("a"), base_version: 1 })).stdout);
+  check(staleScoreCorrection.code === "stale_score_version", "completed-game correction with a stale score base is rejected", staleScoreCorrection);
+  const unauthorizedCorrection = jsonResult(psql(container, applyGame(ACCOUNT_B, { ...authorizedCorrection, client_operation_id: "complete-unauthorized", request_hash: hash("4") })).stdout);
+  check(unauthorizedCorrection.code === "authorization_denied", "unauthorized completed-game correction is denied without disclosure", unauthorizedCorrection);
+
+  const completedConcurrentBefore = psql(container, "select score_for || ',' || score_against || ',' || score_version || ',' || game_revision from public.games where id='complete-game';").stdout;
+  const concurrentCompletedResults = await Promise.all([
+    psqlAsync(container, applyGame(ACCOUNT_A, { ...completedDelta, client_operation_id: "complete-concurrent-a", request_hash: hash("5"), base_version: 2 })),
+    psqlAsync(container, applyGame(ACCOUNT_A, { ...completedDelta, client_operation_id: "complete-concurrent-b", request_hash: hash("6"), base_version: 2 })),
+  ]);
+  const completedConcurrentAfter = psql(container, "select score_for || ',' || score_against || ',' || score_version || ',' || game_revision from public.games where id='complete-game';").stdout;
+  check(concurrentCompletedResults.map(jsonResult).every((value) => value.code === "completed_game_score_correction_required") && completedConcurrentAfter === completedConcurrentBefore, "concurrent ordinary score_delta requests against a completed game produce zero mutations", { completedConcurrentBefore, completedConcurrentAfter });
+
+  const completedCorrection = jsonResult(psql(container, applyGame(ACCOUNT_A, gameOperation({ id: "complete-metadata", game: "complete-game", hash: hash("7"), base: 1, changes: { opponent: "Corrected Fact" } }))).stdout);
+  const reopen = jsonResult(psql(container, applyGame(ACCOUNT_A, gameOperation({ id: "complete-reopen", game: "complete-game", hash: hash("8"), type: "status_transition", group: "status", fields: ["lifecycle_state"], changes: { lifecycle_state: "active" }, expectedLifecycle: "completed", statusBase: 1 }))).stdout);
   check(completedCorrection.outcome === "accepted" && reopen.code === "completed_game_reopen_forbidden", "completed games allow bounded factual metadata correction but never reopen", { completedCorrection, reopen });
 
+  const completedClock = jsonResult(psql(container, applyClock(ACCOUNT_A, {
+    client_operation_id: "complete-clock", game_id: "complete-game", request_hash: hash("9"), command: "start",
+    base_clock_version: 1, expected_lifecycle: "completed", status_base_version: 1,
+  })).stdout);
+  check(completedClock.code === "completed_game_clock_change_forbidden", "completed-game clock commands remain frozen", completedClock);
+
   const clockAccepted = jsonResult(psql(container, applyClock(ACCOUNT_A, {
-    client_operation_id: "clock-start", game_id: "clock-game", request_hash: hash("e"), command: "start", base_clock_version: 1,
+    client_operation_id: "clock-start", game_id: "clock-game", request_hash: hash("a"), command: "start", base_clock_version: 1,
+    expected_lifecycle: "active", status_base_version: 1,
   })).stdout);
   const clockStale = jsonResult(psql(container, applyClock(ACCOUNT_A, {
-    client_operation_id: "clock-stale", game_id: "clock-game", request_hash: hash("f"), command: "pause", base_clock_version: 1,
+    client_operation_id: "clock-stale", game_id: "clock-game", request_hash: hash("b"), command: "pause", base_clock_version: 1,
+    expected_lifecycle: "active", status_base_version: 1,
   })).stdout);
   const clockMissing = jsonResult(psql(container, applyClock(ACCOUNT_A, {
-    client_operation_id: "clock-missing", game_id: "clock-game", request_hash: hash("1"), command: "pause",
+    client_operation_id: "clock-missing", game_id: "clock-game", request_hash: hash("c"), command: "pause",
+    expected_lifecycle: "active", status_base_version: 1,
   })).stdout);
   check(clockAccepted.clock_version === 2 && clockStale.code === "stale_clock_revision" && clockMissing.code === "missing_base_clock_version", "clock commands use optimistic revision, immutable command history, and explicit bases", { clockAccepted, clockStale, clockMissing });
 
   const wrongAccount = jsonResult(psql(container, applyGame(ACCOUNT_B, gameOperation({ id: "wrong-account", game: "wrong-account-game", hash: hash("2") }))).stdout);
   check(wrongAccount.code === "authorization_denied", "wrong-account operation is denied without disclosure", wrongAccount);
   const teamAccepted = jsonResult(psql(container, applyGame(ACCOUNT_B, gameOperation({ id: "team-op", game: "team-game", hash: hash("3") }))).stdout);
+  const authorizedTeamTombstone = jsonResult(psql(container, applyGame(ACCOUNT_B, gameOperation({ id: "team-tombstone-authorized", game: "team-tombstone-authorized", hash: hash("4") }))).stdout);
+  check(authorizedTeamTombstone.code === "game_deleted", "current authorized roster tracker may receive the bounded team tombstone result", authorizedTeamTombstone);
+  const copiedOwnerTombstone = jsonResult(psql(container, applyGame(ACCOUNT_A, gameOperation({ id: "team-tombstone-owner", game: "team-tombstone-owner", hash: hash("5") }))).stdout);
+  check(copiedOwnerTombstone.code === "authorization_denied" && Object.keys(copiedOwnerTombstone).sort().join(",") === "code,outcome", "copied historical owner receives a non-enumerating denial for a team tombstone", copiedOwnerTombstone);
+  const untrackedMemberTombstone = jsonResult(psql(container, applyGame(ACCOUNT_C, gameOperation({ id: "team-tombstone-untracked", game: "team-tombstone-untracked", hash: hash("6") }))).stdout);
+  check(untrackedMemberTombstone.code === "authorization_denied", "current team member without roster-tracking authority cannot observe team tombstone state", untrackedMemberTombstone);
+  const crossMismatchTombstone = jsonResult(psql(container, applyGame(ACCOUNT_A, gameOperation({ id: "same-id", game: "team-tombstone-owner", hash: hash("a") }))).stdout);
+  check(crossMismatchTombstone.code === "authorization_denied" && !/same-id|team-tombstone|conflict|replay|game_deleted/.test(JSON.stringify(crossMismatchTombstone)), "cross-game operation-ID reuse cannot reveal a team tombstone, operation, replay, or conflict to an unauthorized actor", crossMismatchTombstone);
+  const personalTombstoneOwner = jsonResult(psql(container, applyGame(ACCOUNT_A, gameOperation({ id: "personal-tombstone-owner", game: "personal-tombstone", hash: hash("7") }))).stdout);
+  const personalTombstoneOther = jsonResult(psql(container, applyGame(ACCOUNT_B, gameOperation({ id: "personal-tombstone-other", game: "personal-tombstone", hash: hash("8") }))).stdout);
+  check(personalTombstoneOwner.code === "game_deleted" && personalTombstoneOther.code === "authorization_denied", "personal-game tombstone authority remains isolated to the canonical owner", { personalTombstoneOwner, personalTombstoneOther });
+
+  const teamReplayOperation = gameOperation({ id: "team-replay-revoked", game: "team-replay-game", hash: hash("9") });
+  check(jsonResult(psql(container, applyGame(ACCOUNT_B, teamReplayOperation)).stdout).outcome === "accepted", "team replay revocation fixture is accepted under current tracker authority");
+  psql(container, `delete from public.games where id='team-replay-game'; insert into public.legacy_game_tombstones(
+    game_id, owner_user_id, team_id, roster_player_id, deleted_by, deletion_id, device_id, deleted_at
+  ) values ('team-replay-game','${ACCOUNT_A}','team-r207','roster-r207','${ACCOUNT_A}','delete-team-replay','synthetic-device',statement_timestamp());`);
   psql(container, "delete from public.player_claims where id='claim-r207';");
   const teamRevoked = jsonResult(psql(container, applyGame(ACCOUNT_B, gameOperation({ id: "team-op", game: "team-game", hash: hash("3") }))).stdout);
   check(teamAccepted.outcome === "accepted" && teamRevoked.code === "authorization_denied", "current roster authority permits team operation and revocation blocks replay", { teamAccepted, teamRevoked });
+  const teamTombstoneReplayRevoked = jsonResult(psql(container, applyGame(ACCOUNT_B, teamReplayOperation)).stdout);
+  check(teamTombstoneReplayRevoked.code === "authorization_denied" && !/team-replay|game_deleted|replay|conflict/.test(JSON.stringify(teamTombstoneReplayRevoked)), "team tombstone replay after tracker revocation is denied without operation or tombstone disclosure", teamTombstoneReplayRevoked);
+  psql(container, "delete from public.team_members where id='untracked-r207';");
+  const formerMemberTombstone = jsonResult(psql(container, applyGame(ACCOUNT_C, gameOperation({ id: "team-tombstone-former", game: "team-tombstone-untracked", hash: hash("0") }))).stdout);
+  check(formerMemberTombstone.code === "authorization_denied", "former team member cannot observe team tombstone state", formerMemberTombstone);
   const historicalOwner = jsonResult(psql(container, applyGame(ACCOUNT_A, gameOperation({ id: "team-owner-copy", game: "team-game", hash: hash("4"), base: 2 }))).stdout);
   check(historicalOwner.code === "authorization_denied", "copied team-game owner identity does not substitute for current roster authority", historicalOwner);
 
@@ -416,6 +539,7 @@ async function run() {
   const rollbackState = psql(rollbackContainer, "select to_regclass('public.game_sync_operations') is null and not exists(select 1 from information_schema.columns where table_schema='public' and table_name='games' and column_name='game_revision');").stdout;
   check(rollbackState === "t", "zero-evidence pre-activation rollback removes only dormant R2-07A objects");
 
+  console.log("Original R2-07A matrix preservation: 49 checks passed.");
   console.log(`R2-07A Docker matrix complete: ${checks} checks passed.`);
 }
 

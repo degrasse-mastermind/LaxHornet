@@ -267,8 +267,8 @@ Design artifacts:
 
 ### R2-07A — Dormant Concurrency Foundation
 
-**Status:** [!] Implemented on feature branch; draft PR and exact-head Level 3
-review required
+**Status:** [!] Material implementation-review findings remediated on feature
+branch; draft PR and fresh exact-head Level 3 review required
 
 **Branch:** `feature/r2-07a-dormant-concurrency-foundation`
 
@@ -287,11 +287,23 @@ review required
 - [x] Pass the deterministic disposable PostgreSQL concurrency, authorization,
   disclosure, append-only, atomicity, and rollback matrix with zero container
   residue.
+- [x] Preserve the failed exact-head `b071dc6...` implementation review and its
+  two material findings: completed-game ordinary score mutation and copied
+  owner authority for team tombstones.
+- [x] Require current lifecycle/status/score bases and an allowlisted bounded
+  reason for private completed-game score correction; reject ordinary completed
+  score/clock writes with zero mutation or evidence.
+- [x] Require current roster-tracking authority before team tombstone disclosure
+  and deny copied owner, untracked/former member, revoked replay, and
+  unauthorized cross-game operation-ID probes without enumeration.
+- [x] Pass all original `49` R2-07A checks plus `22` adversarial remediation
+  assertions (`71/71`) with zero disposable-container residue.
 - [x] Classify the configured GitHub integration's automatic application to the
   isolated, data-less, separately credentialed PR #64 Supabase Preview branch
   as `AUTOMATIC ISOLATED SUPABASE PREVIEW MIGRATION — ACCEPTED CI
   VERIFICATION`.
-- [ ] Pass exact-head independent Level 3 review before merge.
+- [ ] Pass a fresh exact-head independent Level 3 review before merge; the
+  failed `b071dc6...` review remains historical evidence only.
 
 R2-07A does not authorize local/manual migration application, Supabase CLI
 application to linked main/production, manual Dashboard application,
