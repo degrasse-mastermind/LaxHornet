@@ -2128,11 +2128,13 @@ v285 reconciliation and authorizes no R2-07 implementation.
 
 ### R2-07 — Add game-field versions and conflict records
 
-Status: `DESIGNED — IMPLEMENTATION AUTHORIZATION PENDING`
+Status: `REVIEW REMEDIATION — INDEPENDENT EXACT-HEAD REVIEW PENDING`
 
 Risk level: `LEVEL 3`
 
-Design branch: `design/r2-07-game-field-versions-conflicts`
+Historical design branch: `design/r2-07-game-field-versions-conflicts`
+
+Review-remediation branch: `design/r2-07-review-remediation`
 
 Implementation branches: separate bounded branches for R2-07A through R2-07F;
 none authorized by the design task.
@@ -2182,6 +2184,24 @@ production authorization atomically enables v2 and turns the legacy v1 write
 RPC into an actionable upgrade-required stub. Missing bases are never treated
 as current.
 
+PR #62 merged the planning documentation at exact design head
+`df458789bc3f45e4f01cf31cc0ed10716dd9e2a6`. Preserve the historical
+planning-level PASS, but do not treat it as a closed gate: later P1/P2 findings
+against that same head remained unresolved at merge. They require locked
+tombstone/current-authority checks before stored replay disclosure, a post-lock
+operation recheck for simultaneous first-seen idempotency, and current
+team/roster authority rather than copied owner/account identity for every team-
+game conflict read, replay, resolution, and retention path.
+
+The corrected design is in review remediation. No clean independent Level 3
+PASS exists until a reviewer returns PASS against the exact remediation PR
+head. The product choices above, bounded post-completion correction, no initial
+reopen, server-anchored clock without a device lease, minimum R2-07D Needs
+Attention UX, provisional 180-day resolved-conflict retention subject to
+privacy/legal review, and the R2-07A–R2-07F sequence remain provisionally
+approved recommendations for David's decision. They do not authorize R2-07A.
+Repository and production runtime remain at the documented v285 state.
+
 Design artifacts:
 
 - `review-evidence/r2-07-game-field-versions-conflicts/R2-07_DESIGN.md`
@@ -2189,11 +2209,12 @@ Design artifacts:
 - `review-evidence/r2-07-game-field-versions-conflicts/R2-07_MIGRATION_AND_ROLLBACK_PLAN.md`
 - `review-evidence/r2-07-game-field-versions-conflicts/R2-07_TEST_PLAN.md`
 - `review-evidence/r2-07-game-field-versions-conflicts/R2-07_IMPLEMENTATION_SEQUENCE.md`
+- `review-evidence/r2-07-game-field-versions-conflicts/R2-07_REVIEW_REMEDIATION_EVIDENCE.md`
 
 Design task boundaries: no application code, SQL migration, RPC change,
 release marker, production access, Supabase mutation, deployment, or rollout
-activation. Exact design-head independent Level 3 review is required before
-David decides whether to authorize any implementation phase.
+activation. A new exact remediation-head independent Level 3 PASS is required
+before David decides whether to authorize R2-07A or any implementation phase.
 
 ## Ticket template
 

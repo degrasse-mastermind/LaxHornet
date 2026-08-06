@@ -385,10 +385,16 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   history, independently versioned clock/event authorities, immutable private
   conflicts, and append-only resolutions. v285 clients are protected through
   dormant versioned RPCs and a separately authorized atomic upgrade-required
-  cutover; missing versions are never treated as current. Implementation,
-  migration, production, merge, deployment, and activation remain
-  unauthorized pending David's decision and exact design-head independent
-  Level 3 review.
+  cutover; missing versions are never treated as current. PR #62 merged the
+  original planning documentation, but its earlier planning-level PASS does not
+  close the gate because later P1/P2 findings against the same exact design head
+  remained unresolved at merge. The design is in review remediation for locked
+  tombstone/current-authority precedence before replay disclosure, deterministic
+  post-lock replay recheck, and current team/roster authority for every team-
+  game conflict path. No clean independent Level 3 PASS exists for the corrected
+  design until review of the exact remediation PR head. R2-07A, implementation,
+  migration, production, merge, deployment, and activation remain unauthorized.
+  Repository and production runtime remain v285.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The repository cache marker is `laxhornet-v285`. The updated service worker purges

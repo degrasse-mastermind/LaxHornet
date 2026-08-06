@@ -186,21 +186,30 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
   game-field versions and conflict records; this describes the pre-design
   v285 closeout state and is superseded by the design record below.
 - [x] Complete R2-07 design as a separate Level 3 planning task.
-- [ ] Obtain exact design-head independent Level 3 review and David's decision
-  before authorizing any R2-07 implementation phase.
+- [!] PR #62 merged the planning documentation at design head
+  `df458789bc3f45e4f01cf31cc0ed10716dd9e2a6`, but later P1/P2 findings
+  against that same head remained unresolved at merge; the earlier planning-
+  level PASS is historical and does not close the corrected-design gate.
+- [ ] Obtain a clean independent Level 3 PASS against the exact review-
+  remediation PR head and David's decision before authorizing R2-07A or any
+  later phase.
 - [x] Production access was limited to public static reads and isolated local
   browser fixtures; no real account or production credentials were used.
 
 ## R2-07 — Game-Field Versions and Conflict Records Design
 
-**Status:** [~] Designed — implementation authorization pending
+**Status:** [!] Review remediation — exact-head independent review pending
 
 **Risk level:** Level 3 — synchronization, schema/RPC, conflict, offline,
 authorization, and release semantics
 
-**Design branch:** `design/r2-07-game-field-versions-conflicts`
+**Historical design branch:** `design/r2-07-game-field-versions-conflicts`
+
+**Review-remediation branch:** `design/r2-07-review-remediation`
 
 **Design baseline:** `730655eb8e98ed02eddf2d04d0ca1e7a5438905e`
+
+**Review-remediation baseline:** `0e90e3b4017d65ef35bdf95fc165b3379a4c6844`
 
 - [x] Inventory identity, metadata, live state, score, event-derived state,
   tracked clock, lifecycle, sharing, and deletion authority.
@@ -219,7 +228,15 @@ authorization, and release semantics
 - [x] Preserve local-first tracking, R2-03 hydration, R2-04/R2-05 durable
   operation/error behavior, R2-06 tombstones, Live Share privacy, and v285 PWA
   behavior in the design.
-- [ ] Obtain independent Level 3 review against the exact design PR SHA.
+- [x] Remediate replay ordering so the shared lock, authoritative tombstone,
+  and current personal/team authority checks precede stored-result disclosure.
+- [x] Require a post-lock operation recheck so simultaneous identical first-
+  seen requests deterministically yield one canonical mutation plus one replay,
+  without a uniqueness error.
+- [x] Require current team/roster tracking authority—not historical creator or
+  copied owner/account identity—for team conflict read, replay, resolution, and
+  retention access, with non-enumerating denial and private-value containment.
+- [ ] Obtain independent Level 3 PASS against the exact remediation PR SHA.
 - [ ] Obtain David's explicit decisions on score authority, allowed merges,
   post-completion edits, no initial reopen, clock authority, legacy cutover,
   minimum resolution UX, retention, and phase authorization.
@@ -233,10 +250,15 @@ Design artifacts:
 - `review-evidence/r2-07-game-field-versions-conflicts/R2-07_MIGRATION_AND_ROLLBACK_PLAN.md`
 - `review-evidence/r2-07-game-field-versions-conflicts/R2-07_TEST_PLAN.md`
 - `review-evidence/r2-07-game-field-versions-conflicts/R2-07_IMPLEMENTATION_SEQUENCE.md`
+- `review-evidence/r2-07-game-field-versions-conflicts/R2-07_REVIEW_REMEDIATION_EVIDENCE.md`
 
 Planning boundary: no application code, SQL migration, RPC, release marker,
 production access, Supabase mutation, deployment, production verification, or
 activation is authorized.
+
+PR #62 is historical planning documentation, not implementation authority.
+Production remains at v285. R2-07A remains unauthorized until the remediation
+is committed, reviewed at the exact PR head, and separately approved by David.
 
 ## R2-04 — Durable Game and Clock Operation States
 

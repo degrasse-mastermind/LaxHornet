@@ -1,8 +1,8 @@
 # R2-07 Implementation Sequence
 
-Status: `DESIGNED — IMPLEMENTATION AUTHORIZATION PENDING`
+Status: `REVIEW REMEDIATION — INDEPENDENT EXACT-HEAD REVIEW PENDING`
 
-Baseline: `730655eb8e98ed02eddf2d04d0ca1e7a5438905e`
+Remediation baseline: `0e90e3b4017d65ef35bdf95fc165b3379a4c6844`
 
 No phase below is authorized by this design task. Each phase requires its own
 approved ticket, branch, exact scope, tests, independent exact-PR-SHA Level 3
@@ -43,6 +43,14 @@ versioned RPC signatures. Do not activate production writes.
 - `laxhornet_sync_game_v2` and resolution/read contracts returning
   `r207_not_activated` outside local test mode;
 - shared R2-06A advisory-lock order and tombstone-first behavior;
+- preliminary operation lookup with no result disclosure, followed by the
+  shared game lock, authoritative tombstone check, current personal-versus-team
+  authority recheck, and mandatory post-lock operation recheck before replay or
+  semantic mutation;
+- personal conflict access from current canonical personal-game owner/account
+  authority; team conflict access only from current canonical team/roster
+  tracking authority, including `laxhornet_can_track_roster_player` where
+  applicable; copied/historical owner identity is not authority;
 - database/pgTAP/disposable concurrency tests;
 - no release-manifest runtime hash or production application.
 
@@ -51,6 +59,11 @@ versioned RPC signatures. Do not activate production writes.
 - populated v285-shaped migration passes forward/pre-activation rollback tests;
 - version increments, non-overlap merge, same-field conflict, replay/mismatch,
   tombstone, privacy, RLS/grants, and lock tests pass;
+- accepted/conflict/resolution replay cannot outrank deletion or current
+  authority, and denial discloses no private values or conflict existence;
+- simultaneous identical first-seen requests produce one canonical mutation
+  and one replay after the lock, with no duplicate evidence or uniqueness
+  error; same-ID/different-hash concurrency fails safely;
 - existing R2-06/R2-06A bytes and guarantees remain intact;
 - exact-head Level 3 review passes;
 - server capability remains disabled and production is unchanged.
@@ -143,6 +156,13 @@ deferred.
 ### In scope
 
 - authorized conflict summary/read contract with derived status;
+- tombstone-aware conflict RLS/read RPC: retained conflicts for deleted games
+  expose no private row through app-role direct SELECT, while an authorized
+  bounded read returns only `game_deleted` after the shared lock;
+- identical current-authority rules across direct-table RLS, conflict/read
+  RPCs, replay disclosure, resolution, and retention eligibility: personal
+  owner/account for personal games, current roster tracking authority for team
+  games, and only the existing bounded allowlisted reviewer path;
 - append-only resolution RPC with keep server, apply proposed, custom patch,
   and dismiss;
 - stale-resolution linked conflict behavior;
@@ -158,6 +178,10 @@ deferred.
 - each resolution is idempotent and version-checked;
 - stale resolution cannot overwrite newer state;
 - account/team/Live Share isolation passes;
+- team authority revocation blocks conflict read, replay disclosure, resolution,
+  and retention access even when the actor is the historical creator or copied
+  owner/account; personal authority loss follows the same current-authority
+  principle where applicable;
 - game remains usable for unaffected work;
 - exact-head Level 3 review passes.
 
@@ -181,6 +205,12 @@ non-production database and two-device/browser journeys.
   `R2-07_TEST_PLAN.md`;
 - out-of-order, timeout-after-commit, stale service worker, account switch,
   revocation, deletion race, and conflict-resolution adversarial probes;
+- accepted/conflict replay after deletion, replay after personal/team authority
+  loss, direct read/resolution after team revocation, simultaneous identical
+  first-seen requests, and simultaneous same-ID/different-hash requests;
+- account-switch rejection while replay/conflict-read responses are in flight,
+  private-value containment on every denial, one canonical concurrent result,
+  no exposed uniqueness error, and no R2-06 tombstone-precedence regression;
 - performance/query plan/storage budgets;
 - exact migration/RPC/content hashes and zero-residue cleanup;
 - complete canonical-plus-additive local regression once after final diff;
@@ -236,7 +266,9 @@ it never restores v285 unversioned cloud mutation.
 
 ## Cross-phase decisions requiring David approval
 
-Before R2-07A starts:
+The following are provisionally approved design recommendations for David's
+decision. They do not authorize R2-07A or any implementation, migration,
+release, deployment, or production work:
 
 - approve the hybrid field-group plus operation-journal model;
 - approve direct score aggregate with delta/correction semantics;
@@ -248,6 +280,9 @@ Before R2-07A starts:
   subject to privacy/legal review;
 - approve the six-phase ticket sequence.
 
-Approval of design does not authorize implementation or production.
+Approval of these recommendations still does not authorize implementation or
+production. R2-07A requires a separate explicit authorization after a clean
+independent Level 3 PASS against the exact remediation PR head.
 
-Final sequencing disposition: `R2-07 DESIGN READY FOR INDEPENDENT REVIEW`.
+Final sequencing disposition:
+`R2-07 DESIGN REMEDIATED — EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`.

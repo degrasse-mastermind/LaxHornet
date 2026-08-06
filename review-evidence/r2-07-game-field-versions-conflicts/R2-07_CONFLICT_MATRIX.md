@@ -1,8 +1,8 @@
 # R2-07 Conflict and Merge Matrix
 
-Status: `DESIGNED — IMPLEMENTATION AUTHORIZATION PENDING`
+Status: `REVIEW REMEDIATION — INDEPENDENT EXACT-HEAD REVIEW PENDING`
 
-Baseline: `730655eb8e98ed02eddf2d04d0ca1e7a5438905e`
+Remediation baseline: `0e90e3b4017d65ef35bdf95fc165b3379a4c6844`
 
 This matrix is normative for later implementation. “Merge” always means a
 server transaction proved disjoint accepted field names or applied a
@@ -11,22 +11,39 @@ merge. An authorized game tombstone is checked first and overrides every row.
 
 ## 1. General decision procedure
 
-1. Replay check by authenticated actor, permanent operation ID, operation type,
-   game ID, and canonical request hash.
-2. Shared per-game transaction advisory lock.
-3. Tombstone check. Return `game_deleted` if present.
-4. Canonical authorization check.
-5. Lifecycle and required-version validation.
-6. If base equals current, apply the allowlisted operation.
-7. If base is stale, inspect accepted change rows with result version greater
+1. Validate request shape/protocol, derive the authenticated actor, compute the
+   canonical request hash, and optionally identify a potential operation replay
+   or mismatch. Do not return or disclose any stored result or private content.
+2. Acquire the shared per-game transaction advisory lock.
+3. Check the authoritative tombstone under the lock. Return `game_deleted` only
+   to an actor with current tombstone-read authority; otherwise return a
+   non-enumerating authorization denial. Disclose no replay/conflict/current or
+   proposed values in either response.
+4. Lock the canonical game/clock rows in the universal order and recheck current
+   authority. Personal games require current canonical personal-game
+   owner/account authority. Team games require current canonical team/roster
+   tracking authority, including `laxhornet_can_track_roster_player` where
+   applicable. Copied/historical creator or owner/account identity is not
+   authority. The bounded allowlisted reviewer path remains separate.
+5. Recheck the operation record after serialization. An identical hash returns
+   its canonical replay without semantic mutation processing. A different hash
+   returns `duplicate_operation_id_payload_mismatch` without disclosing the
+   original payload/result and without creating a game conflict.
+6. Validate lifecycle and required versions.
+7. If base equals current, apply the allowlisted operation.
+8. If base is stale, inspect accepted change rows with result version greater
    than the base.
-8. Merge only if the proposed field set is disjoint and the row below permits
+9. Merge only if the proposed field set is disjoint and the row below permits
    it, or if the operation is explicitly commutative.
-9. Otherwise create one immutable conflict and apply nothing from that
+10. Otherwise create one immutable conflict and apply nothing from that
    operation.
 
 An operation with a base greater than current is invalid, not a conflict.
 Missing bases are invalid, not current-by-default.
+No rejected, unauthorized, tombstoned, or payload-mismatched request creates a
+new game conflict. Simultaneous identical first-seen requests serialize: one
+canonical mutation/result is stored and the waiter returns its replay without a
+uniqueness-constraint error.
 
 ## 2. Game-field matrix
 
@@ -135,7 +152,9 @@ timelines automatically.
 | Already resolved, same resolution operation ID/hash | Retry | Replay prior result. |
 | Already resolved, different resolution operation | Any | `conflict_already_resolved`; no mutation. |
 | Open, game deleted | Any | `game_deleted`; delete transaction has already appended/supersedes with terminal delete resolution. |
-| Actor lost authority | Any | `authorization_denied`; no conflict content disclosed. |
+| Personal-game actor lost current canonical owner/account authority | Read, replay, retention list, or resolution | Non-enumerating `authorization_denied`; no conflict existence, current/proposed value, request, or stored result disclosed. |
+| Team-game actor lost current team/roster tracking authority | Read, replay, retention list, or resolution | Non-enumerating `authorization_denied`; copied creator/owner/account identity does not preserve access; direct RLS and RPC denial agree. |
+| Bounded platform reviewer | Authorized read/resolution only when the existing allowlisted, non-public, audited predicate passes | No public/Live Share path and no broader role inference. |
 
 ## 8. Queue blocking matrix
 
@@ -152,4 +171,5 @@ timelines automatically.
 No conflicted item receives an automatic retry timestamp. User resolution or a
 fresh, explicitly created current-version operation is required.
 
-Final matrix disposition: `R2-07 DESIGN READY FOR INDEPENDENT REVIEW`.
+Final matrix disposition:
+`R2-07 DESIGN REMEDIATED — EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`.
