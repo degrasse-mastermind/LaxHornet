@@ -1,6 +1,6 @@
 # R2-07 Test Plan
 
-Status: `REVIEW REMEDIATION — INDEPENDENT EXACT-HEAD REVIEW PENDING`
+Status: `RE-REMEDIATED — NEW EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`
 
 Risk level: `LEVEL 3`
 
@@ -47,8 +47,9 @@ Add focused JavaScript tests for:
 - resolution action validation and stale-resolution handling;
 - legacy upgrade-required classification and user copy mapping;
 - tombstone precedence before any merge rule.
-- replay disclosure only after the shared lock, authoritative tombstone check,
-  current personal/team authority check, and post-lock operation recheck;
+- global actor/operation identity serialization before the requested-game lock,
+  followed by authoritative tombstone/current-authority checks before replay or
+  mismatch disclosure;
 - deterministic simultaneous-first-seen idempotency with no exposed unique-
   constraint failure;
 
@@ -64,7 +65,8 @@ Minimum assertions:
 | Tombstone wins | Every operation class, including accepted/conflict/resolution replay, checks authoritative deletion under the game lock before stored-result disclosure. Authorized actors receive `game_deleted`; actors without current authority receive non-enumerating denial. |
 | Conflict immutability | No API path mutates conflict content; resolution appends separately. |
 | Resolution checks | Apply actions require latest relevant versions and current authority. |
-| Simultaneous first-seen idempotency | Two identical concurrent requests create one canonical mutation/result; the waiter returns replay before semantics and never exposes a uniqueness error. |
+| Simultaneous first-seen idempotency | Two identical concurrent requests serialize globally by actor/operation ID, create one atomic canonical mutation/result, and return one replay without a uniqueness error. |
+| Cross-game operation identity | Same actor/operation ID across different games permits at most one semantic mutation and returns a non-disclosing scope mismatch only after requested-game authority/tombstone checks. |
 | Current conflict authority | Personal conflicts require current personal owner/account authority; team conflicts require current team/roster tracking authority, not historical/copied owner identity. |
 
 ### 2.2 Database/migration tests
@@ -106,8 +108,10 @@ Schema assertions:
 
 Transaction/concurrency assertions:
 
-- advisory lock acquired before tombstone/game/clock reads in every mutation;
-- same-game writes serialize; different games remain independent;
+- operation-identity boundary acquired before the requested-game advisory lock
+  in every R2-07 mutation; no R2-07 path takes the locks in reverse order;
+- same-game writes serialize; different games with unrelated operation IDs
+  remain independent;
 - game row and clock row lock ordering is identical across status, clock,
   delete, and resolution RPCs;
 - concurrent replay creates one canonical operation;
@@ -115,9 +119,15 @@ Transaction/concurrency assertions:
   operation, change/conflict/resolution result as applicable, and one replay;
   the waiter does not enter semantic processing or expose a unique-constraint
   error;
-- simultaneous same operation ID with different canonical hashes produces one
-  safe `duplicate_operation_id_payload_mismatch`, no original request/result
+- same actor/same operation ID across different games produces at most one
+  semantic mutation plus safe `duplicate_operation_id_scope_mismatch`, without
+  stored canonical game ID, request/result, or conflict disclosure;
+- simultaneous same-game operation ID with different canonical hashes produces
+  one safe `duplicate_operation_id_payload_mismatch`, no original request/result
   disclosure, and no duplicate mutation or game conflict;
+- different actors using the same client operation ID remain independent;
+- opposing operation/game requests complete without deadlock and raw unique-
+  constraint errors never escape;
 - concurrent same-field writes create one accepted change and one conflict;
 - concurrent non-overlap writes produce two accepted changes and monotonic
   versions;
@@ -284,9 +294,9 @@ does not preserve team access. Direct-table policy and RPC behavior agree.
 
 Use real concurrent sessions to send two identical previously unseen requests.
 Hold the first after its preliminary lookup so the second also misses, then let
-both contend on the game lock. Expect the first valid request to commit one
+both contend on the global actor/operation identity. Expect the first valid request to commit one
 canonical mutation/result and the second to return its replay after the
-post-lock operation recheck. Confirm no duplicate mutation, operation, change,
+identity-plus-game recheck. Confirm no duplicate mutation, operation, change,
 conflict, resolution, or uniqueness-constraint error.
 
 ### Scenario 19 — simultaneous same ID with different hashes
@@ -306,6 +316,38 @@ local account/request generation to B while each response is in flight, then
 release the responses. The server remains bound to A's authenticated request;
 the client rejects both late responses by account/generation binding. Account B
 receives no private value, conflict existence, local compaction, or queue work.
+
+### Mandatory operation-identity concurrency matrix
+
+R2-07A and integrated R2-07E certification must use real concurrent database
+sessions to prove all of the following, not mock-only scheduling:
+
+1. Same actor, same operation ID, same game, identical concurrent requests:
+   exactly one semantic mutation and canonical result; the waiter replays it.
+2. Same actor, same operation ID, different games: exactly one semantic winner;
+   the other returns safe `duplicate_operation_id_scope_mismatch` only after
+   requested-game tombstone/current-authority checks and never discloses the
+   stored canonical game ID.
+3. Same actor, same operation ID, same game, different payloads: exactly one
+   semantic winner and one non-disclosing payload mismatch.
+4. Different actors, same client operation ID: independent identities and
+   outcomes, each constrained by its own current authority.
+5. Revoked-authority replay: non-enumerating denial with no stored result,
+   operation existence, canonical game ID, payload, or conflict disclosure.
+6. Tombstone replay: authorized `game_deleted` outranks stored replay/mismatch;
+   unauthorized callers receive only non-enumerating denial.
+7. Cross-game mismatch: the response contains no canonical stored game ID or
+   other private content; unauthorized/tombstoned requested scope cannot be used
+   to enumerate operation identity.
+8. No raw unique-constraint error is returned for any arrival or commit order.
+9. Exactly one semantic mutation is observable for each contended operation
+   identity, including conflicts and resolutions where applicable.
+10. Operation identity, semantic mutation, canonical result, and append-only
+    history commit atomically; injected failure proves all-or-none rollback.
+11. Lock tracing and opposing-request stress prove universal operation-then-game
+    ordering and no deadlock; no path acquires game then operation identity.
+12. Fresh unrelated operation IDs, including on different games, proceed
+    independently without a global bottleneck.
 
 ## 4. Additional adversarial scenarios
 
@@ -434,4 +476,4 @@ and independently verify hashes from committed content. Green focused suites
 alone do not authorize production release.
 
 Final test design disposition:
-`R2-07 DESIGN REMEDIATED — EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`.
+`R2-07 DESIGN RE-REMEDIATED — NEW EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`.

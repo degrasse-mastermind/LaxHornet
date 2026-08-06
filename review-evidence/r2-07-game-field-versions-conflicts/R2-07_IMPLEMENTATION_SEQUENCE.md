@@ -1,6 +1,6 @@
 # R2-07 Implementation Sequence
 
-Status: `REVIEW REMEDIATION — INDEPENDENT EXACT-HEAD REVIEW PENDING`
+Status: `RE-REMEDIATED — NEW EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`
 
 Remediation baseline: `0e90e3b4017d65ef35bdf95fc165b3379a4c6844`
 
@@ -42,11 +42,15 @@ versioned RPC signatures. Do not activate production writes.
   triggers, and indexes;
 - `laxhornet_sync_game_v2` and resolution/read contracts returning
   `r207_not_activated` outside local test mode;
-- shared R2-06A advisory-lock order and tombstone-first behavior;
-- preliminary operation lookup with no result disclosure, followed by the
-  shared game lock, authoritative tombstone check, current personal-versus-team
-  authority recheck, and mandatory post-lock operation recheck before replay or
-  semantic mutation;
+- global `(actor_user_id, client_operation_id)` transaction serialization,
+  independent of game ID, before the shared requested-game lock;
+- one universal R2-07 order—operation identity, at most one game lock,
+  tombstone/game/clock rows, then append-only evidence—with no game-then-
+  operation path and no identity reservation committed separately from its
+  semantic result;
+- non-disclosing preliminary operation lookup, operation recheck with both
+  serialization domains held, requested-game tombstone and current personal-
+  versus-team authority checks before replay/scope/payload classification;
 - personal conflict access from current canonical personal-game owner/account
   authority; team conflict access only from current canonical team/roster
   tracking authority, including `laxhornet_can_track_roster_player` where
@@ -61,9 +65,14 @@ versioned RPC signatures. Do not activate production writes.
   tombstone, privacy, RLS/grants, and lock tests pass;
 - accepted/conflict/resolution replay cannot outrank deletion or current
   authority, and denial discloses no private values or conflict existence;
-- simultaneous identical first-seen requests produce one canonical mutation
-  and one replay after the lock, with no duplicate evidence or uniqueness
-  error; same-ID/different-hash concurrency fails safely;
+- same-actor/same-ID concurrency across identical same-game, different-game,
+  and different-payload requests produces at most one semantic mutation,
+  deterministic replay or safe scope/payload mismatch, no duplicate evidence,
+  no stored-scope disclosure, no raw uniqueness error, and no deadlock;
+- the cross-game denial uses stable `duplicate_operation_id_scope_mismatch`
+  without revealing the stored canonical game ID or private operation content;
+- different actors sharing a client operation ID and unrelated operation IDs
+  remain independent; mutation, identity, result, and history are atomic;
 - existing R2-06/R2-06A bytes and guarantees remain intact;
 - exact-head Level 3 review passes;
 - server capability remains disabled and production is unchanged.
@@ -207,10 +216,13 @@ non-production database and two-device/browser journeys.
   revocation, deletion race, and conflict-resolution adversarial probes;
 - accepted/conflict replay after deletion, replay after personal/team authority
   loss, direct read/resolution after team revocation, simultaneous identical
-  first-seen requests, and simultaneous same-ID/different-hash requests;
+  same-game requests, same-actor/same-ID cross-game requests, same-game
+  different-payload requests, and different-actor/same-client-ID requests;
 - account-switch rejection while replay/conflict-read responses are in flight,
   private-value containment on every denial, one canonical concurrent result,
-  no exposed uniqueness error, and no R2-06 tombstone-precedence regression;
+  atomic mutation/identity/result/history, universal lock-order/deadlock probes,
+  unrelated-ID independence, no exposed uniqueness error, and no R2-06
+  tombstone-precedence regression;
 - performance/query plan/storage budgets;
 - exact migration/RPC/content hashes and zero-residue cleanup;
 - complete canonical-plus-additive local regression once after final diff;
@@ -285,4 +297,4 @@ production. R2-07A requires a separate explicit authorization after a clean
 independent Level 3 PASS against the exact remediation PR head.
 
 Final sequencing disposition:
-`R2-07 DESIGN REMEDIATED — EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`.
+`R2-07 DESIGN RE-REMEDIATED — NEW EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`.

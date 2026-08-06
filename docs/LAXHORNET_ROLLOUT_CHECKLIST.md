@@ -186,10 +186,12 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
   game-field versions and conflict records; this describes the pre-design
   v285 closeout state and is superseded by the design record below.
 - [x] Complete R2-07 design as a separate Level 3 planning task.
-- [!] PR #62 merged the planning documentation at design head
-  `df458789bc3f45e4f01cf31cc0ed10716dd9e2a6`, but later P1/P2 findings
-  against that same head remained unresolved at merge; the earlier planning-
-  level PASS is historical and does not close the corrected-design gate.
+- [!] PR #62 received exact-head PASS at design head
+  `df458789bc3f45e4f01cf31cc0ed10716dd9e2a6` on 2026-08-06 at 03:11:56Z. Replay-disclosure
+  P1 was posted at 03:11:35Z and remained unresolved at merge at 03:12:48Z;
+  team-authority P1 and post-lock concurrent-first-seen P2 were posted after
+  merge at 03:17:29Z against the same head. All three remained unresolved when
+  PR #63 began. The historical PASS does not close the corrected-design gate.
 - [ ] Obtain a clean independent Level 3 PASS against the exact review-
   remediation PR head and David's decision before authorizing R2-07A or any
   later phase.
@@ -198,7 +200,7 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
 
 ## R2-07 — Game-Field Versions and Conflict Records Design
 
-**Status:** [!] Review remediation — exact-head independent review pending
+**Status:** [!] Re-remediated — new exact-head independent Level 3 review pending
 
 **Risk level:** Level 3 — synchronization, schema/RPC, conflict, offline,
 authorization, and release semantics
@@ -230,13 +232,22 @@ authorization, and release semantics
   behavior in the design.
 - [x] Remediate replay ordering so the shared lock, authoritative tombstone,
   and current personal/team authority checks precede stored-result disclosure.
-- [x] Require a post-lock operation recheck so simultaneous identical first-
-  seen requests deterministically yield one canonical mutation plus one replay,
-  without a uniqueness error.
+- [x] Require operation recheck while both global operation identity and the
+  requested-game lock are held so simultaneous identical first-seen requests
+  deterministically yield one canonical mutation plus one replay, without a
+  uniqueness error.
 - [x] Require current team/roster tracking authority—not historical creator or
   copied owner/account identity—for team conflict read, replay, resolution, and
   retention access, with non-enumerating denial and private-value containment.
-- [ ] Obtain independent Level 3 PASS against the exact remediation PR SHA.
+- [x] Remediate failed PR #63 head
+  `53e934a80500f6987a724993ce6f8cc47df1529e`: serialize global
+  `(actor_user_id, client_operation_id)` before at most one requested-game lock,
+  forbid reverse ordering, and make cross-game scope mismatch non-disclosing.
+- [x] Require atomic mutation/operation/result/history, no raw unique error,
+  exactly one semantic mutation, opposing-request deadlock probes, unrelated-ID
+  independence, and the full same-/cross-game concurrency matrix.
+- [x] Correct the PR #62 review chronology across all durable records.
+- [ ] Obtain independent Level 3 PASS against the new exact remediation PR SHA.
 - [ ] Obtain David's explicit decisions on score authority, allowed merges,
   post-completion edits, no initial reopen, clock authority, legacy cutover,
   minimum resolution UX, retention, and phase authorization.

@@ -2128,7 +2128,7 @@ v285 reconciliation and authorizes no R2-07 implementation.
 
 ### R2-07 — Add game-field versions and conflict records
 
-Status: `REVIEW REMEDIATION — INDEPENDENT EXACT-HEAD REVIEW PENDING`
+Status: `RE-REMEDIATED — NEW EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`
 
 Risk level: `LEVEL 3`
 
@@ -2184,17 +2184,27 @@ production authorization atomically enables v2 and turns the legacy v1 write
 RPC into an actionable upgrade-required stub. Missing bases are never treated
 as current.
 
-PR #62 merged the planning documentation at exact design head
-`df458789bc3f45e4f01cf31cc0ed10716dd9e2a6`. Preserve the historical
-planning-level PASS, but do not treat it as a closed gate: later P1/P2 findings
-against that same head remained unresolved at merge. They require locked
-tombstone/current-authority checks before stored replay disclosure, a post-lock
-operation recheck for simultaneous first-seen idempotency, and current
-team/roster authority rather than copied owner/account identity for every team-
-game conflict read, replay, resolution, and retention path.
+PR #62 received exact-head PASS at design head
+`df458789bc3f45e4f01cf31cc0ed10716dd9e2a6` on 2026-08-06 at 03:11:56Z. The
+replay-disclosure P1 was posted at 03:11:35Z and remained unresolved when PR #62
+merged at 03:12:48Z. The team-authority P1 and post-lock concurrent-first-seen
+P2 were posted after merge at 03:17:29Z against that same head. All three
+remained unresolved when PR #63 began. Preserve the historical PASS, but do not
+treat it as a clean gate.
 
-The corrected design is in review remediation. No clean independent Level 3
-PASS exists until a reviewer returns PASS against the exact remediation PR
+PR #63 exact head `53e934a80500f6987a724993ce6f8cc47df1529e` then failed independent
+Level 3 review because the globally unique `(actor_user_id,
+client_operation_id)` identity was still serialized only by game ID and because
+the chronology above was inaccurate. The re-remediated contract acquires global
+actor/operation identity before at most one requested-game lock, never in
+reverse order; makes same-ID cross-game scope mismatch non-disclosing; preserves
+tombstone/current-authority precedence; commits identity, semantic mutation,
+canonical result, and history atomically; and requires cross-game, atomicity,
+raw-unique, independence, and deadlock probes. The failed review is
+`https://github.com/degrasse-mastermind/LaxHornet/pull/63#pullrequestreview-4874918869`.
+
+The corrected design is re-remediated. No clean independent Level 3 PASS exists
+until a reviewer returns PASS against the new exact remediation PR
 head. The product choices above, bounded post-completion correction, no initial
 reopen, server-anchored clock without a device lease, minimum R2-07D Needs
 Attention UX, provisional 180-day resolved-conflict retention subject to

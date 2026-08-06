@@ -1,6 +1,6 @@
 # R2-07 Migration and Rollback Plan
 
-Status: `REVIEW REMEDIATION — INDEPENDENT EXACT-HEAD REVIEW PENDING`
+Status: `RE-REMEDIATED — NEW EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`
 
 Risk level: `LEVEL 3 — SCHEMA, RLS, RPC, SYNCHRONIZATION, RECOVERY`
 
@@ -221,20 +221,33 @@ All functions default to `r207_not_activated` until the activation gate is
 enabled. The dormant state must be a committed server-side control, not merely
 a client flag.
 
-Use the existing R2-06 namespaced per-game transaction lock. Every game, clock,
-status, event-boundary, resolution, and delete function acquires it before
-tombstone/game/clock reads. The universal row order is tombstone, game,
-clock, then operation/conflict append. No function takes two game locks.
+R2-07 contracts use two distinct serialization domains. Operation identity is
+global for `(actor_user_id, client_operation_id)` and is independent of game ID;
+game mutation uses the existing R2-06 namespaced per-game transaction lock.
+R2-07A may implement operation identity with a collision-safe transaction
+advisory lock or an atomic blocking reservation row. Either mechanism must
+serialize before game-domain mutation, retain the identity boundary through
+transaction end, and never commit a reservation separately from the semantic
+mutation and canonical result.
 
-Each write/read/resolution contract may perform a preliminary operation-ID/hash
-lookup for routing, but it must not return a stored canonical result before the
-shared game lock, authoritative tombstone check, and current canonical
-authority check. After acquiring the lock, it rechecks the operation record.
-The first simultaneous valid request stores one mutation and canonical result;
-an identical waiter returns that replay without entering semantic mutation or
-surfacing the unique `(actor_user_id, client_operation_id)` constraint. A
-different hash returns `duplicate_operation_id_payload_mismatch` without the
-stored request/result and without a game conflict.
+The universal R2-07 order is: validate and derive actor/hash/requested scope;
+acquire operation identity; perform a non-disclosing operation lookup; resolve
+and acquire at most one requested-game lock while retaining operation identity;
+recheck operation; then read tombstone, lock game and clock rows, validate
+current authority, classify replay/scope/payload mismatch, and perform semantic
+processing. No R2-07 path acquires a game lock and then operation identity.
+Existing R2-06 functions that remain per-game-only must never subsequently take
+the operation lock, so opposing requests cannot form a lock cycle.
+
+The first simultaneous valid request stores exactly one mutation and canonical
+result atomically with the operation row and append-only evidence. An identical
+waiter returns that replay without semantic mutation or a raw unique-constraint
+error. A same-actor/same-ID request for another game cannot enter semantic
+processing and, after requested-game tombstone/current-authority checks, returns
+safe `duplicate_operation_id_scope_mismatch`. A same-game different hash
+returns `duplicate_operation_id_payload_mismatch`. Neither mismatch discloses
+the stored canonical game ID, request/result, or conflict existence; unauthorized
+or tombstoned requested-game outcomes retain precedence.
 
 Keep the R2-06 tombstone trigger. Add no trigger that mutates versions behind a
 v2 function's accounting. Defense-in-depth direct-write triggers may reject
@@ -300,13 +313,21 @@ The schema/contract PR must prove on a disposable production-shaped dataset:
 - public wrappers expose only intended functions;
 - conflict JSON allowlists and 4 KiB limits fail closed;
 - operation ID/hash replay and mismatch behave deterministically;
-- preliminary replay lookup never bypasses the locked tombstone and current-
-  authority checks, and the canonical operation is rechecked after the lock;
-- simultaneous identical first-seen requests produce one mutation/result and
-  one replay with no uniqueness error; simultaneous same-ID/different-hash
-  requests return one safe mismatch and create no duplicate conflict/attempt
-  evidence beyond the approved bounded security-attempt row;
-- shared advisory-lock key and lock-before-read ordering match R2-06A;
+- the global actor/operation boundary serializes before the requested-game lock;
+  preliminary lookup never discloses stored scope or content, and the operation
+  is rechecked with both serialization domains held;
+- same actor/same ID/same game identical concurrency produces one mutation and
+  one replay; same actor/same ID/different games produces one semantic winner
+  and one safe scope mismatch; same game/different hashes produces one safe
+  payload mismatch; different actors with the same client ID remain independent;
+- no scenario exposes a raw unique-constraint error, creates more than one
+  semantic mutation, or creates duplicate conflict/attempt evidence beyond the
+  approved bounded security-attempt row;
+- operation identity, semantic mutation, canonical result, and append-only
+  evidence commit atomically or all roll back;
+- lock instrumentation proves the universal operation-then-game order and no
+  deadlock under opposing requests; unrelated operation IDs remain independent;
+- the requested-game lock and lock-before-tombstone ordering match R2-06A;
 - existing tombstone/write/delete behavior remains byte/semantics compatible;
 - accepted/conflict replay after deletion returns only authorized
   `game_deleted`, while revoked personal or team authority returns only
@@ -421,4 +442,4 @@ migration, a Supabase command, a linked local reset, production preflight,
 production verification, runtime deployment, or release marker change.
 
 Final migration design disposition:
-`R2-07 DESIGN REMEDIATED — EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`.
+`R2-07 DESIGN RE-REMEDIATED — NEW EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`.

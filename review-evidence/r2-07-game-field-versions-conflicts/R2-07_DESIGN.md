@@ -1,6 +1,6 @@
 # R2-07 Game-Field Versions and Conflict Records
 
-Status: `REVIEW REMEDIATION — INDEPENDENT EXACT-HEAD REVIEW PENDING`
+Status: `RE-REMEDIATED — NEW EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`
 
 Risk level: `LEVEL 3`
 
@@ -14,11 +14,13 @@ This is an implementation design, not an implementation record. It creates no
 application code, migration, RPC, release marker, production access, or
 deployment authority.
 
-PR #62 merged the original planning documentation at design head
-`df458789bc3f45e4f01cf31cc0ed10716dd9e2a6`. An earlier planning-level PASS
-against that head is preserved as a historical event, but it does not close the
-review gate: later P1/P2 findings against the same exact head remained
-unresolved at merge. This remediation corrects those findings. No clean
+PR #62 received an exact-head PASS at design head
+`df458789bc3f45e4f01cf31cc0ed10716dd9e2a6` on 2026-08-06 at 03:11:56Z. The
+replay-disclosure P1 was posted at 03:11:35Z and remained unresolved when PR #62
+merged at 03:12:48Z. The team-authority P1 and post-lock concurrent-first-seen
+P2 were posted after merge at 03:17:29Z against that same head. All three
+findings remained unresolved when PR #63 began. The historical PASS is
+preserved, but it does not establish a clean design gate. No clean
 independent Level 3 PASS exists for the corrected design until a new reviewer
 returns PASS against the exact remediation PR head. R2-07A and every later
 implementation, migration, release, deployment, and production action remain
@@ -361,25 +363,42 @@ Contract rules:
 
 ## 7. Server transaction algorithm
 
-Each mutation follows the same order:
+Each R2-07 mutation separates two serialization domains:
 
-1. Validate request shape, allowlisted keys, sizes, operation ID, and protocol.
-2. Derive `auth.uid()` and compute the canonical request hash server-side.
-3. An initial `(actor, operationId)` lookup may identify a potential replay or
-   payload mismatch, but it must not return or disclose the stored canonical
-   result, original payload, conflict existence, current values, proposed
-   values, or any other private game content.
-4. Acquire the existing namespaced per-game transaction advisory lock:
-   `hashtextextended('laxhornet:legacy-game:' || game_id, 0)`.
-5. Read the authoritative tombstone under that lock. If present, recheck
+- **Operation identity:** `(actor_user_id, client_operation_id)` serializes
+  first-seen and replay decisions globally, independent of any game ID.
+- **Game mutation:** the authoritative game ID serializes tombstone, lifecycle,
+  state, and semantic mutation decisions for that game.
+
+Every R2-07 path follows this universal order:
+
+1. Validate request shape, allowlisted keys, sizes, operation ID, and protocol;
+   derive `auth.uid()`, the requested game scope, and the canonical request hash
+   server-side.
+2. Acquire a transaction-scoped operation-identity lock or atomic blocking
+   reservation keyed only by `(actor_user_id, client_operation_id)`. The
+   implementation may use a collision-safe advisory-lock derivation or a
+   reservation row, but it must serialize contenders before any game-domain
+   mutation and must not commit a reservation separately from its semantic
+   result.
+3. Look up or recheck the operation record while retaining that identity lock.
+   This may identify a potential replay or mismatch, but it must not return or
+   disclose the stored canonical game ID, result, original payload, conflict
+   existence, current values, proposed values, or other private game content.
+4. Resolve the requested authoritative game scope, then acquire the existing
+   namespaced per-game transaction advisory lock:
+   `hashtextextended('laxhornet:legacy-game:' || game_id, 0)`, while retaining
+   the operation-identity lock.
+5. Recheck the operation record with both serialization domains held.
+6. Read the authoritative tombstone under the game lock. If present, recheck
    current tombstone-read authority. An authorized actor receives
    `game_deleted` with no prior replay/conflict/current values; an actor without
    current authority receives a non-enumerating authorization failure with no
    game, proposal, conflict, or current-state content. Tombstone authority
    outranks every accepted, merged, conflicted, or resolution replay history.
-6. Lock the game row `FOR UPDATE`, then the clock row `FOR UPDATE` when the
-   operation requires clock/status coupling. This is the universal lock order.
-7. Recheck current authority from canonical rows and grants. Personal games
+7. Lock the game row `FOR UPDATE`, then the clock row `FOR UPDATE` when the
+   operation requires clock/status coupling.
+8. Recheck current authority from canonical rows and grants. Personal games
    require current canonical personal-game owner/account authority. Team games
    require current canonical team/roster tracking authority, including
    `laxhornet_can_track_roster_player` where applicable. Historical creator or
@@ -387,32 +406,50 @@ Each mutation follows the same order:
    the already justified, explicitly allowlisted, non-public, audited platform
    reviewer predicate. Denial is non-enumerating and discloses no stored
    operation or conflict content.
-8. Recheck `(actor, operationId)` after serialization and current-authority
-   validation. If the row now exists and its canonical request hash matches,
-   return its canonical replay result without semantic mutation processing. If
-   the hash differs, return `duplicate_operation_id_payload_mismatch` without
-   disclosing the original request/result and without creating a game conflict.
-9. Validate base versions and lifecycle preconditions.
-10. For a stale group base, query accepted change rows after the base. Merge
+9. After tombstone and current-authority validation, classify any stored
+   operation. If its canonical game ID and request hash both match, return its
+   canonical replay without semantic mutation. If its canonical game ID differs,
+   return `duplicate_operation_id_scope_mismatch` only to a requester currently
+   authorized for the requested live game; otherwise return the applicable
+   non-enumerating authorization denial, or `game_deleted` for an authorized
+   requested tombstone. Never disclose the stored canonical game ID, payload,
+   result, or conflict existence. If the game ID matches but the hash differs,
+   return `duplicate_operation_id_payload_mismatch` with the same containment.
+10. For a first-seen identity, validate base versions and lifecycle
+    preconditions.
+11. For a stale group base, query accepted change rows after the base. Merge
    only if the proposed fields are disjoint and the matrix explicitly permits
    it. Otherwise insert one immutable conflict.
-11. Apply all accepted mutations atomically, increment only affected group
-     versions plus `game_revision`, append operation/change rows, and return the
-     normalized state/version map.
+12. Apply all accepted mutations atomically, increment only affected group
+    versions plus `game_revision`, and append the operation identity, canonical
+    result, and applicable change/conflict/resolution history in the same
+    transaction. Commit all of them or none of them.
+
+No R2-07 path may acquire a game lock and then acquire an operation-identity
+lock. The order is always operation identity, then at most one game lock, then
+tombstone/game/clock rows and append-only evidence. Existing R2-06 delete paths
+that are not enrolled in R2-07 remain per-game-only and must never later acquire
+an operation-identity lock; this prevents an opposing lock cycle. Unrelated
+operation IDs remain independent, including when they target different games.
+R2-07A must prove this order remains deadlock-free under opposing concurrent
+requests; a deadlock or reverse-order path is a release-blocking failure.
 
 No exception path may commit a partial game update without its operation
-result. Conflict creation and its canonical operation result are one
-transaction. Authorization/validation/payload-mismatch failures do not create
-a game conflict. Two simultaneous identical first-seen requests serialize at
-the game lock: the first valid request mutates and stores one canonical result;
-the second finds that operation during the post-lock recheck and returns a
-replay. It does not reach semantic mutation processing and does not expose a
-unique-constraint error.
+identity and canonical result. Conflict creation and its canonical operation
+result are one transaction. Authorization, validation, scope-mismatch, and
+payload-mismatch failures do not create a game conflict. Two simultaneous
+identical first-seen requests serialize at the global operation-identity
+boundary: the first valid request performs one semantic mutation and stores one
+canonical result; the waiter rechecks under the same identity order and returns
+the replay. It does not reach semantic mutation processing and does not expose
+a unique-constraint error.
 
 ## 8. Server response contract
 
-Every response includes `protocolVersion`, `operationId`, `gameId`, a stable
-`responseClass`, and a machine-readable `code`.
+Every response includes `protocolVersion`, `operationId`, the request's `gameId`,
+a stable `responseClass`, and a machine-readable `code`. A scope-mismatch
+response echoes only that requested ID; it never substitutes or discloses the
+stored operation's canonical game ID.
 
 | Response class | Required content | Stable primary codes |
 |---|---|---|
@@ -420,8 +457,8 @@ Every response includes `protocolVersion`, `operationId`, `gameId`, a stable
 | `merged` | Version map, normalized changed state, safe merged field names, and the stale base that was merged | `game_write_merged_non_overlapping`, `score_delta_merged` |
 | `conflict` | Conflict ID, group, overlapping safe fields, current versions, and only authorized bounded current values | `game_field_conflict`, `lifecycle_conflict`, `clock_conflict`, `resolution_stale` |
 | `deleted` | Existing deletion code/receipt fields and no private conflict values | `game_deleted` |
-| `replay` | After locked tombstone and current-authority checks pass, `operation_replayed` plus the exact stored canonical result under `result`; no duplicate mutation/conflict | `operation_replayed` |
-| `invalid` | Safe rejection code; no conflict row | `invalid_game_operation`, `missing_base_versions`, `invalid_base_version`, `unsupported_protocol`, `authorization_denied`, `client_upgrade_required`, `duplicate_operation_id_payload_mismatch` |
+| `replay` | After operation-identity serialization plus requested-game tombstone and current-authority checks pass, `operation_replayed` plus the exact stored canonical result under `result`; no duplicate mutation/conflict | `operation_replayed` |
+| `invalid` | Safe rejection code; no conflict row | `invalid_game_operation`, `missing_base_versions`, `invalid_base_version`, `unsupported_protocol`, `authorization_denied`, `client_upgrade_required`, `duplicate_operation_id_scope_mismatch`, `duplicate_operation_id_payload_mismatch` |
 
 Clients persist the response before compacting the local operation. Accepted
 and merged responses replace local base versions. Conflict responses retain
@@ -697,9 +734,11 @@ Both are required.
 | Accepted/merged write retry | Same actor + operation ID + request hash returns the stored canonical result and versions; no mutation/change row repeats. |
 | Conflict retry | Returns the same conflict ID; no duplicate conflict row. |
 | Network timeout after commit | Retry returns the committed stored result. Client persists receipt before compaction. |
-| Simultaneous identical first-seen requests | The per-game lock serializes both. The first valid request mutates and stores one canonical result; the second post-lock recheck returns that replay, performs no semantic mutation, creates no duplicate operation/change/conflict/resolution row, and exposes no uniqueness error. |
-| Simultaneous same ID, different hashes | After locked tombstone/current-authority checks, one valid canonical request may commit; the other returns `duplicate_operation_id_payload_mismatch` without original payload/result disclosure or a game conflict. |
-| Same operation ID, different payload/type/game | `duplicate_operation_id_payload_mismatch`; no mutation or conflict. A safe tamper attempt may be counted. |
+| Same actor, same operation ID, same game, identical concurrent requests | The global operation-identity boundary serializes both before game mutation. The first valid request mutates and atomically stores one canonical result; the waiter returns that replay, performs no semantic mutation, creates no duplicate operation/change/conflict/resolution row, and exposes no uniqueness error. |
+| Same actor, same operation ID, different games | The first valid request owns the identity. The other request performs no semantic mutation and, only after requested-game tombstone/current-authority checks, receives safe `duplicate_operation_id_scope_mismatch`; unauthorized and tombstoned outcomes retain their higher-precedence denial. No canonical stored game ID, payload, result, or conflict existence is disclosed. |
+| Same actor, same operation ID, same game, different payload/type/hash | After requested-game tombstone/current-authority checks, return `duplicate_operation_id_payload_mismatch`; perform no second mutation or conflict and disclose no original payload/result. A safe tamper attempt may be counted. |
+| Different actors, same client operation ID | Separate operation identities; each proceeds independently under its own authorization and game lock. |
+| First-seen atomicity failure | Semantic mutation, operation identity, canonical result, and append-only history all roll back together; an identity-only committed reservation is forbidden. |
 | Resolution retry | Same resolution operation ID/hash returns prior result; no duplicate resolution. |
 | Out-of-order stale write | Merge only by explicit matrix and change-journal proof; otherwise conflict. |
 | Score delta replay | Same delta ID applies once. Different delta IDs both apply when lifecycle permits. |
@@ -777,4 +816,4 @@ ticket and explicit authorization after all prior phases pass. R2-06 remains
 closed, v285 remains current, and R2-07 implementation remains unauthorized.
 
 Final design disposition:
-`R2-07 DESIGN REMEDIATED — EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`.
+`R2-07 DESIGN RE-REMEDIATED — NEW EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`.
