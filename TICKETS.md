@@ -2513,7 +2513,8 @@ and no production activation.
 - [x] Production runtime flag and Preview server control remain off by default;
   Live Share, release/cache markers, retention, and production state are
   unchanged.
-- [ ] Exact-head GitHub CI passes on the draft PR.
+- [x] Draft PR #69 head `01347204d3407d92216d16cee114a986fe8327c9`
+  passed GitHub Docker/regression, Supabase Preview, and Vercel checks.
 - [ ] Independent Level 3 review returns PASS against the exact draft-PR SHA.
 
 Evidence:

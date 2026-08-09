@@ -81,9 +81,14 @@ Branch: `feature/r2-07d-needs-attention-conflict-resolution`
   `586f46373c6068a050083aff1034d7e661d5b5f046afe88d5a481d8f095894dd`.
 - Rollback SHA-256:
   `57b550f5a136a610c85e89912cd8322239fd220456dbb4446be223da35e5bd2b`.
-- Draft PR #68 previously passed GitHub Docker/regression, Vercel, and isolated
-  Supabase Preview at `a1b54d77eea5dfe509846fe7be45d1998246ddce`.
-  The final exact-head status is recorded after this evidence update is pushed.
+- Draft PR #69 at implementation head
+  `01347204d3407d92216d16cee114a986fe8327c9` passed GitHub Docker,
+  portable regression, Vercel, Vercel Preview Comments, and the automatic
+  isolated Supabase Preview workflow.
+- Supabase Preview project: `syoluqskxascanqktfkv`; database, services, APIs,
+  configuration, migrations, seed, and Edge Functions reported success.
+- Vercel Preview:
+  `https://lax-hornet-git-feature-r2-07-dc7c44-davidltdanes-4133s-projects.vercel.app`.
 
 ## Boundaries and rollback
 

@@ -1183,8 +1183,8 @@ Do not combine these into one large Codex task. Each item requires one approved 
   no horizontal overflow.
 - [x] Keep Live Share, retention, release/cache markers, migration application,
   deployment, and production state unchanged.
-- [ ] Draft PR exact head passes GitHub Docker, regression, and isolated
-  Supabase Preview workflows.
+- [x] Draft PR #69 head `01347204d3407d92216d16cee114a986fe8327c9`
+  passed GitHub Docker, regression, isolated Supabase Preview, and Vercel.
 - [ ] Independent exact-head Level 3 review passes before merge.
 - [ ] Begin R2-07E only after D PASS and merge.
 
