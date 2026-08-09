@@ -2305,6 +2305,69 @@ Evidence:
 
 - `review-evidence/r2-07a-dormant-concurrency-foundation/R2-07A_IMPLEMENTATION_EVIDENCE.md`
 
+### R2-07B — Controlled preview client version tracking and field operations
+
+Status: `IMPLEMENTED — DRAFT PR AND EXACT-HEAD LEVEL 3 REVIEW PENDING`
+
+Risk level: `LEVEL 3`
+
+Branch: `feature/r2-07b-controlled-preview-integration`
+
+Starting main: `3e990ddcec06dbe660703db5fdbf8c12df0ad485`
+
+#### Goal
+
+Hydrate authoritative game version maps, retain immutable durable field
+operations, and exercise the dormant v2 game-field contract only in an
+explicitly enabled isolated Preview. A stale overlapping metadata edit must
+retain the local proposal, avoid legacy overwrite or blind retry, and show a
+bounded nontechnical refresh path.
+
+#### Authorized scope
+
+- Preserve future version-map fields and never invent a missing base.
+- Build identified metadata, score, status, roster-context, and sharing field
+  operations; connect the existing Game Review metadata path for the first
+  controlled demonstration.
+- Persist attempts, receipts, server versions, and bounded conflict state in a
+  separate account-scoped local domain while retaining the canonical game.
+- Add a default-off browser flag and default-disabled server control; enable
+  both only in the managed Vercel/Supabase PR Preview build and seed paths.
+- Add the minimal `This game changed on another device. Refresh before saving
+  again.` notice with no private values or internal IDs.
+- Add focused unit, disposable PostgreSQL, two-session browser, offline,
+  authorization, tombstone, disclosure, and preservation coverage.
+
+#### Explicit exclusions
+
+- No production v2 activation, v1 rejection, production deployment or
+  migration application, migration-history repair, release/cache marker
+  change, Live Share/public disclosure change, retention execution, rich
+  conflict resolution, clock/event concurrency cutover, merge, or R2-07C+.
+
+#### Acceptance record
+
+- [x] Local save precedes cloud work and offline loss preserves the local game.
+- [x] Permanent operation identity and exact hydrated bases are persisted
+  before an attempt; attempted payloads do not mutate.
+- [x] Accepted/merged receipts persist before compaction; conflicts remain
+  durable and are not retried automatically.
+- [x] Stale overlap cannot invoke the legacy whole-game overwrite path;
+  approved non-overlap metadata merges remain deterministic.
+- [x] Authorization denial and tombstone responses remain bounded and distinct
+  from transport retry and field conflict.
+- [x] The runtime flag and server gate are both off by default. Preview
+  enablement contains no data or credentials and production remains v1.
+- [x] Two authenticated synthetic browser contexts pass desktop/mobile stale
+  overlap, safe refresh, non-overlap, denial, tombstone, and flag-off checks.
+- [x] Automatic isolated Supabase Preview and Vercel Preview pass on the draft
+  PR and provide the managed demo URL.
+- [ ] Fresh independent Level 3 review passes against the exact draft-PR SHA.
+
+Evidence:
+
+- `review-evidence/r2-07b-controlled-preview-integration/R2-07B_IMPLEMENTATION_EVIDENCE.md`
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

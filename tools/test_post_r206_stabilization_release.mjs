@@ -70,11 +70,14 @@ test("no new R2-06 production authorization exists", () => {
   assert.equal(reconciliation.newProductionAuthorizationCreatedDuringCloseout, false);
 });
 
-test("latest runtime identity points to the new app runtime", () => {
+test("latest production runtime identity remains bound to the deployed app runtime", () => {
   assert.equal(manifest.release, "v285");
   assert.equal(stabilization.releaseMarker, "v285");
   assert.match(app, /const APP_VERSION = "v285";/);
-  assert.equal(stabilization.runtimeSha256["app.js"], normalizedSha("app.js"));
+  assert.equal(
+    stabilization.runtimeSha256["app.js"],
+    normalizedShaAtRef(stabilization.approvedAndDeployedSha, "app.js"),
+  );
 });
 
 test("PWA cache marker matches the latest runtime marker", () => {

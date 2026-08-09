@@ -57,6 +57,9 @@ const additivePaths = [
   "supabase/tests/durable_game_tombstone_concurrency.sql",
   "supabase/migrations/20260806143128_r207a_dormant_concurrency_foundation.sql",
   "supabase/rollback/20260806143128_r207a_dormant_concurrency_foundation_rollback.sql",
+  "supabase/migrations/20260809155442_r207b_controlled_preview_integration.sql",
+  "supabase/rollback/20260809155442_r207b_controlled_preview_integration_rollback.sql",
+  "supabase/seed.sql",
 ].join(",");
 
 const rootJavaScript = readdirSync(root)
@@ -75,6 +78,9 @@ const tests = [
   { name: "durable legacy game tombstone migration", command: process.execPath, args: ["tools/test_game_tombstone_migration.mjs"] },
   { name: "durable legacy game tombstone concurrency", command: process.execPath, args: ["tools/test_game_tombstone_concurrency.mjs"] },
   { name: "R2-07A dormant concurrency foundation", command: process.execPath, args: ["tools/test_r207a_dormant_concurrency.mjs"] },
+  { name: "R2-07B controlled preview client", command: process.execPath, args: ["tools/test_r207b_controlled_preview.mjs"] },
+  { name: "R2-07B controlled preview migration", command: process.execPath, args: ["tools/test_r207b_preview_migration.mjs"] },
+  { name: "R2-07B two-session browser", command: process.execPath, args: ["tools/test_r207b_two_session_browser.cjs"] },
   { name: "sync error classification contracts", command: process.execPath, args: ["tools/test_sync_error_classification.mjs"] },
   { name: "sync characterization contracts", command: process.execPath, args: ["tools/test_sync_characterization.mjs"] },
   { name: "tracked playing time service contracts", command: process.execPath, args: ["tools/test_tracked_playing_time_service.mjs"] },

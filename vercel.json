@@ -1,0 +1,4 @@
+{
+  "buildCommand": "node tools/build_r207b_vercel_preview.mjs",
+  "outputDirectory": ".vercel-preview"
+}
