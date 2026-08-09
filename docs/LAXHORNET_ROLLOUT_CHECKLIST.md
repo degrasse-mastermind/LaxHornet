@@ -1132,6 +1132,23 @@ Do not combine these into one large Codex task. Each item requires one approved 
 
 # 6. Release Checklist for Production-Impacting Changes
 
+## R2-07C Preview-only event concurrency gate
+
+- [x] Production runtime flag defaults false.
+- [x] Preview server control remains false by migration default.
+- [x] New-client event correction/delete selects versioned RPC before legacy
+  event upsert/delete.
+- [x] Shared game lock precedes game tombstone, game, and event state reads.
+- [x] Current authority and expected lifecycle are rechecked in the transaction.
+- [x] Same-field conflict and proven non-overlap merge use immutable history.
+- [x] Event tombstone is permanent and game tombstone prevents resurrection.
+- [x] Offline intent persists before network work and conflicts do not retry.
+- [x] Bounded UI copy contains no operation, conflict, account, or event ID.
+- [x] Disposable PostgreSQL concurrency and two-session browser tests pass.
+- [ ] Draft PR exact head passes GitHub Docker and regression workflows.
+- [ ] Independent exact-head Level 3 review passes before merge.
+- [ ] Any production activation remains a separate R2-07F authorization.
+
 A feature PR is not automatically a production release.
 
 - [ ] Feature PR merged to `main`.

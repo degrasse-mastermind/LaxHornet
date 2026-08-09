@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
 import os from "node:os";
+import net from "node:net";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -62,6 +63,8 @@ const additivePaths = [
   "supabase/seed.sql",
   "supabase/migrations/20260809164435_r207b_qualify_preview_game_update.sql",
   "supabase/rollback/20260809164435_r207b_qualify_preview_game_update_rollback.sql",
+  "supabase/migrations/20260809173500_r207c_versioned_event_corrections.sql",
+  "supabase/rollback/20260809173500_r207c_versioned_event_corrections_rollback.sql",
 ].join(",");
 
 const rootJavaScript = readdirSync(root)
@@ -83,6 +86,9 @@ const tests = [
   { name: "R2-07B controlled preview client", command: process.execPath, args: ["tools/test_r207b_controlled_preview.mjs"] },
   { name: "R2-07B controlled preview migration", command: process.execPath, args: ["tools/test_r207b_preview_migration.mjs"] },
   { name: "R2-07B two-session browser", command: process.execPath, args: ["tools/test_r207b_two_session_browser.cjs"] },
+  { name: "R2-07C versioned event client", command: process.execPath, args: ["tools/test_r207c_versioned_events.mjs"] },
+  { name: "R2-07C versioned event migration", command: process.execPath, args: ["tools/test_r207c_preview_migration.mjs"] },
+  { name: "R2-07C two-session browser", command: process.execPath, args: ["tools/test_r207c_two_session_browser.cjs"] },
   { name: "sync error classification contracts", command: process.execPath, args: ["tools/test_sync_error_classification.mjs"] },
   { name: "sync characterization contracts", command: process.execPath, args: ["tools/test_sync_characterization.mjs"] },
   { name: "tracked playing time service contracts", command: process.execPath, args: ["tools/test_tracked_playing_time_service.mjs"] },
@@ -163,6 +169,20 @@ let failed = 0;
 let completed = 0;
 let firstFailed = "";
 
+async function waitForLocalServer(port) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const ready = await new Promise((resolve) => {
+      const socket = net.createConnection({ host: "127.0.0.1", port });
+      socket.once("connect", () => { socket.destroy(); resolve(true); });
+      socket.once("error", () => resolve(false));
+      socket.setTimeout(250, () => { socket.destroy(); resolve(false); });
+    });
+    if (ready) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Local browser test server did not become ready on port ${port}`);
+}
+
 for (const test of tests) {
   let localServer;
   if (test.localServer) {
@@ -171,7 +191,7 @@ for (const test of tests) {
       stdio: "ignore",
       windowsHide: true,
     });
-    await new Promise((resolve) => setTimeout(resolve, 900));
+    await waitForLocalServer(test.localServer.port);
   }
   const result = spawnSync(test.command, test.args, {
     cwd: root,

@@ -24,6 +24,10 @@
         ? hooks.requiresAuthoritativeHistory
         : () => true;
     const reportError = typeof hooks.reportError === "function" ? hooks.reportError : () => {};
+    const useVersionedEvents = typeof hooks.useVersionedEvents === "function" ? hooks.useVersionedEvents : () => false;
+    const queueVersionedEvent = typeof hooks.queueVersionedEvent === "function" ? hooks.queueVersionedEvent : () => {};
+    const queueVersionedTombstone = typeof hooks.queueVersionedTombstone === "function" ? hooks.queueVersionedTombstone : () => {};
+    const flushVersionedEvents = typeof hooks.flushVersionedEvents === "function" ? hooks.flushVersionedEvents : () => false;
 
     function runCloudWork(work) {
       if (!canUseCloud()) return Promise.resolve(false);
@@ -52,6 +56,12 @@
         game,
       );
       if (!local.game?.id || !local.event?.id) throw new TypeError("Event creation requires a game and event");
+      if (useVersionedEvents(local.game)) {
+        queueVersionedEvent(local.game, local.event);
+        persistLocal();
+        const cloudPromise = runCloudWork(() => flushVersionedEvents({ gameId: local.game.id }));
+        return { ...local, cloudPromise };
+      }
       queueEvent(local.game, local.event);
       persistLocal();
       const cloudPromise = runCloudWork(async () => {
@@ -68,6 +78,12 @@
         game,
       );
       if (!local.game?.id || !local.event?.id) throw new TypeError("Event correction requires a game and event");
+      if (useVersionedEvents(local.game)) {
+        queueVersionedEvent(local.game, local.event);
+        persistLocal();
+        const cloudPromise = runCloudWork(() => flushVersionedEvents({ gameId: local.game.id }));
+        return { ...local, cloudPromise };
+      }
       queueEvent(local.game, local.event);
       persistLocal();
       const cloudPromise = runCloudWork(async () => {
@@ -84,6 +100,12 @@
         game,
       );
       if (!local.game?.id || !local.event?.id) throw new TypeError("Event tombstone requires a game and event");
+      if (useVersionedEvents(local.game)) {
+        queueVersionedTombstone(local.game, local.event, reason);
+        persistLocal();
+        const cloudPromise = runCloudWork(() => flushVersionedEvents({ gameId: local.game.id }));
+        return { ...local, cloudPromise };
+      }
       queueTombstone(local.game, local.event, reason);
       persistLocal();
       const cloudPromise = runCloudWork(async () => {
@@ -102,6 +124,13 @@
       persistLocal();
       if (!canUseCloud()) return false;
       try {
+        if (useVersionedEvents(game)) {
+          const legacyReady = await syncLegacyGame(game, { includeEvents: false });
+          if (!legacyReady) return false;
+          game.events.forEach((event) => queueVersionedEvent(game, event));
+          persistLocal();
+          return Boolean(await flushVersionedEvents({ gameId: game.id }));
+        }
         const legacyReady = await syncLegacyGame(game, { includeEvents: true });
         if (!legacyReady) return false;
         if (!requiresAuthoritativeHistory(game)) return true;
@@ -115,6 +144,9 @@
     async function retryGameEventOperations(gameId = "") {
       if (!canUseCloud()) return false;
       try {
+        if (useVersionedEvents({ id: gameId })) {
+          return Boolean(await flushVersionedEvents({ gameId }));
+        }
         return Boolean(await flushAuthoritativeQueue({ gameId }));
       } catch (error) {
         reportError(error);
@@ -133,6 +165,269 @@
 
   global.LaxHornetEventOperations = Object.freeze({
     createEventOperationService,
+  });
+})(window);
+
+(function initializeR207EventOperations(global) {
+  "use strict";
+
+  const SCHEMA_VERSION = 1;
+  const CONFLICT_MESSAGE = "This event changed on another device. Refresh before saving again.";
+  const EVENT_FIELDS = Object.freeze([
+    "timestamp", "quarter", "stat_type", "stat_label", "category", "point_value",
+    "tags", "note", "field_zone", "corrected_at", "tags_updated_at",
+  ]);
+  const copy = (value) => JSON.parse(JSON.stringify(value));
+  const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  const now = () => new Date().toISOString();
+  const operationId = () => global.crypto?.randomUUID?.() || `r207c-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  function emptyState() {
+    return { schemaVersion: SCHEMA_VERSION, records: {}, operations: [], receipts: [], conflicts: {} };
+  }
+
+  function isStoredState(value) {
+    return isObject(value) && Number.isInteger(Number(value.schemaVersion))
+      && isObject(value.records || {}) && Array.isArray(value.operations || [])
+      && Array.isArray(value.receipts || []) && isObject(value.conflicts || {});
+  }
+
+  function normalizeState(value = null) {
+    if (!isStoredState(value)) return emptyState();
+    if (Number(value.schemaVersion) > SCHEMA_VERSION) return copy(value);
+    return {
+      ...copy(value),
+      schemaVersion: SCHEMA_VERSION,
+      records: Object.fromEntries(Object.entries(value.records || {}).filter(([id, record]) => id && isObject(record))),
+      operations: (value.operations || []).filter((item) => isObject(item) && item.clientOperationId && item.payload),
+      receipts: (value.receipts || []).filter(isObject).slice(-100),
+      conflicts: Object.fromEntries(Object.entries(value.conflicts || {}).filter(([, item]) => isObject(item))),
+    };
+  }
+
+  function eventSnapshot(event = {}) {
+    return {
+      timestamp: String(event.timestamp || ""),
+      quarter: String(event.quarter || ""),
+      stat_type: String(event.statType ?? event.stat_type ?? ""),
+      stat_label: String(event.statLabel ?? event.stat_label ?? ""),
+      category: String(event.category || ""),
+      point_value: Number(event.pointValue ?? event.point_value ?? 0),
+      tags: [...new Set((Array.isArray(event.tags) ? event.tags : []).map(String))],
+      note: String(event.note || ""),
+      field_zone: String(event.fieldZone ?? event.field_zone ?? ""),
+      corrected_at: event.correctedAt ?? event.corrected_at ?? null,
+      tags_updated_at: event.tagsUpdatedAt ?? event.tags_updated_at ?? null,
+    };
+  }
+
+  function eventChanges(before = {}, after = {}) {
+    return Object.fromEntries(EVENT_FIELDS.filter((field) => JSON.stringify(before[field]) !== JSON.stringify(after[field]))
+      .map((field) => [field, copy(after[field])]));
+  }
+
+  function lifecycle(game = {}) {
+    return String(game.lifecycleState || game.lifecycle_state || (game.status === "complete" ? "completed" : "active"));
+  }
+
+  function createEventOperationService(hooks = {}) {
+    const getState = hooks.getState;
+    const setState = hooks.setState;
+    const persistState = hooks.persistState;
+    const execute = hooks.execute;
+    const isOffline = typeof hooks.isOffline === "function" ? hooks.isOffline : () => false;
+    const currentAccountId = typeof hooks.currentAccountId === "function" ? hooks.currentAccountId : () => "";
+    const onConflict = typeof hooks.onConflict === "function" ? hooks.onConflict : () => {};
+    const onAccepted = typeof hooks.onAccepted === "function" ? hooks.onAccepted : () => {};
+    if (![getState, setState, persistState, execute].every((value) => typeof value === "function")) {
+      throw new TypeError("R2-07C event service hooks are incomplete");
+    }
+
+    function mutate(mutator) {
+      const next = normalizeState(getState());
+      mutator(next);
+      setState(next);
+      persistState(next);
+      return next;
+    }
+
+    function recordFor(state, game, event) {
+      const id = String(event.id || "");
+      if (!state.records[id]) {
+        state.records[id] = {
+          accountId: String(currentAccountId() || ""), gameId: String(game.id || ""), eventId: id,
+          serverEventVersion: Math.max(0, Number(event.serverEventVersion ?? event.server_event_version ?? 0)),
+          lifecycleState: "active", acceptedSnapshot: {}, desiredSnapshot: eventSnapshot(event),
+          deleteRequested: false, updatedAt: now(),
+        };
+      }
+      return state.records[id];
+    }
+
+    function addOperation(state, record, type, base, changes, expectedLifecycle) {
+      const payload = {
+        client_operation_id: operationId(), game_id: record.gameId, event_id: record.eventId,
+        operation_type: type, base_event_version: base, expected_game_lifecycle: expectedLifecycle,
+        changes: copy(changes), client_created_at: now(),
+      };
+      state.operations.push({
+        clientOperationId: payload.client_operation_id, accountId: record.accountId,
+        gameId: record.gameId, eventId: record.eventId, type, payload,
+        state: "pending", attempts: 0, lastAttemptAt: "", lastError: null,
+      });
+      return payload;
+    }
+
+    function pending(state, eventId, type = "") {
+      return state.operations.find((operation) => operation.eventId === eventId
+        && ["pending", "retryable"].includes(operation.state) && (!type || operation.type === type));
+    }
+
+    function materialize(state, record, expectedLifecycle) {
+      if (record.deleteRequested) {
+        state.operations = state.operations.filter((operation) => !(operation.eventId === record.eventId
+          && operation.type === "correct" && operation.attempts === 0));
+        if (record.serverEventVersion >= 1 && !pending(state, record.eventId, "tombstone")) {
+          addOperation(state, record, "tombstone", record.serverEventVersion, {}, expectedLifecycle);
+        }
+        return;
+      }
+      if (record.serverEventVersion < 1) {
+        if (!pending(state, record.eventId, "create")) addOperation(state, record, "create", 0, record.desiredSnapshot, expectedLifecycle);
+        return;
+      }
+      const changes = eventChanges(record.acceptedSnapshot, record.desiredSnapshot);
+      if (Object.keys(changes).length && !pending(state, record.eventId, "correct") && !state.conflicts[record.eventId]) {
+        addOperation(state, record, "correct", record.serverEventVersion, changes, expectedLifecycle);
+      }
+    }
+
+    function hydrate(game, event) {
+      return mutate((state) => {
+        const record = recordFor(state, game, event);
+        const version = Number(event.serverEventVersion ?? event.server_event_version ?? 0);
+        if (Number.isSafeInteger(version) && version >= record.serverEventVersion) {
+          record.serverEventVersion = version;
+          record.acceptedSnapshot = eventSnapshot(event);
+          if (!record.desiredSnapshot || !Object.keys(record.desiredSnapshot).length) record.desiredSnapshot = eventSnapshot(event);
+        }
+        record.updatedAt = now();
+      });
+    }
+
+    function queueEvent(game, event) {
+      return mutate((state) => {
+        const record = recordFor(state, game, event);
+        record.desiredSnapshot = eventSnapshot(event);
+        record.deleteRequested = false;
+        materialize(state, record, lifecycle(game));
+        record.updatedAt = now();
+      });
+    }
+
+    function queueTombstone(game, event) {
+      return mutate((state) => {
+        const record = recordFor(state, game, event);
+        record.deleteRequested = true;
+        delete state.conflicts[record.eventId];
+        const unattemptedCreate = pending(state, record.eventId, "create");
+        if (record.serverEventVersion < 1 && unattemptedCreate?.attempts === 0) {
+          state.operations = state.operations.filter((operation) => operation !== unattemptedCreate);
+          record.lifecycleState = "local_only_deleted";
+        } else {
+          materialize(state, record, lifecycle(game));
+        }
+        record.updatedAt = now();
+      });
+    }
+
+    async function process(options = {}) {
+      if (isOffline()) return false;
+      const gameId = String(options.gameId || "");
+      for (let round = 0; round < 4; round += 1) {
+        const snapshot = normalizeState(getState()).operations
+          .filter((operation) => (!gameId || operation.gameId === gameId)
+            && (operation.state === "pending" || (round === 0 && operation.state === "retryable")));
+        if (!snapshot.length) break;
+        for (const queued of snapshot) {
+        let active;
+        mutate((state) => {
+          active = state.operations.find((operation) => operation.clientOperationId === queued.clientOperationId);
+          if (active) { active.attempts += 1; active.lastAttemptAt = now(); active.state = "attempting"; }
+        });
+        if (!active) continue;
+        let result;
+        try { result = await execute(copy(active.payload)); }
+        catch (error) {
+          mutate((state) => {
+            const operation = state.operations.find((item) => item.clientOperationId === active.clientOperationId);
+            if (operation) { operation.state = "retryable"; operation.lastError = { code: "network_unavailable", message: String(error?.message || error) }; }
+          });
+          continue;
+        }
+        mutate((state) => {
+          const operation = state.operations.find((item) => item.clientOperationId === active.clientOperationId);
+          const record = state.records[active.eventId];
+          if (!operation || !record) return;
+          if (["accepted", "merged"].includes(result?.outcome)) {
+            record.serverEventVersion = Number(result.server_event_version || record.serverEventVersion);
+            if (active.type === "tombstone") record.lifecycleState = "tombstoned";
+            else {
+              const priorDesired = copy(record.desiredSnapshot);
+              record.acceptedSnapshot = { ...record.acceptedSnapshot, ...(result.server_event || active.payload.changes) };
+              record.desiredSnapshot = Object.fromEntries(EVENT_FIELDS.map((field) => {
+                const attempted = active.payload.changes[field];
+                const unchangedSinceQueue = !Object.hasOwn(active.payload.changes, field)
+                  || JSON.stringify(priorDesired[field]) === JSON.stringify(attempted);
+                return [field, unchangedSinceQueue ? copy(record.acceptedSnapshot[field]) : copy(priorDesired[field])];
+              }));
+            }
+            state.receipts.push({ clientOperationId: active.clientOperationId, eventId: active.eventId, type: active.type, result: copy(result), persistedAt: now() });
+            state.receipts = state.receipts.slice(-100);
+            state.operations = state.operations.filter((item) => item.clientOperationId !== active.clientOperationId);
+            materialize(state, record, active.payload.expected_game_lifecycle);
+            onAccepted(active, result);
+          } else if (result?.outcome === "conflicted") {
+            operation.state = "conflicted";
+            operation.lastError = { code: String(result.code || "event_conflict") };
+            state.conflicts[active.eventId] = {
+              eventId: active.eventId, gameId: active.gameId, clientOperationId: active.clientOperationId,
+              code: String(result.code || "event_conflict"), message: CONFLICT_MESSAGE,
+              serverEventVersion: Number(result.server_event_version || record.serverEventVersion), detectedAt: now(),
+            };
+            onConflict(active, result);
+          } else if (result?.outcome === "deleted") {
+            record.lifecycleState = "tombstoned";
+            record.serverEventVersion = Math.max(record.serverEventVersion, Number(result.server_event_version || 0));
+            state.operations = state.operations.filter((item) => item.eventId !== active.eventId);
+          } else {
+            operation.state = "rejected";
+            operation.lastError = { code: String(result?.code || "event_sync_rejected") };
+          }
+          record.updatedAt = now();
+        });
+        }
+      }
+      return true;
+    }
+
+    function markConflictRefreshed(game, event) {
+      return mutate((state) => {
+        const record = recordFor(state, game, event);
+        record.serverEventVersion = Number(event.serverEventVersion ?? event.server_event_version ?? record.serverEventVersion);
+        record.acceptedSnapshot = eventSnapshot(event);
+        delete state.conflicts[record.eventId];
+        state.operations = state.operations.map((operation) => operation.eventId === record.eventId && operation.state === "conflicted"
+          ? { ...operation, state: "superseded" } : operation);
+      });
+    }
+
+    return Object.freeze({ hydrate, queueEvent, queueTombstone, process, markConflictRefreshed });
+  }
+
+  global.LaxHornetR207EventOperations = Object.freeze({
+    SCHEMA_VERSION, CONFLICT_MESSAGE, EVENT_FIELDS, emptyState, isStoredState, normalizeState,
+    eventSnapshot, eventChanges, createEventOperationService,
   });
 })(window);
 

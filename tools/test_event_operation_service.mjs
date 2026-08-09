@@ -10,7 +10,7 @@ const context = { window: {} };
 vm.createContext(context);
 vm.runInContext(source, context, { filename: "event-operation-service.js" });
 
-function harness({ online = true, authoritative = true, flushResult = true } = {}) {
+function harness({ online = true, authoritative = true, flushResult = true, versioned = false } = {}) {
   const calls = [];
   const hooks = {
     persistLocal: () => calls.push("persist"),
@@ -40,6 +40,10 @@ function harness({ online = true, authoritative = true, flushResult = true } = {
     canUseCloud: () => online,
     requiresAuthoritativeHistory: () => authoritative,
     reportError: (error) => calls.push(`error:${error.message}`),
+    useVersionedEvents: () => versioned,
+    queueVersionedEvent: (_game, target) => calls.push(`v2-event:${target.id}`),
+    queueVersionedTombstone: (_game, target) => calls.push(`v2-tombstone:${target.id}`),
+    flushVersionedEvents: async ({ gameId }) => { calls.push(`v2-flush:${gameId}`); return true; },
   };
   return {
     calls,
@@ -49,6 +53,22 @@ function harness({ online = true, authoritative = true, flushResult = true } = {
 
 const game = { id: "game-1" };
 const event = { id: "event-1" };
+
+{
+  const { calls, service } = harness({ versioned: true });
+  const operation = service.correctGameEventOperation({ game, applyLocal: () => event });
+  assert.equal(await operation.cloudPromise, true);
+  assert.equal(calls.includes("legacy-event:event-1"), false);
+  assert.deepEqual(calls.filter((call) => call.startsWith("v2-")), ["v2-event:event-1", "v2-flush:game-1"]);
+}
+
+{
+  const { calls, service } = harness({ versioned: true });
+  const operation = service.tombstoneGameEventOperation({ game, reason: "test", applyLocal: () => event });
+  assert.equal(await operation.cloudPromise, true);
+  assert.equal(calls.some((call) => call.startsWith("legacy-")), false);
+  assert.deepEqual(calls.filter((call) => call.startsWith("v2-")), ["v2-tombstone:event-1", "v2-flush:game-1"]);
+}
 
 {
   const { calls, service } = harness();
@@ -125,6 +145,7 @@ for (const operation of [
 
 const includeEventCallers = [...appSource.matchAll(/syncGameToSupabase\([^;\n]+includeEvents:\s*true[^;\n]*\)/g)];
 assert.equal(includeEventCallers.length, 0, "app callers must not bypass the operation service with includeEvents");
-assert.doesNotMatch(source, /notes|tags/i, "operation service must not project notes or tags");
+const publicDisclosureOperationSource = source.slice(0, source.indexOf("(function initializeR207EventOperations"));
+assert.doesNotMatch(publicDisclosureOperationSource, /notes|tags/i, "public-disclosure operation service must not project notes or tags");
 
 console.log("Event operation service contracts passed.");

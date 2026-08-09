@@ -2307,7 +2307,7 @@ Evidence:
 
 ### R2-07B — Controlled preview client version tracking and field operations
 
-Status: `42702 REMEDIATED — NEW EXACT-HEAD LEVEL 3 REVIEW PENDING`
+Status: `CLOSED VIA PR #66 — MERGED AS df9347ba9bfa9c188513378070bfea70f695ad17`
 
 Risk level: `LEVEL 3`
 
@@ -2367,11 +2367,72 @@ bounded nontechnical refresh path.
 - [x] The later Preview `42702` ambiguous `id` failure is corrected by a new
   additive migration with an explicitly qualified game predicate; rollback
   disables the bridge instead of restoring the defective wrapper.
-- [ ] Fresh independent Level 3 review passes against the exact draft-PR SHA.
+- [x] Fresh independent Level 3 review passed against exact hotfix head
+  `82596df836a2a719fc8fa88bc80974962aabd155`; PR #66 merged as
+  `df9347ba9bfa9c188513378070bfea70f695ad17`.
 
 Evidence:
 
 - `review-evidence/r2-07b-controlled-preview-integration/R2-07B_IMPLEMENTATION_EVIDENCE.md`
+
+### R2-07C — Versioned event corrections
+
+Status: `IMPLEMENTED — EXACT-HEAD LEVEL 3 REVIEW PENDING`
+
+Risk level: `LEVEL 3`
+
+Branch: `feature/r2-07c-versioned-event-corrections`
+
+Starting main: `df9347ba9bfa9c188513378070bfea70f695ad17`
+
+#### Goal
+
+Close the remaining personal/legacy event correction and delete gap without
+changing production behavior. Every R2-07-capable Preview client event append,
+correction, and tombstone uses a permanent identified per-event operation with
+an explicit server event base and game lifecycle precondition.
+
+#### Authorized scope
+
+- One additive default-off Preview migration and refusal-based rollback.
+- Per-event server versions, permanent tombstones, immutable operation,
+  attempt, and changed-field journals, current authority, bounded evidence,
+  canonical server request hashes, and the shared R2-06/R2-07 game lock.
+- Durable account-scoped offline client state, receipt-before-compaction,
+  same-field conflict, proven non-overlap merge, delete supersession, and the
+  exact bounded refresh message.
+- Focused client, disposable PostgreSQL concurrency, two-session browser,
+  preservation, secret, and complete regression validation.
+
+#### Explicit exclusions
+
+- No production capability activation, local/manual/CLI/Dashboard migration,
+  linked-main or production application, deployment, release/cache marker,
+  public disclosure, RLS authority broadening, production data/credentials,
+  clock rewrite, conflict adjudication, R2-07D, merge, or production change.
+
+#### Acceptance record
+
+- [x] New-client Preview event correction/delete chooses the v2 per-event RPC
+  before any legacy upsert/delete and never falls back after conflict.
+- [x] Local mutation and durable intent precede cloud work; offline operations
+  retain exact hydrated bases and immutable attempted payloads.
+- [x] Same-field stale correction conflicts; different-field stale correction
+  merges only with immutable journal proof; different events remain independent.
+- [x] Delete supersedes unattempted correction, current-base delete is
+  permanent, and event/game tombstones prevent resurrection.
+- [x] Current personal/team authority, bounded field types/sizes, lifecycle
+  preconditions, completed-game append restriction, forced RLS, and no app-role
+  history access are enforced server-side.
+- [x] Client `30/30`, disposable PostgreSQL `25/25`, and two-session browser
+  `7/7` focused matrices pass with zero disposable container residue.
+- [x] Complete canonical-plus-additive local regression passes `62/62`.
+- [ ] Exact-head GitHub Docker and regression CI pass.
+- [ ] Independent Level 3 review passes against the exact draft-PR SHA.
+
+Evidence:
+
+- `review-evidence/r2-07c-versioned-event-corrections/R2-07C_IMPLEMENTATION_EVIDENCE.md`
 
 ## Ticket template
 
