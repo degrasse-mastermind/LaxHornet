@@ -65,9 +65,10 @@ Branch: `codex/r2-07d-production-conflict-resolution`
   `32/32`, `13/13`, and `12/12 PASS`; R2-07C client/migration/browser/safety:
   `30/30`, `25/25`, `7/7`, and `37/37 PASS`; tombstone concurrency: `8/8
   PASS`. All disposable Docker checks left zero residue.
-- Complete canonical-plus-additive regression: pending the final stabilized-
-  diff run.
-- Node syntax and `git diff --check`: pending final stabilized-diff run.
+- Complete canonical-plus-additive regression: `65/65 PASS` against committed
+  implementation/containment head `090e114`; this evidence-only closeout edit
+  does not change runtime, SQL, tests, workflows, or release controls.
+- Node syntax, `git diff --check`, and secret/host scan: `PASS`.
 - Migration SHA-256:
   `586f46373c6068a050083aff1034d7e661d5b5f046afe88d5a481d8f095894dd`.
 - Rollback SHA-256:
