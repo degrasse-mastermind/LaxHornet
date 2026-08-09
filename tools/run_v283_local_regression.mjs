@@ -93,6 +93,7 @@ const tests = [
   { name: "R2-07C versioned event migration", command: process.execPath, args: ["tools/test_r207c_preview_migration.mjs"] },
   { name: "R2-07C two-session browser", command: process.execPath, args: ["tools/test_r207c_two_session_browser.cjs"] },
   { name: "R2-07D conflict resolution client", command: process.execPath, args: ["tools/test_r207d_conflict_resolution_client.mjs"] },
+  { name: "R2-07D event dismiss browser", command: process.execPath, args: ["tools/test_r207d_event_dismiss_browser.cjs"] },
   { name: "R2-07D conflict resolution migration", command: process.execPath, args: ["tools/test_r207d_preview_migration.mjs"] },
   { name: "sync error classification contracts", command: process.execPath, args: ["tools/test_sync_error_classification.mjs"] },
   { name: "sync characterization contracts", command: process.execPath, args: ["tools/test_sync_characterization.mjs"] },

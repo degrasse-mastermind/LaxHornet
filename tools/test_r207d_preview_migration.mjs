@@ -117,7 +117,9 @@ try {
   const invalidPatch = resolutionCall(main, ACCOUNT, resolution(invalidPatchConflict, "resolve-invalid-patch", "apply_patch", { note: "private" }));
   check(invalidPatch.code === "invalid_resolution_patch", "unknown or private patch fields fail closed");
   const dismissed = resolutionCall(main, ACCOUNT, resolution(invalidPatchConflict, "resolve-dismiss", "dismiss"));
-  check(dismissed.code === "resolution_dismissed", "dismiss is a distinct terminal append-only action");
+  check(dismissed.code === "resolution_dismissed"
+    && psql(main, "select opponent||'|'||coalesce(location,'') from public.games where id='dismiss-game';").stdout === "invalid-patch-current|",
+  "dismiss is a distinct terminal append-only action with no semantic game mutation");
 
   const stale = makeConflict(main, "stale-game", "stale");
   const remote = gameCall(main, gameOperation({ id: "stale-remote", game: "stale-game", base: 2, changes: { opponent: "newer-current" } }));

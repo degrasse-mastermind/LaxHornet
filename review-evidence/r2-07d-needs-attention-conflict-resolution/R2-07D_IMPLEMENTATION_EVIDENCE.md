@@ -1,12 +1,31 @@
 # R2-07D Minimum Safe Needs Attention Conflict Resolution - Implementation Evidence
 
-Status: `IMPLEMENTED - EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
+Status: `DISMISS SEMANTICS REMEDIATED - NEW EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
 
 Risk level: `LEVEL 3`
 
 Starting main: `91950cc32c641f309e89fd66e44f77966a8b4b7c`
 
 Branch: `feature/r2-07d-needs-attention-conflict-resolution`
+
+## Preserved independent-review finding
+
+Independent Level 3 review failed exact PR head
+`9bfcfaf510791e5a1ffe2862c8365fc272dc7e8b`. The material finding was that
+event-conflict `dismiss` shared the `keep_server` reconciliation branch:
+both replaced the local desired event snapshot with the authoritative accepted
+snapshot before clearing the conflict. This made the UI's `Dismiss notice`
+action falsely select the server value instead of acting as terminal
+acknowledgment only.
+
+The remediation separates the two actions. `keep_server` still materializes
+the authoritative accepted event. `dismiss` clears the Needs Attention item
+and supersedes the conflicted attempt, but does not materialize, replace, or
+update the event record; queue a semantic event mutation; call the event RPC;
+or change the event version. SQL and migration files are unchanged because
+the server already stored dismissal as append-only terminal evidence without
+semantic game mutation. A fresh independent review must inspect the new exact
+PR head before merge.
 
 ## Implementation
 
@@ -53,9 +72,17 @@ Branch: `feature/r2-07d-needs-attention-conflict-resolution`
 - R2-07D client/adversarial matrix: `32/32 PASS`, including serialized reload,
   stale no-retry, independent queue progress, future-schema non-mutation,
   bounded RPC error storage, accessibility contracts, and Live Share isolation.
+- Event-dismiss adversarial matrix: `13/13 PASS`, covering complete-record
+  non-mutation, no server/proposal selection, no operation/RPC/version change,
+  distinct `keep_server`, replay, reload, stale proposal, unrelated work,
+  future schema, authorization failure/raw-error storage, and tombstone safety.
+- Event-dismiss browser matrix: `10/10 PASS` at mobile `390x844` and desktop
+  `1280x800`, including keyboard activation/focus, live outcome announcement,
+  44px-or-larger controls, no horizontal overflow, no raw code, no RPC/event
+  mutation on dismiss, and preserved `keep_server` reconciliation.
 - R2-07D disposable PostgreSQL migration/resolution/RLS/rollback matrix:
-  `23/23 PASS`, including stale `apply_patch`, with zero disposable-container
-  residue.
+  `23/23 PASS`, including explicit metadata-dismiss non-mutation and stale
+  `apply_patch`, with zero disposable-container residue.
 - Actual app Browser journey, desktop `1280x900`: exact copy and safe current /
   saved comparison visible; correction expands and accepts input; all four
   actions visible and 52px high; no horizontal overflow; no console errors.
@@ -73,7 +100,7 @@ Branch: `feature/r2-07d-needs-attention-conflict-resolution`
   `30/30`, `25/25`, `7/7`, and `37/37 PASS`; tombstone concurrency: `8/8
   PASS`. All disposable Docker checks left zero residue.
 - Complete canonical-plus-additive regression after the final implementation
-  diff stabilized: `65/65 PASS`. The Windows run used the supported bundled
+  diff stabilized: `66/66 PASS`. The Windows run used the supported bundled
   Python override and a temporary cached test-runtime junction for Playwright
   and PGlite; the junction and all disposable Docker resources were removed.
 - Node syntax, `git diff --check`, and secret/host scan: `PASS`.
@@ -85,6 +112,10 @@ Branch: `feature/r2-07d-needs-attention-conflict-resolution`
   `01347204d3407d92216d16cee114a986fe8327c9` passed GitHub Docker,
   portable regression, Vercel, Vercel Preview Comments, and the automatic
   isolated Supabase Preview workflow.
+- Draft PR #69 exact head `9bfcfaf510791e5a1ffe2862c8365fc272dc7e8b`
+  retained green CI but failed independent Level 3 review for the event-dismiss
+  semantic defect above. That failure is preserved and is not superseded by
+  local remediation tests; the new exact head requires a fresh review.
 - Supabase Preview project: `syoluqskxascanqktfkv`; database, services, APIs,
   configuration, migrations, seed, and Edge Functions reported success.
 - Vercel Preview:

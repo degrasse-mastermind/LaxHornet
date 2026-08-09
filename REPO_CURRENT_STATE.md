@@ -7,8 +7,8 @@ Current repository release marker: `v285`
 Current production marker: `v285` from Pages run `31061426334` at approved SHA
 `9e434e33534a1b348b19e2081b91d7e0724299fc`;
 R2-06 release closeout approved through reconciled mixed evidence;
-R2-07A through R2-07C merged; R2-07D implemented on a feature branch and
-awaiting exact-head Level 3 review
+R2-07A through R2-07C merged; R2-07D event-dismiss semantics remediated on a
+feature branch and awaiting a new exact-head Level 3 review
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
 
@@ -485,7 +485,15 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   before-compaction, stale linked-conflict replacement, revoked-authority
   purge, and late-account-response rejection. Game Review adds only the
   minimum Needs Attention comparison and actions with bounded labels/values
-  and mobile/accessibility support. The production flag remains false. Live
+  and mobile/accessibility support. Independent review failed exact head
+  `9bfcfaf510791e5a1ffe2862c8365fc272dc7e8b` because event `dismiss` shared
+  `keep_server` reconciliation. The branch now makes dismiss terminal
+  acknowledgment only: it clears the conflict and supersedes the conflicted
+  attempt without changing the local event record, selecting either value,
+  queuing an event mutation, calling the event RPC, or changing the event
+  version; `keep_server` remains authoritative reconciliation. Metadata
+  dismiss was already non-mutating, so SQL/migrations remain unchanged. The
+  production flag remains false. Live
   Share, release/cache markers, retention, deployment, production migration
   history/data, and production runtime remain unchanged. Draft-PR CI and
   independent exact-head Level 3 PASS remain required before merge; R2-07E is

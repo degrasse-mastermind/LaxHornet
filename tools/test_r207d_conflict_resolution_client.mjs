@@ -12,7 +12,9 @@ vm.runInNewContext(source, context);
 const api = context.window.LaxHornetR207ConflictResolution;
 const eventApi = context.window.LaxHornetR207EventOperations;
 let checks = 0;
+let dismissChecks = 0;
 const check = (condition, label) => { assert.ok(condition, label); checks += 1; console.log(`PASS: ${label}`); };
+const dismissCheck = (condition, label) => { assert.ok(condition, label); dismissChecks += 1; console.log(`PASS: ${label}`); };
 const conflict = (overrides = {}) => ({
   conflict_id: "00000000-0000-4000-8000-000000000101",
   game_id: "game-a",
@@ -191,6 +193,139 @@ check(eventState.conflicts[originalEvent.id].proposedValues.note === "saved corr
 eventService.resolveConflict(eventGame, originalEvent.id, "keep_server");
 check(!eventState.conflicts[originalEvent.id] && eventState.records[originalEvent.id].desiredSnapshot.note === "current correction", "event keep-current resolution clears only the affected local conflict");
 
+async function eventConflictFixture(options = {}) {
+  const game = { id: options.gameId || "dismiss-game", lifecycleState: "active" };
+  const event = {
+    ...originalEvent,
+    id: options.eventId || "dismiss-event",
+    note: options.originalNote || "local original",
+    serverEventVersion: 1,
+  };
+  let state = options.initialState || eventApi.emptyState();
+  let persisted = 0;
+  let executeCalls = 0;
+  const service = eventApi.createEventOperationService({
+    getState: () => state,
+    setState: (next) => { state = next; },
+    persistState: () => { persisted += 1; return true; },
+    currentAccountId: () => "account-a",
+    isOffline: () => false,
+    execute: async (request) => {
+      executeCalls += 1;
+      if (options.execute) return options.execute(request, executeCalls);
+      return { outcome: "conflicted", code: "same_field_conflict", server_event_version: 2 };
+    },
+  });
+  if (!options.initialState) {
+    service.hydrate(game, event);
+    service.queueEvent(game, { ...event, note: options.proposedNote || "saved proposal" });
+    await service.process();
+    service.markConflictRefreshed(game, {
+      ...event,
+      note: options.currentNote || "current server",
+      serverEventVersion: 2,
+    }, { preserve: true });
+  }
+  return {
+    event, game, service,
+    state: () => state,
+    persisted: () => persisted,
+    executeCalls: () => executeCalls,
+  };
+}
+
+const dismissedEvent = await eventConflictFixture();
+const dismissedRecordBefore = structuredClone(dismissedEvent.state().records[dismissedEvent.event.id]);
+const dismissedOperationCount = dismissedEvent.state().operations.length;
+const dismissedExecuteCount = dismissedEvent.executeCalls();
+dismissedEvent.service.resolveConflict(dismissedEvent.game, dismissedEvent.event.id, "dismiss");
+const dismissedRecordAfter = dismissedEvent.state().records[dismissedEvent.event.id];
+dismissCheck(!dismissedEvent.state().conflicts[dismissedEvent.event.id]
+  && dismissedEvent.state().operations.some((operation) => operation.eventId === dismissedEvent.event.id && operation.state === "superseded"),
+"event dismiss terminally clears Needs Attention and supersedes only the conflicted attempt");
+dismissCheck(JSON.stringify(dismissedRecordAfter) === JSON.stringify(dismissedRecordBefore)
+  && dismissedRecordAfter.desiredSnapshot.note === "saved proposal",
+"event dismiss preserves the complete pre-dismiss local event record");
+dismissCheck(dismissedRecordAfter.desiredSnapshot.note !== dismissedRecordAfter.acceptedSnapshot.note
+  && dismissedRecordAfter.desiredSnapshot.note === "saved proposal",
+"event dismiss copies neither the current server value nor a new proposal");
+dismissCheck(dismissedEvent.state().operations.length === dismissedOperationCount
+  && dismissedEvent.executeCalls() === dismissedExecuteCount
+  && dismissedRecordAfter.serverEventVersion === dismissedRecordBefore.serverEventVersion,
+"event dismiss creates no operation, RPC call, or event-version change");
+
+const keptEvent = await eventConflictFixture({ eventId: "keep-distinct-event" });
+keptEvent.service.resolveConflict(keptEvent.game, keptEvent.event.id, "keep_server");
+dismissCheck(keptEvent.state().records[keptEvent.event.id].desiredSnapshot.note === "current server",
+"event keep_server continues reconciling to the authoritative current value");
+dismissCheck(keptEvent.state().records[keptEvent.event.id].desiredSnapshot.note
+  !== dismissedRecordAfter.desiredSnapshot.note,
+"event dismiss and keep_server produce observably different local outcomes");
+
+const beforeDismissReplay = JSON.stringify(dismissedEvent.state());
+dismissedEvent.service.resolveConflict(dismissedEvent.game, dismissedEvent.event.id, "dismiss");
+dismissCheck(JSON.stringify(dismissedEvent.state()) === beforeDismissReplay,
+"event dismiss replay is idempotent and does not mutate the event");
+
+const reloadSource = await eventConflictFixture({ eventId: "reload-dismiss-event", proposedNote: "reload proposal" });
+const reloadState = JSON.parse(JSON.stringify(reloadSource.state()));
+const reloadedEvent = await eventConflictFixture({ initialState: reloadState, eventId: "reload-dismiss-event" });
+const reloadRecordBefore = JSON.stringify(reloadedEvent.state().records["reload-dismiss-event"]);
+reloadedEvent.service.resolveConflict(reloadedEvent.game, "reload-dismiss-event", "dismiss");
+dismissCheck(JSON.stringify(reloadedEvent.state().records["reload-dismiss-event"]) === reloadRecordBefore,
+"event dismiss remains acknowledgment-only after serialized reload");
+
+const staleDismiss = await eventConflictFixture({ eventId: "stale-dismiss-event", proposedNote: "stale local proposal", currentNote: "newest server" });
+staleDismiss.service.resolveConflict(staleDismiss.game, staleDismiss.event.id, "dismiss");
+dismissCheck(staleDismiss.state().records[staleDismiss.event.id].desiredSnapshot.note === "stale local proposal"
+  && staleDismiss.state().records[staleDismiss.event.id].acceptedSnapshot.note === "newest server",
+"event dismiss does not apply or replace a stale local proposal");
+
+const unrelated = { ...originalEvent, id: "unrelated-event", note: "unrelated current", serverEventVersion: 1 };
+const dismissedSnapshotBeforeUnrelatedWork = JSON.stringify(staleDismiss.state().records[staleDismiss.event.id]);
+staleDismiss.service.hydrate(staleDismiss.game, unrelated);
+staleDismiss.service.queueEvent(staleDismiss.game, { ...unrelated, note: "unrelated edit" });
+dismissCheck(staleDismiss.state().operations.some((operation) => operation.eventId === unrelated.id && operation.type === "correct")
+  && JSON.stringify(staleDismiss.state().records[staleDismiss.event.id]) === dismissedSnapshotBeforeUnrelatedWork,
+"event dismiss leaves unrelated event work usable without revisiting dismissed content");
+
+const futureEventState = { ...eventApi.emptyState(), schemaVersion: 99, privateFutureShape: { raw: "preserve" } };
+const futureEvent = await eventConflictFixture({ initialState: futureEventState, eventId: "future-event" });
+const futureEventBefore = JSON.stringify(futureEvent.state());
+const futureDismissResult = futureEvent.service.resolveConflict(futureEvent.game, "future-event", "dismiss");
+dismissCheck(futureDismissResult.code === "client_upgrade_required"
+  && JSON.stringify(futureEvent.state()) === futureEventBefore && futureEvent.persisted() === 0,
+"future-schema guard prevents dismiss from rewriting newer durable event state");
+
+let deniedState = eventApi.emptyState();
+const deniedService = eventApi.createEventOperationService({
+  getState: () => deniedState,
+  setState: (next) => { deniedState = next; },
+  persistState: () => true,
+  currentAccountId: () => "account-a",
+  isOffline: () => false,
+  execute: async () => ({ outcome: "rejected", code: "authorization_denied", message: "private raw server detail" }),
+});
+const deniedEvent = { ...originalEvent, id: "denied-event", note: "local denied value", serverEventVersion: 1 };
+deniedService.hydrate(eventGame, deniedEvent);
+deniedService.queueEvent(eventGame, { ...deniedEvent, note: "local denied proposal" });
+const deniedRecordBefore = structuredClone(deniedState.records[deniedEvent.id]);
+await deniedService.process();
+dismissCheck(deniedState.records[deniedEvent.id].desiredSnapshot.note === deniedRecordBefore.desiredSnapshot.note
+  && deniedState.records[deniedEvent.id].serverEventVersion === deniedRecordBefore.serverEventVersion
+  && !JSON.stringify(deniedState).includes("private raw server detail"),
+"authorization failure preserves local event content and stores no raw server message");
+
+const tombstonedDismiss = await eventConflictFixture({ eventId: "tombstoned-dismiss-event" });
+tombstonedDismiss.state().records[tombstonedDismiss.event.id].lifecycleState = "tombstoned";
+const tombstonedRecordBefore = JSON.stringify(tombstonedDismiss.state().records[tombstonedDismiss.event.id]);
+const tombstonedOperationCount = tombstonedDismiss.state().operations.length;
+tombstonedDismiss.service.resolveConflict(tombstonedDismiss.game, tombstonedDismiss.event.id, "dismiss");
+dismissCheck(JSON.stringify(tombstonedDismiss.state().records[tombstonedDismiss.event.id]) === tombstonedRecordBefore
+  && tombstonedDismiss.state().operations.length === tombstonedOperationCount
+  && tombstonedDismiss.state().records[tombstonedDismiss.event.id].lifecycleState === "tombstoned",
+"event dismiss cannot reconcile or resurrect tombstoned event state");
+
 const runtime = fs.readFileSync("runtime-config.js", "utf8");
 const app = fs.readFileSync("app.js", "utf8");
 check(runtime.includes("r207dConflictResolution: false"), "production R2-07D runtime flag defaults off");
@@ -213,4 +348,5 @@ check(publicProjection.length > 0
 "Live Share public projection remains isolated from private conflict and resolution evidence");
 check(!/service[_-]?role|refresh[_-]?token|access[_-]?token/i.test(fs.readFileSync("supabase/migrations/20260809201608_r207d_conflict_resolution_foundation.sql", "utf8")), "R2-07D migration contains no credential material");
 
+console.log(`R2-07D event dismiss semantics: ${dismissChecks}/${dismissChecks} passed`);
 console.log(`R2-07D conflict resolution client: ${checks}/${checks} passed`);

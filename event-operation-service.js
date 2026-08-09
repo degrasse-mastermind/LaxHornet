@@ -586,12 +586,14 @@
           ? { ...operation, state: "superseded" } : operation);
         if (action === "apply_proposed") {
           record.desiredSnapshot = { ...record.acceptedSnapshot, ...copy(conflict.proposedValues || {}) };
-        } else {
+        } else if (action === "keep_server") {
           record.desiredSnapshot = copy(record.acceptedSnapshot);
         }
         delete state.conflicts[eventId];
-        materialize(state, record, lifecycle(game));
-        record.updatedAt = now();
+        if (action !== "dismiss") {
+          materialize(state, record, lifecycle(game));
+          record.updatedAt = now();
+        }
       });
     }
 

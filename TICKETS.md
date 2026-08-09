@@ -2453,7 +2453,7 @@ Evidence:
 
 ### R2-07D — Minimum safe Needs Attention conflict resolution
 
-Status: `IMPLEMENTED — EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
+Status: `DISMISS SEMANTICS REMEDIATED — NEW EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
 
 Risk level: `LEVEL 3`
 
@@ -2515,6 +2515,19 @@ and no production activation.
   unchanged.
 - [x] Draft PR #69 head `01347204d3407d92216d16cee114a986fe8327c9`
   passed GitHub Docker/regression, Supabase Preview, and Vercel checks.
+- [x] Preserve the independent Level 3 failure at exact head
+  `9bfcfaf510791e5a1ffe2862c8365fc272dc7e8b`: event `dismiss` incorrectly
+  shared `keep_server` reconciliation and replaced the local desired event
+  snapshot with the authoritative server snapshot.
+- [x] Separate event `dismiss` as acknowledgment-only: terminally clear the
+  conflict and supersede the conflicted attempt without changing the event
+  record, selecting either competing value, queuing an event mutation, calling
+  the event RPC, or changing the event version. Preserve `keep_server`.
+- [x] Event dismiss `13/13`, browser/mobile/accessibility `10/10`, R2-07D
+  client `32/32`, migration/RLS/rollback `23/23`, A/B/C preservation,
+  tombstone concurrency, secret/host scan, and full regression `66/66` pass.
+- [x] Metadata dismiss remains acknowledgment-only; server SQL and migrations
+  required no remediation and remain unchanged.
 - [ ] Independent Level 3 review returns PASS against the exact draft-PR SHA.
 
 Evidence:

@@ -1185,6 +1185,13 @@ Do not combine these into one large Codex task. Each item requires one approved 
   deployment, and production state unchanged.
 - [x] Draft PR #69 head `01347204d3407d92216d16cee114a986fe8327c9`
   passed GitHub Docker, regression, isolated Supabase Preview, and Vercel.
+- [x] Preserve the Level 3 failure at exact head
+  `9bfcfaf510791e5a1ffe2862c8365fc272dc7e8b`: event `dismiss` reconciled like
+  `keep_server` and mutated the local event to the server snapshot.
+- [x] Remediate only dismiss semantics as acknowledgment-only, preserve
+  `keep_server`, confirm metadata dismiss non-mutation, and leave SQL/migrations
+  unchanged. Dismiss `13/13`, browser/accessibility `10/10`, focused D,
+  A/B/C/tombstone preservation, secret scan, and full regression `66/66` pass.
 - [ ] Independent exact-head Level 3 review passes before merge.
 - [ ] Begin R2-07E only after D PASS and merge.
 
