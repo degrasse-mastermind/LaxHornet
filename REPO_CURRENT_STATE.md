@@ -442,6 +442,13 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   release markers, deployment, Live Share, retention, clock/event behavior,
   and data. Draft-PR managed Preview and independent exact-head Level 3 review
   remain required; R2-07C+ is unauthorized.
+  David manually accepted the bounded two-session Preview demonstration as
+  `Works great.` A later successful-write path exposed PostgreSQL `42702` in
+  the original wrapper's unqualified game identifier, so exact head
+  `2f7b86dd31f2a8345596ad37bcdec319c8e98a18` failed Level 3 review and was not
+  merged. The feature branch now carries a new additive qualification migration
+  and safe dormant rollback; managed Preview CI and a new exact-head review are
+  required before R2-07B may close.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The repository cache marker is `laxhornet-v285`. The updated service worker purges

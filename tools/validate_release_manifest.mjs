@@ -1135,7 +1135,8 @@ const allowedCleanupMigrations = new Set([
   DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS[0],
   DURABLE_GAME_TOMBSTONE_CONCURRENCY_REVIEW_DB_PATHS[0],
   R207A_DORMANT_CONCURRENCY_REVIEW_DB_PATHS[0],
-  R207B_CONTROLLED_PREVIEW_REVIEW_DB_PATHS[0],
+  ...R207B_CONTROLLED_PREVIEW_REVIEW_DB_PATHS.filter((file) =>
+    file.startsWith("supabase/migrations/")),
 ]);
 for (const file of cleanupMigrations) {
   expect(allowedCleanupMigrations.has(file), `unknown cleanup migration detected: ${file}`);

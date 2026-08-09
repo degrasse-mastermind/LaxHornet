@@ -16,6 +16,7 @@ const migrations = [
   "20260730151714_durable_game_tombstone_concurrency.sql",
   "20260806143128_r207a_dormant_concurrency_foundation.sql",
   "20260809155442_r207b_controlled_preview_integration.sql",
+  "20260809164435_r207b_qualify_preview_game_update.sql",
 ];
 const ACCOUNT = "00000000-0000-4000-8000-00000000000a";
 const OTHER = "00000000-0000-4000-8000-00000000000b";
@@ -84,6 +85,7 @@ try {
   check(psql(main, `${claims(ACCOUNT)} select public.laxhornet_r207_preview_capability()::text; reset role;`).stdout.includes('"enabled": true'), "isolated Preview seed explicitly enables bridge");
   const first = call(main, ACCOUNT, operation("first", 1, ["opponent"], { opponent: "Device A" }));
   check(first.outcome === "accepted" && first.versions?.metadata === 2, "first same-base write is accepted with server version");
+  check(first.server_game?.id === "preview-game" && first.server_game?.opponent === "Device A", "qualified Preview refresh returns the accepted canonical game without 42702");
   const stale = call(main, ACCOUNT, operation("stale", 1, ["opponent"], { opponent: "Device B" }));
   check(stale.outcome === "conflicted" && psql(main, "select opponent from public.games where id='preview-game';").stdout === "Device A", "stale overlap conflicts without overwrite");
   const merged = call(main, ACCOUNT, operation("merged", 1, ["location"], { location: "Field 2" }));
@@ -92,10 +94,13 @@ try {
   check(denied.code === "authorization_denied" && !JSON.stringify(denied).includes("Device A"), "unauthorized actor receives bounded non-enumerating denial");
   const direct = psql(main, `${claims(ACCOUNT)} select * from public.r207_preview_control;`, true);
   check(direct.status !== 0, "authenticated clients cannot read or mutate preview control table");
+  psql(main, read("rollback", "20260809164435_r207b_qualify_preview_game_update_rollback.sql"));
+  check(call(main, ACCOUNT, operation("after-hotfix-rollback", 3, ["opponent"], { opponent: "Blocked" })).code === "r207_not_activated", "hotfix rollback disables the bridge instead of restoring the ambiguous wrapper");
   const rollbackRefusal = psql(main, read("rollback", "20260809155442_r207b_controlled_preview_integration_rollback.sql"), true);
   check(rollbackRefusal.status !== 0 && /rollback_refused_after_operation_evidence/.test(rollbackRefusal.stderr), "rollback refuses after operation evidence");
 
   const empty = await start("empty");
+  psql(empty, read("rollback", "20260809164435_r207b_qualify_preview_game_update_rollback.sql"));
   psql(empty, read("rollback", "20260809155442_r207b_controlled_preview_integration_rollback.sql"));
   check(psql(empty, "select to_regclass('public.r207_preview_control') is null;").stdout === "t", "zero-evidence rollback restores dormant foundation");
   check(docker(["ps", "-a", "--filter", "name=laxhornet-r207b-", "--format", "{{.Names}}"], { allowFailure: true }).stdout.trim().length > 0, "disposable test targets are scoped to R2-07B names");

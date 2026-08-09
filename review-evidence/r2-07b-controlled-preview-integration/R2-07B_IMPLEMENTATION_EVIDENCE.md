@@ -26,7 +26,9 @@ clock/event cutover, rich resolution UI, deployment, and R2-07C+ are excluded.
   `styles.css`.
 - Preview database: `supabase/migrations/20260809155442_r207b_controlled_preview_integration.sql`,
   `supabase/rollback/20260809155442_r207b_controlled_preview_integration_rollback.sql`,
-  `supabase/seed.sql`.
+  `supabase/seed.sql`,
+  `supabase/migrations/20260809164435_r207b_qualify_preview_game_update.sql`,
+  `supabase/rollback/20260809164435_r207b_qualify_preview_game_update_rollback.sql`.
 - Preview/CI: `vercel.json`, `tools/build_r207b_vercel_preview.mjs`,
   `.github/workflows/docker-tests.yml`,
   `.github/workflows/laxhornet-regression.yml`.
@@ -86,11 +88,11 @@ clock/event cutover, rich resolution UI, deployment, and R2-07C+ are excluded.
 
 ## Synthetic verification
 
-- Client/operation matrix: `31/31 PASS`.
+- Client/operation matrix: `32/32 PASS`.
 - Real headless-browser two-context matrix: `12/12 PASS`, including 390x844
   mobile viewport, same-base first success, stale overlap, safe refresh,
   non-overlap merge, denial, tombstone, flag off, and zero console errors.
-- Disposable PostgreSQL migration/rollback matrix: `11/11 PASS`, zero named
+- Disposable PostgreSQL migration/rollback matrix: `13/13 PASS`, zero named
   container residue.
 - R2-07A matrix: `71/71 PASS`.
 - Durable tombstone concurrency: `8/8 PASS`.
@@ -118,6 +120,24 @@ creates only synthetic adult/non-youth accounts and games, opens the same game
 in two authenticated contexts, edits the opponent in A, then edits the same
 field from B's stale base and uses `Refresh game`.
 
+David completed that bounded managed-Preview demonstration and reported
+`Works great.` This records manual owner/demo acceptance of the two-session
+behavior only; it is not production authorization.
+
+A later successful-write attempt exposed PostgreSQL `42702` in the original
+public wrapper because its post-operation `games.id` predicate was
+unqualified. Exact head `2f7b86dd31f2a8345596ad37bcdec319c8e98a18`
+therefore received `Independent Level 3 implementation review: FAIL` and was
+not merged. New additive migration
+`20260809164435_r207b_qualify_preview_game_update.sql` replaces only that
+wrapper with an explicitly aliased `game_row.id` predicate. Its safe rollback
+disables the bridge rather than restoring the ambiguous implementation.
+SHA-256 identities are
+`40c502d3cd95e11717935d12d3655cb0822558cde556a51d7bc38ef4367c7a34`
+for the migration and
+`ed862144fff4ae3e8937168d255bbd51eeb4dd3f8d35d8a11301d63b3883943f`
+for the rollback.
+
 No local, manual, CLI, linked-main, Dashboard, persistent shared-environment,
 or production migration was applied. No migration-history repair, production
 activation, deployment, release, data access, or credential use occurred.
@@ -133,4 +153,4 @@ activation, deployment, release, data access, or credential use occurred.
   and accepted server state but does not adjudicate or discard the conflict.
 - Clock/event concurrency is R2-07C and is unchanged.
 - Exact-head GitHub Docker/regression reruns and independent Level 3 review
-  remain required after the workflow allowlist correction.
+  remain required after the additive `42702` remediation.

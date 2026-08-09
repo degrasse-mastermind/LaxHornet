@@ -314,8 +314,8 @@ accepted CI verification. Production and the active runtime remain at v285.
 
 ### R2-07B — Controlled Preview Client Integration
 
-**Status:** [!] Controlled Preview available; independent exact-head Level 3
-review pending
+**Status:** [!] Preview `42702` remediated additively; new independent
+exact-head Level 3 review pending
 
 **Risk level:** Level 3 — Critical synchronization, conflict, migration, and
 authorization behavior
@@ -339,6 +339,10 @@ authorization behavior
   behavior with synthetic evidence.
 - [x] Managed Supabase Preview and Vercel Preview passed on draft PR #65; exact
   workflow-allowlist correction head remains subject to its automatic reruns.
+- [x] Record David's `Works great.` manual acceptance of the bounded
+  two-session demo without treating it as production authorization.
+- [x] Correct the later successful-write `42702` with a new additive migration;
+  preserve migration history and use a safe dormant rollback.
 - [ ] Independent exact-head Level 3 review passes before merge.
 
 R2-07B does not authorize production activation/application/deployment, v1

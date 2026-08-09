@@ -60,6 +60,8 @@ const additivePaths = [
   "supabase/migrations/20260809155442_r207b_controlled_preview_integration.sql",
   "supabase/rollback/20260809155442_r207b_controlled_preview_integration_rollback.sql",
   "supabase/seed.sql",
+  "supabase/migrations/20260809164435_r207b_qualify_preview_game_update.sql",
+  "supabase/rollback/20260809164435_r207b_qualify_preview_game_update_rollback.sql",
 ].join(",");
 
 const rootJavaScript = readdirSync(root)

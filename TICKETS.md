@@ -2307,7 +2307,7 @@ Evidence:
 
 ### R2-07B — Controlled preview client version tracking and field operations
 
-Status: `IMPLEMENTED — DRAFT PR AND EXACT-HEAD LEVEL 3 REVIEW PENDING`
+Status: `42702 REMEDIATED — NEW EXACT-HEAD LEVEL 3 REVIEW PENDING`
 
 Risk level: `LEVEL 3`
 
@@ -2362,6 +2362,11 @@ bounded nontechnical refresh path.
   overlap, safe refresh, non-overlap, denial, tombstone, and flag-off checks.
 - [x] Automatic isolated Supabase Preview and Vercel Preview pass on the draft
   PR and provide the managed demo URL.
+- [x] David manually accepted the bounded two-session Preview demonstration as
+  `Works great.` This is owner/demo acceptance, not production authorization.
+- [x] The later Preview `42702` ambiguous `id` failure is corrected by a new
+  additive migration with an explicitly qualified game predicate; rollback
+  disables the bridge instead of restoring the defective wrapper.
 - [ ] Fresh independent Level 3 review passes against the exact draft-PR SHA.
 
 Evidence:
