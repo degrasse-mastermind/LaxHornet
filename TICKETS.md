@@ -2128,7 +2128,7 @@ v285 reconciliation and authorizes no R2-07 implementation.
 
 ### R2-07 — Add game-field versions and conflict records
 
-Status: `RE-REMEDIATED — NEW EXACT-HEAD INDEPENDENT LEVEL 3 REVIEW PENDING`
+Status: `DESIGN CLOSED — R2-07A AUTHORIZED AND IN IMPLEMENTATION`
 
 Risk level: `LEVEL 3`
 
@@ -2136,8 +2136,8 @@ Historical design branch: `design/r2-07-game-field-versions-conflicts`
 
 Review-remediation branch: `design/r2-07-review-remediation`
 
-Implementation branches: separate bounded branches for R2-07A through R2-07F;
-none authorized by the design task.
+Implementation branches: separate bounded branches for R2-07A through R2-07F.
+Only R2-07A is authorized.
 
 #### Goal
 
@@ -2221,10 +2221,89 @@ Design artifacts:
 - `review-evidence/r2-07-game-field-versions-conflicts/R2-07_IMPLEMENTATION_SEQUENCE.md`
 - `review-evidence/r2-07-game-field-versions-conflicts/R2-07_REVIEW_REMEDIATION_EVIDENCE.md`
 
-Design task boundaries: no application code, SQL migration, RPC change,
-release marker, production access, Supabase mutation, deployment, or rollout
-activation. A new exact remediation-head independent Level 3 PASS is required
-before David decides whether to authorize R2-07A or any implementation phase.
+PR #63 passed independent exact-head Level 3 review and merged as
+`75acbd1d7ee1204d450b3715e41b53ebc6081b37`. David then approved the bounded
+founder decisions and authorized only R2-07A. R2-07B through R2-07F,
+migration application, activation, deployment, and production remain
+unauthorized.
+
+### R2-07A — Dormant concurrency foundation
+
+Status: `MATERIAL REVIEW FINDINGS REMEDIATED — NEW EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
+
+Risk level: `LEVEL 3`
+
+Branch: `feature/r2-07a-dormant-concurrency-foundation`
+
+Approved design merge: `75acbd1d7ee1204d450b3715e41b53ebc6081b37`
+
+#### Goal
+
+Add the inactive server-side schema and executable disposable-test foundation
+for field-group revisions, global actor/operation idempotency, immutable
+history, bounded conflicts, optimistic clock commands, replay safety, current
+authority, and tombstone precedence without changing any v1 caller or applying
+the migration.
+
+#### Authorized scope
+
+- One additive dormant migration and one refusal-based pre-activation rollback.
+- Six game revision columns, lifecycle/score state, and compatible clock anchor
+  and bigint revision additions.
+- Private operation, attempt, field-change, conflict, resolution, clock-command,
+  and disabled retention-control tables with forced RLS and no app-role table
+  access.
+- Globally serialized `(actor_user_id, client_operation_id)` before the existing
+  namespaced per-game transaction lock.
+- Inert authenticated v2 RPC signatures and ungranted private certification
+  helpers for deterministic disposable PostgreSQL validation.
+- Repository documentation, evidence, commit, push, and a draft pull request.
+
+#### Explicit exclusions
+
+- No local/manual migration application; no Supabase CLI application to a
+  linked main or production project; no manual Dashboard, production, or
+  persistent shared-environment application; and no migration-history repair,
+  deployment/activation, production data/credentials, release/cache marker
+  change, Live Share/public disclosure change, client call, v1 change,
+  retention deletion, merge, or R2-07B+ work.
+- Automatic application by the configured GitHub integration to the temporary,
+  isolated, data-less, separately credentialed Supabase Preview branch tied to
+  PR #64 is authorized CI verification and is not production migration
+  application.
+
+#### Acceptance record
+
+- [x] Global operation identity precedes the single requested-game lock.
+- [x] Same-ID identical, cross-game, and different-payload concurrency is
+  deterministic, non-disclosing, atomic, and free of raw uniqueness errors.
+- [x] Field-group non-overlap, score delta/correction, completed-game metadata,
+  no-reopen, optimistic clock, conflict, current-authority, and tombstone rules
+  are executable in the private disposable certification engine.
+- [x] All new tables are forced-RLS, RPC-only for app roles, and append-only
+  where they retain evidence.
+- [x] Retention execution is structurally disabled with no duration, purge
+  routine, trigger, cron, or job.
+- [x] The zero-evidence rollback succeeds and refuses after any R2-07 evidence.
+- [x] Preserve failed exact-head review
+  `https://github.com/degrasse-mastermind/LaxHornet/pull/64#issuecomment-5207402351`
+  against `b071dc6ffc09e2f28f965bcdabe6a4b4d632d89b`.
+- [x] Reject ordinary completed-game score/clock writes before mutation or
+  evidence; require current lifecycle, status, and score bases plus an
+  allowlisted minimum-necessary reason for private completed-game correction.
+- [x] Require current roster-tracking authority for team tombstone disclosure;
+  copied owner, untracked/former member, revoked replay, and unauthorized
+  cross-game mismatch receive bounded `authorization_denied`.
+- [x] Pass the expanded disposable PostgreSQL matrix: all original `49` checks
+  plus `22` remediation assertions, `71/71` total, with zero residue.
+- [x] `AUTOMATIC ISOLATED SUPABASE PREVIEW MIGRATION — ACCEPTED CI
+  VERIFICATION`; no production migration history or deployment changed.
+- [ ] Fresh exact-head independent Level 3 review passes before merge; the
+  failed `b071dc6...` review is not approval for the remediation head.
+
+Evidence:
+
+- `review-evidence/r2-07a-dormant-concurrency-foundation/R2-07A_IMPLEMENTATION_EVIDENCE.md`
 
 ## Ticket template
 
