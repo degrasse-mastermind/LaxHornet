@@ -1302,6 +1302,38 @@ function readStoredAccountState(userId = activeStorageUserId) {
   };
 }
 
+function safeDurableRpcFailureCode(value = null) {
+  const approvedCodes = new Set([
+    "network_unavailable",
+    "service_unavailable",
+    "authorization_denied",
+    "validation_failed",
+    "client_upgrade_required",
+    "conflict",
+    "game_deleted",
+    "tombstone",
+    "server_error",
+  ]);
+  const direct = typeof value === "string" ? value.trim() : "";
+  if (approvedCodes.has(direct)) return direct;
+  return window.LaxHornetR207EventOperations.classifyRpcFailure(value || {}).code;
+}
+
+function safeDurableRpcFailureMessage(code = "server_error") {
+  const messages = {
+    network_unavailable: "The service could not be reached. This saved work will retry.",
+    service_unavailable: "The service is temporarily unavailable. This saved work will retry.",
+    authorization_denied: "This account is not authorized to synchronize that saved work.",
+    validation_failed: "The saved work could not be synchronized because it is invalid.",
+    client_upgrade_required: window.LaxHornetR207EventOperations.CLIENT_UPGRADE_REQUIRED_MESSAGE,
+    conflict: "The saved work conflicts with a newer server version.",
+    game_deleted: "The game was deleted on the server.",
+    tombstone: "The event was already deleted.",
+    server_error: "Synchronization needs attention.",
+  };
+  return messages[code] || messages.server_error;
+}
+
 function normalizeTrustSpineSyncState(value = null) {
   const source = value && typeof value === "object" ? value : {};
   const records = source.events && typeof source.events === "object" ? source.events : {};
@@ -1356,7 +1388,7 @@ function normalizeTrustSpineSyncState(value = null) {
                         : null,
                     attempts: Math.max(0, Number(operation.attempts || 0)),
                     lastAttemptAt: String(operation.lastAttemptAt || "").trim(),
-                    lastError: String(operation.lastError || "").trim(),
+                    lastError: operation.lastError ? safeDurableRpcFailureCode(operation.lastError) : "",
                   }))
                   .filter((operation) => operation.kind && operation.clientOperationId)
               : [],
@@ -1367,7 +1399,7 @@ function normalizeTrustSpineSyncState(value = null) {
               record.conflict && typeof record.conflict === "object"
                 ? { ...record.conflict }
                 : null,
-            lastError: String(record.lastError || "").trim(),
+            lastError: record.lastError ? safeDurableRpcFailureCode(record.lastError) : "",
             updatedAt: String(record.updatedAt || "").trim(),
           },
         ]),
@@ -3336,7 +3368,10 @@ function persistAll() {
   if (state.r207FieldSync !== undefined) {
     saveJSON(STORAGE_KEYS.r207FieldSync, state.r207FieldSync);
   }
-  if (state.r207EventSync !== undefined) {
+  if (
+    state.r207EventSync !== undefined
+    && !window.LaxHornetR207EventOperations.requiresClientUpgrade(state.r207EventSync)
+  ) {
     saveJSON(STORAGE_KEYS.r207EventSync, state.r207EventSync);
   }
   if (state.nextGameFocus?.text && nextGameFocusMatchesPlayer(state.nextGameFocus, state.player)) {
@@ -3780,7 +3815,10 @@ function reportTrackedPlayingTimeSyncError(error) {
     }
     return;
   }
-  if (local) local.syncIssue = String(error?.message || "Playing time synchronization needs attention.");
+  if (local) {
+    const failureCode = safeDurableRpcFailureCode(error);
+    local.syncIssue = safeDurableRpcFailureMessage(failureCode);
+  }
   reportSyncError(error);
   persistAll();
 }
@@ -7700,7 +7738,7 @@ async function processTrustSpineOperation(record, operation) {
   operation.lastAttemptAt = new Date().toISOString();
   const { data, error } = await supabaseClient.rpc(rpcName, { p_operation: rpcPayload });
   if (error) {
-    operation.lastError = readableSupabaseError(error) || "Secure event synchronization failed";
+    operation.lastError = safeDurableRpcFailureCode(error);
     record.lastError = operation.lastError;
     record.updatedAt = new Date().toISOString();
     return false;
@@ -7719,7 +7757,7 @@ async function processTrustSpineOperation(record, operation) {
     };
   }
   record.serverEventVersion = Math.max(record.serverEventVersion, Number(data?.serverEventVersion || 0));
-  record.lastError = String(data?.code || "Secure event synchronization was rejected");
+  record.lastError = safeDurableRpcFailureCode(data || {});
   record.updatedAt = new Date().toISOString();
   return false;
 }
@@ -7808,6 +7846,7 @@ async function reconcileTrustSpineGame(game) {
 }
 
 function persistR207EventSyncState(nextState = state.r207EventSync) {
+  if (window.LaxHornetR207EventOperations.requiresClientUpgrade(nextState)) return false;
   const definition = STORAGE_DOMAIN_DEFINITIONS.get(STORAGE_KEYS.r207EventSync);
   const result = localStorageSafety.write({
     primaryKey: scopedStorageKey(STORAGE_KEYS.r207EventSync),
@@ -7851,11 +7890,21 @@ function useR207VersionedEvents() {
 }
 
 function queueR207VersionedEvent(game, event) {
-  return r207EventService().queueEvent(game, event);
+  const result = r207EventService().queueEvent(game, event);
+  if (result?.code === "client_upgrade_required") {
+    state.syncStatus = "Update required";
+    showToast(window.LaxHornetR207EventOperations.CLIENT_UPGRADE_REQUIRED_MESSAGE);
+  }
+  return result;
 }
 
 function queueR207VersionedTombstone(game, event) {
-  return r207EventService().queueTombstone(game, event);
+  const result = r207EventService().queueTombstone(game, event);
+  if (result?.code === "client_upgrade_required") {
+    state.syncStatus = "Update required";
+    showToast(window.LaxHornetR207EventOperations.CLIENT_UPGRADE_REQUIRED_MESSAGE);
+  }
+  return result;
 }
 
 async function flushR207VersionedEvents(options = {}) {

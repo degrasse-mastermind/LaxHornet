@@ -2377,7 +2377,7 @@ Evidence:
 
 ### R2-07C — Versioned event corrections
 
-Status: `IMPLEMENTED — EXACT-HEAD LEVEL 3 REVIEW PENDING`
+Status: `CLIENT-SAFETY FINDINGS REMEDIATED — NEW EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
 
 Risk level: `LEVEL 3`
 
@@ -2427,6 +2427,21 @@ an explicit server event base and game lifecycle precondition.
 - [x] Client `30/30`, disposable PostgreSQL `25/25`, and two-session browser
   `7/7` focused matrices pass with zero disposable container residue.
 - [x] Complete canonical-plus-additive local regression passes `62/62`.
+- [x] Preserve the independent FAIL against exact head
+  `867e847c82fe99008e3886898287015e7465c830`: future-schema state was writable
+  and thrown RPC failures could be over-retried with raw messages persisted.
+- [x] One central mutation guard makes a future R2-07C schema read-only before
+  hydration, queue mutation, retry, conflict, receipt, compaction, RPC, or
+  persistence work and returns only bounded update-required copy.
+- [x] One central classifier restricts retries to actual transport and approved
+  transient-service failures; `42501`/RLS, validation, schema/contract, and
+  unknown permanent failures are blocked with safe codes only.
+- [x] Dedicated remediation coverage passes `37/37`; R2-07C remains `30/30`,
+  PostgreSQL `25/25`, browser `7/7`, R2-07B client/browser/migration
+  `32/32` + `12/12` + `13/13`, R2-07A `71/71`, and tombstone concurrency
+  `8/8`.
+- [x] Server SQL, migrations, rollback, RLS, grants, RPC behavior, release
+  markers, Preview isolation, and production state remain unchanged.
 - [ ] Exact-head GitHub Docker and regression CI pass.
 - [ ] Independent Level 3 review passes against the exact draft-PR SHA.
 

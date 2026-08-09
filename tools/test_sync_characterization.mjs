@@ -234,6 +234,25 @@ function durableSyncOperationApi() {
   return context.window.LaxHornetDurableSyncOperations;
 }
 
+function r207EventOperationApi() {
+  const context = vm.createContext({
+    window: {},
+    Date,
+    Math,
+    Number,
+    Object,
+    String,
+    TypeError,
+    Promise,
+    Set,
+    Map,
+  });
+  vm.runInContext(eventOperationSource, context, {
+    filename: "event-operation-service.js",
+  });
+  return context.window.LaxHornetR207EventOperations;
+}
+
 function mapperHarness() {
   const state = {
     activeGame: null,
@@ -1348,12 +1367,16 @@ async function processTrustSpineOutcome(rpcResult) {
   const { record, operation } = trustSpineRecordAndOperation();
   const harness = appHarness(
     [
+      "safeDurableRpcFailureCode",
       "trustSpineRpcForOperation",
       "trustSpinePayloadForOperation",
       "acceptTrustSpineOperation",
       "processTrustSpineOperation",
     ],
     {
+      window: {
+        LaxHornetR207EventOperations: r207EventOperationApi(),
+      },
       supabaseClient: {
         async rpc() {
           return clone(rpcResult);
@@ -1366,8 +1389,6 @@ async function processTrustSpineOutcome(rpcResult) {
       }),
       suppressPrivateTrustSpineRecord: () => {},
       trustSpineRecordCanonicalSemantic: () => true,
-      readableSupabaseError: (error) =>
-        [error?.message, error?.code].filter(Boolean).join(" "),
     },
   );
   const result = await harness.get("processTrustSpineOperation")(
@@ -1388,13 +1409,13 @@ test(
     });
     assert.equal(network.result, false);
     assert.equal(network.record.pendingOperations.length, 1);
-    assert.match(network.record.lastError, /Failed to fetch/);
+    assert.equal(network.record.lastError, "network_unavailable");
 
-    for (const code of [
-      "not_authorized",
-      "invalid_input",
-      "capability_unavailable",
-      "membership_required",
+    for (const [code, expectedSafeCode] of [
+      ["not_authorized", "authorization_denied"],
+      ["invalid_input", "validation_failed"],
+      ["capability_unavailable", "client_upgrade_required"],
+      ["membership_required", "authorization_denied"],
     ]) {
       const rejected = await processTrustSpineOutcome({
         data: {
@@ -1406,7 +1427,7 @@ test(
       });
       assert.equal(rejected.result, false, code);
       assert.equal(rejected.record.pendingOperations.length, 0, code);
-      assert.equal(rejected.record.lastError, code, code);
+      assert.equal(rejected.record.lastError, expectedSafeCode, code);
       assert.equal(
         rejected.record.acceptedEvidence.statLabel,
         "Original synthetic label",

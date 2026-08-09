@@ -99,6 +99,9 @@ jobs:
       - name: Run R2-07C versioned event client matrix
         run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_r207c_versioned_events.mjs
 
+      - name: Run R2-07C client safety remediation matrix
+        run: docker run --rm -v "${{ github.workspace }}:/app" laxhornet:test node tools/test_r207c_client_safety_remediation.mjs
+
       - name: Run R2-07C disposable PostgreSQL concurrency matrix
         run: node tools/test_r207c_preview_migration.mjs
 

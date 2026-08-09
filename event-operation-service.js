@@ -171,8 +171,11 @@
 (function initializeR207EventOperations(global) {
   "use strict";
 
-  const SCHEMA_VERSION = 1;
+  const CURRENT_SUPPORTED_SCHEMA_VERSION = 1;
+  const SCHEMA_VERSION = CURRENT_SUPPORTED_SCHEMA_VERSION;
   const CONFLICT_MESSAGE = "This event changed on another device. Refresh before saving again.";
+  const CLIENT_UPGRADE_REQUIRED_MESSAGE =
+    "This data was saved by a newer version of LaxHornet. Update the app before making changes.";
   const EVENT_FIELDS = Object.freeze([
     "timestamp", "quarter", "stat_type", "stat_label", "category", "point_value",
     "tags", "note", "field_zone", "corrected_at", "tags_updated_at",
@@ -192,6 +195,25 @@
       && Array.isArray(value.receipts || []) && isObject(value.conflicts || {});
   }
 
+  function storedSchemaVersion(value) {
+    const version = Number(value?.schemaVersion);
+    return Number.isInteger(version) ? version : 0;
+  }
+
+  function requiresClientUpgrade(value) {
+    return storedSchemaVersion(value) > CURRENT_SUPPORTED_SCHEMA_VERSION;
+  }
+
+  function clientUpgradeRequired() {
+    return Object.freeze({
+      ok: false,
+      state: "blocked",
+      code: "client_upgrade_required",
+      message: CLIENT_UPGRADE_REQUIRED_MESSAGE,
+      retryable: false,
+    });
+  }
+
   function normalizeState(value = null) {
     if (!isStoredState(value)) return emptyState();
     if (Number(value.schemaVersion) > SCHEMA_VERSION) return copy(value);
@@ -199,7 +221,15 @@
       ...copy(value),
       schemaVersion: SCHEMA_VERSION,
       records: Object.fromEntries(Object.entries(value.records || {}).filter(([id, record]) => id && isObject(record))),
-      operations: (value.operations || []).filter((item) => isObject(item) && item.clientOperationId && item.payload),
+      operations: (value.operations || [])
+        .filter((item) => isObject(item) && item.clientOperationId && item.payload)
+        .map((item) => ({
+          ...copy(item),
+          state: item.state === "attempting" ? "retryable" : item.state,
+          lastError: item.lastError?.code
+            ? { code: classifyRpcFailure({ code: item.lastError.code }).code }
+            : null,
+        })),
       receipts: (value.receipts || []).filter(isObject).slice(-100),
       conflicts: Object.fromEntries(Object.entries(value.conflicts || {}).filter(([, item]) => isObject(item))),
     };
@@ -230,6 +260,105 @@
     return String(game.lifecycleState || game.lifecycle_state || (game.status === "complete" ? "completed" : "active"));
   }
 
+  function boundedFailureText(error) {
+    const seen = new Set();
+    const values = [];
+    function collect(value, depth = 0) {
+      if (depth > 3 || value === null || value === undefined || seen.has(value)) return;
+      if (typeof value === "string") {
+        values.push(value.slice(0, 1000));
+        return;
+      }
+      if (typeof value !== "object") return;
+      seen.add(value);
+      ["message", "details", "hint"].forEach((key) => collect(value[key], depth + 1));
+      collect(value.cause, depth + 1);
+      collect(value.error, depth + 1);
+    }
+    collect(error);
+    return values.join(" ").slice(0, 4000);
+  }
+
+  function classifyRpcFailure(error = {}) {
+    const envelope = isObject(error) ? error : {};
+    const nested = isObject(envelope.error) ? envelope.error : {};
+    const cause = isObject(envelope.cause) ? envelope.cause : {};
+    const rawCode = String(
+      envelope.code || nested.code || cause.code || envelope.name || nested.name || cause.name || "",
+    ).trim().toLowerCase();
+    const rawStatus = envelope.status ?? envelope.statusCode ?? envelope.httpStatus
+      ?? nested.status ?? nested.statusCode ?? nested.httpStatus
+      ?? cause.status ?? cause.statusCode ?? cause.httpStatus;
+    const status = rawStatus === null || rawStatus === undefined || rawStatus === ""
+      ? null
+      : Number(rawStatus);
+    const text = boundedFailureText(error).toLowerCase();
+    const outcome = String(envelope.outcome || nested.outcome || "").toLowerCase();
+    let code = "server_error";
+    let retryable = false;
+
+    if (
+      outcome === "conflicted"
+      || rawCode === "conflict"
+      || rawCode.includes("conflict")
+      || status === 409
+    ) {
+      code = "conflict";
+    } else if (
+      outcome === "deleted"
+      || ["game_deleted", "event_tombstoned", "tombstone"].includes(rawCode)
+    ) {
+      code = rawCode === "game_deleted" ? "game_deleted" : "tombstone";
+    } else if (
+      status === 401
+      || status === 403
+      || rawCode === "42501"
+      || ["authorization_denied", "unauthorized", "not_authorized", "permission_denied", "membership_required"].includes(rawCode)
+      || /row-level security|permission denied|not authorized|revoked authority|insufficient privilege/.test(text)
+    ) {
+      code = "authorization_denied";
+    } else if (
+      ["client_upgrade_required", "upgrade_required", "r207_not_activated", "unsupported_contract", "capability_unavailable"].includes(rawCode)
+      || /^pgrst20[2-4]$/.test(rawCode)
+      || rawCode === "42883"
+      || /schema cache|could not find the function|unsupported contract|client upgrade|required.*newer client/.test(text)
+    ) {
+      code = "client_upgrade_required";
+    } else if (
+      status === 400
+      || status === 422
+      || rawCode === "validation_failed"
+      || rawCode === "validation_rejected"
+      || rawCode.startsWith("invalid_")
+      || rawCode.startsWith("unsupported_")
+      || /^pgrst1\d\d$/.test(rawCode)
+      || /malformed|required field|invalid operation|validation/.test(text)
+    ) {
+      code = "validation_failed";
+    } else if (
+      status === 0
+      || /^08/.test(rawCode)
+      || ["offline", "network_unavailable", "fetcherror", "econnreset", "enotfound"].includes(rawCode)
+      || /failed to fetch|fetch failed|network unavailable|connection reset|dns lookup|browser offline/.test(text)
+    ) {
+      code = "network_unavailable";
+      retryable = true;
+    } else if (
+      [408, 429, 500, 502, 503, 504].includes(status)
+      || ["aborterror", "timeout", "service_unavailable", "gateway_timeout"].includes(rawCode)
+      || /timed out|timeout|service unavailable|temporarily unavailable|bad gateway|gateway timeout/.test(text)
+    ) {
+      code = "service_unavailable";
+      retryable = true;
+    }
+
+    return Object.freeze({
+      state: retryable ? "retryable" : "blocked",
+      code,
+      retryable,
+    });
+  }
+
   function createEventOperationService(hooks = {}) {
     const getState = hooks.getState;
     const setState = hooks.setState;
@@ -243,8 +372,14 @@
       throw new TypeError("R2-07C event service hooks are incomplete");
     }
 
+    function writableState() {
+      const source = getState();
+      return requiresClientUpgrade(source) ? null : normalizeState(source);
+    }
+
     function mutate(mutator) {
-      const next = normalizeState(getState());
+      const next = writableState();
+      if (!next) return clientUpgradeRequired();
       mutator(next);
       setState(next);
       persistState(next);
@@ -343,10 +478,14 @@
 
     async function process(options = {}) {
       if (isOffline()) return false;
+      if (!writableState()) return clientUpgradeRequired();
+      const accountId = String(currentAccountId() || "");
+      if (!accountId) return false;
       const gameId = String(options.gameId || "");
       for (let round = 0; round < 4; round += 1) {
         const snapshot = normalizeState(getState()).operations
           .filter((operation) => (!gameId || operation.gameId === gameId)
+            && operation.accountId === accountId
             && (operation.state === "pending" || (round === 0 && operation.state === "retryable")));
         if (!snapshot.length) break;
         for (const queued of snapshot) {
@@ -359,12 +498,18 @@
         let result;
         try { result = await execute(copy(active.payload)); }
         catch (error) {
+          const failure = classifyRpcFailure(error);
+          if (String(currentAccountId() || "") !== accountId) return false;
           mutate((state) => {
             const operation = state.operations.find((item) => item.clientOperationId === active.clientOperationId);
-            if (operation) { operation.state = "retryable"; operation.lastError = { code: "network_unavailable", message: String(error?.message || error) }; }
+            if (operation) {
+              operation.state = failure.state;
+              operation.lastError = { code: failure.code };
+            }
           });
           continue;
         }
+        if (String(currentAccountId() || "") !== accountId) return false;
         mutate((state) => {
           const operation = state.operations.find((item) => item.clientOperationId === active.clientOperationId);
           const record = state.records[active.eventId];
@@ -401,8 +546,9 @@
             record.serverEventVersion = Math.max(record.serverEventVersion, Number(result.server_event_version || 0));
             state.operations = state.operations.filter((item) => item.eventId !== active.eventId);
           } else {
-            operation.state = "rejected";
-            operation.lastError = { code: String(result?.code || "event_sync_rejected") };
+            const failure = classifyRpcFailure(result);
+            operation.state = failure.state;
+            operation.lastError = { code: failure.code };
           }
           record.updatedAt = now();
         });
@@ -426,8 +572,9 @@
   }
 
   global.LaxHornetR207EventOperations = Object.freeze({
-    SCHEMA_VERSION, CONFLICT_MESSAGE, EVENT_FIELDS, emptyState, isStoredState, normalizeState,
-    eventSnapshot, eventChanges, createEventOperationService,
+    SCHEMA_VERSION, CURRENT_SUPPORTED_SCHEMA_VERSION, CONFLICT_MESSAGE, CLIENT_UPGRADE_REQUIRED_MESSAGE,
+    EVENT_FIELDS, emptyState, isStoredState, storedSchemaVersion, requiresClientUpgrade,
+    normalizeState, classifyRpcFailure, eventSnapshot, eventChanges, createEventOperationService,
   });
 })(window);
 

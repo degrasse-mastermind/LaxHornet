@@ -458,9 +458,18 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   same-field conflict, proven non-overlap merge, permanent event tombstones,
   current authority, lifecycle checks, and the shared game tombstone lock.
   The Preview client persists event operations offline and routes create,
-  correction, and delete through this contract before any legacy write. The
-  production flag remains false; exact-head CI and independent Level 3 review
-  remain required, and R2-07D is unauthorized.
+  correction, and delete through this contract before any legacy write.
+  Independent review of exact head
+  `867e847c82fe99008e3886898287015e7465c830` failed because future-schema
+  client state remained writable and thrown RPC failures were overclassified
+  as retryable while raw messages entered durable state. The remediation uses
+  one central read-only future-schema mutation guard and one bounded RPC
+  classifier shared by R2-07C and audited durable error writers. Only actual
+  transport and approved transient service failures retry; `42501`/RLS,
+  validation, client-upgrade, and unknown permanent failures retain safe
+  non-retryable codes. Dedicated remediation coverage passes `37/37`; server
+  SQL is unchanged. The production flag remains false; new exact-head CI and
+  independent Level 3 review remain required, and R2-07D is unauthorized.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The repository cache marker is `laxhornet-v285`. The updated service worker purges

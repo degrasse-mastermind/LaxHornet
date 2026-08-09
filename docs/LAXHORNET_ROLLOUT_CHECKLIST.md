@@ -1145,6 +1145,15 @@ Do not combine these into one large Codex task. Each item requires one approved 
 - [x] Offline intent persists before network work and conflicts do not retry.
 - [x] Bounded UI copy contains no operation, conflict, account, or event ID.
 - [x] Disposable PostgreSQL concurrency and two-session browser tests pass.
+- [x] Preserve the failed review at `867e847c82fe99008e3886898287015e7465c830`.
+- [x] Future-schema R2-07C state is read-only before every mutation, RPC, and
+  persistence path and returns bounded update-required copy.
+- [x] Central RPC classification retries only transport/approved transient
+  service failures and stores no raw server message, body, cause, or SQL text.
+- [x] `42501`/RLS is blocked as `authorization_denied`; validation and
+  client-upgrade failures are blocked; conflict/tombstone behavior is preserved.
+- [x] Dedicated client-safety remediation matrix passes `37/37` without any
+  server SQL or production-boundary change.
 - [ ] Draft PR exact head passes GitHub Docker and regression workflows.
 - [ ] Independent exact-head Level 3 review passes before merge.
 - [ ] Any production activation remains a separate R2-07F authorization.

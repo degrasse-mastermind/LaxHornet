@@ -87,6 +87,7 @@ const tests = [
   { name: "R2-07B controlled preview migration", command: process.execPath, args: ["tools/test_r207b_preview_migration.mjs"] },
   { name: "R2-07B two-session browser", command: process.execPath, args: ["tools/test_r207b_two_session_browser.cjs"] },
   { name: "R2-07C versioned event client", command: process.execPath, args: ["tools/test_r207c_versioned_events.mjs"] },
+  { name: "R2-07C client safety remediation", command: process.execPath, args: ["tools/test_r207c_client_safety_remediation.mjs"] },
   { name: "R2-07C versioned event migration", command: process.execPath, args: ["tools/test_r207c_preview_migration.mjs"] },
   { name: "R2-07C two-session browser", command: process.execPath, args: ["tools/test_r207c_two_session_browser.cjs"] },
   { name: "sync error classification contracts", command: process.execPath, args: ["tools/test_sync_error_classification.mjs"] },
