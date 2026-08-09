@@ -445,10 +445,31 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   David manually accepted the bounded two-session Preview demonstration as
   `Works great.` A later successful-write path exposed PostgreSQL `42702` in
   the original wrapper's unqualified game identifier, so exact head
-  `2f7b86dd31f2a8345596ad37bcdec319c8e98a18` failed Level 3 review and was not
-  merged. The feature branch now carries a new additive qualification migration
-  and safe dormant rollback; managed Preview CI and a new exact-head review are
-  required before R2-07B may close.
+  `2f7b86dd31f2a8345596ad37bcdec319c8e98a18` failed Level 3 review. That head
+  was merged externally before remediation; corrective PR #66 then passed
+  exact-head review and merged as `df9347ba9bfa9c188513378070bfea70f695ad17`.
+  The additive qualification migration and safe dormant rollback now protect
+  Preview successful-write refreshes without changing production behavior.
+- R2-07C versioned event corrections are implemented on
+  `feature/r2-07c-versioned-event-corrections` from corrected main
+  `df9347ba9bfa9c188513378070bfea70f695ad17`. A default-off Preview-only
+  `laxhornet_sync_event_v2` contract gives legacy/personal event heads explicit
+  server versions, canonical operation hashes, immutable changed-field proof,
+  same-field conflict, proven non-overlap merge, permanent event tombstones,
+  current authority, lifecycle checks, and the shared game tombstone lock.
+  The Preview client persists event operations offline and routes create,
+  correction, and delete through this contract before any legacy write.
+  Independent review of exact head
+  `867e847c82fe99008e3886898287015e7465c830` failed because future-schema
+  client state remained writable and thrown RPC failures were overclassified
+  as retryable while raw messages entered durable state. The remediation uses
+  one central read-only future-schema mutation guard and one bounded RPC
+  classifier shared by R2-07C and audited durable error writers. Only actual
+  transport and approved transient service failures retry; `42501`/RLS,
+  validation, client-upgrade, and unknown permanent failures retain safe
+  non-retryable codes. Dedicated remediation coverage passes `37/37`; server
+  SQL is unchanged. The production flag remains false; new exact-head CI and
+  independent Level 3 review remain required, and R2-07D is unauthorized.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The repository cache marker is `laxhornet-v285`. The updated service worker purges

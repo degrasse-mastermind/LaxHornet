@@ -92,7 +92,8 @@ test("unavailable tracked-time cloud sync does not create a data-quality issue",
   );
   assert.match(handler, /if \(local\) local\.syncIssue = ""/);
   assert.match(handler, /state\.syncStatus = "Playing time saved on this phone"/);
-  assert.match(handler, /return;[\s\S]*if \(local\) local\.syncIssue/);
+  assert.match(handler, /return;[\s\S]*if \(local\) \{[\s\S]*safeDurableRpcFailureCode/);
+  assert.doesNotMatch(handler, /syncIssue\s*=\s*String\(error\?\.message/);
 });
 
 test("live tracking explains the review-build account-sync fallback", () => {

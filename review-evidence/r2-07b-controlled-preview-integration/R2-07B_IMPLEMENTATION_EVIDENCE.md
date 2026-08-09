@@ -1,6 +1,6 @@
 # R2-07B Controlled Preview Integration — Implementation Evidence
 
-Status: `CONTROLLED PREVIEW AVAILABLE — EXACT-HEAD LEVEL 3 REVIEW PENDING`
+Status: `CLOSED VIA CORRECTIVE PR #66`
 
 Risk level: `LEVEL 3`
 
@@ -127,8 +127,11 @@ behavior only; it is not production authorization.
 A later successful-write attempt exposed PostgreSQL `42702` in the original
 public wrapper because its post-operation `games.id` predicate was
 unqualified. Exact head `2f7b86dd31f2a8345596ad37bcdec319c8e98a18`
-therefore received `Independent Level 3 implementation review: FAIL` and was
-not merged. New additive migration
+therefore received `Independent Level 3 implementation review: FAIL`. That
+defective head was merged externally before remediation. Corrective PR #66 at
+`82596df836a2a719fc8fa88bc80974962aabd155` then carried the additive migration,
+passed exact-head review and CI, and merged as
+`df9347ba9bfa9c188513378070bfea70f695ad17`. The additive migration
 `20260809164435_r207b_qualify_preview_game_update.sql` replaces only that
 wrapper with an explicitly aliased `game_row.id` predicate. Its safe rollback
 disables the bridge rather than restoring the ambiguous implementation.
@@ -152,5 +155,5 @@ activation, deployment, release, data access, or credential use occurred.
 - Conflict resolution remains a later phase. Refresh preserves the proposal
   and accepted server state but does not adjudicate or discard the conflict.
 - Clock/event concurrency is R2-07C and is unchanged.
-- Exact-head GitHub Docker/regression reruns and independent Level 3 review
-  remain required after the additive `42702` remediation.
+- The additive `42702` remediation passed exact-head GitHub Docker/regression
+  and independent Level 3 review through PR #66.
