@@ -2360,7 +2360,7 @@ bounded nontechnical refresh path.
   enablement contains no data or credentials and production remains v1.
 - [x] Two authenticated synthetic browser contexts pass desktop/mobile stale
   overlap, safe refresh, non-overlap, denial, tombstone, and flag-off checks.
-- [ ] Automatic isolated Supabase Preview and Vercel Preview pass on the draft
+- [x] Automatic isolated Supabase Preview and Vercel Preview pass on the draft
   PR and provide the managed demo URL.
 - [ ] Fresh independent Level 3 review passes against the exact draft-PR SHA.
 

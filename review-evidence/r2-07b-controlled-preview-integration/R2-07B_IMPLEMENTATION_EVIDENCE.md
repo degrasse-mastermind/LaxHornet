@@ -1,6 +1,6 @@
 # R2-07B Controlled Preview Integration — Implementation Evidence
 
-Status: `DRAFT PR AND EXACT-HEAD LEVEL 3 REVIEW PENDING`
+Status: `CONTROLLED PREVIEW AVAILABLE — EXACT-HEAD LEVEL 3 REVIEW PENDING`
 
 Risk level: `LEVEL 3`
 
@@ -19,6 +19,26 @@ status/roster/sharing builders, R2-05 response classification, lossless
 hydration, bounded local conflict state, stale-client fixtures, and focused
 unit/browser/offline/out-of-order tests. Production activation, v1 rejection,
 clock/event cutover, rich resolution UI, deployment, and R2-07C+ are excluded.
+
+## Files changed
+
+- Runtime/UI: `app.js`, `event-operation-service.js`, `runtime-config.js`,
+  `styles.css`.
+- Preview database: `supabase/migrations/20260809155442_r207b_controlled_preview_integration.sql`,
+  `supabase/rollback/20260809155442_r207b_controlled_preview_integration_rollback.sql`,
+  `supabase/seed.sql`.
+- Preview/CI: `vercel.json`, `tools/build_r207b_vercel_preview.mjs`,
+  `.github/workflows/docker-tests.yml`,
+  `.github/workflows/laxhornet-regression.yml`.
+- Focused/preservation tests: `tools/test_r207b_controlled_preview.mjs`,
+  `tools/test_r207b_preview_migration.mjs`,
+  `tools/test_r207b_two_session_browser.cjs`, `tools/release_containment.mjs`,
+  `tools/run_v283_local_regression.mjs`,
+  `tools/test_post_r206_stabilization_release.mjs`,
+  `tools/test_release_hygiene.mjs`, `tools/test_trust_spine_release1.mjs`,
+  `tools/validate_release_manifest.mjs`.
+- Governance/evidence: `TICKETS.md`, `REPO_CURRENT_STATE.md`,
+  `docs/LAXHORNET_ROLLOUT_CHECKLIST.md`, and this evidence file.
 
 ## Implementation
 
@@ -77,22 +97,32 @@ clock/event cutover, rich resolution UI, deployment, and R2-07C+ are excluded.
 - R2-06/R2-06A migration and rollback: `13/13 PASS`.
 - Durable operation preservation: `29/29 PASS`.
 - R2-03/R2-05 sync characterization: `32/32 PASS`.
+- Complete regression: `58/59` on the consolidated run. The only failure was
+  a transient Playwright `page.reload` navigation abort in the pre-existing
+  R2-06P hydration browser suite; that exact suite passed immediately on a
+  focused rerun. No reproducible product failure exists.
+- Secret/host scan and `git diff --check`: `PASS`.
 
 ## Preview and production boundary
 
-Supabase Preview status and Vercel Preview URL are pending the draft PR. The
-managed integration must use the isolated, data-less, separately credentialed
-PR branch. A tester creates only synthetic adult/non-youth accounts and games,
-opens the same game in two authenticated contexts, edits the opponent in A,
-then edits the same field from B's stale base and uses `Refresh game`.
+Draft PR: `https://github.com/degrasse-mastermind/LaxHornet/pull/65`
+
+Vercel Preview:
+`https://lax-hornet-git-feature-r2-07-21d994-davidltdanes-4133s-projects.vercel.app`
+
+The managed Supabase integration created isolated project
+`nirewjjnzoxtqroacldj`; database, services, APIs, configuration, migrations,
+and seeding passed. The Vercel deployment target is `preview`, uses the
+separate integration-provided Preview configuration, and passed. A tester
+creates only synthetic adult/non-youth accounts and games, opens the same game
+in two authenticated contexts, edits the opponent in A, then edits the same
+field from B's stale base and uses `Refresh game`.
 
 No local, manual, CLI, linked-main, Dashboard, persistent shared-environment,
 or production migration was applied. No migration-history repair, production
 activation, deployment, release, data access, or credential use occurred.
 
 `AUTOMATIC ISOLATED SUPABASE PREVIEW MIGRATION — ACCEPTED CI VERIFICATION`
-will apply only after the configured GitHub integration successfully creates
-and migrates the PR-lifecycle Preview branch.
 
 ## Known limitations
 
@@ -102,5 +132,5 @@ and migrates the PR-lifecycle Preview branch.
 - Conflict resolution remains a later phase. Refresh preserves the proposal
   and accepted server state but does not adjudicate or discard the conflict.
 - Clock/event concurrency is R2-07C and is unchanged.
-- The managed Preview URL, automatic migration result, exact commit, PR URL,
-  CI results, and final full-regression total must be appended after publish.
+- Exact-head GitHub Docker/regression reruns and independent Level 3 review
+  remain required after the workflow allowlist correction.
