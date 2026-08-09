@@ -58,6 +58,8 @@ export const R207B_CONTROLLED_PREVIEW_REVIEW_DB_PATHS = Object.freeze([
   "supabase/migrations/20260809155442_r207b_controlled_preview_integration.sql",
   "supabase/rollback/20260809155442_r207b_controlled_preview_integration_rollback.sql",
   "supabase/seed.sql",
+  "supabase/migrations/20260809164435_r207b_qualify_preview_game_update.sql",
+  "supabase/rollback/20260809164435_r207b_qualify_preview_game_update_rollback.sql",
 ]);
 
 export const APPROVED_HISTORICAL_PROVENANCE_PATHS = Object.freeze([
