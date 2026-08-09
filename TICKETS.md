@@ -2128,7 +2128,7 @@ v285 reconciliation and authorizes no R2-07 implementation.
 
 ### R2-07 — Add game-field versions and conflict records
 
-Status: `DESIGN CLOSED — R2-07A AUTHORIZED AND IN IMPLEMENTATION`
+Status: `R2-07D AUTHORIZED — IMPLEMENTED, EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
 
 Risk level: `LEVEL 3`
 
@@ -2137,7 +2137,9 @@ Historical design branch: `design/r2-07-game-field-versions-conflicts`
 Review-remediation branch: `design/r2-07-review-remediation`
 
 Implementation branches: separate bounded branches for R2-07A through R2-07F.
-Only R2-07A is authorized.
+R2-07A through R2-07C are merged. R2-07D is authorized on its own branch;
+R2-07E remains conditional on D exact-head PASS and merge, and R2-07F remains
+conditional on E certification and exact-SHA PASS.
 
 #### Goal
 
@@ -2377,7 +2379,7 @@ Evidence:
 
 ### R2-07C — Versioned event corrections
 
-Status: `CLIENT-SAFETY FINDINGS REMEDIATED — NEW EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
+Status: `CLOSED VIA PR #67 — MERGED AS 91950cc32c641f309e89fd66e44f77966a8b4b7c`
 
 Risk level: `LEVEL 3`
 
@@ -2448,6 +2450,75 @@ an explicit server event base and game lifecycle precondition.
 Evidence:
 
 - `review-evidence/r2-07c-versioned-event-corrections/R2-07C_IMPLEMENTATION_EVIDENCE.md`
+
+### R2-07D — Production-minimum conflict resolution
+
+Status: `IMPLEMENTED — EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
+
+Risk level: `LEVEL 3`
+
+Branch: `codex/r2-07d-production-conflict-resolution`
+
+Starting main: `91950cc32c641f309e89fd66e44f77966a8b4b7c`
+
+#### Goal
+
+Add only the private, bounded conflict read and resolution capability required
+before R2-07 production certification, with a minimum Needs Attention surface
+and no production activation.
+
+#### Authorized scope
+
+- Tombstone-aware, current-authority conflict reads for personal and team
+  games, with authenticated SELECT constrained by forced RLS.
+- Append-only idempotent `keep_server`, `apply_proposed`, allowlisted
+  `apply_patch`, and `dismiss` resolution operations.
+- Global operation-identity serialization before the shared per-game lock,
+  current-version protection, linked stale-conflict replacement, and delete-
+  terminal resolution.
+- Account-scoped durable offline resolution intent, receipt-before-compaction,
+  future-schema fail-closed behavior, bounded error codes, revoked-authority
+  purge, and account-switch response isolation.
+- Minimal Game Review comparison/action UI, safe labels and values, and narrow
+  mobile/accessibility support.
+- Default-off runtime/server gates, focused D validation, A/B/C preservation,
+  complete regression, evidence, push, and a draft pull request.
+
+#### Explicit exclusions
+
+- No rich history, sync journal, bulk management, automated adjudication,
+  R2-08 presentation, retention purge, release/cache marker, production
+  activation, deployment, migration application, production data or
+  credentials, merge, R2-07E certification, or R2-07F release mutation.
+- The configured GitHub integration may automatically apply the repository
+  migration to its isolated, data-less, separately credentialed Supabase
+  Preview branch for PR CI. No local/manual/CLI/Dashboard, linked-main,
+  persistent shared-environment, or production application is authorized.
+
+#### Acceptance record
+
+- [x] Conflict summaries expose only bounded safe fields and require current
+  personal or team tracking authority for both RPC reads and direct SELECT.
+- [x] Resolution identity is idempotent; tombstone and current authority are
+  checked before replay; stale resolution cannot overwrite newer evidence.
+- [x] Keep, proposal, allowlisted correction, dismiss, and delete-terminal
+  paths append resolution evidence without mutating prior conflict rows.
+- [x] Offline intent is durable and immutable after attempt; accepted receipts
+  persist before compaction; an authorized refresh preserves pending work.
+- [x] Revocation purges private cached values and blocks read/resolution;
+  personal and team authority remain separate; late account responses drop.
+- [x] Needs Attention uses nontechnical copy, safe current/saved comparison,
+  four bounded actions, readable contrast, 44px-or-larger mobile controls,
+  and no horizontal overflow or browser console errors.
+- [x] Production runtime flag and Preview server control remain off by default;
+  Live Share, release/cache markers, retention, and production state are
+  unchanged.
+- [ ] Exact-head GitHub CI passes on the draft PR.
+- [ ] Independent Level 3 review returns PASS against the exact draft-PR SHA.
+
+Evidence:
+
+- `review-evidence/r2-07d-production-conflict-resolution/R2-07D_IMPLEMENTATION_EVIDENCE.md`
 
 ## Ticket template
 

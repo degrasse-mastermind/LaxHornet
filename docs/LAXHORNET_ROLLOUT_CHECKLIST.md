@@ -200,7 +200,8 @@ LH-DEV-006 completed under the approved accelerated closeout. Obsolete ceremony 
 
 ## R2-07 — Game-Field Versions and Conflict Records Design
 
-**Status:** [x] Design closed and merged; R2-07A only is authorized
+**Status:** [!] R2-07A through R2-07C merged; R2-07D implemented and awaiting
+exact-head Level 3 review
 
 **Risk level:** Level 3 — synchronization, schema/RPC, conflict, offline,
 authorization, and release semantics
@@ -255,6 +256,9 @@ authorization, and release semantics
   minimum resolution UX, and phase authorization. The proposed 180-day
   retention period remains unapproved.
 - [x] Authorize R2-07A only. R2-07B and later phases remain unauthorized.
+- [x] Record the later production-fast-track direction: R2-07D is authorized
+  now; R2-07E is conditional on D exact-head PASS and merge; R2-07F is
+  conditional on E integrated certification and independent exact-SHA PASS.
 
 Design artifacts:
 
@@ -1157,6 +1161,32 @@ Do not combine these into one large Codex task. Each item requires one approved 
 - [ ] Draft PR exact head passes GitHub Docker and regression workflows.
 - [ ] Independent exact-head Level 3 review passes before merge.
 - [ ] Any production activation remains a separate R2-07F authorization.
+
+## R2-07D Production-minimum conflict resolution gate
+
+- [x] Start from approved main
+  `91950cc32c641f309e89fd66e44f77966a8b4b7c` on a separate feature branch.
+- [x] Keep server and runtime capability disabled by default.
+- [x] Require current personal/team tracking authority consistently for direct
+  SELECT, conflict read, replay, and resolution after tombstone precedence.
+- [x] Serialize global resolution-operation identity before the shared
+  per-game lock and return one canonical result for identical replay.
+- [x] Append keep/proposal/allowlisted-patch/dismiss/delete-terminal evidence;
+  do not rewrite immutable conflicts or allow stale resolution to overwrite.
+- [x] Preserve offline intent before network work, attempted-payload identity,
+  receipt-before-compaction, future-schema fail-closed behavior, and bounded
+  error storage.
+- [x] Purge private cached conflict values on authority loss and reject late
+  responses after account switch.
+- [x] Render minimum Needs Attention copy, safe current/saved comparison, four
+  bounded actions, readable mobile contrast, 44px-or-larger tap targets, and
+  no horizontal overflow.
+- [x] Keep Live Share, retention, release/cache markers, migration application,
+  deployment, and production state unchanged.
+- [ ] Draft PR exact head passes GitHub Docker, regression, and isolated
+  Supabase Preview workflows.
+- [ ] Independent exact-head Level 3 review passes before merge.
+- [ ] Begin R2-07E only after D PASS and merge.
 
 A feature PR is not automatically a production release.
 

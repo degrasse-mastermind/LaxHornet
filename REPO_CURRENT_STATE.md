@@ -1,13 +1,14 @@
 # LaxHornet Repository Current State
 
-Last reviewed: 2026-08-06
+Last reviewed: 2026-08-09
 Baseline branch: `main`
-Baseline commit: `75acbd1d7ee1204d450b3715e41b53ebc6081b37`
+Baseline commit: `91950cc32c641f309e89fd66e44f77966a8b4b7c`
 Current repository release marker: `v285`
 Current production marker: `v285` from Pages run `31061426334` at approved SHA
 `9e434e33534a1b348b19e2081b91d7e0724299fc`;
 R2-06 release closeout approved through reconciled mixed evidence;
-R2-07 design closed; R2-07A dormant foundation authorized on a feature branch
+R2-07A through R2-07C merged; R2-07D implemented on a feature branch and
+awaiting exact-head Level 3 review
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
 
@@ -468,8 +469,27 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   transport and approved transient service failures retry; `42501`/RLS,
   validation, client-upgrade, and unknown permanent failures retain safe
   non-retryable codes. Dedicated remediation coverage passes `37/37`; server
-  SQL is unchanged. The production flag remains false; new exact-head CI and
-  independent Level 3 review remain required, and R2-07D is unauthorized.
+  SQL is unchanged. PR #67 merged the reviewed R2-07C work as
+  `91950cc32c641f309e89fd66e44f77966a8b4b7c`; the production flag remains
+  false.
+- R2-07D production-minimum conflict resolution is implemented on
+  `codex/r2-07d-production-conflict-resolution` from approved main
+  `91950cc32c641f309e89fd66e44f77966a8b4b7c`. It replaces only the dormant
+  conflict read/resolution wrappers behind the existing default-disabled
+  Preview control; derives canonical request identity server-side; serializes
+  global resolution identity before the shared game lock; enforces tombstone
+  and current personal/team authority before read, replay, direct SELECT, and
+  resolution; and appends keep/proposal/allowlisted patch/dismiss/delete-
+  terminal evidence without rewriting the original conflict. The client owns
+  a separate account-scoped durable queue with immutable attempts, receipt-
+  before-compaction, stale linked-conflict replacement, revoked-authority
+  purge, and late-account-response rejection. Game Review adds only the
+  minimum Needs Attention comparison and actions with bounded labels/values
+  and mobile/accessibility support. The production flag remains false. Live
+  Share, release/cache markers, retention, deployment, production migration
+  history/data, and production runtime remain unchanged. Draft-PR CI and
+  independent exact-head Level 3 PASS remain required before merge; R2-07E is
+  conditional on that PASS and merge.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The repository cache marker is `laxhornet-v285`. The updated service worker purges

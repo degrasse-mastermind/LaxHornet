@@ -24,6 +24,7 @@ const STORAGE_KEYS = {
   syncOperations: "laxhornet.syncOperations.v1",
   r207FieldSync: "laxhornet.r207FieldSync.v1",
   r207EventSync: "laxhornet.r207EventSync.v1",
+  r207ConflictSync: "laxhornet.r207ConflictSync.v1",
 };
 
 // LOCAL_STORAGE_SAFETY_CORE_START
@@ -395,6 +396,8 @@ const isStorageR207FieldSyncState = (value) =>
   window.LaxHornetR207FieldOperations?.isStoredState(value) === true;
 const isStorageR207EventSyncState = (value) =>
   window.LaxHornetR207EventOperations?.isStoredState(value) === true;
+const isStorageR207ConflictSyncState = (value) =>
+  window.LaxHornetR207ConflictResolution?.isStoredState(value) === true;
 const STORAGE_DOMAIN_DEFINITIONS = new Map([
   [STORAGE_KEYS.games, { domain: "saved_games", validate: isStorageObjectArray, critical: true }],
   [STORAGE_KEYS.activeGame, { domain: "active_game", validate: isStorageNullableObject, critical: true }],
@@ -416,6 +419,7 @@ const STORAGE_DOMAIN_DEFINITIONS = new Map([
   [STORAGE_KEYS.syncOperations, { domain: "game_clock_operation_state", validate: isStorageDurableSyncOperationState, critical: true }],
   [STORAGE_KEYS.r207FieldSync, { domain: "r207_field_operation_state", validate: isStorageR207FieldSyncState, critical: true }],
   [STORAGE_KEYS.r207EventSync, { domain: "r207_event_operation_state", validate: isStorageR207EventSyncState, critical: true }],
+  [STORAGE_KEYS.r207ConflictSync, { domain: "r207_conflict_resolution_state", validate: isStorageR207ConflictSyncState, critical: true }],
   [STORAGE_KEYS.trackingSession, { domain: "tracking_session", validate: isStorageNullableObject, critical: true }],
   [STORAGE_KEYS.reviewGameId, { domain: "review_game_id", validate: isStorageNullableString, critical: false }],
 ]);
@@ -423,6 +427,7 @@ const STORAGE_DOMAIN_DEFINITIONS = new Map([
 const RUNTIME_CONFIG = window.LAXHORNET_RUNTIME_CONFIG || {};
 const R207B_CONTROLLED_PREVIEW = RUNTIME_CONFIG.r207bControlledPreview === true;
 const R207C_VERSIONED_EVENTS = RUNTIME_CONFIG.r207cVersionedEventCorrections === true;
+const R207D_CONFLICT_RESOLUTION = RUNTIME_CONFIG.r207dConflictResolution === true;
 const SUPABASE_CONFIG = {
   url: RUNTIME_CONFIG.supabaseUrl || "https://ulbmjcvnyznvmjgpstno.supabase.co",
   publishableKey: RUNTIME_CONFIG.supabasePublishableKey || "sb_publishable_-RUc79OPosRLNP5B6JIH2A_f3I_2A0M",
@@ -994,6 +999,7 @@ let gameEventOperationService = null;
 let durableSyncOperationService = null;
 let r207FieldOperationService = null;
 let r207EventOperationService = null;
+let r207ConflictResolutionService = null;
 let r207PreviewCapabilityState = { enabled: false, checkedAt: 0, error: "" };
 let trackedPlayingTimeService = null;
 let trackedPlayingTimeCloudAvailability = "unknown";
@@ -1068,6 +1074,8 @@ const state = {
   trustSpineSync: initialStoredState.trustSpineSync,
   syncOperations: initialStoredState.syncOperations,
   r207FieldSync: initialStoredState.r207FieldSync,
+  r207EventSync: initialStoredState.r207EventSync,
+  r207ConflictSync: initialStoredState.r207ConflictSync,
   focusEditorContext: "",
   gameSetupReturnScreen: "home",
   signupDraft: null,
@@ -1297,6 +1305,13 @@ function readStoredAccountState(userId = activeStorageUserId) {
         STORAGE_KEYS.r207EventSync,
         window.LaxHornetR207EventOperations.emptyState(),
       ),
+    ),
+    r207ConflictSync: window.LaxHornetR207ConflictResolution.normalizeState(
+      loadJSON(
+        STORAGE_KEYS.r207ConflictSync,
+        window.LaxHornetR207ConflictResolution.emptyState(userId),
+      ),
+      userId,
     ),
     adminViewMode,
   };
@@ -3374,6 +3389,12 @@ function persistAll() {
   ) {
     saveJSON(STORAGE_KEYS.r207EventSync, state.r207EventSync);
   }
+  if (
+    state.r207ConflictSync !== undefined
+    && !window.LaxHornetR207ConflictResolution.requiresClientUpgrade(state.r207ConflictSync)
+  ) {
+    saveJSON(STORAGE_KEYS.r207ConflictSync, state.r207ConflictSync);
+  }
   if (state.nextGameFocus?.text && nextGameFocusMatchesPlayer(state.nextGameFocus, state.player)) {
     saveScopedNextGameFocus(state.nextGameFocus, state.player);
   }
@@ -3411,6 +3432,9 @@ function applyStoredAccountState(userId) {
   state.nextGameFocus = stored.nextGameFocus;
   state.trustSpineSync = stored.trustSpineSync;
   state.syncOperations = stored.syncOperations;
+  state.r207FieldSync = stored.r207FieldSync;
+  state.r207EventSync = stored.r207EventSync;
+  state.r207ConflictSync = stored.r207ConflictSync;
   state.games = stored.games;
   state.activeGame = stored.activeGame;
   state.trackingSession = stored.trackingSession;
@@ -3524,6 +3548,7 @@ function navigate(screen) {
   state.screen = screen;
   recoverAdminTeamContext();
   render();
+  if (screen === "review") void loadR207ConflictsForGame(currentReviewGame()?.id || "");
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -6435,7 +6460,9 @@ async function loadCloudGames(options = {}) {
   ) {
     for (const cloudGame of cloudGames) {
       for (const event of cloudGame.events) {
-        if (state.r207EventSync?.conflicts?.[event.id]) r207EventService().markConflictRefreshed(cloudGame, event);
+        if (state.r207EventSync?.conflicts?.[event.id]) {
+          r207EventService().markConflictRefreshed(cloudGame, event, { preserve: useR207ConflictResolution() });
+        }
         else r207EventService().hydrate(cloudGame, event);
       }
     }
@@ -8020,6 +8047,75 @@ function r207ConflictForGame(gameId = "") {
   return conflict?.refreshedAt ? null : conflict;
 }
 
+function useR207ConflictResolution() {
+  return R207B_CONTROLLED_PREVIEW && R207D_CONFLICT_RESOLUTION;
+}
+
+function r207ServerConflictsForGame(gameId = "") {
+  if (!useR207ConflictResolution()) return [];
+  return Object.values(state.r207ConflictSync?.conflicts || {})
+    .filter((conflict) => conflict.gameId === gameId && conflict.resolutionStatus === "open")
+    .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+}
+
+function persistR207ConflictSyncState(nextState = state.r207ConflictSync) {
+  if (window.LaxHornetR207ConflictResolution.requiresClientUpgrade(nextState)) return false;
+  const definition = STORAGE_DOMAIN_DEFINITIONS.get(STORAGE_KEYS.r207ConflictSync);
+  const result = localStorageSafety.write({
+    primaryKey: scopedStorageKey(STORAGE_KEYS.r207ConflictSync),
+    domain: definition.domain,
+    value: nextState,
+    validate: definition.validate,
+  });
+  if (!result?.ok) scheduleStorageHealthNotice(localStorageSafety.healthSnapshot());
+  return result?.ok === true;
+}
+
+function r207ConflictService() {
+  if (r207ConflictResolutionService) return r207ConflictResolutionService;
+  r207ConflictResolutionService = window.LaxHornetR207ConflictResolution.createConflictResolutionService({
+    getState: () => state.r207ConflictSync,
+    setState: (next) => { state.r207ConflictSync = next; },
+    persistState: persistR207ConflictSyncState,
+    currentAccountId: currentUserId,
+    isOffline: () => state.isOffline,
+    read: async (request) => {
+      if (!(await r207PreviewCapabilityAvailable())) {
+        return { outcome: "rejected", code: "r207_not_activated" };
+      }
+      const { data, error, status } = await supabaseClient.rpc(
+        "laxhornet_read_game_conflicts_v1",
+        { p_request: request },
+      );
+      if (error) return durableSyncFailure({ error, httpStatus: status }, { source: "r207_conflict_read_rpc" });
+      return data || { outcome: "rejected", code: "empty_r207_response" };
+    },
+    resolve: async (request) => {
+      if (!(await r207PreviewCapabilityAvailable())) {
+        return { outcome: "rejected", code: "r207_not_activated" };
+      }
+      const { data, error, status } = await supabaseClient.rpc(
+        "laxhornet_resolve_game_conflict_v1",
+        { p_resolution: request },
+      );
+      if (error) return durableSyncFailure({ error, httpStatus: status }, { source: "r207_conflict_resolution_rpc" });
+      return data || { outcome: "rejected", code: "empty_r207_response" };
+    },
+    onChange: () => {
+      state.syncStatus = r207ServerConflictsForGame(state.reviewGameId).length
+        ? "Sync needs attention"
+        : "Ready";
+      render();
+    },
+  });
+  return r207ConflictResolutionService;
+}
+
+async function loadR207ConflictsForGame(gameId = "") {
+  if (!useR207ConflictResolution() || !gameId || state.isOffline || !state.authUser) return false;
+  return r207ConflictService().load(gameId);
+}
+
 async function r207PreviewCapabilityAvailable(options = {}) {
   const now = Date.now();
   if (!R207B_CONTROLLED_PREVIEW || !supabaseClient || state.isOffline) return false;
@@ -8077,10 +8173,11 @@ function r207FieldService() {
       return data || { outcome: "rejected", code: "empty_r207_response" };
     },
     onAccepted: applyR207AcceptedResult,
-    onConflict: () => {
+    onConflict: (operation) => {
       state.syncStatus = "Sync needs attention";
       persistAll();
       render();
+      if (useR207ConflictResolution()) void loadR207ConflictsForGame(operation.gameId);
     },
     onRejected: (_operation, result = {}) => {
       state.syncStatus = result.code === "authorization_denied"
@@ -11933,30 +12030,153 @@ function renderGameEditForm(game) {
 
 function renderR207ConflictNotice(game) {
   const conflict = r207ConflictForGame(game?.id);
+  const serverConflicts = r207ServerConflictsForGame(game?.id);
+  if (serverConflicts.length) {
+    return `
+      <section class="card pad r207-conflict-notice r207-needs-attention" aria-labelledby="r207NeedsAttentionTitle">
+        <h3 id="r207NeedsAttentionTitle">Needs Attention</h3>
+        <p>This game changed on another device. Your version is saved and needs review.</p>
+        <div class="r207-conflict-list">
+          ${serverConflicts.map(renderR207ServerConflict).join("")}
+        </div>
+      </section>
+    `;
+  }
   if (!conflict) return "";
   return `
     <section class="card pad r207-conflict-notice" role="status" aria-live="polite">
       <h3>Game update needs attention</h3>
-      <p>${escapeHTML(window.LaxHornetR207FieldOperations.CONFLICT_MESSAGE)}</p>
+      <p>This game changed on another device. Your version is saved and needs review.</p>
       <p class="muted small">Your attempted change is retained on this device. No newer server value was overwritten.</p>
-      <button class="btn secondary" type="button" data-action="refresh-r207-conflict" data-game-id="${escapeHTML(game.id)}">Refresh game</button>
+      <button class="btn secondary" type="button" data-action="refresh-r207-conflict" data-game-id="${escapeHTML(game.id)}">Review latest version</button>
     </section>
+  `;
+}
+
+function renderR207ConflictPatchControl(conflict, field) {
+  const proposed = conflict.proposedValues?.[field];
+  const id = `r207Patch-${conflict.conflictId}-${field}`.replace(/[^a-zA-Z0-9_-]/g, "");
+  const name = `patch_${field}`;
+  const label = window.LaxHornetR207ConflictResolution.fieldLabel(field);
+  if (field === "lifecycle_state") {
+    return `
+      <label class="field" for="${id}">
+        <span>${escapeHTML(label)} correction</span>
+        <select id="${id}" name="${name}">
+          ${["active", "paused", "completed"].map((value) => `
+            <option value="${value}" ${proposed === value ? "selected" : ""}>
+              ${escapeHTML(window.LaxHornetR207ConflictResolution.formatValue(field, value))}
+            </option>
+          `).join("")}
+        </select>
+      </label>
+    `;
+  }
+  if (field === "is_shared") {
+    return `
+      <label class="field" for="${id}">
+        <span>${escapeHTML(label)} correction</span>
+        <select id="${id}" name="${name}">
+          <option value="false" ${proposed !== true ? "selected" : ""}>Off</option>
+          <option value="true" ${proposed === true ? "selected" : ""}>On</option>
+        </select>
+      </label>
+    `;
+  }
+  const numeric = ["score_against", "score_for", "clock_seconds_remaining"].includes(field);
+  return `
+    <label class="field" for="${id}">
+      <span>${escapeHTML(label)} correction</span>
+      <input id="${id}" name="${name}" ${numeric
+        ? `type="number" inputmode="numeric" min="0" max="${field === "clock_seconds_remaining" ? "999999" : "9999"}"`
+        : `type="${field === "game_date" ? "date" : "text"}" maxlength="160"`
+      } value="${escapeHTML(proposed ?? "")}" />
+    </label>
+  `;
+}
+
+function renderR207ServerConflict(conflict) {
+  const valueFields = [...new Set([
+    ...Object.keys(conflict.currentValues || {}),
+    ...Object.keys(conflict.proposedValues || {}),
+  ])].sort();
+  const patchFields = window.LaxHornetR207ConflictResolution.patchableFields(conflict);
+  return `
+    <form class="r207-conflict-item" data-form="r207-conflict-resolution" data-conflict-id="${escapeHTML(conflict.conflictId)}">
+      <div class="r207-conflict-values" role="group" aria-label="Current and saved values">
+        ${valueFields.map((field) => `
+          <div class="r207-conflict-value-row">
+            <strong>${escapeHTML(window.LaxHornetR207ConflictResolution.fieldLabel(field))}</strong>
+            <span><small>Current</small>${escapeHTML(window.LaxHornetR207ConflictResolution.formatValue(field, conflict.currentValues?.[field]))}</span>
+            <span><small>Your saved version</small>${escapeHTML(window.LaxHornetR207ConflictResolution.formatValue(field, conflict.proposedValues?.[field]))}</span>
+          </div>
+        `).join("")}
+      </div>
+      ${patchFields.length ? `
+        <details class="r207-patch-details">
+          <summary>Make a correction</summary>
+          <div class="r207-patch-fields">
+            ${patchFields.map((field) => renderR207ConflictPatchControl(conflict, field)).join("")}
+          </div>
+          <button class="btn neutral" type="submit" name="resolutionAction" value="apply_patch">Apply correction</button>
+        </details>
+      ` : ""}
+      <div class="r207-resolution-actions">
+        <button class="btn secondary" type="submit" name="resolutionAction" value="keep_server">Keep current</button>
+        <button class="btn positive" type="submit" name="resolutionAction" value="apply_proposed">Apply my version</button>
+        <button class="btn ghost" type="submit" name="resolutionAction" value="dismiss">Dismiss notice</button>
+      </div>
+    </form>
   `;
 }
 
 function renderR207EventConflictNotice(game) {
   if (!useR207VersionedEvents()) return "";
-  const conflict = Object.values(state.r207EventSync?.conflicts || {})
-    .find((item) => item.gameId === game?.id);
-  if (!conflict) return "";
+  const conflicts = Object.values(state.r207EventSync?.conflicts || {})
+    .filter((item) => item.gameId === game?.id);
+  if (!conflicts.length) return "";
+  const labels = {
+    timestamp: "Event time", quarter: "Period", stat_type: "Play type",
+    stat_label: "Play result", category: "Category", point_value: "Points",
+    tags: "Tags", note: "Private note", field_zone: "Field area",
+    corrected_at: "Correction time", tags_updated_at: "Tag update time",
+  };
   return `
     <section class="card pad r207-conflict-notice" role="status" aria-live="polite">
       <h3>Event update needs attention</h3>
-      <p>${escapeHTML(window.LaxHornetR207EventOperations.CONFLICT_MESSAGE)}</p>
-      <p class="muted small">Your attempted correction is retained on this device. No newer event value was overwritten.</p>
-      <button class="btn secondary" type="button" data-action="sync-cloud-games">Refresh game</button>
+      <p>This event changed on another device. Review it before saving again.</p>
+      ${conflicts.map((conflict) => {
+        const fields = Object.keys(conflict.proposedValues || {}).map((field) => labels[field] || "Event detail");
+        return `
+          <div class="r207-conflict-item">
+            <p class="muted small">Your saved correction is retained on this device${fields.length ? `: ${escapeHTML(fields.join(", "))}` : ""}.</p>
+            ${conflict.refreshedAt && useR207ConflictResolution() ? `
+              <div class="r207-resolution-actions">
+                <button class="btn secondary" type="button" data-action="resolve-r207-event-conflict" data-event-id="${escapeHTML(conflict.eventId)}" data-resolution="keep_server">Keep current</button>
+                <button class="btn positive" type="button" data-action="resolve-r207-event-conflict" data-event-id="${escapeHTML(conflict.eventId)}" data-resolution="apply_proposed">Apply my version</button>
+                <button class="btn ghost" type="button" data-action="resolve-r207-event-conflict" data-event-id="${escapeHTML(conflict.eventId)}" data-resolution="dismiss">Dismiss notice</button>
+              </div>
+            ` : `<button class="btn secondary" type="button" data-action="sync-cloud-games">Review latest version</button>`}
+          </div>
+        `;
+      }).join("")}
     </section>
   `;
+}
+
+async function resolveR207EventConflict(eventId = "", action = "") {
+  const game = currentReviewGame();
+  if (!game || !eventId || !["keep_server", "apply_proposed", "dismiss"].includes(action)) return false;
+  const changed = r207EventService().resolveConflict(game, eventId, action);
+  if (!changed || changed?.code === "client_upgrade_required") {
+    showToast("That event review item is no longer available");
+    return false;
+  }
+  persistAll();
+  if (action === "apply_proposed") await flushR207VersionedEvents({ gameId: game.id });
+  render();
+  showToast(action === "apply_proposed" ? "Saved event version sent" : "Event review item resolved");
+  return true;
 }
 
 async function refreshR207Conflict(gameId = "") {
@@ -11973,6 +12193,45 @@ async function refreshR207Conflict(gameId = "") {
   persistAll();
   render();
   showToast("Latest saved game loaded");
+  return true;
+}
+
+async function submitR207ConflictResolution(form, formData) {
+  const conflictId = String(form?.dataset.conflictId || "");
+  const conflict = state.r207ConflictSync?.conflicts?.[conflictId];
+  const action = String(formData.get("resolutionAction") || "");
+  if (!conflict || !window.LaxHornetR207ConflictResolution.ACTIONS.includes(action)) {
+    showToast("That review item is no longer available");
+    return false;
+  }
+  const patch = {};
+  if (action === "apply_patch") {
+    for (const field of window.LaxHornetR207ConflictResolution.patchableFields(conflict)) {
+      const raw = formData.get(`patch_${field}`);
+      if (["score_against", "score_for", "clock_seconds_remaining"].includes(field)) {
+        patch[field] = Number(raw);
+      } else if (field === "is_shared") {
+        patch[field] = raw === "true";
+      } else {
+        patch[field] = String(raw ?? "").trim();
+      }
+    }
+  }
+  form.setAttribute("aria-busy", "true");
+  [...form.querySelectorAll("button")].forEach((button) => { button.disabled = true; });
+  const queued = await r207ConflictService().queue(conflictId, action, patch);
+  if (!queued) {
+    render();
+    showToast(state.isOffline ? "Your choice is saved and will send when online" : "Could not resolve that item");
+    return false;
+  }
+  await loadCloudGames({ silent: true, forceCloudGameIds: [conflict.gameId] });
+  await loadR207ConflictsForGame(conflict.gameId);
+  state.reviewGameId = conflict.gameId;
+  persistAll();
+  render();
+  const stillOpen = r207ServerConflictsForGame(conflict.gameId).length > 0;
+  showToast(stillOpen ? "The game changed again. Review the latest values." : "Review item resolved");
   return true;
 }
 
@@ -15484,6 +15743,11 @@ function handleSubmit(event) {
     formData.set(event.submitter.name, event.submitter.value);
   }
 
+  if (form.dataset.form === "r207-conflict-resolution") {
+    void submitR207ConflictResolution(form, formData);
+    return;
+  }
+
   if (form.dataset.form === "settings") {
     if (isTeamPlayer(state.player) && !canEditTeam(state.player.teamId)) {
       showToast("View-only team roster");
@@ -15920,6 +16184,9 @@ function handleClick(event) {
     }
     if (action.dataset.action === "refresh-r207-conflict") {
       void refreshR207Conflict(action.dataset.gameId);
+    }
+    if (action.dataset.action === "resolve-r207-event-conflict") {
+      void resolveR207EventConflict(action.dataset.eventId, action.dataset.resolution);
     }
     if (action.dataset.action === "cancel-tags") {
       state.tagEditingEventId = null;
@@ -16630,6 +16897,10 @@ window.addEventListener("online", async () => {
     await loadCloudGames({ silent: true });
     await processDurableSyncOperations();
     await eventOperationService().retryGameEventOperations();
+    if (useR207ConflictResolution()) {
+      await r207ConflictService().process();
+      await loadR207ConflictsForGame(state.reviewGameId || "");
+    }
     const trackedGames = [state.activeGame, ...state.games].filter(hasTrackedPlayingTime);
     await Promise.all(trackedGames.map(async (game) => {
       const reconciled = await trackedTimeService().reconcileParticipationOperations(game);
