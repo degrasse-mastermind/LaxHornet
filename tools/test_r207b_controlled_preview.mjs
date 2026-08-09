@@ -124,12 +124,14 @@ check(calls === callsBeforeRetryable + 1 && retryable.state().operations[0].stat
 const runtime = fs.readFileSync("runtime-config.js", "utf8");
 const app = fs.readFileSync("app.js", "utf8");
 const migration = fs.readFileSync("supabase/migrations/20260809155442_r207b_controlled_preview_integration.sql", "utf8");
+const qualificationFix = fs.readFileSync("supabase/migrations/20260809164435_r207b_qualify_preview_game_update.sql", "utf8");
 const seed = fs.readFileSync("supabase/seed.sql", "utf8");
 check(runtime.includes("r207bControlledPreview: false"), "production runtime flag defaults off");
 check(app.includes(r207.CONFLICT_MESSAGE) === false && app.includes("CONFLICT_MESSAGE"), "UI consumes the bounded shared conflict copy without duplicating raw diagnostics");
 check(app.includes("&& r207ConflictForGame(game.id)"), "a conflict blocks the legacy whole-game overwrite path");
 check(/preview_enabled boolean not null default false/i.test(migration), "server preview capability defaults off");
 check(/update public\.r207_preview_control[\s\S]*preview_enabled = true/i.test(seed), "isolated Preview seed explicitly enables the server bridge");
+check(/update public\.games as game_row[\s\S]*where game_row\.id\s*=/i.test(qualificationFix), "Preview wrapper qualifies the game identifier and prevents PostgreSQL 42702");
 check(!/service[_-]?role|refresh[_-]?token|access[_-]?token/i.test(`${migration}\n${seed}`), "migration and Preview seed contain no credential material");
 
 console.log(`R2-07B controlled preview tests: ${checks.length}/${checks.length} passed`);
