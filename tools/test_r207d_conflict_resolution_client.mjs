@@ -43,7 +43,7 @@ check(api.patchableFields(api.safeConflict(conflict())).join() === "opponent", "
 function device(options = {}) {
   let account = options.account || "account-a";
   let offline = options.offline === true;
-  let state = api.emptyState(account);
+  let state = options.initialState || api.emptyState(account);
   let persisted = 0;
   let changes = 0;
   let resolveResponse = options.resolveResponse || { outcome: "accepted", code: "resolution_kept" };
@@ -56,7 +56,11 @@ function device(options = {}) {
     currentAccountId: () => account,
     isOffline: () => offline,
     read: (...args) => readImpl(...args),
-    resolve: async (request) => { calls.push(structuredClone(request)); return structuredClone(resolveResponse); },
+    resolve: async (request) => {
+      calls.push(structuredClone(request));
+      if (options.resolve) return options.resolve(request, calls.length);
+      return structuredClone(resolveResponse);
+    },
     onChange: () => { changes += 1; },
   });
   return {
@@ -79,6 +83,13 @@ check(Object.values(loaded.state().conflicts).length === 1 && loaded.persisted()
 await loaded.service.queue(conflict().conflict_id, "keep_server");
 check(loaded.calls.length === 1 && loaded.calls[0].request_hash.length === 64, "resolution persists a permanent operation ID and request hash before RPC");
 check(Object.keys(loaded.state().conflicts).length === 0 && loaded.state().receipts.length === 1, "accepted resolution persists a receipt before compacting the conflict operation");
+
+const reloaded = device({ initialState: JSON.parse(JSON.stringify({
+  ...api.emptyState("account-a"),
+  conflicts: { [conflict().conflict_id]: api.safeConflict(conflict()) },
+})) });
+check(reloaded.state().conflicts[conflict().conflict_id].proposedValues.opponent === "Saved",
+  "bounded unresolved conflict and saved proposal survive serialized reload");
 
 const offline = device({ offline: true });
 await offline.service.load("game-a");
@@ -107,6 +118,43 @@ await stale.service.queue(conflict().conflict_id, "apply_proposed");
 check(!stale.state().conflicts[conflict().conflict_id]
   && stale.state().conflicts["00000000-0000-4000-8000-000000000202"]?.currentValues.opponent === "Newer",
 "stale resolution replaces the local item with the linked latest conflict without losing the proposal");
+await stale.service.process();
+check(stale.calls.length === 1, "stale resolution becomes review-only and is never blindly retried");
+
+const independentA = conflict({ conflict_id: "00000000-0000-4000-8000-000000000301", game_id: "game-a" });
+const independentB = conflict({ conflict_id: "00000000-0000-4000-8000-000000000302", game_id: "game-b" });
+const independent = device({
+  offline: true,
+  initialState: { ...api.emptyState("account-a"), conflicts: {
+    [independentA.conflict_id]: api.safeConflict(independentA),
+    [independentB.conflict_id]: api.safeConflict(independentB),
+  } },
+  resolve: async (_request, callNumber) => callNumber === 1 ? {
+    outcome: "conflicted", code: "resolution_stale",
+    conflict: conflict({ conflict_id: "00000000-0000-4000-8000-000000000303", game_id: "game-a", current_values: { opponent: "Newer" } }),
+  } : { outcome: "accepted", code: "resolution_kept" },
+});
+await independent.service.queue(independentA.conflict_id, "apply_proposed");
+await independent.service.queue(independentB.conflict_id, "keep_server");
+independent.setOffline(false);
+await independent.service.process();
+check(independent.calls.length === 2 && independent.state().receipts.some((item) => item.conflictId === independentB.conflict_id),
+  "one stale dependency blocks only its conflict while unrelated game work continues");
+
+const rawFailure = device({ resolve: async () => { throw new Error("postgres secret row payload"); } });
+await rawFailure.service.load("game-a");
+await rawFailure.service.queue(conflict().conflict_id, "keep_server");
+check(!JSON.stringify(rawFailure.state()).includes("postgres secret row payload")
+  && Object.values(rawFailure.state().operations)[0]?.lastError?.code,
+"RPC failures persist only a bounded classification code and never a raw server message");
+
+const futureState = { ...api.emptyState("account-a"), schemaVersion: 99, futurePrivateShape: { raw: "must-remain-untouched" } };
+const future = device({ initialState: futureState });
+check(await future.service.load("game-a") === false
+  && await future.service.queue(conflict().conflict_id, "keep_server") === false
+  && future.calls.length === 0 && future.persisted() === 0
+  && JSON.stringify(future.state()) === JSON.stringify(futureState),
+"future conflict schema remains read-only with no RPC or local rewrite");
 
 const revoked = device();
 await revoked.service.load("game-a");
@@ -148,6 +196,21 @@ const app = fs.readFileSync("app.js", "utf8");
 check(runtime.includes("r207dConflictResolution: false"), "production R2-07D runtime flag defaults off");
 check(app.includes("This game changed on another device. Your version is saved and needs review."), "minimum game conflict copy is nontechnical and exact");
 check(app.includes("Keep current") && app.includes("Apply my version") && app.includes("Apply correction") && app.includes("Dismiss notice"), "minimum Needs Attention surface exposes all bounded actions");
+check(app.includes('aria-labelledby="r207NeedsAttentionTitle"')
+  && app.includes('role="group" aria-label="Current and saved values"')
+  && app.includes('<div class="toast" role="status">')
+  && app.includes('id="gameReviewTitle" tabindex="-1"')
+  && app.includes("focusR207ResolutionOutcome();"),
+"Needs Attention has screen-reader labels, live outcome announcement, and deterministic focus restoration");
+const styles = fs.readFileSync("styles.css", "utf8");
+check(styles.includes("@media (max-width: 430px)")
+  && /\.r207-conflict-value-row,\s*\n\s*\.r207-resolution-actions\s*\{\s*\n\s*grid-template-columns:\s*1fr;/.test(styles)
+  && styles.includes("min-height: var(--lh-tap-min)"),
+"Needs Attention has a single-column mobile layout and minimum touch-target sizing");
+const publicProjection = app.slice(app.indexOf("function publicLiveShareGameFromPayload"), app.indexOf("async function fetchPublicLiveShareGame"));
+check(publicProjection.length > 0
+  && !/r207Conflict|conflictId|proposedValues|currentValues|operationId|request_hash/.test(publicProjection),
+"Live Share public projection remains isolated from private conflict and resolution evidence");
 check(!/service[_-]?role|refresh[_-]?token|access[_-]?token/i.test(fs.readFileSync("supabase/migrations/20260809201608_r207d_conflict_resolution_foundation.sql", "utf8")), "R2-07D migration contains no credential material");
 
 console.log(`R2-07D conflict resolution client: ${checks}/${checks} passed`);

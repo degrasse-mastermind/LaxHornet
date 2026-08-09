@@ -1162,7 +1162,7 @@ Do not combine these into one large Codex task. Each item requires one approved 
 - [ ] Independent exact-head Level 3 review passes before merge.
 - [ ] Any production activation remains a separate R2-07F authorization.
 
-## R2-07D Production-minimum conflict resolution gate
+## R2-07D Minimum safe Needs Attention conflict resolution gate
 
 - [x] Start from approved main
   `91950cc32c641f309e89fd66e44f77966a8b4b7c` on a separate feature branch.

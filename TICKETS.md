@@ -2451,13 +2451,13 @@ Evidence:
 
 - `review-evidence/r2-07c-versioned-event-corrections/R2-07C_IMPLEMENTATION_EVIDENCE.md`
 
-### R2-07D — Production-minimum conflict resolution
+### R2-07D — Minimum safe Needs Attention conflict resolution
 
 Status: `IMPLEMENTED — EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
 
 Risk level: `LEVEL 3`
 
-Branch: `codex/r2-07d-production-conflict-resolution`
+Branch: `feature/r2-07d-needs-attention-conflict-resolution`
 
 Starting main: `91950cc32c641f309e89fd66e44f77966a8b4b7c`
 
@@ -2518,7 +2518,7 @@ and no production activation.
 
 Evidence:
 
-- `review-evidence/r2-07d-production-conflict-resolution/R2-07D_IMPLEMENTATION_EVIDENCE.md`
+- `review-evidence/r2-07d-needs-attention-conflict-resolution/R2-07D_IMPLEMENTATION_EVIDENCE.md`
 
 ## Ticket template
 

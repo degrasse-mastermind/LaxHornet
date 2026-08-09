@@ -3552,6 +3552,13 @@ function navigate(screen) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function focusR207ResolutionOutcome() {
+  const target = document.querySelector("#r207NeedsAttentionTitle, #gameReviewTitle");
+  if (!target) return false;
+  target.focus({ preventScroll: true });
+  return true;
+}
+
 function applyStartupDeepLink() {
   if (startupDeepLinkHandled || startupOpenTarget !== "team-request" || !state.authUser) return false;
   if (!isReviewerAccount()) {
@@ -12176,6 +12183,7 @@ async function resolveR207EventConflict(eventId = "", action = "") {
   if (action === "apply_proposed") await flushR207VersionedEvents({ gameId: game.id });
   render();
   showToast(action === "apply_proposed" ? "Saved event version sent" : "Event review item resolved");
+  focusR207ResolutionOutcome();
   return true;
 }
 
@@ -12223,6 +12231,7 @@ async function submitR207ConflictResolution(form, formData) {
   if (!queued) {
     render();
     showToast(state.isOffline ? "Your choice is saved and will send when online" : "Could not resolve that item");
+    focusR207ResolutionOutcome();
     return false;
   }
   await loadCloudGames({ silent: true, forceCloudGameIds: [conflict.gameId] });
@@ -12232,6 +12241,7 @@ async function submitR207ConflictResolution(form, formData) {
   render();
   const stillOpen = r207ServerConflictsForGame(conflict.gameId).length > 0;
   showToast(stillOpen ? "The game changed again. Review the latest values." : "Review item resolved");
+  focusR207ResolutionOutcome();
   return true;
 }
 
@@ -14507,7 +14517,7 @@ function renderReview() {
   const opponent = String(game.opponent || "").trim();
   return renderShell(`
     <section class="screen-title lh-review-header">
-      <h2>Game Review</h2>
+      <h2 id="gameReviewTitle" tabindex="-1">Game Review</h2>
       <p>${escapeHTML(playerTitle(player))}${opponent ? ` vs ${escapeHTML(opponent)}` : ""} &middot; ${formatDate(game.date)}</p>
     </section>
 

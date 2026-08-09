@@ -472,8 +472,8 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   SQL is unchanged. PR #67 merged the reviewed R2-07C work as
   `91950cc32c641f309e89fd66e44f77966a8b4b7c`; the production flag remains
   false.
-- R2-07D production-minimum conflict resolution is implemented on
-  `codex/r2-07d-production-conflict-resolution` from approved main
+- R2-07D minimum safe Needs Attention conflict resolution is implemented on
+  `feature/r2-07d-needs-attention-conflict-resolution` from approved main
   `91950cc32c641f309e89fd66e44f77966a8b4b7c`. It replaces only the dormant
   conflict read/resolution wrappers behind the existing default-disabled
   Preview control; derives canonical request identity server-side; serializes

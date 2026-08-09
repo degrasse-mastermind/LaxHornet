@@ -1,4 +1,4 @@
-# R2-07D Production-Minimum Conflict Resolution - Implementation Evidence
+# R2-07D Minimum Safe Needs Attention Conflict Resolution - Implementation Evidence
 
 Status: `IMPLEMENTED - EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
 
@@ -6,7 +6,7 @@ Risk level: `LEVEL 3`
 
 Starting main: `91950cc32c641f309e89fd66e44f77966a8b4b7c`
 
-Branch: `codex/r2-07d-production-conflict-resolution`
+Branch: `feature/r2-07d-needs-attention-conflict-resolution`
 
 ## Implementation
 
@@ -50,30 +50,40 @@ Branch: `codex/r2-07d-production-conflict-resolution`
 
 ## Verification record
 
-- R2-07D client/adversarial matrix: `24/24 PASS`.
+- R2-07D client/adversarial matrix: `32/32 PASS`, including serialized reload,
+  stale no-retry, independent queue progress, future-schema non-mutation,
+  bounded RPC error storage, accessibility contracts, and Live Share isolation.
 - R2-07D disposable PostgreSQL migration/resolution/RLS/rollback matrix:
-  `22/22 PASS`, with zero disposable-container residue.
+  `23/23 PASS`, including stale `apply_patch`, with zero disposable-container
+  residue.
 - Actual app Browser journey, desktop `1280x900`: exact copy and safe current /
   saved comparison visible; correction expands and accepts input; all four
   actions visible and 52px high; no horizontal overflow; no console errors.
-- Actual app Browser journey, mobile `360x800`: one-column comparison/actions,
+- Actual synthetic conflict Browser journey, mobile `360x800`: one-column comparison/actions,
   readable tertiary-action contrast, all four actions 52px high, no horizontal
   overflow, and no console errors.
+- Protected Vercel Preview app smoke, mobile `390x844`: correct page identity,
+  meaningful app content, no horizontal overflow, labeled inputs/buttons,
+  visible controls 44-52px high, Help interaction changed the rendered screen,
+  and no console warnings/errors.
 - Desktop screenshot: external task evidence `r207d-desktop.png`.
 - Mobile screenshot: external task evidence `r207d-mobile.png`.
 - R2-07A preservation: `71/71 PASS`; R2-07B client/migration/browser:
   `32/32`, `13/13`, and `12/12 PASS`; R2-07C client/migration/browser/safety:
   `30/30`, `25/25`, `7/7`, and `37/37 PASS`; tombstone concurrency: `8/8
   PASS`. All disposable Docker checks left zero residue.
-- Complete canonical-plus-additive regression: `65/65 PASS` against committed
-  implementation/containment head `090e114`; this evidence-only closeout edit
-  does not change runtime, SQL, tests, workflows, or release controls.
+- Complete canonical-plus-additive regression after the final implementation
+  diff stabilized: `65/65 PASS`. The Windows run used the supported bundled
+  Python override and a temporary cached test-runtime junction for Playwright
+  and PGlite; the junction and all disposable Docker resources were removed.
 - Node syntax, `git diff --check`, and secret/host scan: `PASS`.
 - Migration SHA-256:
   `586f46373c6068a050083aff1034d7e661d5b5f046afe88d5a481d8f095894dd`.
 - Rollback SHA-256:
   `57b550f5a136a610c85e89912cd8322239fd220456dbb4446be223da35e5bd2b`.
-- Draft-PR GitHub Docker/regression and isolated Supabase Preview: pending push.
+- Draft PR #68 previously passed GitHub Docker/regression, Vercel, and isolated
+  Supabase Preview at `a1b54d77eea5dfe509846fe7be45d1998246ddce`.
+  The final exact-head status is recorded after this evidence update is pushed.
 
 ## Boundaries and rollback
 
@@ -92,6 +102,11 @@ migrations to its isolated, data-less, separately credentialed ephemeral
 Supabase Preview branch tied to the draft PR. When it does, that status is:
 
 `AUTOMATIC ISOLATED SUPABASE PREVIEW MIGRATION - ACCEPTED CI VERIFICATION`
+
+Material limitation: the exact `390x844` protected Preview smoke reached the
+ordinary app entry state, not the synthetic signed-in conflict fixture. The
+conflict-specific interaction evidence remains the local synthetic desktop and
+mobile Browser journey above, supplemented by the exact focused contracts.
 
 R2-07E remains conditional on R2-07D exact-head Level 3 PASS and merge. No
 production mutation is authorized in this phase.

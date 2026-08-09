@@ -92,6 +92,7 @@ try {
       ('patch-game','${ACCOUNT}','PATCH001','Initial','2026-08-09','in-progress','active'),
       ('dismiss-game','${ACCOUNT}','DISMISS1','Initial','2026-08-09','in-progress','active'),
       ('stale-game','${ACCOUNT}','STALE001','Initial','2026-08-09','in-progress','active'),
+      ('patch-stale-game','${ACCOUNT}','PSTALE01','Initial','2026-08-09','in-progress','active'),
       ('delete-game','${ACCOUNT}','DELETE01','Initial','2026-08-09','in-progress','active'),
       ('revoked-game','${ACCOUNT}','REVOKE01','Initial','2026-08-09','in-progress','active');
   `);
@@ -124,6 +125,14 @@ try {
   const staleResult = resolutionCall(main, ACCOUNT, resolution(stale, "resolve-stale", "apply_proposed"));
   check(staleResult.code === "resolution_stale" && psql(main, "select opponent from public.games where id='stale-game';").stdout === "newer-current", "stale resolution cannot overwrite newer evidence");
   check(psql(main, `select count(*) from public.game_conflicts where parent_conflict_id='${stale.conflict_id}';`).stdout === "1", "stale resolution creates one linked immutable conflict");
+
+  const stalePatch = makeConflict(main, "patch-stale-game", "patch-stale");
+  const newerPatchBase = gameCall(main, gameOperation({ id: "patch-stale-remote", game: "patch-stale-game", base: 2, changes: { opponent: "newer-patch-current" } }));
+  assert.equal(newerPatchBase.outcome, "accepted");
+  const stalePatchResult = resolutionCall(main, ACCOUNT, resolution(stalePatch, "resolve-patch-stale", "apply_patch", { location: "Must Not Apply" }));
+  check(stalePatchResult.code === "resolution_stale"
+    && psql(main, "select opponent||'|'||coalesce(location,'') from public.games where id='patch-stale-game';").stdout === "newer-patch-current|",
+  "apply_patch requires exact current versions and cannot overwrite a newer value");
 
   const revoked = makeConflict(main, "revoked-game", "revoked");
   psql(main, `update public.games set user_id='${OTHER}' where id='revoked-game';`);
