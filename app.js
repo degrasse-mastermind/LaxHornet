@@ -22,6 +22,7 @@ const STORAGE_KEYS = {
   familyRecapFocus: "laxhornet.familyRecapFocus",
   trustSpineSync: "laxhornet.trustSpineSync.v1",
   syncOperations: "laxhornet.syncOperations.v1",
+  r207FieldSync: "laxhornet.r207FieldSync.v1",
 };
 
 // LOCAL_STORAGE_SAFETY_CORE_START
@@ -389,6 +390,8 @@ const isStorageObjectArray = (value) => Array.isArray(value) && value.every(isSt
 const isStorageStringArray = (value) => Array.isArray(value) && value.every(isStorageString);
 const isStorageDurableSyncOperationState = (value) =>
   window.LaxHornetDurableSyncOperations?.isStoredState(value) === true;
+const isStorageR207FieldSyncState = (value) =>
+  window.LaxHornetR207FieldOperations?.isStoredState(value) === true;
 const STORAGE_DOMAIN_DEFINITIONS = new Map([
   [STORAGE_KEYS.games, { domain: "saved_games", validate: isStorageObjectArray, critical: true }],
   [STORAGE_KEYS.activeGame, { domain: "active_game", validate: isStorageNullableObject, critical: true }],
@@ -408,11 +411,13 @@ const STORAGE_DOMAIN_DEFINITIONS = new Map([
   [STORAGE_KEYS.nextGameFocus, { domain: "next_game_focus", validate: isStorageNullableObject, critical: false }],
   [STORAGE_KEYS.trustSpineSync, { domain: "event_operation_state", validate: isStorageNullableObject, critical: true }],
   [STORAGE_KEYS.syncOperations, { domain: "game_clock_operation_state", validate: isStorageDurableSyncOperationState, critical: true }],
+  [STORAGE_KEYS.r207FieldSync, { domain: "r207_field_operation_state", validate: isStorageR207FieldSyncState, critical: true }],
   [STORAGE_KEYS.trackingSession, { domain: "tracking_session", validate: isStorageNullableObject, critical: true }],
   [STORAGE_KEYS.reviewGameId, { domain: "review_game_id", validate: isStorageNullableString, critical: false }],
 ]);
 
 const RUNTIME_CONFIG = window.LAXHORNET_RUNTIME_CONFIG || {};
+const R207B_CONTROLLED_PREVIEW = RUNTIME_CONFIG.r207bControlledPreview === true;
 const SUPABASE_CONFIG = {
   url: RUNTIME_CONFIG.supabaseUrl || "https://ulbmjcvnyznvmjgpstno.supabase.co",
   publishableKey: RUNTIME_CONFIG.supabasePublishableKey || "sb_publishable_-RUc79OPosRLNP5B6JIH2A_f3I_2A0M",
@@ -982,6 +987,8 @@ let sharedGamePollTimer = null;
 let trustSpineSyncInFlight = null;
 let gameEventOperationService = null;
 let durableSyncOperationService = null;
+let r207FieldOperationService = null;
+let r207PreviewCapabilityState = { enabled: false, checkedAt: 0, error: "" };
 let trackedPlayingTimeService = null;
 let trackedPlayingTimeCloudAvailability = "unknown";
 let cloudGameHydrationGeneration = 0;
@@ -1054,6 +1061,7 @@ const state = {
   nextGameFocus: initialStoredState.nextGameFocus,
   trustSpineSync: initialStoredState.trustSpineSync,
   syncOperations: initialStoredState.syncOperations,
+  r207FieldSync: initialStoredState.r207FieldSync,
   focusEditorContext: "",
   gameSetupReturnScreen: "home",
   signupDraft: null,
@@ -1271,6 +1279,12 @@ function readStoredAccountState(userId = activeStorageUserId) {
         acknowledgments: {},
       }),
       userId,
+    ),
+    r207FieldSync: window.LaxHornetR207FieldOperations.normalizeState(
+      loadJSON(
+        STORAGE_KEYS.r207FieldSync,
+        window.LaxHornetR207FieldOperations.emptyState(),
+      ),
     ),
     adminViewMode,
   };
@@ -3269,6 +3283,15 @@ function normalizeGame(game = {}, fallbackPlayer = null) {
     scoreTrackingTouched,
     finalScoreFor,
     finalScoreAgainst,
+    serverVersions: Object.fromEntries(
+      Object.entries(game.serverVersions && typeof game.serverVersions === "object" ? game.serverVersions : {})
+        .filter(([, value]) => Number.isSafeInteger(Number(value)) && Number(value) >= 1)
+        .map(([key, value]) => [key, Number(value)]),
+    ),
+    scoreKnown: game.scoreKnown === true,
+    lifecycleState: ["active", "paused", "completed"].includes(game.lifecycleState)
+      ? game.lifecycleState
+      : game.status === "complete" ? "completed" : "active",
     events: (game.events || [])
       .filter((event) => !isDeletedEvent(event.id))
       .map((event) => normalizeEvent({ ...event, teamId: event.teamId || event.team_id || teamId, rosterPlayerId: event.rosterPlayerId || event.roster_player_id || rosterPlayerId }, id)),
@@ -3298,6 +3321,9 @@ function persistAll() {
   saveJSON(STORAGE_KEYS.nextGameFocus, normalizeNextGameFocus(state.nextGameFocus));
   saveJSON(STORAGE_KEYS.trustSpineSync, normalizeTrustSpineSyncState(state.trustSpineSync));
   saveJSON(STORAGE_KEYS.syncOperations, state.syncOperations);
+  if (state.r207FieldSync !== undefined) {
+    saveJSON(STORAGE_KEYS.r207FieldSync, state.r207FieldSync);
+  }
   if (state.nextGameFocus?.text && nextGameFocusMatchesPlayer(state.nextGameFocus, state.player)) {
     saveScopedNextGameFocus(state.nextGameFocus, state.player);
   }
@@ -5265,6 +5291,14 @@ function cloudProjectionMetadataForRow(row = {}, events = null) {
     created_at: "createdAt",
     saved_at: "savedAt",
     ended_at: "endedAt",
+    game_revision: "serverVersions",
+    metadata_version: "serverVersions",
+    score_version: "serverVersions",
+    status_version: "serverVersions",
+    roster_context_version: "serverVersions",
+    sharing_version: "serverVersions",
+    score_known: "scoreKnown",
+    lifecycle_state: "lifecycleState",
   };
   const eventFieldMap = {
     id: "id",
@@ -5321,6 +5355,16 @@ function gameFromSupabaseRow(row, events = null) {
     createdAt: row.created_at,
     savedAt: row.saved_at,
     endedAt: row.ended_at,
+    serverVersions: {
+      gameRevision: Number(row.game_revision),
+      metadataVersion: Number(row.metadata_version),
+      scoreVersion: Number(row.score_version),
+      statusVersion: Number(row.status_version),
+      rosterContextVersion: Number(row.roster_context_version),
+      sharingVersion: Number(row.sharing_version),
+    },
+    scoreKnown: row.score_known === true,
+    lifecycleState: row.lifecycle_state || (row.status === "complete" ? "completed" : "active"),
     events: projectedEvents
       .map(eventFromSupabaseRow)
       .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)),
@@ -5624,7 +5668,10 @@ async function upsertWithOptionalColumns(table, payload, optionalColumns = []) {
 function cloudGameMergePolicy() {
   return {
     identity: ["id"],
-    cloudAuthoritative: ["userId", "teamId", "rosterPlayerId", "shareCode", "isShared"],
+    cloudAuthoritative: [
+      "userId", "teamId", "rosterPlayerId", "shareCode", "isShared",
+      "serverVersions", "scoreKnown", "lifecycleState",
+    ],
     localAuthoritative: [
       "scoreFor",
       "scoreAgainst",
@@ -5727,17 +5774,14 @@ function mergeHydratedEvent(
   return normalizeEvent(merged, localEvent.gameId || cloudEvent.gameId);
 }
 
-function mergeHydratedGame(localGame, cloudGame) {
+function mergeHydratedGame(localGame, cloudGame, options = {}) {
   const local = normalizeGame(localGame);
   const cloud = normalizeGame(cloudGame);
   const metadata = cloudGameHydrationMetadata.get(cloudGame);
   const projectedFields = metadata?.gameFields || new Set(Object.keys(cloudGame || {}));
   const policy = cloudGameMergePolicy();
-  const acceptCloudConflictFields = cloudConflictFieldsAreCurrent(
-    local,
-    cloud,
-    projectedFields,
-  );
+  const acceptCloudConflictFields = options.forceCloudConflictFields === true
+    || cloudConflictFieldsAreCurrent(local, cloud, projectedFields);
   const merged = { ...local };
 
   for (const field of policy.cloudAuthoritative) {
@@ -5804,7 +5848,9 @@ function mergeGames(localGames, cloudGames, options = {}) {
         : merged.get(cloudGame.id);
       merged.set(
         cloudGame.id,
-        localGame ? mergeHydratedGame(localGame, cloudGame) : normalizeGame(cloudGame),
+        localGame ? mergeHydratedGame(localGame, cloudGame, {
+          forceCloudConflictFields: options.forceCloudGameIds?.includes(cloudGame.id) === true,
+        }) : normalizeGame(cloudGame),
       );
     });
   return [...merged.values()].sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
@@ -6328,11 +6374,18 @@ async function loadCloudGames(options = {}) {
     ))
     .filter(canShowGameForCurrentAccess);
   const cloudGames = filterTombstonedHydrationCandidates(remoteCandidates, tombstonedIds);
+  if (globalThis.window?.LAXHORNET_RUNTIME_CONFIG?.r207bControlledPreview === true) {
+    for (const cloudGame of cloudGames) {
+      if (window.LaxHornetR207FieldOperations.hasRequiredVersions(cloudGame.serverVersions)) {
+        r207FieldService().hydrate(cloudGame.id, cloudGame.serverVersions);
+      }
+    }
+  }
   const localCandidates = filterTombstonedHydrationCandidates(state.games, tombstonedIds);
   state.games = mergeGames(
     localCandidates,
     cloudGames,
-    { activeGame: state.activeGame },
+    { activeGame: state.activeGame, forceCloudGameIds: options.forceCloudGameIds || [] },
   )
     .filter(canShowGameForCurrentAccess)
     .filter((game) => !hydrationCandidateIsTombstoned(game, tombstonedIds));
@@ -7806,6 +7859,130 @@ function durableSyncService() {
   return durableSyncOperationService;
 }
 
+function persistR207FieldSyncState(nextState = state.r207FieldSync) {
+  const definition = STORAGE_DOMAIN_DEFINITIONS.get(STORAGE_KEYS.r207FieldSync);
+  const result = localStorageSafety.write({
+    primaryKey: scopedStorageKey(STORAGE_KEYS.r207FieldSync),
+    domain: definition.domain,
+    value: nextState,
+    validate: definition.validate,
+  });
+  if (!result?.ok) scheduleStorageHealthNotice(localStorageSafety.healthSnapshot());
+  return result?.ok === true;
+}
+
+function r207ConflictForGame(gameId = "") {
+  if (!R207B_CONTROLLED_PREVIEW) return null;
+  const conflict = state.r207FieldSync?.conflicts?.[gameId] || null;
+  return conflict?.refreshedAt ? null : conflict;
+}
+
+async function r207PreviewCapabilityAvailable(options = {}) {
+  const now = Date.now();
+  if (!R207B_CONTROLLED_PREVIEW || !supabaseClient || state.isOffline) return false;
+  if (!options.force && now - r207PreviewCapabilityState.checkedAt < 30_000) {
+    return r207PreviewCapabilityState.enabled;
+  }
+  const { data, error } = await supabaseClient.rpc("laxhornet_r207_preview_capability");
+  const value = Array.isArray(data) ? data[0] : data;
+  r207PreviewCapabilityState = {
+    enabled: !error && value?.enabled === true && value?.productionActivation === false,
+    checkedAt: now,
+    error: readableSupabaseError(error),
+  };
+  return r207PreviewCapabilityState.enabled;
+}
+
+function applyR207AcceptedResult(operation, result = {}) {
+  const server = result.server_game || {};
+  const resultVersions = window.LaxHornetR207FieldOperations.normalizeVersionMap(result.versions || {}) || {};
+  const update = (game) => {
+    if (!game || game.id !== operation.gameId) return game;
+    return normalizeGame({
+      ...game,
+      opponent: Object.hasOwn(server, "opponent") ? server.opponent : game.opponent,
+      date: Object.hasOwn(server, "game_date") ? server.game_date : game.date,
+      location: Object.hasOwn(server, "location") ? server.location : game.location,
+      gameType: Object.hasOwn(server, "game_type") ? server.game_type : game.gameType,
+      savedAt: server.saved_at || game.savedAt,
+      lifecycleState: server.lifecycle_state || game.lifecycleState,
+      scoreKnown: Object.hasOwn(server, "score_known") ? server.score_known === true : game.scoreKnown,
+      serverVersions: { ...(game.serverVersions || {}), ...resultVersions },
+    });
+  };
+  state.games = state.games.map(update);
+  state.activeGame = update(state.activeGame);
+  state.syncStatus = result.outcome === "merged" ? "Synced safely with another device" : "Synced";
+  persistAll();
+  render();
+}
+
+function r207FieldService() {
+  if (r207FieldOperationService) return r207FieldOperationService;
+  r207FieldOperationService = window.LaxHornetR207FieldOperations.createFieldOperationService({
+    getState: () => state.r207FieldSync,
+    setState: (next) => { state.r207FieldSync = next; },
+    persistState: persistR207FieldSyncState,
+    currentAccountId: currentUserId,
+    isOffline: () => state.isOffline,
+    execute: async (request) => {
+      if (!(await r207PreviewCapabilityAvailable())) {
+        return { outcome: "rejected", code: "r207_not_activated" };
+      }
+      const { data, error, status } = await supabaseClient.rpc("laxhornet_sync_game_v2", { p_operation: request });
+      if (error) return durableSyncFailure({ error, httpStatus: status }, { source: "r207_game_field_rpc" });
+      return data || { outcome: "rejected", code: "empty_r207_response" };
+    },
+    onAccepted: applyR207AcceptedResult,
+    onConflict: () => {
+      state.syncStatus = "Sync needs attention";
+      persistAll();
+      render();
+    },
+    onRejected: (_operation, result = {}) => {
+      state.syncStatus = result.code === "authorization_denied"
+        ? "This account cannot save that game"
+        : result.outcome === "retryable" ? "Sync waiting to retry" : "Sync needs preview setup";
+      persistAll();
+      render();
+    },
+  });
+  return r207FieldOperationService;
+}
+
+async function saveReviewedGameWithR207Metadata(before, after, message = "Game details saved") {
+  const updatedGame = normalizeGame({ ...after, savedAt: new Date().toISOString() });
+  upsertGame(updatedGame);
+  if (state.activeGame?.id === updatedGame.id) state.activeGame = updatedGame;
+  persistAll();
+  showToast(message);
+  if (state.isOffline) {
+    state.syncStatus = "Saved on this phone";
+    return false;
+  }
+  let request;
+  try {
+    request = window.LaxHornetR207FieldOperations.buildMetadataOperation({
+      before,
+      after: updatedGame,
+      clientOperationId: uid("game-field"),
+      createdAt: Date.now(),
+    });
+  } catch {
+    state.syncStatus = "Saved on this phone";
+    return false;
+  }
+  const queued = await r207FieldService().queue(request);
+  if (!queued) {
+    state.syncStatus = r207ConflictForGame(updatedGame.id) ? "Sync needs attention" : "Saved on this phone";
+    render();
+    return false;
+  }
+  state.syncStatus = "Syncing";
+  render();
+  return r207FieldService().process();
+}
+
 function durableSyncFailure(error, options = {}) {
   return window.LaxHornetDurableSyncOperations.classifyFailure(error, options);
 }
@@ -8251,6 +8428,13 @@ async function syncTrackedClockPayload(clockPayload) {
 
 async function syncGameToSupabase(game, options = {}) {
   if (!supabaseClient || !game || isDeletedGame(game.id)) return false;
+  if (
+    globalThis.window?.LAXHORNET_RUNTIME_CONFIG?.r207bControlledPreview === true
+    && r207ConflictForGame(game.id)
+  ) {
+    state.syncStatus = "Sync needs attention";
+    return false;
+  }
   const queued = queueLegacyGameOperation(game, options);
   if (!queued) {
     state.syncStatus = "Saved on this phone";
@@ -11604,6 +11788,36 @@ function renderGameEditForm(game) {
   `;
 }
 
+function renderR207ConflictNotice(game) {
+  const conflict = r207ConflictForGame(game?.id);
+  if (!conflict) return "";
+  return `
+    <section class="card pad r207-conflict-notice" role="status" aria-live="polite">
+      <h3>Game update needs attention</h3>
+      <p>${escapeHTML(window.LaxHornetR207FieldOperations.CONFLICT_MESSAGE)}</p>
+      <p class="muted small">Your attempted change is retained on this device. No newer server value was overwritten.</p>
+      <button class="btn secondary" type="button" data-action="refresh-r207-conflict" data-game-id="${escapeHTML(game.id)}">Refresh game</button>
+    </section>
+  `;
+}
+
+async function refreshR207Conflict(gameId = "") {
+  if (!gameId || !r207ConflictForGame(gameId)) return false;
+  await loadCloudGames({ silent: true, forceCloudGameIds: [gameId] });
+  const refreshed = state.games.find((game) => game.id === gameId);
+  if (!refreshed || !window.LaxHornetR207FieldOperations.hasRequiredVersions(refreshed.serverVersions)) {
+    showToast("Could not refresh the latest game");
+    return false;
+  }
+  r207FieldService().markConflictRefreshed(gameId, refreshed.serverVersions);
+  state.reviewGameId = gameId;
+  state.syncStatus = "Latest game loaded";
+  persistAll();
+  render();
+  showToast("Latest saved game loaded");
+  return true;
+}
+
 function suggestedTagsForEvent(event) {
   return TAG_SUGGESTIONS[event.statType] || [];
 }
@@ -13881,6 +14095,7 @@ function renderReview() {
     </section>
 
     <section class="stack review-screen-stack lh-review-page">
+      ${renderR207ConflictNotice(game)}
       ${renderReviewSummarySection(game, player, totals)}
       ${renderTrackedPlayingTimeReview(game, canEditCurrentGame)}
       ${renderGameStorySection(postGameIntelligence)}
@@ -15321,7 +15536,21 @@ function handleSubmit(event) {
     state.activePlayerId = selectedPlayer.id;
     syncActivePlayer();
     state.reviewGameId = updatedGame.id;
-    saveReviewedGame(updatedGame, "Game details saved");
+    const versionedPreviewGame = R207B_CONTROLLED_PREVIEW
+      && window.LaxHornetR207FieldOperations.hasRequiredVersions(game.serverVersions);
+    if (
+      versionedPreviewGame
+      && (selectedPlayer.id !== gamePlayerId(game) || nextPeriodFormat !== periodFormatForGame(game))
+    ) {
+      showToast("Player and game format changes are not available in this preview");
+      render();
+      return;
+    }
+    if (versionedPreviewGame) {
+      void saveReviewedGameWithR207Metadata(game, updatedGame, "Game details saved");
+    } else {
+      saveReviewedGame(updatedGame, "Game details saved");
+    }
     render();
   }
 
@@ -15529,6 +15758,9 @@ function handleClick(event) {
     if (action.dataset.action === "cancel-edit-game") {
       state.editingGameDetails = false;
       render();
+    }
+    if (action.dataset.action === "refresh-r207-conflict") {
+      void refreshR207Conflict(action.dataset.gameId);
     }
     if (action.dataset.action === "cancel-tags") {
       state.tagEditingEventId = null;

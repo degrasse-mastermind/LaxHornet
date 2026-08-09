@@ -427,6 +427,21 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   Production migration history and deployment remain unchanged. R2-07B+,
   production, deployment, activation, release/cache changes, and merge remain
   unauthorized. Repository and production runtime remain v285.
+- R2-07B controlled Preview integration is implemented on
+  `feature/r2-07b-controlled-preview-integration` from approved main
+  `3e990ddcec06dbe660703db5fdbf8c12df0ad485`. It adds lossless game version
+  hydration, durable immutable-after-attempt field operations, safe builders,
+  persisted receipts/conflicts, and the first bounded Game Review metadata
+  caller. Browser and server gates both default off. The migration leaves the
+  server control disabled; only the data-less isolated Supabase Preview seed
+  enables it, and only the Vercel Preview build injects the client flag and
+  separate Preview publishable configuration. A stale overlap is retained
+  locally, never blindly retried or sent through legacy whole-game overwrite,
+  and displays only `This game changed on another device. Refresh before
+  saving again.` Production remains v285/v1 with unchanged migration history,
+  release markers, deployment, Live Share, retention, clock/event behavior,
+  and data. Draft-PR managed Preview and independent exact-head Level 3 review
+  remain required; R2-07C+ is unauthorized.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The repository cache marker is `laxhornet-v285`. The updated service worker purges

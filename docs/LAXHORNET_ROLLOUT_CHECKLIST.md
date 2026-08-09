@@ -312,6 +312,38 @@ repair, client cutover, deployment, production access, activation, merge, or
 R2-07B through R2-07F. The automatic PR-lifecycle Preview application is
 accepted CI verification. Production and the active runtime remain at v285.
 
+### R2-07B — Controlled Preview Client Integration
+
+**Status:** [!] Implemented on feature branch; managed Preview and independent
+exact-head Level 3 review pending
+
+**Risk level:** Level 3 — Critical synchronization, conflict, migration, and
+authorization behavior
+
+**Branch:** `feature/r2-07b-controlled-preview-integration`
+
+- [x] Start from approved main `3e990ddcec06dbe660703db5fdbf8c12df0ad485`.
+- [x] Hydrate complete server game/field version maps without defaulting a
+  missing base or discarding future version fields.
+- [x] Add durable identified field-operation builders and persist accepted,
+  merged, conflicted, deleted, authorization, and retryable outcomes
+  truthfully.
+- [x] Connect the canonical Game Review metadata path behind a browser flag
+  that defaults off; preserve v1 as the production path.
+- [x] Keep the server bridge disabled by migration default and enable it only
+  through data-less Supabase Preview seed behavior.
+- [x] Add a minimal safe refresh notice, retain the local proposal, block blind
+  retry and legacy overwrite, and display no conflict payload or internal ID.
+- [x] Prove two-session stale overlap, approved non-overlap, mobile layout,
+  authorization denial, tombstone behavior, offline retention, and flag-off
+  behavior with synthetic evidence.
+- [ ] Managed Supabase Preview and Vercel Preview pass at the exact PR head.
+- [ ] Independent exact-head Level 3 review passes before merge.
+
+R2-07B does not authorize production activation/application/deployment, v1
+cutoff, retention deletion, release/cache changes, Live Share disclosure
+changes, clock/event cutover, merge, or R2-07C through R2-07F.
+
 ## R2-04 — Durable Game and Clock Operation States
 
 **Status:** [x] Complete

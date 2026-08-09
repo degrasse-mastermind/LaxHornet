@@ -136,6 +136,353 @@
   });
 })(window);
 
+(function initializeR207FieldOperations(global) {
+  "use strict";
+
+  const SCHEMA_VERSION = 1;
+  const MAX_RECEIPTS = 100;
+  const VERSION_FIELDS = Object.freeze({
+    metadata: "metadataVersion",
+    score: "scoreVersion",
+    status: "statusVersion",
+    roster_context: "rosterContextVersion",
+    sharing: "sharingVersion",
+  });
+  const OPERATION_TYPES = Object.freeze({
+    metadata: "metadata_patch",
+    scoreDelta: "score_delta",
+    scoreCorrection: "score_correction",
+    status: "status_transition",
+    rosterContext: "roster_context_patch",
+    sharing: "sharing_patch",
+  });
+  const CONFLICT_MESSAGE = "This game changed on another device. Refresh before saving again.";
+  const copy = (value) => JSON.parse(JSON.stringify(value));
+  const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  const timestamp = (value = Date.now()) => new Date(value).toISOString();
+
+  function canonicalValue(value) {
+    if (Array.isArray(value)) return value.map(canonicalValue);
+    if (!isObject(value)) return value;
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalValue(value[key])]));
+  }
+
+  async function sha256(value) {
+    const subtle = global.crypto?.subtle;
+    if (!subtle) throw new Error("SHA-256 is unavailable");
+    const bytes = new TextEncoder().encode(JSON.stringify(canonicalValue(value)));
+    const digest = await subtle.digest("SHA-256", bytes);
+    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+
+  function normalizeVersionMap(value = {}) {
+    if (!isObject(value)) return null;
+    const normalized = {};
+    const aliases = {
+      game: "gameRevision",
+      metadata: "metadataVersion",
+      score: "scoreVersion",
+      status: "statusVersion",
+      roster_context: "rosterContextVersion",
+      sharing: "sharingVersion",
+    };
+    for (const [key, raw] of Object.entries(value)) {
+      const number = Number(raw);
+      if (!Number.isSafeInteger(number) || number < 1) return null;
+      normalized[aliases[key] || key] = number;
+    }
+    return normalized;
+  }
+
+  function hasRequiredVersions(value = {}) {
+    const versions = normalizeVersionMap(value);
+    return Boolean(versions && Object.values(VERSION_FIELDS).every((key) => Number.isSafeInteger(versions[key])));
+  }
+
+  function emptyState() {
+    return { schemaVersion: SCHEMA_VERSION, versionMaps: {}, operations: [], receipts: [], conflicts: {} };
+  }
+
+  function isStoredState(value) {
+    return isObject(value)
+      && Number.isInteger(Number(value.schemaVersion))
+      && isObject(value.versionMaps || {})
+      && Array.isArray(value.operations || [])
+      && Array.isArray(value.receipts || [])
+      && isObject(value.conflicts || {});
+  }
+
+  function normalizeState(value = null) {
+    if (!isStoredState(value)) return emptyState();
+    if (Number(value.schemaVersion) > SCHEMA_VERSION) return copy(value);
+    const source = copy(value);
+    const versionMaps = {};
+    for (const [gameId, versions] of Object.entries(source.versionMaps || {})) {
+      const normalized = normalizeVersionMap(versions);
+      if (gameId && normalized) versionMaps[gameId] = normalized;
+    }
+    return {
+      ...source,
+      schemaVersion: SCHEMA_VERSION,
+      versionMaps,
+      operations: (source.operations || []).filter((item) => isObject(item) && item.clientOperationId && item.gameId),
+      receipts: (source.receipts || []).filter(isObject).slice(-MAX_RECEIPTS),
+      conflicts: Object.fromEntries(Object.entries(source.conflicts || {}).filter(([, item]) => isObject(item))),
+    };
+  }
+
+  function operationBase({ game, fieldGroup, operationType, changedFields, changes, clientOperationId, createdAt }) {
+    const gameId = String(game?.id || "").trim();
+    const versions = normalizeVersionMap(game?.serverVersions);
+    const versionKey = VERSION_FIELDS[fieldGroup];
+    if (!gameId || !versions || !Number.isSafeInteger(versions[versionKey])) {
+      throw new TypeError("A hydrated server base is required");
+    }
+    const fields = [...new Set(changedFields)].sort();
+    if (!fields.length || !isObject(changes)) throw new TypeError("A bounded field change is required");
+    const result = {
+      client_operation_id: String(clientOperationId || "").trim(),
+      game_id: gameId,
+      operation_type: operationType,
+      field_group: fieldGroup,
+      base_version: versions[versionKey],
+      changed_fields: fields,
+      changes: copy(changes),
+      client_created_at: timestamp(createdAt),
+    };
+    if (!result.client_operation_id) throw new TypeError("A permanent client operation ID is required");
+    return result;
+  }
+
+  function buildMetadataOperation(options = {}) {
+    const before = options.before || {};
+    const after = options.after || {};
+    const mapping = {
+      opponent: "opponent",
+      date: "game_date",
+      location: "location",
+      gameType: "game_type",
+    };
+    const changes = {};
+    const changedFields = [];
+    for (const [local, server] of Object.entries(mapping)) {
+      if (after[local] !== before[local]) {
+        changedFields.push(server);
+        changes[server] = after[local];
+      }
+    }
+    return operationBase({
+      ...options,
+      game: before,
+      fieldGroup: "metadata",
+      operationType: OPERATION_TYPES.metadata,
+      changedFields,
+      changes,
+    });
+  }
+
+  function buildScoreDeltaOperation(options = {}) {
+    const changes = {};
+    const changedFields = [];
+    for (const side of ["score_for", "score_against"]) {
+      const amount = Number(options.deltas?.[side] || 0);
+      if (!Number.isInteger(amount) || amount === 0) continue;
+      changedFields.push(side);
+      changes[`${side}_delta`] = amount;
+    }
+    return {
+      ...operationBase({ ...options, fieldGroup: "score", operationType: OPERATION_TYPES.scoreDelta, changedFields, changes }),
+      expected_lifecycle: String(options.game?.lifecycleState || "active"),
+      status_base_version: options.game.serverVersions.statusVersion,
+    };
+  }
+
+  function buildScoreCorrectionOperation(options = {}) {
+    const changes = {
+      score_for: Number(options.scoreFor),
+      score_against: Number(options.scoreAgainst),
+    };
+    if (!Object.values(changes).every((value) => Number.isInteger(value) && value >= 0)) {
+      throw new TypeError("Scores must be nonnegative integers");
+    }
+    const result = {
+      ...operationBase({ ...options, fieldGroup: "score", operationType: OPERATION_TYPES.scoreCorrection, changedFields: ["score_against", "score_for"], changes }),
+      expected_lifecycle: String(options.game?.lifecycleState || "active"),
+      status_base_version: options.game.serverVersions.statusVersion,
+    };
+    if (options.correctionReason) result.correction_reason = String(options.correctionReason);
+    return result;
+  }
+
+  function buildStatusOperation(options = {}) {
+    return {
+      ...operationBase({ ...options, fieldGroup: "status", operationType: OPERATION_TYPES.status, changedFields: ["lifecycle_state"], changes: { lifecycle_state: options.lifecycleState } }),
+      expected_lifecycle: String(options.game?.lifecycleState || "active"),
+      status_base_version: options.game.serverVersions.statusVersion,
+    };
+  }
+
+  function buildRosterContextOperation(options = {}) {
+    return operationBase({ ...options, fieldGroup: "roster_context", operationType: OPERATION_TYPES.rosterContext, changedFields: ["player_id"], changes: { player_id: String(options.playerId || "") } });
+  }
+
+  function buildSharingOperation(options = {}) {
+    return operationBase({ ...options, fieldGroup: "sharing", operationType: OPERATION_TYPES.sharing, changedFields: ["is_shared"], changes: { is_shared: options.isShared === true } });
+  }
+
+  async function finalizeOperation(operation) {
+    const request = copy(operation);
+    delete request.request_hash;
+    return { ...request, request_hash: await sha256(request) };
+  }
+
+  function createFieldOperationService(hooks = {}) {
+    const getState = hooks.getState;
+    const setState = hooks.setState;
+    const persistState = hooks.persistState;
+    const execute = hooks.execute;
+    const accountId = hooks.currentAccountId;
+    const isOffline = hooks.isOffline;
+    let processing = null;
+    const save = (next) => {
+      setState(next);
+      return persistState(next) === true;
+    };
+
+    async function queue(rawOperation) {
+      const operation = await finalizeOperation(rawOperation);
+      const state = normalizeState(getState());
+      if (Number(state.schemaVersion) > SCHEMA_VERSION) return null;
+      if (state.receipts.some((item) => item.clientOperationId === operation.client_operation_id)) {
+        return null;
+      }
+      const duplicate = state.operations.find((item) => item.clientOperationId === operation.client_operation_id);
+      if (duplicate) return copy(duplicate);
+      if (state.operations.some((item) => item.gameId === operation.game_id && item.fieldGroup === operation.field_group && item.state === "conflicted")) {
+        return null;
+      }
+      const stored = {
+        accountId: String(accountId() || ""),
+        clientOperationId: operation.client_operation_id,
+        gameId: operation.game_id,
+        fieldGroup: operation.field_group,
+        state: "pending",
+        attemptCount: 0,
+        createdAt: operation.client_created_at,
+        updatedAt: operation.client_created_at,
+        request: operation,
+        lastError: null,
+      };
+      const next = copy(state);
+      next.operations.push(stored);
+      return save(next) ? copy(stored) : null;
+    }
+
+    function mergeVersions(next, gameId, versions) {
+      const normalized = normalizeVersionMap(versions);
+      if (!normalized) return false;
+      next.versionMaps[gameId] = { ...(next.versionMaps[gameId] || {}), ...normalized };
+      return true;
+    }
+
+    function hydrate(gameId, versions) {
+      const state = normalizeState(getState());
+      if (Number(state.schemaVersion) > SCHEMA_VERSION) return false;
+      const next = copy(state);
+      return mergeVersions(next, gameId, versions) && save(next);
+    }
+
+    async function run() {
+      if (isOffline()) return false;
+      let changed = false;
+      for (let index = 0; index < 100; index += 1) {
+        const state = normalizeState(getState());
+        const operation = state.operations.find((item) => item.accountId === accountId() && ["pending", "retryable"].includes(item.state));
+        if (!operation) break;
+        const attempted = copy(state);
+        const attemptedIndex = attempted.operations.findIndex((item) => item.clientOperationId === operation.clientOperationId);
+        attempted.operations[attemptedIndex] = { ...attempted.operations[attemptedIndex], state: "syncing", attemptCount: operation.attemptCount + 1, updatedAt: timestamp(), lastError: null };
+        if (!save(attempted)) break;
+        let result;
+        try { result = await execute(copy(operation.request)); }
+        catch (error) { result = { outcome: "retryable", code: "network_unavailable", message: String(error?.message || "") }; }
+        const current = normalizeState(getState());
+        const currentIndex = current.operations.findIndex((item) => item.clientOperationId === operation.clientOperationId);
+        if (currentIndex < 0) continue;
+        const next = copy(current);
+        if (["accepted", "merged"].includes(result?.outcome) && mergeVersions(next, operation.gameId, result.versions)) {
+          next.receipts.push({ clientOperationId: operation.clientOperationId, gameId: operation.gameId, fieldGroup: operation.fieldGroup, outcome: result.outcome, replay: result.replay === true, versions: copy(result.versions), acceptedAt: timestamp() });
+          next.receipts = next.receipts.slice(-MAX_RECEIPTS);
+          next.operations[currentIndex] = { ...next.operations[currentIndex], state: "accepted", updatedAt: timestamp() };
+          if (!save(next)) break;
+          const compacted = normalizeState(getState());
+          compacted.operations = compacted.operations.filter((item) => item.clientOperationId !== operation.clientOperationId);
+          save(compacted);
+          hooks.onAccepted?.(operation, result);
+          changed = true;
+          continue;
+        }
+        if (result?.outcome === "conflicted") {
+          next.operations[currentIndex] = { ...next.operations[currentIndex], state: "conflicted", updatedAt: timestamp(), lastError: { category: "conflict", code: String(result.code || "field_conflict") } };
+          next.conflicts[operation.gameId] = { gameId: operation.gameId, fieldGroup: operation.fieldGroup, proposedChanges: copy(operation.request.changes), message: CONFLICT_MESSAGE, createdAt: timestamp() };
+          if (result.versions) mergeVersions(next, operation.gameId, result.versions);
+          save(next);
+          hooks.onConflict?.(operation, result);
+          continue;
+        }
+        const retryable = result?.outcome === "retryable";
+        next.operations[currentIndex] = { ...next.operations[currentIndex], state: retryable ? "retryable" : "rejected", updatedAt: timestamp(), lastError: { category: retryable ? "retryable_transport" : result?.code === "authorization_denied" ? "authorization_denied" : "rejected", code: String(result?.code || "operation_rejected") } };
+        save(next);
+        hooks.onRejected?.(operation, result);
+        if (retryable) break;
+      }
+      return changed;
+    }
+
+    function markConflictRefreshed(gameId, versions) {
+      const state = normalizeState(getState());
+      if (Number(state.schemaVersion) > SCHEMA_VERSION || !state.conflicts[gameId]) return false;
+      const next = copy(state);
+      const refreshedAt = timestamp();
+      next.conflicts[gameId] = { ...next.conflicts[gameId], refreshedAt };
+      next.operations = next.operations.map((item) => (
+        item.gameId === gameId && item.state === "conflicted"
+          ? { ...item, state: "superseded", updatedAt: refreshedAt }
+          : item
+      ));
+      if (versions && !mergeVersions(next, gameId, versions)) return false;
+      return save(next);
+    }
+
+    function process() {
+      if (!processing) processing = run().finally(() => { processing = null; });
+      return processing;
+    }
+
+    return Object.freeze({ queue, process, hydrate, markConflictRefreshed });
+  }
+
+  global.LaxHornetR207FieldOperations = Object.freeze({
+    SCHEMA_VERSION,
+    VERSION_FIELDS,
+    OPERATION_TYPES,
+    CONFLICT_MESSAGE,
+    emptyState,
+    isStoredState,
+    normalizeState,
+    normalizeVersionMap,
+    hasRequiredVersions,
+    buildMetadataOperation,
+    buildScoreDeltaOperation,
+    buildScoreCorrectionOperation,
+    buildStatusOperation,
+    buildRosterContextOperation,
+    buildSharingOperation,
+    finalizeOperation,
+    createFieldOperationService,
+  });
+})(window);
+
 (function initializeLaxHornetDurableSyncOperations(global) {
   "use strict";
 

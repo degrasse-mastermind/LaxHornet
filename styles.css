@@ -606,6 +606,16 @@ button:focus-visible,
   font-weight: 800;
 }
 
+.r207-conflict-notice {
+  border-left: 4px solid var(--warning, #b7791f);
+  background: color-mix(in srgb, var(--surface, #fff) 92%, #f6ad55);
+}
+
+.r207-conflict-notice h3,
+.r207-conflict-notice p {
+  margin-top: 0;
+}
+
 .lh-notice,
 .lh-notice-privacy {
   border: 1px solid rgba(232, 16, 16, 0.22);
