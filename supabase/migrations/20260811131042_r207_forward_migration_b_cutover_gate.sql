@@ -28,19 +28,9 @@ begin
     raise exception using errcode = 'P0001',
       message = 'R207_CUTOVER_GATE_ALREADY_INSTALLED';
   end if;
-  if coalesce((select preview_enabled from public.r207_preview_control where control_id), false)
-    and (
-      pg_catalog.md5(pg_catalog.replace(pg_catalog.pg_get_functiondef(
-        'public.laxhornet_sync_game(jsonb)'::regprocedure
-      ), pg_catalog.chr(13), '')) <> '5ed65c9a743d18d894389940402f5331'
-      or pg_catalog.has_table_privilege('authenticated', 'public.games', 'update')
-      or pg_catalog.has_table_privilege('authenticated', 'public.events', 'update')
-      or pg_catalog.has_function_privilege('authenticated', 'public.lh_update_game_clock(jsonb)', 'execute')
-      or not pg_catalog.has_function_privilege('authenticated', 'public.laxhornet_sync_game_v2(jsonb)', 'execute')
-    )
-  then
+  if coalesce((select preview_enabled from public.r207_preview_control where control_id), false) then
     raise exception using errcode = 'P0001',
-      message = 'R207_CUTOVER_GATE_PREFLIGHT_FAILED:ACTIVE_STATE_DRIFT';
+      message = 'R207_CUTOVER_GATE_PREFLIGHT_FAILED:CAPABILITY_NOT_DORMANT';
   end if;
 end;
 $preflight$;
@@ -123,24 +113,6 @@ $function$;
 
 revoke all on function lh_sync_private.r207_instrument_versioned_writer(regprocedure)
   from public, anon, authenticated;
-
--- A persistent isolated PR Preview may already contain an earlier reviewed
--- activation attempt. Repair only that exact active shape by installing the
--- same private transaction authorization the fresh activation installs. A
--- fresh dormant target remains in legacy mode with unchanged v2 definitions.
-do $active_preview_repair$
-begin
-  if coalesce((select preview_enabled from public.r207_preview_control where control_id), false) then
-    perform lh_sync_private.r207_instrument_versioned_writer('public.laxhornet_sync_game_v2(jsonb)'::regprocedure);
-    perform lh_sync_private.r207_instrument_versioned_writer('public.laxhornet_sync_event_v2(jsonb)'::regprocedure);
-    perform lh_sync_private.r207_instrument_versioned_writer('public.lh_apply_game_clock_operation_v2(jsonb)'::regprocedure);
-    perform lh_sync_private.r207_instrument_versioned_writer('public.lh_apply_game_clock_batch_v2(jsonb)'::regprocedure);
-    perform lh_sync_private.r207_instrument_versioned_writer('public.laxhornet_resolve_game_conflict_v1(jsonb)'::regprocedure);
-    perform lh_sync_private.r207_instrument_versioned_writer('public.laxhornet_delete_game_durable(jsonb)'::regprocedure);
-    update public.r207_preview_control set cutover_mode = 'v2' where control_id;
-  end if;
-end;
-$active_preview_repair$;
 
 create or replace function public.laxhornet_r207_cutover_write_gate()
 returns trigger

@@ -6,7 +6,7 @@
   "historicalPreflightPr": 73,
   "cutoverGate": {
     "path": "supabase/migrations/20260811131042_r207_forward_migration_b_cutover_gate.sql",
-    "sha256": "4d6018e2aae3c5f0c7aeaf4ef1817a1ab2f008348c95e7453b4a4a66ff7d998c",
+    "sha256": "2600577c36ae85ef7208909514e25c97056aec2c5771577162eee0a8c8489800",
     "modeAfter": "legacy",
     "productionActivation": false
   },
@@ -19,6 +19,12 @@
     "cutoverModeAfter": "v2",
     "transactional": true,
     "replayBehavior": "R207_ACTIVATION_ALREADY_APPLIED"
+  },
+  "postActivationVerification": {
+    "path": "supabase/migrations/20260811131044_r207_forward_migration_b_postactivation_verification.sql",
+    "sha256": "7bdf456e464d7437e1a4bb84d7602ac6b7a43302c70f7175e263d2f7c5d54ece",
+    "mutatesState": false,
+    "requiresActivatedExactState": true
   },
   "recovery": {
     "path": "supabase/rollback/20260811131043_r207_forward_migration_b_activation_rollback.sql",

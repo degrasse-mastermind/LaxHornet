@@ -80,6 +80,7 @@ export const R207_CLOCK_COMMAND_BATCH_REVIEW_DB_PATHS = Object.freeze([
 export const R207_FORWARD_MIGRATION_B_ACTIVATION_REVIEW_DB_PATHS = Object.freeze([
   "supabase/migrations/20260811131042_r207_forward_migration_b_cutover_gate.sql",
   "supabase/migrations/20260811131043_r207_forward_migration_b_activation.sql",
+  "supabase/migrations/20260811131044_r207_forward_migration_b_postactivation_verification.sql",
   "supabase/rollback/20260811131043_r207_forward_migration_b_activation_rollback.sql",
 ]);
 

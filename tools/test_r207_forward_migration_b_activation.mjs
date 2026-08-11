@@ -7,6 +7,7 @@ import path from "node:path";
 const root = path.resolve(import.meta.dirname, "..");
 const image = "postgres:17-alpine";
 const migrationFile = "20260811131043_r207_forward_migration_b_activation.sql";
+const verificationFile = "20260811131044_r207_forward_migration_b_postactivation_verification.sql";
 const recoveryFile = "20260811131043_r207_forward_migration_b_activation_rollback.sql";
 const migrations = [
   "20260723000000_laxhornet_legacy_baseline.sql",
@@ -107,7 +108,7 @@ grant execute on function auth.uid(), auth.jwt() to anon, authenticated;
 create publication supabase_realtime;
 `;
 
-async function start(label) {
+async function start(label, migrationNames = migrations) {
   const container = `laxhornet-r207b-activation-${label}-${process.pid}`;
   containers.add(container);
   docker(["run", "-d", "--rm", "--name", container, "-e", "POSTGRES_PASSWORD=synthetic-only", image]);
@@ -120,7 +121,7 @@ async function start(label) {
   }
   assert.ok(ready >= 3, `${label} disposable PostgreSQL target did not become ready`);
   psql(container, bootstrap);
-  for (const name of migrations) {
+  for (const name of migrationNames) {
     if (name === "20260730004700_team_members_rls_recursion.sql") {
       psql(container, `
         revoke all privileges on table public.team_members from anon, authenticated, service_role;
@@ -246,6 +247,8 @@ try {
   check(
     gitBlobSha256(path.join(root, binding.cutoverGate.path)) === binding.cutoverGate.sha256
       && gitBlobSha256(path.join(root, binding.activation.path)) === binding.activation.sha256
+      && gitBlobSha256(path.join(root, binding.postActivationVerification.path))
+        === binding.postActivationVerification.sha256
       && gitBlobSha256(path.join(root, binding.recovery.path)) === binding.recovery.sha256
       && crypto.createHash("sha256").update(exactRuntimeSet).digest("hex")
         === binding.client.runtimeClientSetSha256,
@@ -254,6 +257,8 @@ try {
   check(
     releaseManifest.r207ForwardMigrationBActivation.cutoverGateMigrationSha256 === binding.cutoverGate.sha256
       && releaseManifest.r207ForwardMigrationBActivation.activationMigrationSha256 === binding.activation.sha256
+      && releaseManifest.r207ForwardMigrationBActivation.postActivationVerificationMigrationSha256
+        === binding.postActivationVerification.sha256
       && releaseManifest.r207ForwardMigrationBActivation.recoveryArtifactSha256 === binding.recovery.sha256
       && releaseManifest.r207ForwardMigrationBActivation.runtimeClientSetSha256 === binding.client.runtimeClientSetSha256
       && releaseManifest.r207ForwardMigrationBActivation.preActivationRelationShapeMd5 === binding.preActivationCatalog.relationShapeMd5
@@ -337,6 +342,9 @@ try {
   psql(main, read("migrations", migrationFile));
   psql(main, "insert into supabase_migrations.schema_migrations values ('20260811131043','r207_forward_migration_b_activation');");
   check(true, "activation preconditions accept the exact certified schema");
+  psql(main, read("migrations", verificationFile));
+  psql(main, "insert into supabase_migrations.schema_migrations values ('20260811131044','r207_forward_migration_b_postactivation_verification');");
+  check(true, "inert post-activation verification accepts the exact committed state");
 
   const capability = parse(psql(main, `${claims(OWNER)} select public.laxhornet_r207_preview_capability()::text; reset role;`).stdout);
   const stubBefore = psql(main, "select opponent from public.games where id='legacy-game';").stdout;
@@ -496,6 +504,19 @@ try {
   check(failedApply.status !== 0 && /R207_SYNTHETIC_ACTIVATION_FAILURE/.test(failedApply.stderr)
     && failedState === "false,true,true",
   "mid-transaction failure rolls back capability, grants, and v1 function together");
+
+  const activeGate = await start("active-gate-refusal", migrations.slice(0, -1));
+  psql(activeGate, "update public.r207_preview_control set preview_enabled=true where control_id;");
+  const activeGateResult = psql(activeGate,
+    read("migrations", "20260811131042_r207_forward_migration_b_cutover_gate.sql"), true);
+  const activeGateState = psql(activeGate, `select preview_enabled::text||','||
+    (exists(select 1 from information_schema.columns where table_schema='public'
+      and table_name='r207_preview_control' and column_name='cutover_mode'))::text
+    from public.r207_preview_control where control_id;`).stdout;
+  check(activeGateResult.status !== 0
+      && activeGateResult.stderr.includes("R207_CUTOVER_GATE_PREFLIGHT_FAILED:CAPABILITY_NOT_DORMANT")
+      && activeGateState === "true,false",
+    "cutover gate deterministically refuses an active capability without adapting state");
 
   const activationRace = await start("activation-race");
   psql(activationRace, `insert into auth.users(id,email) values ('${OWNER}','race@example.invalid'); ${gameInsert("activation-race-game")}`);
