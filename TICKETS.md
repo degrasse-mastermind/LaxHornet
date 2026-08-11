@@ -2646,6 +2646,70 @@ Evidence:
 - `review-evidence/r2-07e-integrated-certification/BASELINE_MANIFEST.md`
 - `review-evidence/r2-07e-integrated-certification/R2-07E_CERTIFICATION_REPORT.md`
 
+#### Fresh V2 certification record
+
+- [x] PR #71 clock remediation squash-merged as certified product baseline
+  `b7269194a4ce8b9068b0d46c44d840efc4048c69` with tree
+  `f2f0a34f448481ec8856e346d415e1a1e7bde354`.
+- [x] Fresh disposable certification passed and is bound to evidence SHA
+  `c2726b0c1cd979a7af2b04bc9a0a25865f4636ea` on PR #72.
+- [x] Exact-head independent Level 3 review returned PASS for that SHA on
+  2026-08-11.
+
+### R2-07F — Production release
+
+Status: `STOPPED PRE-ACTIVATION — PRODUCTION REMAINS SAFE`
+
+Risk level: `LEVEL 3`
+
+Branch: `release/r2-07f-production`
+
+Certified product source: `b7269194a4ce8b9068b0d46c44d840efc4048c69`
+
+Certification evidence: `c2726b0c1cd979a7af2b04bc9a0a25865f4636ea`
+
+#### Goal
+
+Prepare and execute the bounded R2-07 production release only after every
+mandatory target, schema, runtime, recovery, compatibility, and atomic-cutover
+gate passes.
+
+#### Pre-mutation result
+
+- [x] Positively identified Supabase project `ulbmjcvnyznvmjgpstno`
+  (`LaxHornet`, `us-east-2`) and canonical GitHub Pages production domain
+  `https://laxhornet.mybranford.com`.
+- [x] Confirmed remote `main` and the release branch start at the certified
+  product SHA/tree; PR #72's evidence/tooling changes do not change deployable
+  product files.
+- [x] Read-only production inspection found all 17 certified migrations already
+  recorded, all required R2-07 relations/functions present, RLS and FORCE RLS
+  enabled, authenticated-only v2 RPC execution, the server control false,
+  retention disabled, and zero R2-07 operation/conflict/clock/event evidence.
+- [x] Confirmed production remains on v285 source
+  `9e434e33534a1b348b19e2081b91d7e0724299fc`; the certified R2-07-capable
+  runtime has not been deployed.
+- [x] Stopped before production mutation because the repository contains no
+  separately reviewed Forward Migration B activation artifact. The certified
+  runtime also hard-codes all four R2-07 client controls false. Creating the
+  activation SQL or enabling client flags would change source/runtime and,
+  under the release authorization, requires a new exact-head review before
+  production execution.
+
+#### Explicit exclusions preserved
+
+- No production deployment, schema application, activation, grant change,
+  release/cache change, synthetic fixture, credential entry, retention enablement,
+  merge, or R2-08 work occurred.
+- Legacy unversioned write authority was not changed. It remains the observed
+  pre-activation state and was not restored or broadened by this task.
+
+Evidence:
+
+- `review-evidence/r2-07f-production-release/README.md`
+- `review-evidence/r2-07f-production-release/PRE_MUTATION_GATE.json`
+- `review-evidence/r2-07f-production-release/CERTIFIED_INVENTORY.md`
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

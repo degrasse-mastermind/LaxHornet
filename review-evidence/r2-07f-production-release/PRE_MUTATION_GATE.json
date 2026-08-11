@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "status": "R2-07F PRODUCTION PREFLIGHT FAIL",
+  "finalDisposition": "R2-07F STOPPED PRE-ACTIVATION — PRODUCTION REMAINS SAFE",
+  "observedAt": "2026-08-11T06:26:15.045731Z",
+  "certifiedProductSha": "b7269194a4ce8b9068b0d46c44d840efc4048c69",
+  "certifiedProductTree": "f2f0a34f448481ec8856e346d415e1a1e7bde354",
+  "certificationEvidenceSha": "c2726b0c1cd979a7af2b04bc9a0a25865f4636ea",
+  "independentReview": "PASS",
+  "production": {
+    "supabaseProjectId": "ulbmjcvnyznvmjgpstno",
+    "supabaseProjectName": "LaxHornet",
+    "supabaseRegion": "us-east-2",
+    "postgresVersion": "17.6",
+    "frontendProvider": "GitHub Pages",
+    "frontendDomain": "https://laxhornet.mybranford.com",
+    "deployedSourceSha": "9e434e33534a1b348b19e2081b91d7e0724299fc",
+    "releaseMarker": "v285",
+    "cacheMarker": "laxhornet-v285",
+    "vercelProjectId": "prj_M6fl5dGasEk2dYAl8eH7nsblEpPk",
+    "vercelProjectName": "lax-hornet",
+    "vercelIsCanonicalProduction": false
+  },
+  "database": {
+    "certifiedMigrations": 17,
+    "recordedCertifiedMigrations": 17,
+    "pendingCertifiedMigrations": 0,
+    "previewEnabled": false,
+    "retentionExecutionEnabled": false,
+    "retentionDaysConfigured": false,
+    "requiredRelationsPresent": true,
+    "requiredRelationsRlsEnabled": true,
+    "requiredRelationsForceRls": true,
+    "requiredFunctionsPresent": true,
+    "authenticatedV2Execute": true,
+    "anonV2Execute": false,
+    "legacyGameIsUpgradeStub": false,
+    "legacyGameAuthenticatedExecute": true,
+    "authenticatedDirectGameMutation": true,
+    "authenticatedDirectEventMutation": true,
+    "anonDirectGameMutation": true,
+    "anonDirectEventMutation": true,
+    "r207EvidenceCountsAllZero": true
+  },
+  "failedGates": [
+    "CERTIFIED_ACTIVATION_ARTIFACT_ABSENT",
+    "CERTIFIED_CLIENT_CONFIGURATION_DEFAULT_OFF",
+    "NEW_EXACT_HEAD_REVIEW_REQUIRED_FOR_ACTIVATED_SOURCE"
+  ],
+  "productionMutations": {
+    "schemaApplied": false,
+    "runtimeDeployed": false,
+    "activationExecuted": false,
+    "grantsChanged": false,
+    "releaseMarkersChanged": false,
+    "syntheticFixtureCreated": false,
+    "retentionEnabled": false
+  },
+  "productionCredentialsEntered": false,
+  "privateDataInspected": false,
+  "syntheticCleanupRequired": false
+}
