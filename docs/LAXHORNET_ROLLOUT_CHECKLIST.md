@@ -1253,11 +1253,45 @@ Do not combine these into one large Codex task. Each item requires one approved 
 - [ ] Independent exact-head Level 3 implementation review passes before
   merge; R2-07E remains blocked until review and merge.
 
+## R2-07E V2 disposable integrated certification gate
+
+**Status:** [x] PASS
+
+- [x] Certify unchanged merged product baseline
+  `b7269194a4ce8b9068b0d46c44d840efc4048c69`.
+- [x] Bind final certification evidence and CI to exact SHA
+  `c2726b0c1cd979a7af2b04bc9a0a25865f4636ea`.
+- [x] Preserve the historical failed certification and earlier PR #72 review
+  FAIL as historical evidence.
+- [x] Obtain independent exact-head Level 3 PASS on PR #72.
+
+## R2-07F production release gate
+
+**Status:** [!] STOPPED PRE-ACTIVATION — PRODUCTION REMAINS SAFE
+
+- [x] Create `release/r2-07f-production` from the certified product source.
+- [x] Identify the production Supabase, Pages, domain, and Vercel integration
+  targets without inferring production from Preview resources.
+- [x] Perform catalog-only production preflight: all 17 certified migrations
+  are already recorded; the complete dormant R2-07 schema is present; required
+  RLS/FORCE RLS and RPC grants match; server capability and retention remain
+  off; R2-07 evidence counts are zero.
+- [x] Confirm production frontend remains v285 at prior Pages source
+  `9e434e33534a1b348b19e2081b91d7e0724299fc`; certified dormant runtime is not
+  live.
+- [x] Stop before the first production mutation because the repository contains
+  no reviewed Forward Migration B activation artifact and the certified client
+  configuration keeps every R2-07 control false.
+- [ ] Add and independently review the bounded activation artifact and activated
+  runtime configuration before any new production authorization/execution.
+- [ ] Rerun a fresh read-only production preflight after that exact-head review;
+  do not reuse this preflight as execution authority.
+
 A feature PR is not automatically a production release.
 
 - [ ] Feature PR merged to `main`.
-- [ ] Exact release source SHA identified.
-- [ ] Separate release ticket approved.
+- [x] Exact release source SHA identified.
+- [x] Separate release ticket approved.
 - [ ] Release preflight passes.
 - [ ] Release manifest updated and validated where required.
 - [ ] Migration plan displayed before execution.

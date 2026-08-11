@@ -1,14 +1,21 @@
 # LaxHornet Repository Current State
 
-Last reviewed: 2026-08-09
+Last reviewed: 2026-08-11
 Baseline branch: `main`
-Baseline commit: `91950cc32c641f309e89fd66e44f77966a8b4b7c`
+Baseline commit: `b7269194a4ce8b9068b0d46c44d840efc4048c69`
 Current repository release marker: `v285`
 Current production marker: `v285` from Pages run `31061426334` at approved SHA
 `9e434e33534a1b348b19e2081b91d7e0724299fc`;
 R2-06 release closeout approved through reconciled mixed evidence;
-R2-07A through R2-07D merged; R2-07E disposable certification failed because
-the public and client clock command/batch integration is absent
+R2-07A through R2-07D and the default-off clock remediation are merged. Fresh
+R2-07E V2 certification passed for the unchanged product baseline, with final
+evidence and independent exact-head PASS bound to
+`c2726b0c1cd979a7af2b04bc9a0a25865f4636ea`. R2-07F read-only production
+preflight found the complete 17-migration dormant schema already present with
+the server control false, retention disabled, and zero R2-07 evidence. Release
+execution stopped before mutation because no separately reviewed activation
+migration exists and the certified runtime keeps all R2-07 client controls
+false. Production remains on the prior v285 Pages runtime.
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
 
