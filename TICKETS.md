@@ -2591,8 +2591,9 @@ atomic reconnect batches.
   `23/23`; tombstone concurrency `8/8` all pass.
 - [x] Complete canonical-plus-additive regression passes `69/69`; focused
   hydration rerun, secret/host scan, diff hygiene, and zero-residue checks pass.
-- [ ] Draft PR exact-head CI, automatic isolated Supabase Preview, and Vercel
-  Preview pass.
+- [x] Draft PR #71 integration head `11475fc2a3c401370e8dc327e9345aa8b497ac8c`
+  passes Docker, portable regression, automatic isolated Supabase Preview,
+  Vercel, and Preview Comments checks.
 - [ ] Independent exact-PR-SHA Level 3 review returns PASS before merge.
 
 Evidence:

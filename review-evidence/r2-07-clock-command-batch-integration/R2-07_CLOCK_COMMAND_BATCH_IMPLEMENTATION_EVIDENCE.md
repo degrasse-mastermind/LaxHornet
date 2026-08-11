@@ -94,9 +94,13 @@ schema, but no functional Preview/test wrapper or client route connected it.
   `page.reload ERR_ABORTED`, which passed immediately on focused rerun, plus
   review-package expected-list omissions fixed before the clean final run.
   Secret/host scan and `git diff --check` passed. Zero `laxhornet-r207*`
-  containers and zero headless Playwright processes remained. Exact-head CI,
-  automatic isolated Preview, and Vercel results are recorded after the draft
-  PR exists.
+  containers and zero headless Playwright processes remained.
+- Draft PR #71 integration head
+  `11475fc2a3c401370e8dc327e9345aa8b497ac8c` passed Docker, portable
+  regression, automatic isolated Supabase Preview, Vercel, and Preview
+  Comments checks. The managed application Preview was
+  `https://lax-hornet-git-feature-r2-07-9b0304-davidltdanes-4133s-projects.vercel.app`;
+  the isolated Supabase Preview project was `mojsdmyfzhdqukwwbhyk`.
 
 ## File identity
 

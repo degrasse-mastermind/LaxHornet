@@ -1243,8 +1243,9 @@ Do not combine these into one large Codex task. Each item requires one approved 
 - [x] A/B/C/D, R2-07D dismiss, tracked-time, and tombstone preservation pass.
 - [x] Complete regression `69/69`, secret/host scan, diff hygiene, focused
   hydration rerun, and zero-residue proof pass.
-- [ ] Draft PR exact-head GitHub, automatic isolated Supabase Preview, and
-  Vercel checks pass.
+- [x] Draft PR #71 integration head `11475fc2a3c401370e8dc327e9345aa8b497ac8c`
+  passes Docker, portable regression, automatic isolated Supabase Preview,
+  Vercel, and Preview Comments checks.
 - [ ] Independent exact-head Level 3 implementation review passes before
   merge; R2-07E remains blocked until review and merge.
 
