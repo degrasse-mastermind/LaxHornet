@@ -7,8 +7,8 @@ Current repository release marker: `v285`
 Current production marker: `v285` from Pages run `31061426334` at approved SHA
 `9e434e33534a1b348b19e2081b91d7e0724299fc`;
 R2-06 release closeout approved through reconciled mixed evidence;
-R2-07A through R2-07C merged; R2-07D event-dismiss semantics remediated on a
-feature branch and awaiting a new exact-head Level 3 review
+R2-07A through R2-07D merged; R2-07E disposable certification failed because
+the public and client clock command/batch integration is absent
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
 
@@ -485,7 +485,7 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   SQL is unchanged. PR #67 merged the reviewed R2-07C work as
   `91950cc32c641f309e89fd66e44f77966a8b4b7c`; the production flag remains
   false.
-- R2-07D minimum safe Needs Attention conflict resolution is implemented on
+- R2-07D minimum safe Needs Attention conflict resolution was implemented on
   `feature/r2-07d-needs-attention-conflict-resolution` from approved main
   `91950cc32c641f309e89fd66e44f77966a8b4b7c`. It replaces only the dormant
   conflict read/resolution wrappers behind the existing default-disabled
@@ -506,11 +506,23 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   queuing an event mutation, calling the event RPC, or changing the event
   version; `keep_server` remains authoritative reconciliation. Metadata
   dismiss was already non-mutating, so SQL/migrations remain unchanged. The
-  production flag remains false. Live
+  production flag remains false. PR #69 squash-merged as
+  `08e7abf01d22cb60fc88422c961104a952b9b7e9`; its tree exactly matches the
+  remediated PR head. A retrospective independent exact-tree technical review
+  passed after merge, and the user ratified that review-timing exception for
+  disposable R2-07E certification while preserving the historical chronology.
+  Live
   Share, release/cache markers, retention, deployment, production migration
-  history/data, and production runtime remain unchanged. Draft-PR CI and
-  independent exact-head Level 3 PASS remain required before merge; R2-07E is
-  conditional on that PASS and merge.
+  history/data, and production runtime remain unchanged.
+- R2-07E began from exact merged-main baseline
+  `08e7abf01d22cb60fc88422c961104a952b9b7e9` on
+  `feature/r2-07e-integrated-certification` and stopped with a material FAIL.
+  Disposable PostgreSQL 17 proved that `lh_apply_game_clock_operation_v2` and
+  `lh_apply_game_clock_batch_v2` remain dormant after Preview enablement, no
+  post-R2-07A migration replaces them, and `app.js` has no R2-07 command/batch
+  integration. Zero container residue remained and production was untouched.
+  A separate default-off Level 3 clock server/client remediation, exact-head
+  review PASS, merge, and complete R2-07E rerun are required before R2-07F.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The repository cache marker is `laxhornet-v285`. The updated service worker purges
