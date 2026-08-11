@@ -108,7 +108,7 @@ synthetic adult-only fixtures. It proves:
 - post-evidence recovery fail-closes without restoring legacy authority;
 - zero disposable container residue.
 
-Focused result: `36/36 PASS`. Complete local Level 3 regression result:
+Focused result: `40/40 PASS`. Complete local Level 3 regression result:
 `70 passed, 0 failed`. Exact-head CI and independent review remain separately
 required on the final pushed SHA.
 
