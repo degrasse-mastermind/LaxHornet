@@ -26,7 +26,7 @@
     "recoveryArtifactSha256": "abe91140754da66c33a90babbf82d780566ae669fd09bd08b52da995697900fb",
     "productionCapableRuntimeConfig": "release/r2-07-forward-migration-b-runtime-config.js",
     "productionCapableRuntimeConfigSha256": "9f3170ef6dee5cf8837162a8335c8deaf3ed7b074d168ff11dd33408f22388f8",
-    "runtimeClientSetSha256": "24ad518ba6badf643a455d55ff6ac6ecf5226f09f39f22c0e4db8a6f9a9af221",
+    "runtimeClientSetSha256": "5600d42a92dbba86ee95d6554bdc7da1cdfd37eb140a50711aba09e096f9030d",
     "preActivationRelationShapeMd5": "4567f943c9bff20f9510a28c8c7bbf98",
     "preActivationPolicyDefinitionMd5": "0c9fc6789e1401e149592e2d8c7f0334",
     "v1PreActivationSignature": "public.laxhornet_sync_game(jsonb)",

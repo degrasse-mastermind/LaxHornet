@@ -6446,7 +6446,9 @@ async function loadCloudGames(options = {}) {
   if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) {
     return discardStaleHydration();
   }
-  await processDurableSyncOperations();
+  const productionActivated = globalThis.window?.LAXHORNET_RUNTIME_CONFIG?.r207ProductionActivation === true
+    && r207ProductionActivationConfirmed();
+  if (!productionActivated) await processDurableSyncOperations();
   if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) {
     return discardStaleHydration();
   }
@@ -6454,8 +6456,6 @@ async function loadCloudGames(options = {}) {
   if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) {
     return discardStaleHydration();
   }
-  const productionActivated = globalThis.window?.LAXHORNET_RUNTIME_CONFIG?.r207ProductionActivation === true
-    && r207ProductionActivationConfirmed();
   if (!productionActivated) await processDurableSyncOperations();
   if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) {
     return discardStaleHydration();

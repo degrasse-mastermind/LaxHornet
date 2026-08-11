@@ -257,12 +257,24 @@ try {
       && releaseManifest.r207ForwardMigrationBActivation.preActivationPolicyDefinitionMd5 === binding.preActivationCatalog.policyDefinitionMd5,
     "release manifest binds the exact activation, recovery, runtime set, and relation shape",
   );
+  const loadCloudGamesSource = appSource.slice(
+    appSource.indexOf("async function loadCloudGames(options = {})"),
+    appSource.indexOf("async function refreshCloudGames()"),
+  );
+  const firstDurableProcessor = loadCloudGamesSource.indexOf("processDurableSyncOperations()");
+  const guardedDurableProcessor = loadCloudGamesSource.indexOf(
+    "if (!productionActivated) await processDurableSyncOperations();",
+  );
   check(
     appSource.indexOf("if (active) return syncGameWithR207Operations(game, options)")
         < appSource.indexOf("const queued = queueLegacyGameOperation(game, options)")
       && appSource.includes("buildCreateOperation")
       && appSource.includes("queueR207VersionedEvent(synchronized, event)")
-      && appSource.includes("await r207PreviewCapabilityAvailable({ force: true })"),
+      && appSource.includes("await r207PreviewCapabilityAvailable({ force: true })")
+      && guardedDurableProcessor >= 0
+      && guardedDurableProcessor < firstDurableProcessor
+      && loadCloudGamesSource.indexOf("syncLocalGamesToCloud({ allowCreate: true })")
+        < loadCloudGamesSource.lastIndexOf("processDurableSyncOperations()"),
     "fresh-load production activation routes game creation, field writes, and events to v2 before legacy work",
   );
 
@@ -491,9 +503,14 @@ try {
   console.log(`R2-07 Forward Migration B disposable activation certification: PASS (${checks} checks)`);
 } finally {
   for (const container of containers) docker(["rm", "-f", container], { allowFailure: true });
-  const residue = docker([
+  const listResidue = () => docker([
     "ps", "-a", "--filter", "name=laxhornet-r207b-activation-", "--format", "{{.Names}}",
   ], { allowFailure: true }).stdout.trim();
+  let residue = listResidue();
+  for (const container of residue.split(/\r?\n/).filter(Boolean)) {
+    docker(["rm", "-f", container], { allowFailure: true });
+  }
+  residue = listResidue();
   assert.equal(residue, "", `disposable activation container residue remains: ${residue}`);
   console.log("PASS: disposable activation certification left zero container residue");
 }

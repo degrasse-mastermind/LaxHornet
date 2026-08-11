@@ -21,10 +21,10 @@
   "client": {
     "activatedConfigPath": "release/r2-07-forward-migration-b-runtime-config.js",
     "activatedConfigSha256": "9f3170ef6dee5cf8837162a8335c8deaf3ed7b074d168ff11dd33408f22388f8",
-    "runtimeClientSetSha256": "24ad518ba6badf643a455d55ff6ac6ecf5226f09f39f22c0e4db8a6f9a9af221",
+    "runtimeClientSetSha256": "5600d42a92dbba86ee95d6554bdc7da1cdfd37eb140a50711aba09e096f9030d",
     "runtimeClientFiles": {
       "app.html": "c0978064416e0306129a85feb5a34b61a2138d3f3771eb54939da718143739a7",
-      "app.js": "586d193176dee8d4706687a34ecde7c591acad5358e16b2363056edf925a3e33",
+      "app.js": "7aaf3326eb050ad6580abfa565a8b15d71b82e11090b2747e45ef2fdf95d74ce",
       "event-operation-service.js": "3446ea684233e7120935402d56d774a6fa17367c91aa91dee8c61d2ccc2396ca",
       "tracked-playing-time-service.js": "73e55689216c92c0746990ceaba8f253aa4d44b4016619973a310f8e864e8992",
       "runtime-config.js": "e7bd97e684f7c39f411952f8b5bfcf8175053f9a292ee9cb9a5a1b4b4ad60794",
