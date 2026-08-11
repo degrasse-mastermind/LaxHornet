@@ -1248,7 +1248,7 @@ Do not combine these into one large Codex task. Each item requires one approved 
 - [x] A/B/C/D, R2-07D dismiss, tracked-time, and tombstone preservation pass.
 - [x] New remediation-head complete regression, secret/host scan, diff hygiene,
   focused hydration, and zero-residue proof pass.
-- [ ] New remediation-head GitHub, automatic isolated Supabase Preview, and
+- [x] New remediation-head GitHub, automatic isolated Supabase Preview, and
   Vercel checks pass.
 - [ ] Independent exact-head Level 3 implementation review passes before
   merge; R2-07E remains blocked until review and merge.

@@ -139,9 +139,13 @@ without starting R2-07E or changing the production-default-off boundary:
   Comments checks. The managed application Preview was
   `https://lax-hornet-git-feature-r2-07-9b0304-davidltdanes-4133s-projects.vercel.app`;
   the isolated Supabase Preview project was `mojsdmyfzhdqukwwbhyk`.
-- New remediation-head Docker, portable regression, automatic isolated
-  Supabase Preview, Vercel, and Preview Comments checks remain pending until
-  the evidence commit is pushed.
+- Remediation/evidence head `9f64da30c54d1df560c5ee8336d50da8897a7786`
+  passed Docker, portable regression, automatic isolated Supabase Preview,
+  Vercel, and Preview Comments checks. Because the Preview integration may
+  process only newly named migration files, its green result is not claimed as
+  proof that the changed contents of this existing unmerged migration were
+  reapplied; the disposable PostgreSQL `55/55` result is the direct SQL
+  execution evidence.
 
 ## File identity
 

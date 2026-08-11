@@ -2599,7 +2599,7 @@ atomic reconnect batches.
   `23/23`; tombstone concurrency `8/8` all pass.
 - [x] New remediation-head complete canonical-plus-additive regression,
   secret/host scan, diff hygiene, and zero-residue checks pass.
-- [ ] New remediation-head Docker, portable regression, automatic isolated
+- [x] New remediation-head Docker, portable regression, automatic isolated
   Supabase Preview, Vercel, and Preview Comments checks pass.
 - [ ] Independent exact-PR-SHA Level 3 review returns PASS before merge.
 
