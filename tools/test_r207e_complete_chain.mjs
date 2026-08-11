@@ -11,7 +11,12 @@ const manifestPath = path.join(
   "r2-07e-integrated-certification",
   "R2-07E_V2_BASELINE_MANIFEST.md",
 );
-const assertionPath = path.join(root, "supabase", "tests", "r207e_v2_complete_chain.sql");
+const assertionPath = path.join(
+  root,
+  "review-evidence",
+  "r2-07e-integrated-certification",
+  "R2-07E_V2_COMPLETE_CHAIN_ASSERTIONS.sql",
+);
 const container = `laxhornet-r207e-chain-${process.pid}`;
 const image = "postgres:17-alpine";
 
