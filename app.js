@@ -6454,7 +6454,9 @@ async function loadCloudGames(options = {}) {
   if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) {
     return discardStaleHydration();
   }
-  await processDurableSyncOperations();
+  const productionActivated = globalThis.window?.LAXHORNET_RUNTIME_CONFIG?.r207ProductionActivation === true
+    && r207ProductionActivationConfirmed();
+  if (!productionActivated) await processDurableSyncOperations();
   if (!cloudGameHydrationIsCurrent(hydrationGeneration, hydrationUserId)) {
     return discardStaleHydration();
   }
@@ -6564,9 +6566,9 @@ async function loadCloudGames(options = {}) {
   persistAll();
   const deletedGameReintroduced = [...tombstonedIds].some((gameId) =>
     Object.values(hydrationGamePresence(gameId)).some(Boolean));
-  if (globalThis.window?.LAXHORNET_RUNTIME_CONFIG?.r207ProductionActivation === true
-    && r207ProductionActivationConfirmed()) {
+  if (productionActivated) {
     await syncLocalGamesToCloud({ allowCreate: true });
+    await processDurableSyncOperations();
   }
   const tombstoneSuppressionComplete = !deletedGameReintroduced;
   publishHydrationDiagnostics({

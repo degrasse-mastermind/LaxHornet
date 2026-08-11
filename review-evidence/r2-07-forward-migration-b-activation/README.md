@@ -89,10 +89,16 @@ synthetic adult-only fixtures. It proves:
 - exact policy/RLS drift refusal and canonical Git-blob runtime hashes;
 - deterministic activation replay refusal;
 - injected post-capability failure rolls the entire transaction back;
+- activation drains an in-flight legacy writer before v2 authority commits;
+- reconnect processes retained game creation before dependent clock intent;
+- interrupted `syncing` operations recover as retryable durable work;
+- game-create idempotency uses a server-derived canonical request hash;
+- release-manifest hashes match the exact activation, recovery, runtime, relation,
+  and policy bindings;
 - post-evidence recovery fail-closes without restoring legacy authority;
 - zero disposable container residue.
 
-Focused result: `32/32 PASS`. Complete local Level 3 regression result:
+Focused result: `34/34 PASS`. Complete local Level 3 regression result:
 `70 passed, 0 failed`. Exact-head CI and independent review remain separately
 required on the final pushed SHA.
 

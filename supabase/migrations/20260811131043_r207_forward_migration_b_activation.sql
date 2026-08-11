@@ -288,7 +288,8 @@ declare
   actor_id uuid := (select auth.uid());
   client_id text := btrim(coalesce(p_operation ->> 'client_operation_id', ''));
   target_game_id text := btrim(coalesce(p_operation ->> 'game_id', ''));
-  request_hash text := lower(btrim(coalesce(p_operation ->> 'request_hash', '')));
+  provided_request_hash text := lower(btrim(coalesce(p_operation ->> 'request_hash', '')));
+  request_hash text;
   game_payload jsonb := p_operation -> 'game';
   target_game public.games%rowtype;
   tombstone public.legacy_game_tombstones%rowtype;
@@ -328,7 +329,7 @@ begin
 
   if client_id = '' or length(client_id) > 200
     or target_game_id = '' or length(target_game_id) > 200
-    or request_hash !~ '^[0-9a-f]{64}$'
+    or provided_request_hash !~ '^[0-9a-f]{64}$'
     or jsonb_typeof(game_payload) <> 'object'
     or pg_column_size(game_payload) > 16384
     or exists (
@@ -343,6 +344,10 @@ begin
   then
     return jsonb_build_object('outcome', 'rejected', 'code', 'invalid_game_create');
   end if;
+  request_hash := encode(extensions.digest(
+    pg_catalog.convert_to((p_operation - 'request_hash')::text, 'UTF8'),
+    'sha256'
+  ), 'hex');
   if btrim(coalesce(game_payload ->> 'id', '')) <> target_game_id
     or length(btrim(coalesce(game_payload ->> 'share_code', ''))) not between 1 and 64
     or length(btrim(coalesce(game_payload ->> 'opponent', ''))) not between 1 and 200

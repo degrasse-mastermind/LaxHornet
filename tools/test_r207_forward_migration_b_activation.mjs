@@ -219,6 +219,7 @@ try {
   const binding = JSON.parse(fs.readFileSync(path.join(
     root, "review-evidence", "r2-07-forward-migration-b-activation", "ACTIVATION_BINDING.json",
   ), "utf8"));
+  const releaseManifest = JSON.parse(fs.readFileSync(path.join(root, "release", "laxhornet-release-manifest.json"), "utf8"));
   check(
     /r207ProductionActivation:\s*true/.test(productionConfig)
       && [
@@ -247,6 +248,14 @@ try {
       && crypto.createHash("sha256").update(exactRuntimeSet).digest("hex")
         === binding.client.runtimeClientSetSha256,
     "activation, recovery, and runtime evidence bind canonical exact Git-blob bytes",
+  );
+  check(
+    releaseManifest.r207ForwardMigrationBActivation.activationMigrationSha256 === binding.activation.sha256
+      && releaseManifest.r207ForwardMigrationBActivation.recoveryArtifactSha256 === binding.recovery.sha256
+      && releaseManifest.r207ForwardMigrationBActivation.runtimeClientSetSha256 === binding.client.runtimeClientSetSha256
+      && releaseManifest.r207ForwardMigrationBActivation.preActivationRelationShapeMd5 === binding.preActivationCatalog.relationShapeMd5
+      && releaseManifest.r207ForwardMigrationBActivation.preActivationPolicyDefinitionMd5 === binding.preActivationCatalog.policyDefinitionMd5,
+    "release manifest binds the exact activation, recovery, runtime set, and relation shape",
   );
   check(
     appSource.indexOf("if (active) return syncGameWithR207Operations(game, options)")
@@ -328,7 +337,11 @@ try {
   createRequest.request_hash = hash(JSON.stringify(createRequest));
   const created = gameCall(main, OWNER, createRequest);
   const createdReplay = gameCall(main, OWNER, createRequest);
+  const changedCreateRequest = structuredClone(createRequest);
+  changedCreateRequest.game.opponent = "Changed payload";
+  const changedCreateReplay = gameCall(main, OWNER, changedCreateRequest);
   check(created.code === "game_created" && createdReplay.replay === true
+    && changedCreateReplay.code === "duplicate_operation_id_payload_mismatch"
     && psql(main, "select count(*) from public.games where id='created-game-v2';").stdout === "1",
   "v2 creates a new game idempotently after activation");
 
@@ -437,6 +450,20 @@ try {
   check(failedApply.status !== 0 && /R207_SYNTHETIC_ACTIVATION_FAILURE/.test(failedApply.stderr)
     && failedState === "false,true,true",
   "mid-transaction failure rolls back capability, grants, and v1 function together");
+
+  const activationRace = await start("activation-race");
+  psql(activationRace, `insert into auth.users(id,email) values ('${OWNER}','race@example.invalid'); ${gameInsert("activation-race-game")}`);
+  const legacyWriter = psqlAsync(activationRace, `begin;
+    update public.games set opponent='legacy transaction completed' where id='activation-race-game';
+    select pg_sleep(2); commit;`);
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  const activationStartedAt = Date.now();
+  psql(activationRace, read("migrations", migrationFile));
+  const activationElapsedMs = Date.now() - activationStartedAt;
+  const legacyWriterResult = await legacyWriter;
+  check(legacyWriterResult.status === 0 && activationElapsedMs >= 1200,
+    "activation drains an in-flight legacy RowExclusive writer before v2 authority commits",
+    `elapsed=${activationElapsedMs} stderr=${legacyWriterResult.stderr}`);
 
   const raceOperation = gameOperation("recovery-race-operation", "recovery-race", 1, { opponent: "Drained before recovery" });
   const inFlight = psqlAsync(main, `begin; ${claims(OWNER)}

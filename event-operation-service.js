@@ -1066,7 +1066,9 @@
       ...source,
       schemaVersion: SCHEMA_VERSION,
       versionMaps,
-      operations: (source.operations || []).filter((item) => isObject(item) && item.clientOperationId && item.gameId),
+      operations: (source.operations || [])
+        .filter((item) => isObject(item) && item.clientOperationId && item.gameId)
+        .map((item) => ({ ...item, state: item.state === "syncing" ? "retryable" : item.state })),
       receipts: (source.receipts || []).filter(isObject).slice(-MAX_RECEIPTS),
       conflicts: Object.fromEntries(Object.entries(source.conflicts || {}).filter(([, item]) => isObject(item))),
     };

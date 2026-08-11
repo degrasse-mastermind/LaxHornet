@@ -34,6 +34,17 @@ const createOperation = r207.buildCreateOperation({
 });
 check(createOperation.operation_type === "game_create" && createOperation.game_id === "new-synthetic-game",
   "new-game operation is identified before cloud work and requires no invented server base");
+const interrupted = r207.normalizeState({
+  ...r207.emptyState(),
+  operations: [{
+    accountId: "synthetic-account", clientOperationId: "interrupted-create",
+    gameId: "new-synthetic-game", fieldGroup: "create", state: "syncing",
+    attemptCount: 1, createdAt: new Date(1).toISOString(), updatedAt: new Date(1).toISOString(),
+    request: createOperation, lastError: null,
+  }],
+});
+check(interrupted.operations[0].state === "retryable",
+  "interrupted field operations recover from syncing to retryable on reload");
 
 for (const builder of [
   r207.buildScoreDeltaOperation({ game: before, deltas: { score_for: 1 }, clientOperationId: "score-delta" }),

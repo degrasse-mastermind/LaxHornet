@@ -6,7 +6,7 @@
   "historicalPreflightPr": 73,
   "activation": {
     "path": "supabase/migrations/20260811131043_r207_forward_migration_b_activation.sql",
-    "sha256": "0d02c13e4c3c116ced2c0e4d03fe189ad6aef8e31d2446058bbb2d6876042d19",
+    "sha256": "fa425f77673048665703e7c3fbacaf3f1a5f2adebc7513f8321537477d4606cf",
     "capabilityBefore": false,
     "capabilityAfter": true,
     "transactional": true,
@@ -21,11 +21,11 @@
   "client": {
     "activatedConfigPath": "release/r2-07-forward-migration-b-runtime-config.js",
     "activatedConfigSha256": "9f3170ef6dee5cf8837162a8335c8deaf3ed7b074d168ff11dd33408f22388f8",
-    "runtimeClientSetSha256": "61aecc9a42f83e02372af07041a137a891858ff0eab86f4dfa78562746dee5fc",
+    "runtimeClientSetSha256": "24ad518ba6badf643a455d55ff6ac6ecf5226f09f39f22c0e4db8a6f9a9af221",
     "runtimeClientFiles": {
       "app.html": "c0978064416e0306129a85feb5a34b61a2138d3f3771eb54939da718143739a7",
-      "app.js": "1bf6bef17301cb1757d17209123d5988691e7910c03f49f5e7fdabde7ddfd6fc",
-      "event-operation-service.js": "b697e1733c0467dbd0f11d4d90b9409541fcd3cb1d27ee6c705e12c680a30fcc",
+      "app.js": "586d193176dee8d4706687a34ecde7c591acad5358e16b2363056edf925a3e33",
+      "event-operation-service.js": "3446ea684233e7120935402d56d774a6fa17367c91aa91dee8c61d2ccc2396ca",
       "tracked-playing-time-service.js": "73e55689216c92c0746990ceaba8f253aa4d44b4016619973a310f8e864e8992",
       "runtime-config.js": "e7bd97e684f7c39f411952f8b5bfcf8175053f9a292ee9cb9a5a1b4b4ad60794",
       "release/r2-07-forward-migration-b-runtime-config.js": "9f3170ef6dee5cf8837162a8335c8deaf3ed7b074d168ff11dd33408f22388f8"
