@@ -6734,8 +6734,10 @@ async function handleAuthSubmit(formData) {
   if (state.authUser) await loadUserProfile({ silent: true });
   if (state.authUser && needsParentProfileSetup()) state.screen = "profileSetup";
   state.syncStatus = state.authUser ? "Signed in" : "Check your email to confirm your account";
+  const startupDeepLinkApplied = applyStartupDeepLink();
+  if (!startupDeepLinkApplied) render();
   if (state.authUser) await loadCloudGames({ silent: true });
-  if (!applyStartupDeepLink()) render();
+  if (!startupDeepLinkApplied) render();
   showToast(state.syncStatus);
 }
 
