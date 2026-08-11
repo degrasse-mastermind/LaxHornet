@@ -989,6 +989,7 @@
     sharing: "sharingVersion",
   });
   const OPERATION_TYPES = Object.freeze({
+    create: "game_create",
     metadata: "metadata_patch",
     scoreDelta: "score_delta",
     scoreCorrection: "score_correction",
@@ -1065,7 +1066,9 @@
       ...source,
       schemaVersion: SCHEMA_VERSION,
       versionMaps,
-      operations: (source.operations || []).filter((item) => isObject(item) && item.clientOperationId && item.gameId),
+      operations: (source.operations || [])
+        .filter((item) => isObject(item) && item.clientOperationId && item.gameId)
+        .map((item) => ({ ...item, state: item.state === "syncing" ? "retryable" : item.state })),
       receipts: (source.receipts || []).filter(isObject).slice(-MAX_RECEIPTS),
       conflicts: Object.fromEntries(Object.entries(source.conflicts || {}).filter(([, item]) => isObject(item))),
     };
@@ -1092,6 +1095,23 @@
     };
     if (!result.client_operation_id) throw new TypeError("A permanent client operation ID is required");
     return result;
+  }
+
+  function buildCreateOperation(options = {}) {
+    const game = copy(options.game || {});
+    const gameId = String(game.id || "").trim();
+    const clientOperationId = String(options.clientOperationId || "").trim();
+    if (!gameId || !clientOperationId || !isObject(game)) {
+      throw new TypeError("A game and permanent client operation ID are required");
+    }
+    return {
+      client_operation_id: clientOperationId,
+      game_id: gameId,
+      operation_type: OPERATION_TYPES.create,
+      field_group: "create",
+      game,
+      client_created_at: timestamp(options.createdAt),
+    };
   }
 
   function buildMetadataOperation(options = {}) {
@@ -1312,6 +1332,7 @@
     normalizeState,
     normalizeVersionMap,
     hasRequiredVersions,
+    buildCreateOperation,
     buildMetadataOperation,
     buildScoreDeltaOperation,
     buildScoreCorrectionOperation,
@@ -1438,6 +1459,9 @@
   }
 
   function classificationCode(category, sourceCode = "") {
+    if (/^client_upgrade_required$/i.test(sourceCode)) {
+      return "client_upgrade_required";
+    }
     if (
       category === FAILURE_CATEGORIES.conflict
       && /stale_clock_revision/i.test(sourceCode)
@@ -1851,6 +1875,7 @@
       /^pgrst20[0-5]$/.test(code)
       || code === "42883"
       || code === "capability_unavailable"
+      || code === "client_upgrade_required"
       || /schema cache|could not find the function|function .* does not exist|function signature|unsupported backend capability|feature not deployed|backend capability/i.test(text)
     ) {
       category = FAILURE_CATEGORIES.capabilityUnavailable;
@@ -1894,7 +1919,9 @@
           : "rejected",
       category,
       code: classificationCode(category, sourceCode),
-      message: FAILURE_MESSAGES[category],
+      message: code === "client_upgrade_required"
+        ? "Update LaxHornet before retrying. This saved operation remains on this device."
+        : FAILURE_MESSAGES[category],
       httpStatus,
       retryable,
       attentionRequired: !retryable,

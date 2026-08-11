@@ -1253,6 +1253,29 @@ Do not combine these into one large Codex task. Each item requires one approved 
 - [ ] Independent exact-head Level 3 implementation review passes before
   merge; R2-07E remains blocked until review and merge.
 
+## R2-07 Forward Migration B activation-artifact gate
+
+**Status:** [!] IMPLEMENTED — exact-head review and fresh R2-07F authority required
+
+- [x] Preserve PR #73 as the historical preflight that stopped before the
+  first production mutation because Forward Migration B was absent.
+- [x] Add an inert pre-cutover shared/exclusive writer gate followed by one
+  exact-schema-bound transactional activation migration that enables reviewed
+  v2 authority and disables v1/direct legacy authority with no committed or
+  cutover-race dual-authority state.
+- [x] Keep v1 as a bounded actionable `client_upgrade_required` stub for the
+  approved sunset period.
+- [x] Add production-capable dormant client configuration driven by the
+  authoritative server capability with no production-active v1 fallback.
+- [x] Add post-evidence fail-closed recovery that never restores v285
+  last-write-wins game/event/clock mutation.
+- [x] Pass fresh disposable PostgreSQL 17 activation, security, drift,
+  failure-injection, recovery, and zero-residue certification.
+- [ ] Draft PR exact-head CI is green.
+- [ ] Independent read-only exact-head Level 3 implementation review passes.
+- [ ] Merge and all R2-07F production actions require separate explicit
+  authorization and a fresh pre-mutation gate; PR #73 authority is not reused.
+
 A feature PR is not automatically a production release.
 
 - [ ] Feature PR merged to `main`.

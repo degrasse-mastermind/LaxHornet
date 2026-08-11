@@ -2646,6 +2646,51 @@ Evidence:
 - `review-evidence/r2-07e-integrated-certification/BASELINE_MANIFEST.md`
 - `review-evidence/r2-07e-integrated-certification/R2-07E_CERTIFICATION_REPORT.md`
 
+### R2-07 Forward Migration B — Atomic activation cutover
+
+Status: `IMPLEMENTED — EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
+
+Risk level: `LEVEL 3`
+
+Branch: `feature/r2-07-forward-migration-b-activation`
+
+Starting main: `b7269194a4ce8b9068b0d46c44d840efc4048c69`
+
+#### Goal
+
+Supply the missing, separately reviewed Forward Migration B artifact that a
+future R2-07F release may apply to atomically enable reviewed v2 writes, replace
+v1 with a bounded upgrade-required stub, and remove every unversioned game,
+event, and clock mutation bypass without activating production in this task.
+
+#### Acceptance
+
+- [x] Bind the exact 17-migration certified schema plus the inert pre-cutover
+  gate, RPC definitions, relation/trigger hashes, RLS/FORCE RLS state, grants,
+  dormant capability, v1 function, and zero pre-activation R2-07 evidence;
+  deterministic drift refusal.
+- [x] Execute capability, function, table-grant, and legacy-RPC changes in one
+  transaction with a shared/exclusive writer gate, both-order concurrency
+  probes, and committed no-dual-authority postflight.
+- [x] Retain v1 as bounded `client_upgrade_required` with no mutation/private
+  detail and retain durable R2-06 tombstone authority.
+- [x] Add production-capable dormant client configuration with authoritative
+  server transition, actionable stale-client handling, and no active-state v1
+  fallback or Preview URL/debug/query bypass.
+- [x] Add fail-closed forward recovery that never restores v285 unversioned
+  mutation, including after R2-07 evidence exists.
+- [x] Disposable PostgreSQL 17 certification passes the required activation,
+  v1/v2, security, failure-injection, recovery, and zero-residue matrix.
+- [ ] Exact-head CI is green and independent exact-head Level 3 review passes.
+- [ ] Merge, production migration/application, capability activation, runtime
+  deployment, release markers, and production smoke remain separately
+  unauthorized.
+
+Evidence:
+
+- `review-evidence/r2-07-forward-migration-b-activation/README.md`
+- `review-evidence/r2-07-forward-migration-b-activation/ACTIVATION_BINDING.json`
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

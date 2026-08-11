@@ -1,14 +1,15 @@
 # LaxHornet Repository Current State
 
-Last reviewed: 2026-08-09
+Last reviewed: 2026-08-11
 Baseline branch: `main`
-Baseline commit: `91950cc32c641f309e89fd66e44f77966a8b4b7c`
+Baseline commit: `b7269194a4ce8b9068b0d46c44d840efc4048c69`
 Current repository release marker: `v285`
 Current production marker: `v285` from Pages run `31061426334` at approved SHA
 `9e434e33534a1b348b19e2081b91d7e0724299fc`;
 R2-06 release closeout approved through reconciled mixed evidence;
-R2-07A through R2-07D merged; R2-07E disposable certification failed because
-the public and client clock command/batch integration is absent
+R2-07A through R2-07D and the clock command/batch remediation are merged;
+R2-07E V2 certified the product baseline, while historical production
+preflight PR #73 stopped before mutation because Forward Migration B was absent
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.
 
@@ -532,6 +533,20 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   integration. Zero container residue remained and production was untouched.
   A separate default-off Level 3 clock server/client remediation, exact-head
   review PASS, merge, and complete R2-07E rerun are required before R2-07F.
+- R2-07E V2 subsequently certified exact product baseline
+  `b7269194a4ce8b9068b0d46c44d840efc4048c69`; evidence SHA
+  `c2726b0c1cd979a7af2b04bc9a0a25865f4636ea` records the integrated PASS.
+  Historical R2-07F preflight PR #73 then stopped before the first production
+  mutation because the certified source had no Forward Migration B activation
+  artifact or production-capable client configuration. The new Level 3 branch
+  `feature/r2-07-forward-migration-b-activation` adds an exact-schema-bound
+  transactional cutover preceded by an inert shared/exclusive canonical-write
+  gate, bounded v1 upgrade stub, unversioned grant/RPC revocations,
+  server-authoritative dormant client profile, permanent
+  disposable activation tests, and fail-closed recovery that never restores
+  v285 writes. It changes no release/cache marker and remains unapplied and
+  undeployed pending exact-head CI, independent review, merge decision, fresh
+  production authorization, and a new preflight.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The repository cache marker is `laxhornet-v285`. The updated service worker purges
