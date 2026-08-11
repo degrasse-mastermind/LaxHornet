@@ -2646,6 +2646,33 @@ Evidence:
 - `review-evidence/r2-07e-integrated-certification/BASELINE_MANIFEST.md`
 - `review-evidence/r2-07e-integrated-certification/R2-07E_CERTIFICATION_REPORT.md`
 
+#### Fresh V2 certification from merged clock remediation
+
+- [x] Preserve the historical PR #70 FAIL at
+  `6cbcad274961aff8e8f701c63d26bec58193d93c` without reusing it as current
+  evidence.
+- [x] Bind fresh baseline `b7269194a4ce8b9068b0d46c44d840efc4048c69`
+  with 17 migration hashes, 14 rollback hashes, runtime hashes, default-false
+  controls, and unchanged v285 markers.
+- [x] Former blocker gate passes: clock server `55/55`, P1 `19/19`, client
+  `15/15`, browser `18/18`.
+- [x] Integrated operation, game, event, clock, conflict, offline, account,
+  revocation, future-schema, sanitization, RLS/privacy, disclosure, browser,
+  accessibility, query-plan, and preservation gates pass on disposable
+  synthetic infrastructure.
+- [x] Evidence-fix source/tooling head passes hosted complete regression
+  `69/69`, Docker, Vercel, Preview Comments, clean diff hygiene, and a fresh
+  disposable PostgreSQL 17 complete chain `17/17` with applicable rollbacks
+  `14/14`; Supabase Preview is explicitly `NOT APPLICABLE` for the
+  evidence/tooling-only diff and reported `SKIPPED` without creating a branch.
+- [ ] Independent exact-SHA integrated-certification review returns PASS.
+- [ ] R2-07F remains blocked pending separate production-release authorization.
+
+Evidence:
+
+- `review-evidence/r2-07e-integrated-certification/R2-07E_V2_BASELINE_MANIFEST.md`
+- `review-evidence/r2-07e-integrated-certification/R2-07E_V2_CERTIFICATION_REPORT.md`
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

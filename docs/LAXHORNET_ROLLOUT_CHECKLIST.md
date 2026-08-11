@@ -1253,6 +1253,25 @@ Do not combine these into one large Codex task. Each item requires one approved 
 - [ ] Independent exact-head Level 3 implementation review passes before
   merge; R2-07E remains blocked until review and merge.
 
+## R2-07E V2 disposable integrated certification
+
+- [x] Start fresh from merged clock-remediation main
+  `b7269194a4ce8b9068b0d46c44d840efc4048c69`; preserve PR #70 as historical
+  failed certification.
+- [x] Bind exact migration/rollback/runtime identities and default-off release
+  controls before mutation testing.
+- [x] Prove the former clock blocker and all three P1 remediations in disposable
+  PostgreSQL plus real client/two-context browser integration.
+- [x] Pass integrated concurrency, conflict, offline, account, revocation,
+  future-schema, sanitization, RLS/privacy, disclosure, browser/accessibility,
+  performance-structure, and A/B/C/D preservation gates.
+- [x] Pass hosted complete regression `69/69`, Docker, Vercel, Preview
+  Comments, diff hygiene, and fresh disposable complete-chain migration/
+  rollback proof; classify the evidence-only PR's skipped Supabase Preview as
+  `NOT APPLICABLE` without claiming automatic Preview migration verification.
+- [ ] Obtain independent exact-SHA Level 3 integrated-certification PASS.
+- [ ] Stop before R2-07F; production release requires separate authorization.
+
 A feature PR is not automatically a production release.
 
 - [ ] Feature PR merged to `main`.
