@@ -8,6 +8,9 @@ Starting main: `08e7abf01d22cb60fc88422c961104a952b9b7e9`
 
 Branch: `feature/r2-07-clock-command-batch-integration`
 
+P1 remediation implementation commit:
+`81c77c7470c3f9e72440691c9e0f0ba8dcb8912c`
+
 Historical certification evidence: PR #70 remains the truthful failed R2-07E
 record and was not used as an implementation branch.
 
@@ -123,8 +126,8 @@ without starting R2-07E or changing the production-default-off boundary:
   `13/13 PASS`. R2-07C: client `30/30`, client safety `37/37`, browser `7/7`,
   migration `25/25 PASS`. R2-07D: client `32/32`, event dismiss `13/13`, dismiss
   browser `10/10`, migration `23/23 PASS`. Tombstone concurrency: `8/8 PASS`.
-- New exact-head complete canonical-plus-additive regression: `PENDING` after
-  the remediation commit. The prior reviewed head passed `69/69`. An earlier
+- New remediation-head complete canonical-plus-additive regression: `69/69 PASS`.
+  The prior reviewed head also passed `69/69`. An earlier
   consolidated attempt exposed one pre-existing transient hydration-browser
   `page.reload ERR_ABORTED`, which passed immediately on focused rerun, plus
   review-package expected-list omissions fixed before the clean final run.
@@ -137,7 +140,8 @@ without starting R2-07E or changing the production-default-off boundary:
   `https://lax-hornet-git-feature-r2-07-9b0304-davidltdanes-4133s-projects.vercel.app`;
   the isolated Supabase Preview project was `mojsdmyfzhdqukwwbhyk`.
 - New remediation-head Docker, portable regression, automatic isolated
-  Supabase Preview, Vercel, and Preview Comments checks are pending after push.
+  Supabase Preview, Vercel, and Preview Comments checks remain pending until
+  the evidence commit is pushed.
 
 ## File identity
 

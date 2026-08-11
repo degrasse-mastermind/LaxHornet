@@ -2597,7 +2597,7 @@ atomic reconnect batches.
 - [x] R2-07A `71/71`; B `32/32`, `12/12`, `13/13`; C `30/30`, `37/37`,
   `7/7`, `25/25`; D `32/32`, dismiss `13/13`, browser `10/10`, SQL
   `23/23`; tombstone concurrency `8/8` all pass.
-- [ ] New remediation-head complete canonical-plus-additive regression,
+- [x] New remediation-head complete canonical-plus-additive regression,
   secret/host scan, diff hygiene, and zero-residue checks pass.
 - [ ] New remediation-head Docker, portable regression, automatic isolated
   Supabase Preview, Vercel, and Preview Comments checks pass.
