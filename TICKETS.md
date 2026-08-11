@@ -2528,11 +2528,54 @@ and no production activation.
   tombstone concurrency, secret/host scan, and full regression `66/66` pass.
 - [x] Metadata dismiss remains acknowledgment-only; server SQL and migrations
   required no remediation and remain unchanged.
-- [ ] Independent Level 3 review returns PASS against the exact draft-PR SHA.
+- [x] PR #69 was squash-merged as
+  `08e7abf01d22cb60fc88422c961104a952b9b7e9`; a retrospective independent
+  exact-tree technical review passed remediated PR head `72e9d745...` after
+  merge. The user explicitly ratified the review-timing governance exception
+  for disposable R2-07E certification; the chronology remains preserved.
 
 Evidence:
 
 - `review-evidence/r2-07d-needs-attention-conflict-resolution/R2-07D_IMPLEMENTATION_EVIDENCE.md`
+
+### R2-07E — Disposable integrated certification
+
+Status: `FAILED — MATERIAL CLOCK IMPLEMENTATION GAP`
+
+Risk level: `LEVEL 3`
+
+Branch: `feature/r2-07e-integrated-certification`
+
+Certification baseline: `08e7abf01d22cb60fc88422c961104a952b9b7e9`
+
+#### Goal
+
+Certify the complete merged R2-07 implementation at one exact SHA using only
+disposable PostgreSQL 17 and synthetic browser/session fixtures.
+
+#### Failure record
+
+- [x] Exact baseline, tree, ordered migrations/rollbacks, Git-blob SHA-256
+  values, runtime hashes, default-off flags, and v285 markers recorded before
+  mutation testing.
+- [x] Focused disposable PostgreSQL 17 reproduction confirmed `4/4` that the
+  online clock and offline clock-batch wrappers remain dormant after Preview
+  enablement, no post-A migration replaces them, and no client integration
+  exists.
+- [x] Disposable container cleanup left zero residue; production was never
+  contacted or mutated.
+- [x] Certification stopped at the first reproducible material defect. The
+  remaining mandatory matrices and complete regression were not run and no
+  prior phase result was promoted to an integrated PASS.
+- [ ] Implement the bounded Level 3 clock command/batch remediation described
+  in the certification report, obtain exact-head review PASS, merge it, and
+  rerun R2-07E from the new exact merged-main SHA.
+- [ ] R2-07F remains blocked.
+
+Evidence:
+
+- `review-evidence/r2-07e-integrated-certification/BASELINE_MANIFEST.md`
+- `review-evidence/r2-07e-integrated-certification/R2-07E_CERTIFICATION_REPORT.md`
 
 ## Ticket template
 

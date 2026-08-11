@@ -1192,8 +1192,29 @@ Do not combine these into one large Codex task. Each item requires one approved 
   `keep_server`, confirm metadata dismiss non-mutation, and leave SQL/migrations
   unchanged. Dismiss `13/13`, browser/accessibility `10/10`, focused D,
   A/B/C/tombstone preservation, secret scan, and full regression `66/66` pass.
-- [ ] Independent exact-head Level 3 review passes before merge.
-- [ ] Begin R2-07E only after D PASS and merge.
+- [x] PR #69 squash-merged as `08e7abf01d22cb60fc88422c961104a952b9b7e9`.
+- [x] Retrospective exact-tree R2-07D technical review passed; the user
+  ratified the post-merge review-timing exception for disposable R2-07E only.
+- [x] Begin R2-07E on `feature/r2-07e-integrated-certification` at exact merged
+  baseline `08e7abf01d22cb60fc88422c961104a952b9b7e9`.
+
+## R2-07E Disposable integrated certification gate
+
+**Status:** [!] FAILED — production release blocked
+
+- [x] Bind the exact baseline, migration/rollback/runtime hashes, default-off
+  capabilities, and v285 release/cache markers before testing.
+- [x] Use disposable PostgreSQL 17 and synthetic adult-only fixtures with no
+  production connection.
+- [x] Reproduce the material clock gap `4/4`: both public clock wrappers remain
+  dormant after Preview enablement, no later migration replaces them, and the
+  client has no command/batch integration.
+- [x] Stop certification at the first reproducible material defect and retain
+  zero disposable container residue.
+- [ ] Implement and independently review the missing default-off clock
+  command/batch server and durable-client integration.
+- [ ] Rerun all R2-07E matrices from the new exact merged-main SHA.
+- [ ] R2-07F production authorization remains blocked.
 
 A feature PR is not automatically a production release.
 
