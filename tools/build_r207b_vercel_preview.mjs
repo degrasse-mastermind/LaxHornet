@@ -26,10 +26,12 @@ const runtime = fs.readFileSync(runtimePath, "utf8");
 assert.ok(runtime.includes("r207bControlledPreview: false"), "default-off R2-07B flag is missing");
 assert.ok(runtime.includes("r207cVersionedEventCorrections: false"), "default-off R2-07C flag is missing");
 assert.ok(runtime.includes("r207dConflictResolution: false"), "default-off R2-07D flag is missing");
+assert.ok(runtime.includes("r207ClockCommandBatch: false"), "default-off R2-07 clock command/batch flag is missing");
 const previewRuntime = runtime
   .replace("r207bControlledPreview: false", "r207bControlledPreview: true")
   .replace("r207cVersionedEventCorrections: false", "r207cVersionedEventCorrections: true")
   .replace("r207dConflictResolution: false", "r207dConflictResolution: true")
+  .replace("r207ClockCommandBatch: false", "r207ClockCommandBatch: true")
   .replace(
     "...(window.LAXHORNET_RUNTIME_CONFIG || {}),",
     `...(window.LAXHORNET_RUNTIME_CONFIG || {}),\n  supabaseUrl: ${JSON.stringify(supabaseUrl)},\n  supabasePublishableKey: ${JSON.stringify(publishableKey)},`,

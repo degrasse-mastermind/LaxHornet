@@ -1195,6 +1195,38 @@ Do not combine these into one large Codex task. Each item requires one approved 
 - [ ] Independent exact-head Level 3 review passes before merge.
 - [ ] Begin R2-07E only after D PASS and merge.
 
+## R2-07 clock command and atomic batch remediation gate
+
+- [x] Start from merged main `08e7abf01d22cb60fc88422c961104a952b9b7e9`
+  on a new implementation branch; leave PR #70 and its failed certification
+  evidence unchanged.
+- [x] Replace only the dormant clock command/batch wrappers through one
+  additive migration; repository runtime and Preview control default false.
+- [x] Preserve server anchors, monotonic bigint clock revisions, exact bases,
+  immutable command identity/history, no device lease, tombstone precedence,
+  lifecycle/status validation, and current personal/team authority.
+- [x] Serialize operation identities before one shared game lock and prove
+  same-game start/start, stale command, replay/mismatch, unrelated-game
+  progress, and injected rollback behavior.
+- [x] Apply reconnect batches in local semantic order only when the base is
+  unchanged; otherwise retain the whole local timeline with zero server prefix
+  or receipt mutation.
+- [x] Route the existing tracked clock to online commands/offline batches only
+  under the Preview flag; persist locally first, store acknowledged versions,
+  project from the server anchor, and never predict server revisions.
+- [x] Preserve future-schema read-only behavior, bounded error storage,
+  account isolation, non-retryable conflicts, and minimum safe clock copy.
+- [x] Focused server `36/36`, client `12/12`, and two-context browser `13/13`
+  matrices pass, including `390x844`, completion, offline success/conflict,
+  no partial application, and no console error.
+- [x] A/B/C/D, R2-07D dismiss, tracked-time, and tombstone preservation pass.
+- [ ] Complete regression, secret/host scan, diff hygiene, and zero-residue
+  proof pass after the final documentation diff stabilizes.
+- [ ] Draft PR exact-head GitHub, automatic isolated Supabase Preview, and
+  Vercel checks pass.
+- [ ] Independent exact-head Level 3 implementation review passes before
+  merge; R2-07E remains blocked until review and merge.
+
 A feature PR is not automatically a production release.
 
 - [ ] Feature PR merged to `main`.
