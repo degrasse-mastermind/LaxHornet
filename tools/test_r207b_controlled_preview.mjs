@@ -28,6 +28,12 @@ check(operation.base_version === 1 && operation.changed_fields.join() === "oppon
 check(r207.hasRequiredVersions(versions), "complete version map is accepted");
 check(r207.normalizeVersionMap(versions).futureVersion === 9, "future version fields survive local schema normalization");
 check(!r207.hasRequiredVersions({ metadataVersion: 1 }), "missing bases are never defaulted to current");
+const createOperation = r207.buildCreateOperation({
+  game: { id: "new-synthetic-game", opponent: "New opponent" },
+  clientOperationId: "permanent-create", createdAt: 1,
+});
+check(createOperation.operation_type === "game_create" && createOperation.game_id === "new-synthetic-game",
+  "new-game operation is identified before cloud work and requires no invented server base");
 
 for (const builder of [
   r207.buildScoreDeltaOperation({ game: before, deltas: { score_for: 1 }, clientOperationId: "score-delta" }),

@@ -24,6 +24,8 @@ The additive migration binds to the exact certified migration inventory,
 relation shape, public RPC definitions, RLS/FORCE RLS state, grants, dormant
 capability, legacy v1 definition, and zero pre-activation R2-07 evidence. Any
 drift raises a stable `R207_ACTIVATION_PREFLIGHT_FAILED:*` error before cutover.
+The relation binding includes durable game tombstones, and a separate exact
+policy-definition digest prevents permissive-policy substitution.
 
 Within one PostgreSQL transaction it acquires a release advisory lock, gates
 the canonical game/event/clock tables, performs the final legacy
@@ -49,7 +51,10 @@ private database detail. The durable client classifier keeps the operation and
 shows actionable update copy. The production-capable runtime profile treats
 the server capability response as authoritative, uses legacy mutation only
 after an explicit dormant response, and refuses v1 fallback after confirmed
-production activation. The checked-in default remains dormant until a separate
+production activation. After authoritative activation, fresh-load, reconnect,
+new-game creation, field changes, events, and clock startup all route through
+reviewed v2 contracts; pending legacy game writes are superseded locally.
+The checked-in default remains dormant until a separate
 R2-07F deployment authorization installs the reviewed profile.
 
 ## Recovery
@@ -60,6 +65,9 @@ and Live Share, retains the v1 upgrade-required stub, and reasserts every
 legacy mutation revocation. It works after evidence exists and never restores
 v285 last-write-wins authority. Repair/reactivation requires a new reviewed
 forward artifact.
+Recovery first takes an exclusive lock on the capability relation. Because
+every v2 writer reads that relation in its transaction, recovery drains
+in-flight writers and cannot complete ahead of a later v2 commit.
 
 ## Disposable certification
 
@@ -72,14 +80,16 @@ synthetic adult-only fixtures. It proves:
 - v1 active/v2 dormant before cutover;
 - atomic v2 enable plus v1/direct disable;
 - bounded stale-v285 rejection with no mutation;
-- metadata, event, clock command, clock batch, conflict, and resolution paths;
+- idempotent game creation, metadata, event, clock command, clock batch,
+  conflict, and resolution paths;
 - RLS/FORCE RLS, non-enumeration, tombstone precedence, and Live Share bytes;
+- exact policy/RLS drift refusal and canonical Git-blob runtime hashes;
 - deterministic activation replay refusal;
 - injected post-capability failure rolls the entire transaction back;
 - post-evidence recovery fail-closes without restoring legacy authority;
 - zero disposable container residue.
 
-Focused result: `26/26 PASS`. Complete local Level 3 regression result:
+Focused result: `32/32 PASS`. Complete local Level 3 regression result:
 `70 passed, 0 failed`. Exact-head CI and independent review remain separately
 required on the final pushed SHA.
 

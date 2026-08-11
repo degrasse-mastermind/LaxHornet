@@ -25,10 +25,12 @@ declare
   ];
   actual_versions text[];
   relation_hash text;
+  policy_hash text;
   signature text;
   expected_hash text;
   actual_hash text;
   relation_name text;
+  expected_force boolean;
 begin
   if pg_catalog.to_regclass('public.r207_preview_control') is not null
     and coalesce((
@@ -88,7 +90,7 @@ begin
       and default_value.adnum = attribute.attnum
     where namespace.nspname = 'public'
       and class.relname = any(array[
-        'games', 'events', 'r207_preview_control', 'game_sync_operations',
+        'games', 'events', 'legacy_game_tombstones', 'r207_preview_control', 'game_sync_operations',
         'game_sync_operation_attempts', 'game_field_changes', 'game_conflicts',
         'game_conflict_resolutions', 'legacy_event_sync_operations',
         'legacy_event_sync_operation_attempts', 'legacy_event_field_changes',
@@ -96,9 +98,39 @@ begin
         'game_clock_commands', 'game_clock_batches'
       ])
   ) as shape;
-  if relation_hash is distinct from '4529b8192848e429d76d67d6021d78be' then
+  if relation_hash is distinct from '4567f943c9bff20f9510a28c8c7bbf98' then
     raise exception using errcode = 'P0001',
       message = 'R207_ACTIVATION_PREFLIGHT_FAILED:RELATION_SHAPE_DRIFT';
+  end if;
+
+  select pg_catalog.md5(pg_catalog.string_agg(policy.item, E'\n' order by policy.item))
+  into policy_hash
+  from (
+    select class.relname || '|' || rule.polname || '|' || rule.polpermissive::text || '|'
+      || rule.polcmd::text || '|' || coalesce((
+        select pg_catalog.string_agg(
+          case when role_oid = 0 then 'PUBLIC' else pg_catalog.pg_get_userbyid(role_oid) end,
+          ',' order by role_oid
+        )
+        from pg_catalog.unnest(rule.polroles) as role_oid
+      ), '') || '|' || coalesce(pg_catalog.pg_get_expr(rule.polqual, rule.polrelid), '')
+      || '|' || coalesce(pg_catalog.pg_get_expr(rule.polwithcheck, rule.polrelid), '') as item
+    from pg_catalog.pg_policy as rule
+    join pg_catalog.pg_class as class on class.oid = rule.polrelid
+    join pg_catalog.pg_namespace as namespace on namespace.oid = class.relnamespace
+    where namespace.nspname = 'public'
+      and class.relname = any(array[
+        'games', 'events', 'legacy_game_tombstones', 'r207_preview_control',
+        'game_sync_operations', 'game_sync_operation_attempts', 'game_field_changes',
+        'game_conflicts', 'game_conflict_resolutions', 'legacy_event_sync_operations',
+        'legacy_event_sync_operation_attempts', 'legacy_event_field_changes',
+        'legacy_event_tombstones', 'lh_game_clock_states', 'game_clock_commands',
+        'game_clock_batches'
+      ])
+  ) as policy;
+  if policy_hash is distinct from '0c9fc6789e1401e149592e2d8c7f0334' then
+    raise exception using errcode = 'P0001',
+      message = 'R207_ACTIVATION_PREFLIGHT_FAILED:POLICY_DRIFT';
   end if;
 
   for signature, expected_hash in
@@ -135,13 +167,18 @@ begin
     end if;
   end loop;
 
-  foreach relation_name in array array[
-    'r207_preview_control', 'game_sync_operations',
-    'game_sync_operation_attempts', 'game_field_changes', 'game_conflicts',
-    'game_conflict_resolutions', 'legacy_event_sync_operations',
-    'legacy_event_sync_operation_attempts', 'legacy_event_field_changes',
-    'legacy_event_tombstones', 'game_clock_commands', 'game_clock_batches'
-  ]
+  for relation_name, expected_force in
+    select binding.relation_name, binding.expected_force
+    from (values
+      ('games', false), ('events', false), ('legacy_game_tombstones', true),
+      ('lh_game_clock_states', true), ('r207_preview_control', true),
+      ('game_sync_operations', true), ('game_sync_operation_attempts', true),
+      ('game_field_changes', true), ('game_conflicts', true),
+      ('game_conflict_resolutions', true), ('legacy_event_sync_operations', true),
+      ('legacy_event_sync_operation_attempts', true), ('legacy_event_field_changes', true),
+      ('legacy_event_tombstones', true), ('game_clock_commands', true),
+      ('game_clock_batches', true)
+    ) as binding(relation_name, expected_force)
   loop
     if not exists (
       select 1
@@ -150,7 +187,7 @@ begin
       where namespace.nspname = 'public'
         and class.relname = relation_name
         and class.relrowsecurity
-        and class.relforcerowsecurity
+        and class.relforcerowsecurity = expected_force
     ) then
       raise exception using errcode = 'P0001',
         message = 'R207_ACTIVATION_PREFLIGHT_FAILED:RLS_DRIFT:' || relation_name;
@@ -230,6 +267,188 @@ where game_row.lifecycle_state is distinct from case
   when game_row.status = 'complete' then 'completed'
   else 'active'
 end;
+
+alter table public.game_sync_operations
+  drop constraint game_sync_operations_type_r207_check,
+  add constraint game_sync_operations_type_r207_check check (operation_type in (
+    'game_create', 'metadata_patch', 'score_delta', 'score_correction',
+    'status_transition', 'roster_context_patch', 'sharing_patch',
+    'clock_start', 'clock_pause', 'clock_set_remaining', 'clock_batch',
+    'conflict_resolution'
+  ));
+
+create or replace function public.laxhornet_sync_game_v2(p_operation jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  enabled boolean := false;
+  actor_id uuid := (select auth.uid());
+  client_id text := btrim(coalesce(p_operation ->> 'client_operation_id', ''));
+  target_game_id text := btrim(coalesce(p_operation ->> 'game_id', ''));
+  request_hash text := lower(btrim(coalesce(p_operation ->> 'request_hash', '')));
+  game_payload jsonb := p_operation -> 'game';
+  target_game public.games%rowtype;
+  tombstone public.legacy_game_tombstones%rowtype;
+  stored_operation public.game_sync_operations%rowtype;
+  result jsonb;
+  operation_uuid uuid := gen_random_uuid();
+  payload_team_id text;
+  payload_roster_player_id text;
+begin
+  select control.preview_enabled into enabled
+  from public.r207_preview_control as control
+  where control.control_id;
+  if not coalesce(enabled, false) then
+    return jsonb_build_object('outcome', 'rejected', 'code', 'r207_not_activated');
+  end if;
+  if actor_id is null then
+    return jsonb_build_object('outcome', 'rejected', 'code', 'authentication_required');
+  end if;
+
+  if coalesce(p_operation ->> 'operation_type', '') <> 'game_create' then
+    result := lh_sync_private.r207_apply_game_operation_for_test(p_operation, false);
+    if result ->> 'outcome' in ('accepted', 'merged') then
+      update public.games as game_row set saved_at = statement_timestamp()
+      where game_row.id = target_game_id returning game_row.* into target_game;
+      if found then
+        result := result || jsonb_build_object('server_game', jsonb_strip_nulls(jsonb_build_object(
+          'id', target_game.id, 'opponent', target_game.opponent,
+          'game_date', target_game.game_date, 'location', target_game.location,
+          'game_type', target_game.game_type, 'lifecycle_state', target_game.lifecycle_state,
+          'score_for', target_game.score_for, 'score_against', target_game.score_against,
+          'score_known', target_game.score_known, 'saved_at', target_game.saved_at
+        )));
+      end if;
+    end if;
+    return result;
+  end if;
+
+  if client_id = '' or length(client_id) > 200
+    or target_game_id = '' or length(target_game_id) > 200
+    or request_hash !~ '^[0-9a-f]{64}$'
+    or jsonb_typeof(game_payload) <> 'object'
+    or pg_column_size(game_payload) > 16384
+    or exists (
+      select 1 from jsonb_object_keys(game_payload) as key
+      where key <> all(array[
+        'id','player_id','team_id','roster_player_id','share_code','is_shared',
+        'opponent','game_date','location','game_type','period_format','player_snapshot',
+        'current_quarter','status','created_at','saved_at','ended_at','score_for',
+        'score_against','score_known','lifecycle_state'
+      ])
+    )
+  then
+    return jsonb_build_object('outcome', 'rejected', 'code', 'invalid_game_create');
+  end if;
+  if btrim(coalesce(game_payload ->> 'id', '')) <> target_game_id
+    or length(btrim(coalesce(game_payload ->> 'share_code', ''))) not between 1 and 64
+    or length(btrim(coalesce(game_payload ->> 'opponent', ''))) not between 1 and 200
+    or length(coalesce(game_payload ->> 'location', '')) > 500
+    or length(coalesce(game_payload ->> 'game_type', '')) > 100
+    or coalesce(game_payload ->> 'period_format', '') not in ('quarters', 'halves')
+    or coalesce(game_payload ->> 'status', '') not in ('in-progress', 'complete')
+    or coalesce(game_payload ->> 'lifecycle_state', '') not in ('active', 'paused', 'completed')
+  then
+    return jsonb_build_object('outcome', 'rejected', 'code', 'invalid_game_create');
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
+    'laxhornet:r207-operation:' || actor_id::text || ':' || client_id, 0
+  ));
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('laxhornet:legacy-game:' || target_game_id, 0)
+  );
+  select * into tombstone from public.legacy_game_tombstones where game_id = target_game_id;
+  if found then
+    if lh_sync_private.r207_tombstone_authority(actor_id, tombstone) then
+      return jsonb_build_object('outcome', 'deleted', 'code', 'game_deleted');
+    end if;
+    return jsonb_build_object('outcome', 'rejected', 'code', 'authorization_denied');
+  end if;
+  select * into stored_operation from public.game_sync_operations
+  where actor_user_id = actor_id and client_operation_id = client_id;
+  if found then
+    if stored_operation.game_id <> target_game_id then
+      return jsonb_build_object('outcome', 'rejected', 'code', 'duplicate_operation_id_scope_mismatch');
+    elsif stored_operation.request_hash <> request_hash then
+      return jsonb_build_object('outcome', 'rejected', 'code', 'duplicate_operation_id_payload_mismatch');
+    end if;
+    insert into public.game_sync_operation_attempts(
+      actor_user_id, client_operation_id, canonical_operation_id, attempt_code
+    ) values (actor_id, client_id, stored_operation.operation_id, 'idempotent_replay');
+    return stored_operation.canonical_result || jsonb_build_object('replay', true);
+  end if;
+  if exists (select 1 from public.games where id = target_game_id) then
+    return jsonb_build_object('outcome', 'rejected', 'code', 'authorization_denied');
+  end if;
+
+  payload_team_id := nullif(btrim(coalesce(game_payload ->> 'team_id', '')), '');
+  payload_roster_player_id := nullif(btrim(coalesce(game_payload ->> 'roster_player_id', '')), '');
+  if (payload_team_id is null) <> (payload_roster_player_id is null)
+    or (payload_team_id is not null and not public.laxhornet_can_track_roster_player(
+      payload_team_id, payload_roster_player_id
+    ))
+  then
+    return jsonb_build_object('outcome', 'rejected', 'code', 'authorization_denied');
+  end if;
+
+  insert into public.games(
+    id, player_id, user_id, team_id, roster_player_id, share_code, is_shared,
+    opponent, game_date, location, game_type, period_format, player_snapshot,
+    current_quarter, status, created_at, saved_at, ended_at, lifecycle_state,
+    score_for, score_against, score_known, final_score_for, final_score_against
+  ) values (
+    target_game_id, nullif(game_payload ->> 'player_id', ''), actor_id,
+    payload_team_id, payload_roster_player_id, btrim(game_payload ->> 'share_code'),
+    coalesce((game_payload ->> 'is_shared')::boolean, false),
+    btrim(game_payload ->> 'opponent'), (game_payload ->> 'game_date')::date,
+    coalesce(game_payload ->> 'location', ''), coalesce(game_payload ->> 'game_type', ''),
+    game_payload ->> 'period_format', coalesce(game_payload -> 'player_snapshot', '{}'::jsonb),
+    coalesce(game_payload ->> 'current_quarter', 'Q1'), game_payload ->> 'status',
+    coalesce((game_payload ->> 'created_at')::timestamptz, statement_timestamp()),
+    coalesce((game_payload ->> 'saved_at')::timestamptz, statement_timestamp()),
+    nullif(game_payload ->> 'ended_at', '')::timestamptz,
+    game_payload ->> 'lifecycle_state',
+    coalesce((game_payload ->> 'score_for')::integer, 0),
+    coalesce((game_payload ->> 'score_against')::integer, 0),
+    coalesce((game_payload ->> 'score_known')::boolean, false),
+    case when game_payload ->> 'lifecycle_state' = 'completed' and coalesce((game_payload ->> 'score_known')::boolean, false)
+      then coalesce((game_payload ->> 'score_for')::integer, 0) end,
+    case when game_payload ->> 'lifecycle_state' = 'completed' and coalesce((game_payload ->> 'score_known')::boolean, false)
+      then coalesce((game_payload ->> 'score_against')::integer, 0) end
+  ) returning * into target_game;
+
+  result := jsonb_build_object(
+    'outcome', 'accepted', 'code', 'game_created', 'replay', false,
+    'versions', lh_sync_private.r207_game_versions(target_game),
+    'server_game', jsonb_strip_nulls(jsonb_build_object(
+      'id', target_game.id, 'opponent', target_game.opponent,
+      'game_date', target_game.game_date, 'location', target_game.location,
+      'game_type', target_game.game_type, 'lifecycle_state', target_game.lifecycle_state,
+      'score_for', target_game.score_for, 'score_against', target_game.score_against,
+      'score_known', target_game.score_known, 'saved_at', target_game.saved_at
+    ))
+  );
+  insert into public.game_sync_operations(
+    operation_id, actor_user_id, client_operation_id, game_id, operation_type,
+    request_hash, changed_fields, outcome_class, outcome_code, result_versions,
+    canonical_result, client_created_at
+  ) values (
+    operation_uuid, actor_id, client_id, target_game_id, 'game_create', request_hash,
+    array['game'], 'accepted', 'game_created',
+    lh_sync_private.r207_game_versions(target_game), result,
+    nullif(p_operation ->> 'client_created_at', '')::timestamptz
+  );
+  return result;
+exception
+  when check_violation or foreign_key_violation or unique_violation
+    or invalid_text_representation or numeric_value_out_of_range or datetime_field_overflow then
+    return jsonb_build_object('outcome', 'rejected', 'code', 'invalid_game_create');
+end;
+$function$;
 
 create or replace function public.laxhornet_sync_game(p_operation jsonb)
 returns jsonb

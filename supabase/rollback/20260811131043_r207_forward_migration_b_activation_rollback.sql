@@ -36,6 +36,10 @@ begin
 end;
 $preflight$;
 
+-- Every reviewed v2 writer reads this table before mutation. AccessExclusive
+-- therefore drains in-flight writers and prevents a commit after recovery.
+lock table public.r207_preview_control in access exclusive mode;
+
 update public.r207_preview_control
 set preview_enabled = false,
     updated_at = statement_timestamp()

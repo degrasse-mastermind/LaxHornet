@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import crypto from "node:crypto";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -62,10 +63,28 @@ function psql(container, sql, allowFailure = false) {
   return result;
 }
 
+function psqlAsync(container, sql) {
+  return new Promise((resolve) => {
+    const child = spawn("docker", [
+      "exec", "-i", container, "psql", "-U", "postgres", "-d", "postgres",
+      "-X", "-qAt", "-v", "ON_ERROR_STOP=1",
+    ], { cwd: root, stdio: ["pipe", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("close", (status) => resolve({ status, stdout: stdout.trim(), stderr: stderr.trim() }));
+    child.stdin.end(sql);
+  });
+}
+
 const read = (folder, name) => fs.readFileSync(path.join(root, "supabase", folder, name), "utf8");
 const claims = (actor) => `select set_config('request.jwt.claims', '{"sub":"${actor}","role":"authenticated"}', false); set role authenticated;`;
 const parse = (text) => JSON.parse(text.split(/\r?\n/).reverse().find((line) => line.startsWith("{")));
 const hash = (value) => Buffer.from(String(value)).toString("hex").padEnd(64, "0").slice(0, 64);
+const gitBlobSha256 = (filePath) => crypto.createHash("sha256")
+  .update(Buffer.from(fs.readFileSync(filePath, "utf8").replace(/\r\n/g, "\n"), "utf8"))
+  .digest("hex");
 
 const bootstrap = `
 create role anon nologin;
@@ -197,6 +216,9 @@ try {
   );
   const defaultConfig = fs.readFileSync(path.join(root, "runtime-config.js"), "utf8");
   const appSource = fs.readFileSync(path.join(root, "app.js"), "utf8");
+  const binding = JSON.parse(fs.readFileSync(path.join(
+    root, "review-evidence", "r2-07-forward-migration-b-activation", "ACTIVATION_BINDING.json",
+  ), "utf8"));
   check(
     /r207ProductionActivation:\s*true/.test(productionConfig)
       && [
@@ -213,6 +235,27 @@ try {
       && appSource.includes("client_upgrade_required"),
     "production client has server-authoritative activation, no URL/debug bypass, and no active-state v1 fallback",
   );
+  const runtimeEntries = Object.entries(binding.client.runtimeClientFiles);
+  const exactRuntimeSet = runtimeEntries.map(([file, expected]) => {
+    const actual = gitBlobSha256(path.join(root, file));
+    assert.equal(actual, expected, `${file} exact Git-blob hash binding`);
+    return `${file}|${actual}`;
+  }).join("\n");
+  check(
+    gitBlobSha256(path.join(root, binding.activation.path)) === binding.activation.sha256
+      && gitBlobSha256(path.join(root, binding.recovery.path)) === binding.recovery.sha256
+      && crypto.createHash("sha256").update(exactRuntimeSet).digest("hex")
+        === binding.client.runtimeClientSetSha256,
+    "activation, recovery, and runtime evidence bind canonical exact Git-blob bytes",
+  );
+  check(
+    appSource.indexOf("if (active) return syncGameWithR207Operations(game, options)")
+        < appSource.indexOf("const queued = queueLegacyGameOperation(game, options)")
+      && appSource.includes("buildCreateOperation")
+      && appSource.includes("queueR207VersionedEvent(synchronized, event)")
+      && appSource.includes("await r207PreviewCapabilityAvailable({ force: true })"),
+    "fresh-load production activation routes game creation, field writes, and events to v2 before legacy work",
+  );
 
   const main = await start("main");
   psql(main, `
@@ -224,6 +267,7 @@ try {
     ${gameInsert("clock-batch")}${clockInsert("clock-batch")}
     ${gameInsert("conflict-game")}
     ${gameInsert("deleted-game")}
+    ${gameInsert("recovery-race")}
   `);
 
   const liveShareHashBefore = psql(main, "select md5(pg_get_functiondef('public.lh_public_live_share_game(text)'::regprocedure));").stdout;
@@ -266,6 +310,27 @@ try {
   const metadata = gameCall(main, OWNER, gameOperation("metadata-accepted", "metadata-game", 1, { opponent: "Accepted v2" }));
   check(metadata.outcome === "accepted" && psql(main, "select opponent from public.games where id='metadata-game';").stdout === "Accepted v2",
     "v2 metadata write is accepted after activation");
+
+  const createRequest = {
+    client_operation_id: "create-game-v2", game_id: "created-game-v2",
+    operation_type: "game_create", field_group: "create",
+    game: {
+      id: "created-game-v2", player_id: "player-created", team_id: null,
+      roster_player_id: null, share_code: "CREATEV2", is_shared: false,
+      opponent: "Created opponent", game_date: "2026-08-11", location: "",
+      game_type: "league", period_format: "quarters", player_snapshot: {},
+      current_quarter: "Q1", status: "in-progress", created_at: NOW,
+      saved_at: NOW, ended_at: null, score_for: 0, score_against: 0,
+      score_known: false, lifecycle_state: "active",
+    },
+    client_created_at: NOW,
+  };
+  createRequest.request_hash = hash(JSON.stringify(createRequest));
+  const created = gameCall(main, OWNER, createRequest);
+  const createdReplay = gameCall(main, OWNER, createRequest);
+  check(created.code === "game_created" && createdReplay.replay === true
+    && psql(main, "select count(*) from public.games where id='created-game-v2';").stdout === "1",
+  "v2 creates a new game idempotently after activation");
 
   const event = eventCall(main, OWNER, {
     client_operation_id: "event-create", game_id: "event-game", event_id: "event-v2",
@@ -343,6 +408,18 @@ try {
     && psql(drift, "select preview_enabled from public.r207_preview_control where control_id;").stdout === "f",
   "certified-schema drift refuses before capability activation");
 
+  const policyDrift = await start("policy-drift");
+  psql(policyDrift, "drop policy \"laxhornet insert own games\" on public.games; create policy r207_permissive_probe on public.games for insert to authenticated with check (true);");
+  const policyDriftApply = psql(policyDrift, read("migrations", migrationFile), true);
+  check(policyDriftApply.status !== 0 && /POLICY_DRIFT/.test(policyDriftApply.stderr),
+    "policy-definition drift refuses before capability activation");
+
+  const rlsDrift = await start("rls-drift");
+  psql(rlsDrift, "alter table public.games disable row level security;");
+  const rlsDriftApply = psql(rlsDrift, read("migrations", migrationFile), true);
+  check(rlsDriftApply.status !== 0 && /RLS_DRIFT:games/.test(rlsDriftApply.stderr),
+    "critical-table RLS drift refuses before capability activation");
+
   const failure = await start("failure");
   const injected = read("migrations", migrationFile).replace(
     "-- R207_ACTIVATION_FAILURE_INJECTION_BOUNDARY",
@@ -361,7 +438,18 @@ try {
     && failedState === "false,true,true",
   "mid-transaction failure rolls back capability, grants, and v1 function together");
 
+  const raceOperation = gameOperation("recovery-race-operation", "recovery-race", 1, { opponent: "Drained before recovery" });
+  const inFlight = psqlAsync(main, `begin; ${claims(OWNER)}
+    select public.laxhornet_sync_game_v2($json$${JSON.stringify(raceOperation)}$json$::jsonb)::text;
+    select pg_sleep(2); commit; reset role;`);
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  const recoveryStartedAt = Date.now();
   psql(main, read("rollback", recoveryFile));
+  const recoveryElapsedMs = Date.now() - recoveryStartedAt;
+  const inFlightResult = await inFlight;
+  check(inFlightResult.status === 0 && recoveryElapsedMs >= 1200,
+    "recovery drains an in-flight v2 writer before fail-closed completion",
+    `elapsed=${recoveryElapsedMs} stderr=${inFlightResult.stderr}`);
   const recoveryState = psql(main, `select preview_enabled::text||','||
     has_function_privilege('authenticated','public.laxhornet_sync_game_v2(jsonb)','execute')::text||','||
     has_table_privilege('authenticated','public.games','update')::text

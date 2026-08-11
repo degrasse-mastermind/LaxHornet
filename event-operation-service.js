@@ -989,6 +989,7 @@
     sharing: "sharingVersion",
   });
   const OPERATION_TYPES = Object.freeze({
+    create: "game_create",
     metadata: "metadata_patch",
     scoreDelta: "score_delta",
     scoreCorrection: "score_correction",
@@ -1092,6 +1093,23 @@
     };
     if (!result.client_operation_id) throw new TypeError("A permanent client operation ID is required");
     return result;
+  }
+
+  function buildCreateOperation(options = {}) {
+    const game = copy(options.game || {});
+    const gameId = String(game.id || "").trim();
+    const clientOperationId = String(options.clientOperationId || "").trim();
+    if (!gameId || !clientOperationId || !isObject(game)) {
+      throw new TypeError("A game and permanent client operation ID are required");
+    }
+    return {
+      client_operation_id: clientOperationId,
+      game_id: gameId,
+      operation_type: OPERATION_TYPES.create,
+      field_group: "create",
+      game,
+      client_created_at: timestamp(options.createdAt),
+    };
   }
 
   function buildMetadataOperation(options = {}) {
@@ -1312,6 +1330,7 @@
     normalizeState,
     normalizeVersionMap,
     hasRequiredVersions,
+    buildCreateOperation,
     buildMetadataOperation,
     buildScoreDeltaOperation,
     buildScoreCorrectionOperation,
