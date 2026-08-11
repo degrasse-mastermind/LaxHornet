@@ -1,5 +1,5 @@
 {
-  "release": "v285",
+  "release": "v286",
   "productionRelease": "v285",
   "finalMainBaseSha": "fc9c079d69757cfc2667dea7e1dfcc56524dce56",
   "preReleaseBaseSha": "fc9c079d69757cfc2667dea7e1dfcc56524dce56",
@@ -17,7 +17,7 @@
   "productionUrl": "https://laxhornet.mybranford.com",
   "productionVerifiedAt": "2026-08-06T02:13:34.778Z",
   "r207ForwardMigrationBActivation": {
-    "status": "reviewed_artifact_not_applied",
+    "status": "production_database_and_runtime_active_v286_release",
     "certifiedProductBaseline": "b7269194a4ce8b9068b0d46c44d840efc4048c69",
     "certificationEvidenceSha": "c2726b0c1cd979a7af2b04bc9a0a25865f4636ea",
     "cutoverGateMigration": "supabase/migrations/20260811131042_r207_forward_migration_b_cutover_gate.sql",
@@ -44,9 +44,9 @@
     "v1PreActivationFunctionMd5": "b768a13ed661414af84c72f16194c0b6",
     "v1PostActivationFunctionMd5": "5ed65c9a743d18d894389940402f5331",
     "capabilityTransition": "dormant_false_to_production_true",
-    "releaseMarkerChanged": false,
-    "cacheMarkerChanged": false,
-    "productionApplied": false
+    "releaseMarkerChanged": true,
+    "cacheMarkerChanged": true,
+    "productionApplied": true
   },
   "productionSmokeEvidence": "review-evidence/post-r2-06-user-centered-qa/V285_PRODUCTION_RECONCILIATION.json",
   "postR206Stabilization": {

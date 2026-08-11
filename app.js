@@ -449,7 +449,7 @@ const GAME_SCOPE_TYPES = Object.freeze({
 const PUBLIC_LIVE_SHARE_POLL_MS = 4000;
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v285";
+const APP_VERSION = "v286";
 window.LAXHORNET_DISCLOSURE_STATUS = Object.freeze({
   appVersion: APP_VERSION,
   ready: SECURE_DISCLOSURE_RUNTIME_READY,
