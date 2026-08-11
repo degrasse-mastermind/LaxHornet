@@ -54,6 +54,9 @@ after an explicit dormant response, and refuses v1 fallback after confirmed
 production activation. After authoritative activation, fresh-load, reconnect,
 new-game creation, field changes, events, and clock startup all route through
 reviewed v2 contracts; pending legacy game writes are superseded locally.
+The production profile also durably queues v2 game creation, events, and clock
+commands while offline without requiring a live capability request; reconnect
+processes the retained intent only through the authoritative v2 gate.
 The checked-in default remains dormant until a separate
 R2-07F deployment authorization installs the reviewed profile.
 

@@ -1318,6 +1318,58 @@ test(
   },
 );
 
+test("R2-07F: production profile durably queues clock initialization while offline", async () => {
+  const queued = [];
+  let capabilityCalls = 0;
+  let gameSyncCalls = 0;
+  const game = {
+    id: "offline-r207-game",
+    lifecycleState: "active",
+    serverVersions: {},
+  };
+  const clockState = {
+    gameId: game.id,
+    serverClockVersion: 0,
+    clientUpdatedAt: "2026-08-11T12:00:00.000Z",
+  };
+  const harness = appHarness(["syncTrackedClockPayload"], {
+    R207_PRODUCTION_ACTIVATION_CLIENT: true,
+    state: { isOffline: true, activeGame: game, games: [], syncStatus: "" },
+    currentUserId: () => "offline-account",
+    r207PreviewCapabilityAvailable: async () => { capabilityCalls += 1; return false; },
+    r207DormantLegacyMutationConfirmed: () => false,
+    syncGameWithR207Operations: async () => { gameSyncCalls += 1; return true; },
+    queueLegacyGameOperation: () => assert.fail("offline production clock must not queue legacy work"),
+    r207ClockCommandAvailable: () => false,
+    trackedTimeState: () => ({ clockState }),
+    unresolvedR207ClockOperations: () => [],
+    durableSyncService: () => ({
+      queueClock: (operation) => { queued.push(clone(operation)); return { operationId: "offline-clock" }; },
+    }),
+    persistAll: () => true,
+    window: {
+      LaxHornetTrackedPlayingTime: {
+        clockCommandPayload: (_clock, options) => ({
+          contract: "r207_clock_v2", gameId: game.id, command: options.command,
+          arguments: {}, baseClockVersion: 0, statusBaseVersion: options.statusBaseVersion,
+          expectedLifecycle: options.expectedLifecycle,
+          clientOccurredAt: clockState.clientUpdatedAt,
+        }),
+      },
+    },
+  });
+  const result = await harness.get("syncTrackedClockPayload")(
+    { game_id: game.id, period_format: "quarters" },
+    { command: "initialize", afterClock: clockState },
+  );
+  assert.equal(result, false, "offline transport remains pending rather than acknowledged");
+  assert.equal(capabilityCalls, 0, "offline production routing does not require a live capability call");
+  assert.equal(gameSyncCalls, 1, "offline production routing durably establishes v2 game intent first");
+  assert.equal(queued.length, 1);
+  assert.equal(queued[0].payload.command, "initialize");
+  assert.equal(queued[0].payload.statusBaseVersion, 1);
+});
+
 test(
   "CHARACTERIZATION: global sync copy remains transient pending visible R2 sync states",
   () => {

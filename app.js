@@ -9122,8 +9122,8 @@ async function syncTrackedClockPayload(clockPayload, commandContext = {}) {
   if (!accountId || !game || !clockPayload) return false;
 
   const productionActive = R207_PRODUCTION_ACTIVATION_CLIENT
-    && await r207PreviewCapabilityAvailable();
-  if (R207_PRODUCTION_ACTIVATION_CLIENT && !productionActive
+    && (state.isOffline || await r207PreviewCapabilityAvailable());
+  if (R207_PRODUCTION_ACTIVATION_CLIENT && !state.isOffline && !productionActive
     && !r207DormantLegacyMutationConfirmed()) return false;
   const gameOperation = productionActive
     ? await syncGameWithR207Operations(game, { allowCreate: true })
@@ -9237,18 +9237,23 @@ async function syncGameWithR207Operations(game, options = {}) {
   const requests = [];
   if (!fields.hasRequiredVersions(current.serverVersions)) {
     if (options.allowCreate === false) return false;
-    const row = gameToSupabaseRow(current);
-    delete row.user_id;
-    requests.push(fields.buildCreateOperation({
-      game: {
-        ...row,
-        score_for: current.scoreFor,
-        score_against: current.scoreAgainst,
-        score_known: current.scoreKnown || current.scoreTrackingTouched,
-        lifecycle_state: current.lifecycleState,
-      },
-      clientOperationId: uid("game-create"), createdAt: Date.now(),
-    }));
+    const pendingCreate = (state.r207FieldSync?.operations || []).some((operation) =>
+      operation.gameId === current.id && operation.fieldGroup === "create"
+      && ["pending", "retryable", "syncing"].includes(operation.state));
+    if (!pendingCreate) {
+      const row = gameToSupabaseRow(current);
+      delete row.user_id;
+      requests.push(fields.buildCreateOperation({
+        game: {
+          ...row,
+          score_for: current.scoreFor,
+          score_against: current.scoreAgainst,
+          score_known: current.scoreKnown || current.scoreTrackingTouched,
+          lifecycle_state: current.lifecycleState,
+        },
+        clientOperationId: uid("game-create"), createdAt: Date.now(),
+      }));
+    }
   } else {
     const before = normalizeGame(current.r207ServerSnapshot || current);
     before.serverVersions = { ...current.serverVersions };
@@ -9279,7 +9284,8 @@ async function syncGameWithR207Operations(game, options = {}) {
     const queued = await r207FieldService().queue(request);
     if (!queued) return false;
   }
-  if (requests.length) await r207FieldService().process();
+  if (state.isOffline) return true;
+  await r207FieldService().process();
   const synchronized = state.games.find((item) => item.id === current.id)
     || (state.activeGame?.id === current.id ? state.activeGame : current);
   if (!fields.hasRequiredVersions(synchronized.serverVersions)) return false;
@@ -9296,7 +9302,7 @@ async function syncGameToSupabase(game, options = {}) {
     return false;
   }
   if (globalThis.window?.LAXHORNET_RUNTIME_CONFIG?.r207ProductionActivation === true) {
-    const active = await r207PreviewCapabilityAvailable();
+    const active = state.isOffline || await r207PreviewCapabilityAvailable();
     if (active) return syncGameWithR207Operations(game, options);
     if (!r207DormantLegacyMutationConfirmed()) {
       state.syncStatus = "Saved on this phone; waiting for activation status";
@@ -9341,7 +9347,8 @@ async function syncLoggedEvent(game, event) {
   }
   const gameSynced = await syncGameToSupabase(game);
   if (!gameSynced) return false;
-  if (R207_PRODUCTION_ACTIVATION_CLIENT && r207ProductionActivationConfirmed()) {
+  if (R207_PRODUCTION_ACTIVATION_CLIENT
+    && (state.isOffline || r207ProductionActivationConfirmed())) {
     const synchronized = state.games.find((item) => item.id === game.id)
       || (state.activeGame?.id === game.id ? state.activeGame : game);
     const queued = queueR207VersionedEvent(synchronized, event);
