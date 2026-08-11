@@ -1237,15 +1237,19 @@ Do not combine these into one large Codex task. Each item requires one approved 
   project from the server anchor, and never predict server revisions.
 - [x] Preserve future-schema read-only behavior, bounded error storage,
   account isolation, non-retryable conflicts, and minimum safe clock copy.
-- [x] Focused server `36/36`, client `12/12`, and two-context browser `13/13`
+- [x] Preserve the exact-head Level 3 FAIL at `895612d17ec52bd101f126cf77696023b908f3b9`
+  and remediate its three P1 findings without merging or starting R2-07E.
+- [x] Append-only exact prefix/new-suffix replay, bounded server-anchor offline
+  chronology, and pre-mutation JavaScript-safe revision guards pass a
+  dedicated real-RPC adversarial matrix `19/19`.
+- [x] Focused server `55/55`, client `15/15`, and two-context browser `18/18`
   matrices pass, including `390x844`, completion, offline success/conflict,
   no partial application, and no console error.
 - [x] A/B/C/D, R2-07D dismiss, tracked-time, and tombstone preservation pass.
-- [x] Complete regression `69/69`, secret/host scan, diff hygiene, focused
-  hydration rerun, and zero-residue proof pass.
-- [x] Draft PR #71 integration head `11475fc2a3c401370e8dc327e9345aa8b497ac8c`
-  passes Docker, portable regression, automatic isolated Supabase Preview,
-  Vercel, and Preview Comments checks.
+- [ ] New remediation-head complete regression, secret/host scan, diff hygiene,
+  focused hydration, and zero-residue proof pass.
+- [ ] New remediation-head GitHub, automatic isolated Supabase Preview, and
+  Vercel checks pass.
 - [ ] Independent exact-head Level 3 implementation review passes before
   merge; R2-07E remains blocked until review and merge.
 

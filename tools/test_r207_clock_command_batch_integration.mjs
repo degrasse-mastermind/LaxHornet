@@ -27,10 +27,15 @@ const TRACKER = "00000000-0000-4000-8000-00000000000b";
 const OTHER = "00000000-0000-4000-8000-00000000000c";
 const containers = new Set();
 let checks = 0;
+let p1Checks = 0;
 const check = (condition, label, details = null) => {
   assert.ok(condition, details ? `${label}: ${JSON.stringify(details)}` : label);
   checks += 1;
   console.log(`PASS: ${label}`);
+};
+const p1Check = (condition, label, details = null) => {
+  check(condition, label, details);
+  p1Checks += 1;
 };
 const read = (folder, file) => fs.readFileSync(path.join(root, "supabase", folder, file), "utf8");
 function docker(args, options = {}) {
@@ -189,6 +194,16 @@ try {
     ${gameInsert("independent-a")}${clockInsert("independent-a")}
     ${gameInsert("independent-b")}${clockInsert("independent-b")}
     ${gameInsert("unauthorized-game")}${clockInsert("unauthorized-game")}
+    ${gameInsert("p1-prefix-one")}${clockInsert("p1-prefix-one")}
+    ${gameInsert("p1-prefix-multi")}${clockInsert("p1-prefix-multi")}
+    ${gameInsert("p1-period")}${clockInsert("p1-period")}
+    ${gameInsert("p1-complete")}${clockInsert("p1-complete")}
+    ${gameInsert("p1-reversed")}${clockInsert("p1-reversed")}
+    ${gameInsert("p1-gap")}${clockInsert("p1-gap")}
+    ${gameInsert("p1-boundary")}${clockInsert("p1-boundary")}
+    ${gameInsert("p1-ceiling-single")}${clockInsert("p1-ceiling-single")}
+    ${gameInsert("p1-ceiling-batch")}${clockInsert("p1-ceiling-batch")}
+    ${gameInsert("p1-ceiling-prefix")}${clockInsert("p1-ceiling-prefix")}
   `);
 
   const dormant = callOperation(main, OWNER, operation({
@@ -302,6 +317,228 @@ try {
   }));
   check(partialReplay.code === "clock_batch_partial_replay_mismatch", "partial duplicate/new batch mixtures fail closed", partialReplay);
 
+  const onePrefix = batch({
+    id: "p1-one-batch", game: "p1-prefix-one", base: 1, commands: [
+      command({ id: "p1-one-a", lifecycle: "active", command: "start", occurred: "2026-08-10T12:10:00Z" }),
+    ],
+  });
+  const onePrefixAccepted = callBatch(main, OWNER, onePrefix);
+  const onePrefixExtended = callBatch(main, OWNER, batch({
+    id: "p1-one-batch", game: "p1-prefix-one", base: 1, commands: [
+      ...onePrefix.commands,
+      command({ id: "p1-one-b", lifecycle: "active", command: "pause", occurred: "2026-08-10T12:10:05Z" }),
+    ],
+  }));
+  p1Check(onePrefixAccepted.clock_version === 2
+    && onePrefixExtended.outcome === "accepted"
+    && onePrefixExtended.clock_version === 3
+    && onePrefixExtended.clock_state.clock_seconds_remaining === 715
+    && onePrefixExtended.receipts[0].replay === true,
+  "exact one-command prefix replays and one new suffix commits without duplicate mutation", { onePrefixAccepted, onePrefixExtended });
+
+  const multiPrefix = batch({
+    id: "p1-multi-batch", game: "p1-prefix-multi", base: 1, commands: [
+      command({ id: "p1-multi-a", lifecycle: "active", command: "start", occurred: "2026-08-10T12:20:00Z" }),
+      command({ id: "p1-multi-b", lifecycle: "active", command: "pause", occurred: "2026-08-10T12:20:05Z" }),
+    ],
+  });
+  const multiPrefixAccepted = callBatch(main, OWNER, multiPrefix);
+  const multiExtendedRequest = batch({
+    id: "p1-multi-batch", game: "p1-prefix-multi", base: 1, commands: [
+      ...multiPrefix.commands,
+      command({ id: "p1-multi-c", lifecycle: "paused", command: "resume", occurred: "2026-08-10T12:20:06Z" }),
+      command({ id: "p1-multi-d", lifecycle: "active", command: "pause", occurred: "2026-08-10T12:20:10Z" }),
+    ],
+  });
+  const multiExtended = callBatch(main, OWNER, multiExtendedRequest);
+  p1Check(multiPrefixAccepted.clock_state.clock_seconds_remaining === 715
+    && multiExtended.outcome === "accepted"
+    && multiExtended.clock_version === 5
+    && multiExtended.clock_state.clock_seconds_remaining === 711
+    && multiExtended.receipts.length === 4
+    && multiExtended.receipts.slice(0, 2).every((receipt) => receipt.replay === true),
+  "exact multi-command prefix replays and multi-command suffix preserves both elapsed intervals", { multiPrefixAccepted, multiExtended });
+
+  const initialReplayAfterExtension = callBatch(main, OWNER, multiPrefix);
+  const extendedReplayAfterTimeout = callBatch(main, OWNER, multiExtendedRequest);
+  p1Check(initialReplayAfterExtension.replay === true
+    && initialReplayAfterExtension.clock_version === 3
+    && extendedReplayAfterTimeout.replay === true
+    && extendedReplayAfterTimeout.clock_version === 5
+    && extendedReplayAfterTimeout.clock_state.clock_seconds_remaining === 711,
+  "full replay and timeout-after-extension replay return their exact immutable canonical results", { initialReplayAfterExtension, extendedReplayAfterTimeout });
+
+  const changedPrefix = callBatch(main, OWNER, batch({
+    id: "p1-multi-batch", game: "p1-prefix-multi", base: 1, commands: [
+      command({ id: "p1-multi-a", lifecycle: "active", command: "start", args: { unexpected: true }, occurred: "2026-08-10T12:20:00Z" }),
+      ...multiExtendedRequest.commands.slice(1),
+      command({ id: "p1-multi-e", lifecycle: "paused", command: "resume", occurred: "2026-08-10T12:20:11Z" }),
+    ],
+  }));
+  p1Check(changedPrefix.code === "duplicate_operation_id_payload_mismatch",
+    "changed semantic payload inside a committed prefix is rejected", changedPrefix);
+
+  const reorderedPrefix = callBatch(main, OWNER, batch({
+    id: "p1-multi-batch", game: "p1-prefix-multi", base: 1, commands: [
+      { ...multiExtendedRequest.commands[1], client_occurred_at: "2026-08-10T12:20:00Z" },
+      { ...multiExtendedRequest.commands[0], client_occurred_at: "2026-08-10T12:20:05Z" },
+      ...multiExtendedRequest.commands.slice(2),
+      command({ id: "p1-multi-f", lifecycle: "paused", command: "resume", occurred: "2026-08-10T12:20:11Z" }),
+    ],
+  }));
+  p1Check(reorderedPrefix.code === "duplicate_operation_id_payload_mismatch",
+    "reordered committed prefix is rejected", reorderedPrefix);
+
+  const missingPrefix = callBatch(main, OWNER, batch({
+    id: "p1-multi-batch", game: "p1-prefix-multi", base: 1, commands: [
+      multiExtendedRequest.commands[0], multiExtendedRequest.commands[1],
+      multiExtendedRequest.commands[2],
+    ],
+  }));
+  p1Check(missingPrefix.code === "duplicate_operation_id_payload_mismatch",
+    "omitting a committed prefix command is rejected", missingPrefix);
+
+  const interleavedPrefix = callBatch(main, OWNER, batch({
+    id: "p1-multi-batch", game: "p1-prefix-multi", base: 1, commands: [
+      multiExtendedRequest.commands[0],
+      command({ id: "p1-interleaved", lifecycle: "active", command: "pause", occurred: "2026-08-10T12:20:04Z" }),
+      ...multiExtendedRequest.commands.slice(1),
+    ],
+  }));
+  p1Check(interleavedPrefix.outcome === "rejected"
+    && ["clock_batch_partial_replay_mismatch", "duplicate_operation_id_payload_mismatch"].includes(interleavedPrefix.code),
+    "duplicate/new interleaving inside the committed prefix is rejected", interleavedPrefix);
+
+  const wrongSuffixBase = callBatch(main, OWNER, batch({
+    id: "p1-multi-batch", game: "p1-prefix-multi", base: 2, commands: [
+      ...multiExtendedRequest.commands,
+      command({ id: "p1-wrong-base", lifecycle: "paused", command: "resume", occurred: "2026-08-10T12:20:11Z" }),
+    ],
+  }));
+  p1Check(wrongSuffixBase.code === "duplicate_operation_id_payload_mismatch",
+    "suffix with a changed original batch base is rejected", wrongSuffixBase);
+
+  p1Check(psql(main, "select count(*) from public.game_clock_commands where game_id='p1-prefix-multi';").stdout === "4"
+    && psql(main, "select count(*) from public.game_clock_batches where game_id='p1-prefix-multi';").stdout === "2"
+    && psql(main, "select count(distinct operation_id) from public.game_clock_commands where game_id='p1-prefix-multi';").stdout === "4",
+  "prefix extension creates no duplicate command receipts or evidence");
+
+  const periodChronology = callBatch(main, OWNER, batch({
+    id: "p1-period-batch", game: "p1-period", base: 1, commands: [
+      command({ id: "p1-period-start", lifecycle: "active", command: "start", occurred: "2026-08-10T12:30:00Z" }),
+      command({ id: "p1-period-pause", lifecycle: "active", command: "pause", occurred: "2026-08-10T12:30:05Z" }),
+      command({ id: "p1-period-advance", lifecycle: "paused", command: "advance_period", args: { next_period: "Q2" }, occurred: "2026-08-10T12:30:06Z" }),
+    ],
+  }));
+  p1Check(periodChronology.outcome === "accepted"
+    && periodChronology.clock_state.current_period === "Q2"
+    && periodChronology.clock_state.clock_seconds_remaining === 720
+    && psql(main, "select clock_seconds_remaining from public.game_clock_commands where game_id='p1-period' and command='pause';").stdout === "715",
+  "period advance preserves the elapsed prior-period interval before the bounded reset", periodChronology);
+
+  const completionChronology = callBatch(main, OWNER, batch({
+    id: "p1-complete-batch", game: "p1-complete", base: 1, commands: [
+      command({ id: "p1-complete-start", lifecycle: "active", command: "start", occurred: "2026-08-10T12:40:00Z" }),
+      command({ id: "p1-complete-end", lifecycle: "active", command: "complete", occurred: "2026-08-10T12:40:07Z" }),
+    ],
+  }));
+  p1Check(completionChronology.outcome === "accepted"
+    && completionChronology.lifecycle_state === "completed"
+    && completionChronology.clock_state.is_running === false
+    && completionChronology.clock_state.clock_seconds_remaining === 713,
+  "completion preserves bounded offline elapsed time and freezes the canonical clock", completionChronology);
+
+  const reversedChronology = callBatch(main, OWNER, batch({
+    id: "p1-reversed-batch", game: "p1-reversed", base: 1, commands: [
+      command({ id: "p1-reversed-start", lifecycle: "active", command: "start", occurred: "2026-08-10T12:50:05Z" }),
+      command({ id: "p1-reversed-pause", lifecycle: "active", command: "pause", occurred: "2026-08-10T12:50:00Z" }),
+    ],
+  }));
+  p1Check(reversedChronology.code === "clock_chronology_needs_review"
+    && psql(main, "select revision||'|'||is_running::text from public.lh_game_clock_states where game_id='p1-reversed';").stdout === "1|false"
+    && psql(main, "select count(*) from public.game_clock_commands where game_id='p1-reversed';").stdout === "0",
+  "reversed offline chronology fails closed with zero mutation", reversedChronology);
+
+  const excessiveGap = callBatch(main, OWNER, batch({
+    id: "p1-gap-batch", game: "p1-gap", base: 1, commands: [
+      command({ id: "p1-gap-start", lifecycle: "active", command: "start", occurred: "2026-08-10T13:00:00Z" }),
+      command({ id: "p1-gap-pause", lifecycle: "active", command: "pause", occurred: "2026-08-10T13:00:31Z" }),
+    ],
+  }));
+  p1Check(excessiveGap.code === "clock_chronology_needs_review"
+    && psql(main, "select revision||'|'||is_running::text from public.lh_game_clock_states where game_id='p1-gap';").stdout === "1|false",
+  "offline chronology beyond the approved 30-second certainty bound applies zero commands", excessiveGap);
+
+  psql(main, "update public.lh_game_clock_states set clock_seconds_remaining=3,anchor_clock_seconds_remaining=3 where game_id='p1-boundary';");
+  const completionBoundary = callBatch(main, OWNER, batch({
+    id: "p1-boundary-batch", game: "p1-boundary", base: 1, commands: [
+      command({ id: "p1-boundary-start", lifecycle: "active", command: "start", occurred: "2026-08-10T13:10:00Z" }),
+      command({ id: "p1-boundary-pause", lifecycle: "active", command: "pause", occurred: "2026-08-10T13:10:05Z" }),
+    ],
+  }));
+  p1Check(completionBoundary.code === "clock_chronology_needs_review"
+    && completionBoundary.batch_atomic === true
+    && psql(main, "select revision||'|'||clock_seconds_remaining||'|'||is_running::text from public.lh_game_clock_states where game_id='p1-boundary';").stdout === "1|3|false"
+    && psql(main, "select count(*) from public.game_sync_operations where client_operation_id in ('p1-boundary-start','p1-boundary-pause');").stdout === "0",
+  "elapsed chronology crossing the clock boundary rolls back the complete batch", completionBoundary);
+
+  p1Check(batchConflict.outcome === "conflicted"
+    && psql(main, "select count(*) from public.game_clock_commands where game_id='batch-conflict';").stdout === "1",
+  "changed server base continues to apply zero offline batch commands", batchConflict);
+
+  const MAX_SAFE_REVISION = 9007199254740991n;
+  psql(main, `update public.lh_game_clock_states set revision=${MAX_SAFE_REVISION - 1n} where game_id='p1-ceiling-single';`);
+  const reachesCeiling = callOperation(main, OWNER, operation({
+    id: "p1-ceiling-start", game: "p1-ceiling-single", base: Number(MAX_SAFE_REVISION - 1n), command: "start",
+  }));
+  const ceilingReplay = callOperation(main, OWNER, operation({
+    id: "p1-ceiling-start", game: "p1-ceiling-single", base: Number(MAX_SAFE_REVISION - 1n), command: "start",
+  }));
+  p1Check(reachesCeiling.outcome === "accepted"
+    && BigInt(reachesCeiling.clock_version) === MAX_SAFE_REVISION
+    && ceilingReplay.replay === true
+    && BigInt(ceilingReplay.clock_version) === MAX_SAFE_REVISION,
+  "one command may reach MAX_SAFE_INTEGER and exact replay at the ceiling consumes no revision", { reachesCeiling, ceilingReplay });
+
+  const beyondCeiling = callOperation(main, OWNER, operation({
+    id: "p1-ceiling-pause", game: "p1-ceiling-single", base: Number(MAX_SAFE_REVISION), command: "pause",
+  }));
+  p1Check(beyondCeiling.code === "clock_revision_exhausted"
+    && psql(main, "select revision||'|'||is_running::text from public.lh_game_clock_states where game_id='p1-ceiling-single';").stdout === `${MAX_SAFE_REVISION}|true`
+    && psql(main, "select count(*) from public.game_sync_operations where client_operation_id='p1-ceiling-pause';").stdout === "0",
+  "command requiring MAX_SAFE_INTEGER plus one rejects before state, receipt, or evidence mutation", beyondCeiling);
+
+  psql(main, `update public.lh_game_clock_states set revision=${MAX_SAFE_REVISION - 1n} where game_id='p1-ceiling-batch';`);
+  const crossingBatch = callBatch(main, OWNER, batch({
+    id: "p1-ceiling-batch-id", game: "p1-ceiling-batch", base: Number(MAX_SAFE_REVISION - 1n), commands: [
+      command({ id: "p1-ceiling-batch-start", lifecycle: "active", command: "start", occurred: "2026-08-10T13:20:00Z" }),
+      command({ id: "p1-ceiling-batch-pause", lifecycle: "active", command: "pause", occurred: "2026-08-10T13:20:01Z" }),
+    ],
+  }));
+  p1Check(crossingBatch.code === "clock_revision_exhausted"
+    && psql(main, "select revision||'|'||is_running::text from public.lh_game_clock_states where game_id='p1-ceiling-batch';").stdout === `${MAX_SAFE_REVISION - 1n}|false`
+    && psql(main, "select count(*) from public.game_sync_operations where client_operation_id in ('p1-ceiling-batch-start','p1-ceiling-batch-pause','p1-ceiling-batch-id');").stdout === "0",
+  "batch crossing the safe revision ceiling is rejected in full before its first command", crossingBatch);
+
+  psql(main, `update public.lh_game_clock_states set revision=${MAX_SAFE_REVISION - 1n} where game_id='p1-ceiling-prefix';`);
+  const ceilingPrefixRequest = batch({
+    id: "p1-ceiling-prefix-id", game: "p1-ceiling-prefix", base: Number(MAX_SAFE_REVISION - 1n), commands: [
+      command({ id: "p1-ceiling-prefix-start", lifecycle: "active", command: "start", occurred: "2026-08-10T13:30:00Z" }),
+    ],
+  });
+  const ceilingPrefixAccepted = callBatch(main, OWNER, ceilingPrefixRequest);
+  const ceilingSuffixRejected = callBatch(main, OWNER, batch({
+    id: "p1-ceiling-prefix-id", game: "p1-ceiling-prefix", base: Number(MAX_SAFE_REVISION - 1n), commands: [
+      ...ceilingPrefixRequest.commands,
+      command({ id: "p1-ceiling-prefix-pause", lifecycle: "active", command: "pause", occurred: "2026-08-10T13:30:01Z" }),
+    ],
+  }));
+  p1Check(BigInt(ceilingPrefixAccepted.clock_version) === MAX_SAFE_REVISION
+    && ceilingSuffixRejected.code === "clock_revision_exhausted"
+    && psql(main, "select count(*) from public.game_clock_commands where game_id='p1-ceiling-prefix';").stdout === "1"
+    && psql(main, "select count(*) from public.game_sync_operations where client_operation_id='p1-ceiling-prefix-pause';").stdout === "0",
+  "exact prefix replay plus a suffix crossing the ceiling rejects the suffix atomically", { ceilingPrefixAccepted, ceilingSuffixRejected });
+
   const unauthorized = callOperation(main, OTHER, operation({ id: "unauthorized-clock", game: "unauthorized-game", base: 1, command: "start" }));
   check(unauthorized.code === "authorization_denied" && Object.keys(unauthorized).sort().join(",") === "code,outcome", "unrelated personal account receives non-enumerating authorization denial", unauthorized);
 
@@ -367,6 +604,7 @@ try {
     && psql(empty, `${claims(OWNER)} select public.lh_apply_game_clock_operation_v2('{}'::jsonb)->>'code'; reset role;`).stdout.split(/\r?\n/).at(-1) === "r207_not_activated",
   "zero-evidence rollback restores dormant wrappers and removes only additive batch schema");
 
+  console.log(`R2-07 clock P1 remediation adversarial matrix: ${p1Checks}/${p1Checks} passed`);
   console.log(`R2-07 clock command/batch server matrix: ${checks}/${checks} passed`);
 } finally {
   for (const container of containers) docker(["rm", "-f", container], { allowFailure: true });

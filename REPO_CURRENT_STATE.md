@@ -165,6 +165,15 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
   false by default. This is unmerged Level 3 implementation state: exact-head
   independent review and CI are required, and no production migration,
   activation, deployment, release marker, or public disclosure changed.
+  Independent review failed PR #71 head `895612d17ec52bd101f126cf77696023b908f3b9`
+  on three adversarial contracts: exact-prefix/new-suffix replay, offline
+  elapsed chronology, and JavaScript-safe revision exhaustion. The same
+  unmerged branch now preserves append-only batch request versions, replays an
+  exact stored prefix before applying only its atomic suffix, reconstructs
+  bounded offline intervals on server anchors or returns Needs Attention with
+  zero mutation, and rejects single/batch revisions before exceeding
+  `Number.MAX_SAFE_INTEGER`. Fresh exact-head CI and independent Level 3 review
+  remain required; R2-07E has not restarted.
 - `main` contains the reviewed Tracked Playing Time foundation from merged PR #24 and the opt-in Phase 1 UI from merged PR #25.
 - The v284 frontend is deployed through the allowlisted Pages workflow. The
   completed rollback/restore proof restored approved source SHA

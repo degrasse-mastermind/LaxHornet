@@ -42,12 +42,23 @@ create table public.game_clock_batches (
   client_batch_id text not null,
   game_id text not null,
   request_hash text not null check (request_hash ~ '^[0-9a-f]{64}$'),
-  base_clock_version bigint not null check (base_clock_version >= 1),
+  base_clock_version bigint not null check (
+    base_clock_version between 1 and 9007199254740991
+  ),
+  base_status_version bigint not null check (base_status_version >= 1),
+  initial_lifecycle text not null check (
+    initial_lifecycle in ('active', 'paused')
+  ),
   command_count integer not null check (command_count between 1 and 32),
-  result_clock_version bigint not null check (result_clock_version >= base_clock_version),
+  replayed_prefix_count integer not null default 0 check (
+    replayed_prefix_count between 0 and command_count
+  ),
+  result_clock_version bigint not null check (
+    result_clock_version between base_clock_version and 9007199254740991
+  ),
   recorded_at timestamptz not null default statement_timestamp(),
-  constraint game_clock_batches_actor_client_r207clock_key
-    unique (actor_user_id, client_batch_id),
+  constraint game_clock_batches_actor_client_hash_r207clock_key
+    unique (actor_user_id, client_batch_id, request_hash),
   constraint game_clock_batches_client_id_r207clock_check
     check (length(btrim(client_batch_id)) between 1 and 200),
   constraint game_clock_batches_game_id_r207clock_check
@@ -56,6 +67,9 @@ create table public.game_clock_batches (
 
 create index game_clock_batches_game_r207clock_idx
   on public.game_clock_batches(game_id, recorded_at desc);
+
+create index game_clock_batches_actor_client_r207clock_idx
+  on public.game_clock_batches(actor_user_id, client_batch_id, command_count desc);
 
 create trigger game_clock_batches_append_only_r207clock
 before update or delete on public.game_clock_batches
@@ -266,7 +280,7 @@ declare
   authorized_scope record;
   operation_uuid uuid := gen_random_uuid();
   conflict_uuid uuid;
-  anchor_at timestamptz := statement_timestamp();
+  anchor_at timestamptz;
   remaining integer;
   next_remaining integer;
   next_period text;
@@ -280,6 +294,9 @@ begin
     base_version := (p_operation ->> 'base_clock_version')::bigint;
     status_base := (p_operation ->> 'status_base_version')::bigint;
     client_time := (p_operation ->> 'client_occurred_at')::timestamptz;
+    anchor_at := case when p_operation ? 'server_anchor_at'
+      then (p_operation ->> 'server_anchor_at')::timestamptz
+      else statement_timestamp() end;
   exception when invalid_text_representation or numeric_value_out_of_range or datetime_field_overflow then
     return jsonb_build_object('outcome', 'rejected', 'code', 'invalid_clock_operation');
   end;
@@ -422,6 +439,26 @@ begin
         jsonb_build_object('protocol', 'r207-clock-v2')
       );
       return result;
+    end if;
+
+    if target_clock.revision >= 9007199254740991 then
+      return jsonb_build_object(
+        'outcome', 'rejected', 'code', 'clock_revision_exhausted'
+      );
+    end if;
+    if p_batch_id is not null
+      and target_clock.is_running
+      and anchor_at > coalesce(target_clock.anchor_server_at, target_clock.server_updated_at)
+      and floor(extract(epoch from (
+        anchor_at - coalesce(target_clock.anchor_server_at, target_clock.server_updated_at)
+      )))::bigint > coalesce(
+        target_clock.anchor_clock_seconds_remaining,
+        target_clock.clock_seconds_remaining
+      )
+    then
+      return jsonb_build_object(
+        'outcome', 'conflicted', 'code', 'clock_chronology_needs_review'
+      );
     end if;
 
     remaining := lh_sync_private.r207_clock_current_remaining(target_clock, anchor_at);
@@ -697,24 +734,39 @@ as $function$
 declare
   actor_id uuid := (select auth.uid());
   batch_client_id text;
+  batch_operation_client_id text;
   target_game_id text;
   expected_lifecycle text;
   batch_hash text;
   base_version bigint;
   status_base bigint;
   command_count integer;
+  prefix_count integer := 0;
+  new_command_count integer;
   identity text;
   command_item jsonb;
   command_operation jsonb;
   command_hash text;
   command_index integer := 0;
+  command_time timestamptz;
+  first_client_time timestamptz;
+  previous_client_time timestamptz;
+  last_client_time timestamptz;
+  prefix_last_client_time timestamptz;
+  timeline_anchor_at timestamptz;
+  command_anchor_at timestamptz;
+  chronology_needs_review boolean := false;
   current_clock_version bigint;
   current_status_version bigint;
   target_game public.games%rowtype;
   target_clock public.lh_game_clock_states%rowtype;
   tombstone public.legacy_game_tombstones%rowtype;
   stored_batch public.game_sync_operations%rowtype;
+  replay_batch public.game_sync_operations%rowtype;
+  prior_batch_operation public.game_sync_operations%rowtype;
+  stored_batch_version public.game_clock_batches%rowtype;
   stored_command public.game_sync_operations%rowtype;
+  stored_clock_command public.game_clock_commands%rowtype;
   batch_operation_uuid uuid := gen_random_uuid();
   conflict_uuid uuid;
   result jsonb;
@@ -753,7 +805,8 @@ begin
   if length(batch_client_id) not between 1 and 200
     or length(target_game_id) not between 1 and 200
     or expected_lifecycle not in ('active', 'paused')
-    or base_version < 1 or status_base < 1
+    or base_version not between 1 and 9007199254740991
+    or status_base < 1
     or command_count not between 1 and 32
   then
     return jsonb_build_object('outcome', 'rejected', 'code', 'invalid_clock_batch');
@@ -779,12 +832,29 @@ begin
       return jsonb_build_object('outcome', 'rejected', 'code', 'invalid_clock_batch');
     end if;
     begin
+      command_time := (command_item ->> 'client_occurred_at')::timestamptz;
       insert into pg_temp.r207_clock_batch_identities(identity)
       values (btrim(command_item ->> 'client_operation_id'));
-    exception when unique_violation then
+    exception
+      when unique_violation then
       return jsonb_build_object('outcome', 'rejected', 'code', 'duplicate_clock_batch_operation_id');
+      when invalid_text_representation or datetime_field_overflow then
+        return jsonb_build_object('outcome', 'rejected', 'code', 'invalid_clock_batch');
     end;
+    if command_time is null then
+      return jsonb_build_object('outcome', 'rejected', 'code', 'invalid_clock_batch');
+    end if;
+    if first_client_time is null then
+      first_client_time := command_time;
+    elsif command_time < previous_client_time then
+      chronology_needs_review := true;
+    end if;
+    previous_client_time := command_time;
+    last_client_time := command_time;
   end loop;
+  if last_client_time - first_client_time > interval '30 seconds' then
+    chronology_needs_review := true;
+  end if;
   batch_hash := lh_sync_private.r207_clock_request_hash(p_batch);
 
   for identity in select item.identity from pg_temp.r207_clock_batch_identities as item order by item.identity loop
@@ -818,6 +888,31 @@ begin
     return jsonb_build_object('outcome', 'rejected', 'code', 'authorization_denied');
   end if;
 
+  if chronology_needs_review then
+    return jsonb_build_object(
+      'outcome', 'conflicted', 'code', 'clock_chronology_needs_review',
+      'receipts', '[]'::jsonb, 'replay', false
+    );
+  end if;
+
+  select operation_row.* into replay_batch
+  from public.game_clock_batches as batch_row
+  join public.game_sync_operations as operation_row
+    on operation_row.operation_id = batch_row.batch_operation_id
+  where batch_row.actor_user_id = actor_id
+    and batch_row.client_batch_id = batch_client_id
+    and batch_row.request_hash = batch_hash
+  order by batch_row.recorded_at desc
+  limit 1;
+  if found then
+    insert into public.game_sync_operation_attempts(
+      actor_user_id, client_operation_id, canonical_operation_id, attempt_code
+    ) values (
+      actor_id, batch_client_id, replay_batch.operation_id, 'idempotent_replay'
+    );
+    return replay_batch.canonical_result || jsonb_build_object('replay', true);
+  end if;
+
   select operation_row.* into stored_batch
   from public.game_sync_operations as operation_row
   where operation_row.actor_user_id = actor_id
@@ -827,36 +922,127 @@ begin
       return jsonb_build_object(
         'outcome', 'rejected', 'code', 'duplicate_operation_id_scope_mismatch'
       );
-    elsif stored_batch.request_hash <> batch_hash
-      or stored_batch.operation_type <> 'clock_batch'
+    elsif stored_batch.operation_type <> 'clock_batch' then
+      return jsonb_build_object(
+        'outcome', 'rejected', 'code', 'duplicate_operation_id_payload_mismatch'
+      );
+    end if;
+  end if;
+
+  select batch_row.* into stored_batch_version
+  from public.game_clock_batches as batch_row
+  where batch_row.actor_user_id = actor_id
+    and batch_row.client_batch_id = batch_client_id
+  order by batch_row.command_count desc, batch_row.recorded_at desc
+  limit 1;
+  if found then
+    if stored_batch_version.game_id <> target_game_id then
+      return jsonb_build_object(
+        'outcome', 'rejected', 'code', 'duplicate_operation_id_scope_mismatch'
+      );
+    end if;
+    if stored_batch_version.base_clock_version <> base_version
+      or stored_batch_version.base_status_version <> status_base
+      or stored_batch_version.initial_lifecycle <> expected_lifecycle
+      or command_count <= stored_batch_version.command_count
     then
       return jsonb_build_object(
         'outcome', 'rejected', 'code', 'duplicate_operation_id_payload_mismatch'
       );
     end if;
-    insert into public.game_sync_operation_attempts(
-      actor_user_id, client_operation_id, canonical_operation_id, attempt_code
-    ) values (actor_id, batch_client_id, stored_batch.operation_id, 'idempotent_replay');
-    return stored_batch.canonical_result || jsonb_build_object('replay', true);
+    prefix_count := stored_batch_version.command_count;
+    select operation_row.* into prior_batch_operation
+    from public.game_sync_operations as operation_row
+    where operation_row.operation_id = stored_batch_version.batch_operation_id;
+    if not found then
+      return jsonb_build_object(
+        'outcome', 'rejected', 'code', 'clock_batch_partial_replay_mismatch'
+      );
+    end if;
+  elsif stored_batch.operation_id is not null then
+    return jsonb_build_object(
+      'outcome', 'rejected', 'code', 'duplicate_operation_id_payload_mismatch'
+    );
   end if;
 
+  command_index := 0;
   for command_item in select value from jsonb_array_elements(p_batch -> 'commands') loop
+    command_index := command_index + 1;
+    command_time := (command_item ->> 'client_occurred_at')::timestamptz;
+    command_hash := lh_sync_private.r207_clock_request_hash(
+      command_item || jsonb_build_object(
+        'batch_id', batch_client_id,
+        'batch_sequence', command_index,
+        'game_id', target_game_id,
+        'batch_base_clock_version', base_version
+      )
+    );
     select operation_row.* into stored_command
     from public.game_sync_operations as operation_row
     where operation_row.actor_user_id = actor_id
       and operation_row.client_operation_id = btrim(command_item ->> 'client_operation_id');
-    if found then
+    if command_index <= prefix_count then
+      if not found
+        or stored_command.game_id <> target_game_id
+        or stored_command.operation_type <> 'clock_' || (command_item ->> 'command')
+        or stored_command.request_hash <> command_hash
+      then
+        return jsonb_build_object(
+          'outcome', 'rejected', 'code', 'duplicate_operation_id_payload_mismatch'
+        );
+      end if;
+      select clock_command.* into stored_clock_command
+      from public.game_clock_commands as clock_command
+      where clock_command.operation_id = stored_command.operation_id;
+      if not found
+        or stored_clock_command.batch_id <> batch_client_id
+        or stored_clock_command.batch_sequence <> command_index
+        or stored_clock_command.base_clock_version <> base_version + command_index - 1
+        or stored_clock_command.result_clock_version <> base_version + command_index
+        or (stored_command.canonical_result ->> 'clock_version')::bigint
+          <> stored_clock_command.result_clock_version
+      then
+        return jsonb_build_object(
+          'outcome', 'rejected', 'code', 'clock_batch_partial_replay_mismatch'
+        );
+      end if;
+      receipts := receipts || jsonb_build_array(jsonb_build_object(
+        'client_operation_id', stored_command.client_operation_id,
+        'clock_version', stored_command.canonical_result -> 'clock_version',
+        'status_version', stored_command.canonical_result -> 'status_version',
+        'code', stored_command.canonical_result ->> 'code',
+        'replay', true
+      ));
+      prefix_last_client_time := command_time;
+    elsif found then
       return jsonb_build_object(
         'outcome', 'rejected', 'code', 'clock_batch_partial_replay_mismatch'
       );
     end if;
   end loop;
 
-  if target_game.lifecycle_state <> expected_lifecycle then
-    return jsonb_build_object('outcome', 'rejected', 'code', 'stale_lifecycle_state');
-  end if;
-  if target_game.status_version <> status_base then
-    return jsonb_build_object('outcome', 'rejected', 'code', 'stale_status_version');
+  if prefix_count = 0 then
+    if target_game.lifecycle_state <> expected_lifecycle then
+      return jsonb_build_object('outcome', 'rejected', 'code', 'stale_lifecycle_state');
+    end if;
+    if target_game.status_version <> status_base then
+      return jsonb_build_object('outcome', 'rejected', 'code', 'stale_status_version');
+    end if;
+  else
+    if (prior_batch_operation.canonical_result ->> 'status_version')::bigint
+        <> target_game.status_version
+      or prior_batch_operation.canonical_result ->> 'lifecycle_state'
+        <> target_game.lifecycle_state
+    then
+      return jsonb_build_object(
+        'outcome', 'conflicted', 'code', 'clock_conflict',
+        'clock_version', coalesce(
+          (prior_batch_operation.canonical_result ->> 'clock_version')::bigint,
+          base_version
+        ),
+        'receipts', '[]'::jsonb, 'replay', false
+      );
+    end if;
   end if;
   select clock_row.* into target_clock
   from public.lh_game_clock_states as clock_row
@@ -865,11 +1051,26 @@ begin
   if not found then
     return jsonb_build_object('outcome', 'rejected', 'code', 'clock_not_initialized');
   end if;
+  if target_clock.revision > 9007199254740991 then
+    return jsonb_build_object(
+      'outcome', 'rejected', 'code', 'clock_revision_exhausted',
+      'receipts', '[]'::jsonb
+    );
+  end if;
   if base_version > target_clock.revision then
     return jsonb_build_object('outcome', 'rejected', 'code', 'invalid_base_clock_version');
   end if;
-  if base_version <> target_clock.revision then
+  if prefix_count > 0 and (
+    target_clock.revision <> stored_batch_version.result_clock_version
+    or stored_batch_version.result_clock_version <> base_version + prefix_count
+  ) then
+    prefix_count := 0;
+  end if;
+  if (prefix_count = 0 and base_version <> target_clock.revision) then
     conflict_uuid := gen_random_uuid();
+    batch_operation_client_id := case when stored_batch.operation_id is null
+      then batch_client_id
+      else 'clock-batch-extension:' || batch_operation_uuid::text end;
     result := jsonb_build_object(
       'outcome', 'conflicted', 'code', 'clock_conflict',
       'conflict_id', conflict_uuid, 'clock_version', target_clock.revision,
@@ -880,7 +1081,7 @@ begin
       request_hash, changed_fields, outcome_class, outcome_code, conflict_id,
       result_versions, canonical_result
     ) values (
-      batch_operation_uuid, actor_id, batch_client_id, target_game_id,
+      batch_operation_uuid, actor_id, batch_operation_client_id, target_game_id,
       'clock_batch', batch_hash, array['clock'], 'conflicted', 'clock_conflict',
       conflict_uuid, jsonb_build_object('clock', target_clock.revision), result
     );
@@ -902,13 +1103,41 @@ begin
     );
     insert into public.game_clock_batches(
       batch_operation_id, actor_user_id, client_batch_id, game_id, request_hash,
-      base_clock_version, command_count, result_clock_version
+      base_clock_version, base_status_version, initial_lifecycle, command_count,
+      replayed_prefix_count, result_clock_version
     ) values (
       batch_operation_uuid, actor_id, batch_client_id, target_game_id,
-      batch_hash, base_version, command_count, target_clock.revision
+      batch_hash, base_version, status_base, expected_lifecycle, command_count,
+      0, target_clock.revision
     );
     return result;
   end if;
+
+  if prefix_count = 0
+    and target_clock.is_running
+    and p_batch -> 'commands' -> 0 ->> 'command' in (
+      'pause', 'persist_position', 'advance_period', 'complete'
+    )
+  then
+    return jsonb_build_object(
+      'outcome', 'conflicted', 'code', 'clock_chronology_needs_review',
+      'receipts', '[]'::jsonb, 'replay', false
+    );
+  end if;
+
+  new_command_count := command_count - prefix_count;
+  if target_clock.revision > 9007199254740991 - new_command_count then
+    return jsonb_build_object(
+      'outcome', 'rejected', 'code', 'clock_revision_exhausted',
+      'receipts', '[]'::jsonb, 'replay', false
+    );
+  end if;
+
+  timeline_anchor_at := case when prefix_count = 0
+    then anchor_at - (last_client_time - first_client_time)
+    else coalesce(target_clock.anchor_server_at, target_clock.server_updated_at)
+      - (prefix_last_client_time - first_client_time)
+  end;
 
   begin
     current_clock_version := target_clock.revision;
@@ -916,10 +1145,16 @@ begin
     command_index := 0;
     for command_item in select value from jsonb_array_elements(p_batch -> 'commands') loop
       command_index := command_index + 1;
+      if command_index <= prefix_count then
+        continue;
+      end if;
+      command_time := (command_item ->> 'client_occurred_at')::timestamptz;
+      command_anchor_at := timeline_anchor_at + (command_time - first_client_time);
       command_operation := command_item || jsonb_build_object(
         'game_id', target_game_id,
         'base_clock_version', current_clock_version,
-        'status_base_version', current_status_version
+        'status_base_version', current_status_version,
+        'server_anchor_at', command_anchor_at
       );
       command_hash := lh_sync_private.r207_clock_request_hash(
         command_item || jsonb_build_object(
@@ -964,7 +1199,10 @@ begin
       request_hash, changed_fields, outcome_class, outcome_code, result_versions,
       canonical_result
     ) values (
-      batch_operation_uuid, actor_id, batch_client_id, target_game_id,
+      batch_operation_uuid, actor_id, case when prefix_count = 0
+        then batch_client_id
+        else 'clock-batch-extension:' || batch_operation_uuid::text end,
+      target_game_id,
       'clock_batch', batch_hash, array['clock'], 'accepted',
       'clock_batch_accepted', jsonb_build_object(
         'clock', current_clock_version, 'status', current_status_version
@@ -972,10 +1210,12 @@ begin
     );
     insert into public.game_clock_batches(
       batch_operation_id, actor_user_id, client_batch_id, game_id, request_hash,
-      base_clock_version, command_count, result_clock_version
+      base_clock_version, base_status_version, initial_lifecycle, command_count,
+      replayed_prefix_count, result_clock_version
     ) values (
       batch_operation_uuid, actor_id, batch_client_id, target_game_id,
-      batch_hash, base_version, command_count, current_clock_version
+      batch_hash, base_version, status_base, expected_lifecycle, command_count,
+      prefix_count, current_clock_version
     );
   exception when sqlstate 'P0002' then
     return failed_result || jsonb_build_object('batch_atomic', true, 'receipts', '[]'::jsonb);

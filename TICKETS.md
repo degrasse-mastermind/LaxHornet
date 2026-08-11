@@ -2540,7 +2540,7 @@ Evidence:
 
 ### R2-07 clock command and atomic batch integration
 
-Status: `IMPLEMENTED — EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
+Status: `P1 REMEDIATED — NEW EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
 
 Risk level: `LEVEL 3`
 
@@ -2584,16 +2584,23 @@ atomic reconnect batches.
 - [x] Online command and atomic batch RPCs are functional only when the
   existing Preview control is explicitly enabled; all repository defaults
   remain false.
-- [x] Server clock matrix passes `36/36`; client matrix passes `12/12`; real
-  two-context desktop/mobile browser matrix passes `13/13`.
+- [x] Preserve the independent Level 3 FAIL at exact head
+  `895612d17ec52bd101f126cf77696023b908f3b9`: offline elapsed time was lost,
+  exact-prefix/new-suffix replay was rejected, and the server could commit a
+  JavaScript-unsafe clock revision.
+- [x] Remediate all three P1s with append-only batch versions and exact prefix
+  proof, bounded server-anchor chronology, and pre-mutation single/batch
+  revision-capacity guards.
+- [x] Server clock matrix passes `55/55`, including the dedicated P1 real-RPC
+  group `19/19`; client passes `15/15`; real two-context desktop/mobile
+  browser passes `18/18`.
 - [x] R2-07A `71/71`; B `32/32`, `12/12`, `13/13`; C `30/30`, `37/37`,
   `7/7`, `25/25`; D `32/32`, dismiss `13/13`, browser `10/10`, SQL
   `23/23`; tombstone concurrency `8/8` all pass.
-- [x] Complete canonical-plus-additive regression passes `69/69`; focused
-  hydration rerun, secret/host scan, diff hygiene, and zero-residue checks pass.
-- [x] Draft PR #71 integration head `11475fc2a3c401370e8dc327e9345aa8b497ac8c`
-  passes Docker, portable regression, automatic isolated Supabase Preview,
-  Vercel, and Preview Comments checks.
+- [ ] New remediation-head complete canonical-plus-additive regression,
+  secret/host scan, diff hygiene, and zero-residue checks pass.
+- [ ] New remediation-head Docker, portable regression, automatic isolated
+  Supabase Preview, Vercel, and Preview Comments checks pass.
 - [ ] Independent exact-PR-SHA Level 3 review returns PASS before merge.
 
 Evidence:

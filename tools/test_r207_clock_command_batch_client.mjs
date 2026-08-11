@@ -230,6 +230,89 @@ test("authorization is blocked, non-retryable, and raw error detail is sanitized
   assert.doesNotMatch(JSON.stringify(error), /private table|secret host/i);
 });
 
+test("clock revision exhaustion is non-retryable and stores no raw server detail", async () => {
+  const h = harness({ executeSingle: async () => ({
+    outcome: "rejected",
+    code: "clock_revision_exhausted",
+    message: "bigint 9007199254740992 from private clock row",
+  }) });
+  h.service.queueClock({ accountId: "account-a", gameId: "clock-game", payload: command("start", "2026-08-11T02:00:01.000Z"), baseRevision: 3 });
+  await h.service.process();
+  await h.service.process();
+  const operation = h.state.operations[0];
+  assert.equal(operation.state, "rejected");
+  assert.equal(operation.lastError.category, "validation_rejected");
+  assert.equal(operation.lastError.code, "validation_rejected");
+  assert.equal(operation.nextAttemptAt, null);
+  assert.equal(h.singleAttempts.length, 1);
+  assert.doesNotMatch(JSON.stringify(operation), /9007199254740992|private clock row/i);
+});
+
+test("offline chronology uncertainty retains the full batch as a non-retryable conflict", async () => {
+  const h = harness({ executeBatch: async () => ({
+    outcome: "conflicted",
+    code: "clock_chronology_needs_review",
+    message: "raw client timestamp and private anchor",
+  }) });
+  for (const [name, occurredAt] of [["start", "2026-08-11T02:00:01.000Z"], ["pause", "2026-08-11T02:00:45.000Z"]]) {
+    h.service.queueClock({
+      accountId: "account-a", gameId: "clock-game",
+      payload: command(name, occurredAt), baseRevision: 3, batchRequired: true,
+    });
+  }
+  await h.service.process();
+  await h.service.process();
+  assert.equal(h.batchAttempts.length, 1);
+  assert.deepEqual(h.state.operations.map((operation) => operation.state), ["conflicted", "conflicted"]);
+  assert.ok(h.state.operations.every((operation) => operation.nextAttemptAt === null));
+  assert.doesNotMatch(JSON.stringify(h.state.operations), /raw client timestamp|private anchor/i);
+});
+
+test("timeout prefix plus new suffix reuses one batch and compacts only after all receipts", async () => {
+  let attempt = 0;
+  const h = harness({
+    executeBatch: async (operations) => {
+      attempt += 1;
+      if (attempt === 1) throw Object.assign(new Error("network timeout after commit"), { status: 0 });
+      return {
+        outcome: "accepted",
+        canonical: { clockVersion: 7 },
+        operationResults: operations.map((operation, index) => ({
+          operationId: operation.operationId,
+          receipt: { code: index < 2 ? "replayed_prefix" : "accepted", serverRevision: 4 + index },
+        })),
+      };
+    },
+  });
+  for (const [name, occurredAt, lifecycle] of [
+    ["start", "2026-08-11T02:00:01.000Z", "active"],
+    ["pause", "2026-08-11T02:00:03.000Z", "active"],
+  ]) {
+    h.service.queueClock({ accountId: "account-a", gameId: "clock-game", payload: command(name, occurredAt, { expectedLifecycle: lifecycle }), baseRevision: 3, batchRequired: true });
+  }
+  await h.service.process();
+  const batchId = h.state.operations[0].batchId;
+  for (const [name, occurredAt, lifecycle] of [
+    ["resume", "2026-08-11T02:00:04.000Z", "paused"],
+    ["pause", "2026-08-11T02:00:06.000Z", "active"],
+  ]) {
+    h.service.queueClock({ accountId: "account-a", gameId: "clock-game", payload: command(name, occurredAt, { expectedLifecycle: lifecycle }), baseRevision: 3, batchRequired: true });
+  }
+  assert.ok(h.state.operations.every((operation) => operation.batchId === batchId));
+  h.advance(2500);
+  await h.service.process();
+  assert.deepEqual(h.batchAttempts.map((operations) => operations.map((operation) => operation.payload.command)), [
+    ["start", "pause"],
+    ["start", "pause", "resume", "pause"],
+  ]);
+  assert.deepEqual(h.batchAttempts[1].map((operation) => operation.payload.clientOccurredAt), [
+    "2026-08-11T02:00:01.000Z", "2026-08-11T02:00:03.000Z",
+    "2026-08-11T02:00:04.000Z", "2026-08-11T02:00:06.000Z",
+  ]);
+  assert.equal(h.state.operations.length, 0);
+  assert.equal(Object.keys(h.state.acknowledgments).length, 4);
+});
+
 test("account switch cannot execute or disclose another account clock queue", async () => {
   const h = harness({ offline: true });
   h.service.queueClock({ accountId: "account-a", gameId: "clock-game", payload: command("start", "2026-08-11T02:00:01.000Z"), baseRevision: 3 });

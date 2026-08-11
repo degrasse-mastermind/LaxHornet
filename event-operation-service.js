@@ -1819,6 +1819,7 @@
       || /^stale_.*_revision$/.test(code)
       || code.includes("revision_conflict")
       || code.includes("clock_acknowledgment_mismatch")
+      || code === "clock_chronology_needs_review"
       || code === "game_deleted"
       || code === "game_already_deleted"
       || code === "newer_game_revision"
@@ -1857,6 +1858,7 @@
       httpStatus === 400
       || httpStatus === 422
       || code === "validation_rejected"
+      || code === "clock_revision_exhausted"
       || code.startsWith("invalid_")
       || code.startsWith("unsupported_")
       || /^pgrst1\d\d$/.test(code)

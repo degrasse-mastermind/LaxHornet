@@ -1,6 +1,6 @@
 # R2-07 Clock Command and Atomic Batch Integration — Implementation Evidence
 
-Status: `IMPLEMENTED — EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
+Status: `P1 REMEDIATED — NEW EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
 
 Risk level: `LEVEL 3`
 
@@ -20,6 +20,35 @@ No later migration replaced them, and the client submitted only the older
 tracked-clock snapshot RPCs. The certification gap was therefore real: the
 approved server command/batch architecture existed in design and dormant
 schema, but no functional Preview/test wrapper or client route connected it.
+
+## Failed exact-head review and bounded remediation
+
+Independent Level 3 review failed exact head
+`895612d17ec52bd101f126cf77696023b908f3b9` at
+`https://github.com/degrasse-mastermind/LaxHornet/pull/71#issuecomment-5248367312`.
+The failed review remains preserved. Its three P1 findings were remediated
+without starting R2-07E or changing the production-default-off boundary:
+
+- **Exact prefix plus new suffix:** the batch function previously treated the
+  permanent batch ID as one immutable whole-request hash. It now records
+  append-only batch request versions, proves the complete stored command-ID,
+  canonical-hash, sequence, base, and result-revision prefix, reuses the exact
+  stored receipts without mutation, and applies only a fully validated new
+  suffix. Changed, reordered, missing, non-prefix, interleaved, or wrong-base
+  mixtures still fail closed.
+- **Offline elapsed chronology:** `client_occurred_at` was parsed but every
+  command used one transaction timestamp. The batch now validates ordered
+  occurrence evidence within the existing 30-second certainty bound, maps the
+  relative intervals onto server anchors, applies elapsed time only while the
+  clock is running, and rejects reversed, excessive, ambiguous-running, or
+  completion-boundary chronology as `clock_chronology_needs_review` with zero
+  partial mutation.
+- **JavaScript-safe revision ceiling:** the server previously incremented an
+  unbounded PostgreSQL `bigint`. Single commands now reject before mutation at
+  the ceiling, and batches preflight the complete count of genuinely new
+  suffix commands before applying the first one. Exact replay consumes no
+  revision. `clock_revision_exhausted` is non-retryable and sanitized by the
+  client while the existing client safe-integer check remains defense in depth.
 
 ## Additive implementation
 
@@ -66,46 +95,54 @@ schema, but no functional Preview/test wrapper or client route connected it.
 
 ## Verification
 
-- Focused disposable PostgreSQL clock matrix: `36/36 PASS` after final test
-  additions, covering default-off behavior, all command semantics, missing and
+- Focused disposable PostgreSQL clock matrix: `55/55 PASS`, including a
+  dedicated real-RPC P1 adversarial group at `19/19 PASS`. It covers default-
+  off behavior, all command semantics, missing and
   stale bases, start/start concurrency, delayed stale mutation, timeout-style
   replay, payload mismatch, completion/no-reopen, tombstone, personal/team/
   revoked/copied-owner authority, batch success/conflict/replay/invalid/
   injected rollback/partial-mix refusal, lock order, unrelated games, RLS,
-  grants, and rollback. Zero named container residue.
-- Focused durable client matrix: `12/12 PASS`, including single and batch
+  grants, rollback, exact prefix extension/rejection cases, bounded offline
+  chronology, and safe revision exhaustion. Zero named container residue.
+- Focused durable client matrix: `15/15 PASS`, including single and batch
   persistence, immutable attempted payload, permanent IDs, offline ordering,
   receipt/compaction order, whole-timeline conflict retention, no auto-retry,
   network retry, authorization/raw-error sanitization, account switch,
-  future-schema non-mutation, server-anchor projection, and no predicted
-  versions.
-- Real two-context browser matrix: `13/13 PASS`, desktop and `390x844` mobile.
+  future-schema non-mutation, server-anchor projection, no predicted versions,
+  timeout prefix extension, chronology conflict retention, and sanitized
+  non-retryable exhaustion.
+- Real two-context browser matrix: `18/18 PASS`, desktop and `390x844` mobile.
   Concurrent start produced one authority and one safe durable conflict;
   unchanged-base offline work applied in order; changed-base reconnect retained
   the full batch and applied no prefix; completion stopped the clock and stale
   mutation could not reopen it; controls remained at least 44px, no horizontal
-  overflow occurred, and no page errors were observed.
+  overflow occurred, and no page errors were observed. Additional browser
+  probes preserve two elapsed intervals, replay a committed timeout prefix
+  before a new suffix, and expose no raw revision/debug detail at exhaustion.
 - R2-07A: `71/71 PASS`. R2-07B: client `32/32`, browser `12/12`, migration
   `13/13 PASS`. R2-07C: client `30/30`, client safety `37/37`, browser `7/7`,
   migration `25/25 PASS`. R2-07D: client `32/32`, event dismiss `13/13`, dismiss
   browser `10/10`, migration `23/23 PASS`. Tombstone concurrency: `8/8 PASS`.
-- Complete canonical-plus-additive regression: `69/69 PASS`. An earlier
+- New exact-head complete canonical-plus-additive regression: `PENDING` after
+  the remediation commit. The prior reviewed head passed `69/69`. An earlier
   consolidated attempt exposed one pre-existing transient hydration-browser
   `page.reload ERR_ABORTED`, which passed immediately on focused rerun, plus
   review-package expected-list omissions fixed before the clean final run.
   Secret/host scan and `git diff --check` passed. Zero `laxhornet-r207*`
   containers and zero headless Playwright processes remained.
-- Draft PR #71 integration head
+- Historical draft PR #71 integration head
   `11475fc2a3c401370e8dc327e9345aa8b497ac8c` passed Docker, portable
   regression, automatic isolated Supabase Preview, Vercel, and Preview
   Comments checks. The managed application Preview was
   `https://lax-hornet-git-feature-r2-07-9b0304-davidltdanes-4133s-projects.vercel.app`;
   the isolated Supabase Preview project was `mojsdmyfzhdqukwwbhyk`.
+- New remediation-head Docker, portable regression, automatic isolated
+  Supabase Preview, Vercel, and Preview Comments checks are pending after push.
 
 ## File identity
 
 - Migration SHA-256:
-  `c71562b15b04cd31c0cd915a96243f2df6d035b1747e0e85a008f7786fd18247`
+  `c09cbb8988418d24c42c3882f21a465fd4365561c14cada64a3bd4dc20998409`
 - Rollback SHA-256:
   `8548bbe4e91f506a2222bfe7feab826d4e5725dcfe98ac98098075b3484e1c93`
 
