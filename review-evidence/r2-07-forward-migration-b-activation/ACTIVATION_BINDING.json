@@ -6,7 +6,7 @@
   "historicalPreflightPr": 73,
   "cutoverGate": {
     "path": "supabase/migrations/20260811131042_r207_forward_migration_b_cutover_gate.sql",
-    "sha256": "8548cb480c499a5da8626d43d19e1819464eecd2695f3ddde5495951dd353748",
+    "sha256": "41980999fd3b9ad813f93b8ef15305a5eb946d95b37f8d6d0a797104056499e7",
     "modeAfter": "legacy",
     "productionActivation": false
   },

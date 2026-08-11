@@ -21,7 +21,7 @@
     "certifiedProductBaseline": "b7269194a4ce8b9068b0d46c44d840efc4048c69",
     "certificationEvidenceSha": "c2726b0c1cd979a7af2b04bc9a0a25865f4636ea",
     "cutoverGateMigration": "supabase/migrations/20260811131042_r207_forward_migration_b_cutover_gate.sql",
-    "cutoverGateMigrationSha256": "8548cb480c499a5da8626d43d19e1819464eecd2695f3ddde5495951dd353748",
+    "cutoverGateMigrationSha256": "41980999fd3b9ad813f93b8ef15305a5eb946d95b37f8d6d0a797104056499e7",
     "activationMigration": "supabase/migrations/20260811131043_r207_forward_migration_b_activation.sql",
     "activationMigrationSha256": "06089f64363e7ebd114e08e27d6dc322aaa392c257bf1bb419fc8dc847b1debd",
     "recoveryArtifact": "supabase/rollback/20260811131043_r207_forward_migration_b_activation_rollback.sql",
