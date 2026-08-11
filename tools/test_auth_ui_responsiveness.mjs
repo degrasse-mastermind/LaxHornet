@@ -18,3 +18,21 @@ assert.ok(hydration > immediateRender, "cloud hydration must start after the aut
 assert.ok(finalRender > hydration, "cloud hydration completion must render refreshed state");
 
 console.log("PASS authenticated UI renders before cloud hydration and refreshes after hydration");
+
+const authListenerStart = source.indexOf("supabaseClient.auth.onAuthStateChange(");
+const authListenerEnd = source.indexOf("\n    if (state.authUser) {", authListenerStart);
+
+assert.notEqual(authListenerStart, -1, "auth-state listener must exist");
+assert.notEqual(authListenerEnd, -1, "auth-state listener boundary must exist");
+
+const authListener = source.slice(authListenerStart, authListenerEnd);
+assert.ok(
+  authListener.startsWith("supabaseClient.auth.onAuthStateChange((event, session) =>"),
+  "auth-state listener must return synchronously so Supabase can release its auth lock",
+);
+assert.ok(
+  authListener.includes("window.setTimeout(async () =>"),
+  "network hydration must be deferred until after the auth-state listener returns",
+);
+
+console.log("PASS auth-state listener releases the Supabase auth lock before network hydration");

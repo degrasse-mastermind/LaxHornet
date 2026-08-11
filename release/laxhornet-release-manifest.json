@@ -1,5 +1,5 @@
 {
-  "release": "v287",
+  "release": "v288",
   "productionRelease": "v285",
   "finalMainBaseSha": "fc9c079d69757cfc2667dea7e1dfcc56524dce56",
   "preReleaseBaseSha": "fc9c079d69757cfc2667dea7e1dfcc56524dce56",
@@ -17,7 +17,7 @@
   "productionUrl": "https://laxhornet.mybranford.com",
   "productionVerifiedAt": "2026-08-06T02:13:34.778Z",
   "r207ForwardMigrationBActivation": {
-    "status": "production_database_and_runtime_active_v287_release",
+    "status": "production_database_and_runtime_active_v288_release",
     "certifiedProductBaseline": "b7269194a4ce8b9068b0d46c44d840efc4048c69",
     "certificationEvidenceSha": "c2726b0c1cd979a7af2b04bc9a0a25865f4636ea",
     "cutoverGateMigration": "supabase/migrations/20260811131042_r207_forward_migration_b_cutover_gate.sql",

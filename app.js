@@ -449,7 +449,7 @@ const GAME_SCOPE_TYPES = Object.freeze({
 const PUBLIC_LIVE_SHARE_POLL_MS = 4000;
 
 const PLATFORM_REVIEWER_EMAIL = "degrassed@gmail.com";
-const APP_VERSION = "v287";
+const APP_VERSION = "v288";
 window.LAXHORNET_DISCLOSURE_STATUS = Object.freeze({
   appVersion: APP_VERSION,
   ready: SECURE_DISCLOSURE_RUNTIME_READY,
@@ -17511,21 +17511,24 @@ async function initApp() {
     const { data } = await supabaseClient.auth.getSession();
     setAuthUser(data.session?.user || null);
     state.syncStatus = state.authUser ? "Signed in" : "Signed out";
-    supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    supabaseClient.auth.onAuthStateChange((event, session) => {
       setAuthUser(session?.user || null);
       if (event === "SIGNED_IN" && state.authUser) {
         durableSyncService().recoverAuthentication(currentUserId());
       }
       state.syncStatus = state.authUser ? "Signed in" : "Signed out";
-      await fetchBackendCapabilities({ force: true }).catch(() => null);
-      if (state.authUser) {
-        if (R207_PRODUCTION_ACTIVATION_CLIENT) {
-          await r207PreviewCapabilityAvailable({ force: true }).catch(() => false);
-        }
-        await loadUserProfile({ silent: true });
-        await loadCloudGames({ silent: true });
-      }
       if (!applyStartupDeepLink()) render();
+      window.setTimeout(async () => {
+        await fetchBackendCapabilities({ force: true }).catch(() => null);
+        if (state.authUser) {
+          if (R207_PRODUCTION_ACTIVATION_CLIENT) {
+            await r207PreviewCapabilityAvailable({ force: true }).catch(() => false);
+          }
+          await loadUserProfile({ silent: true });
+          await loadCloudGames({ silent: true });
+        }
+        if (!applyStartupDeepLink()) render();
+      }, 0);
     });
     if (state.authUser) {
       if (R207_PRODUCTION_ACTIVATION_CLIENT) {
