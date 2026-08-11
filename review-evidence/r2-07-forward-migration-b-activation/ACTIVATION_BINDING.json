@@ -6,7 +6,7 @@
   "historicalPreflightPr": 73,
   "activation": {
     "path": "supabase/migrations/20260811131043_r207_forward_migration_b_activation.sql",
-    "sha256": "d0bcb9b10c976c21ec67af52eb4dcc76f71d98853ab85cd6bfcefd632fe1c6ff",
+    "sha256": "afcaa44730983f2f5fcaf37057330e28d1ab9bcf8503cefe6bcffe3ac6e2227a",
     "capabilityBefore": false,
     "capabilityAfter": true,
     "transactional": true,
@@ -14,7 +14,7 @@
   },
   "recovery": {
     "path": "supabase/rollback/20260811131043_r207_forward_migration_b_activation_rollback.sql",
-    "sha256": "651396438c3c8b2407810e0172d9ab704d49439b348c8c822166d518b050882d",
+    "sha256": "be9ee4177c4789e3a79ab615c89ea2704ab5b96ea542f810cbc3d5712ebe3e43",
     "mode": "fail_closed_forward_recovery",
     "restoresLegacyMutation": false
   },
@@ -34,7 +34,7 @@
   "preActivationCatalog": {
     "relationShapeMd5": "4529b8192848e429d76d67d6021d78be",
     "v1Signature": "public.laxhornet_sync_game(jsonb)",
-    "v1FunctionMd5": "54b6ca6bf4752f1bb3ef2fe98ae1e393",
+    "v1FunctionMd5": "b768a13ed661414af84c72f16194c0b6",
     "v1PostActivationFunctionMd5": "5ed65c9a743d18d894389940402f5331",
     "expectedMigrationCount": 17,
     "expectedR207EvidenceCount": 0

@@ -104,26 +104,30 @@ begin
   for signature, expected_hash in
     select binding.signature, binding.expected_hash
     from (values
-      ('public.laxhornet_sync_game(jsonb)', '54b6ca6bf4752f1bb3ef2fe98ae1e393'),
-      ('public.laxhornet_r207_preview_capability()', '63bb9356af17f5571d8ae8e05e42b6b9'),
-      ('public.laxhornet_sync_game_v2(jsonb)', '873759464eefa7d321765829f2cdc13f'),
-      ('public.laxhornet_sync_event_v2(jsonb)', 'afc7cab909561c4f191bbb59b7911006'),
-      ('public.lh_apply_game_clock_operation_v2(jsonb)', '93d3b57670aea4e7bd357c23bd49ec3b'),
-      ('public.lh_apply_game_clock_batch_v2(jsonb)', 'eedf0882efa95b4e4d7ec05c72a2098a'),
-      ('public.laxhornet_read_game_conflicts_v1(jsonb)', '73fcf1f9a7e7eaca5825491aa0b64d7a'),
-      ('public.laxhornet_resolve_game_conflict_v1(jsonb)', 'eb79a8e1790561813961958dcb8a67cc'),
-      ('public.laxhornet_delete_event(text)', '4ce6265c91ea7062371e4072f2112856'),
-      ('public.laxhornet_delete_game(text)', '3970745ff956522cae43e050410ee41a'),
-      ('public.lh_initialize_game_clock(jsonb)', '4e4a0aefe3cc2f68aff8b1c8b3546206'),
-      ('public.lh_update_game_clock(jsonb)', 'fae4d47d017536c54dc98d7e106ef04a'),
-      ('public.lh_reconcile_game_clock(jsonb)', '0b4f0872b60e2ebfb5acc15aab3b2d9e')
+      ('public.laxhornet_sync_game(jsonb)', 'b768a13ed661414af84c72f16194c0b6'),
+      ('public.laxhornet_r207_preview_capability()', 'c72cc295ab1536e8ae361901bd1228bd'),
+      ('public.laxhornet_sync_game_v2(jsonb)', '7b053d29f37620c6e1f2334a5f58c944'),
+      ('public.laxhornet_sync_event_v2(jsonb)', '0414e1bd5f1ac670e1da9c533a9c5e5a'),
+      ('public.lh_apply_game_clock_operation_v2(jsonb)', '8390daceb66c3aa887381856bae46dd6'),
+      ('public.lh_apply_game_clock_batch_v2(jsonb)', 'd45cacd7f640a07766a62630653aa4f6'),
+      ('public.laxhornet_read_game_conflicts_v1(jsonb)', 'a2341d6d4a3193d673c2452e19b6d7c2'),
+      ('public.laxhornet_resolve_game_conflict_v1(jsonb)', 'd7b726ac2259f40c87c5337b5ce902e2'),
+      ('public.laxhornet_delete_event(text)', '43fedf1f19742eeb032206192af47499'),
+      ('public.laxhornet_delete_game(text)', 'db4e68499bb72c1eca9ae66a3a9f629b'),
+      ('public.lh_initialize_game_clock(jsonb)', '3fbafbf7d9dc715c16cb798c609045b2'),
+      ('public.lh_update_game_clock(jsonb)', 'f3b01610665c64d33d7536e6e1ff6713'),
+      ('public.lh_reconcile_game_clock(jsonb)', 'bd4904dc45210bb037bfcabeb83eb328')
     ) as binding(signature, expected_hash)
   loop
     if pg_catalog.to_regprocedure(signature) is null then
       raise exception using errcode = 'P0001',
         message = 'R207_ACTIVATION_PREFLIGHT_FAILED:FUNCTION_MISSING:' || signature;
     end if;
-    select pg_catalog.md5(pg_catalog.pg_get_functiondef(pg_catalog.to_regprocedure(signature)))
+    select pg_catalog.md5(pg_catalog.replace(
+      pg_catalog.pg_get_functiondef(pg_catalog.to_regprocedure(signature)),
+      pg_catalog.chr(13),
+      ''
+    ))
     into actual_hash;
     if actual_hash is distinct from expected_hash then
       raise exception using errcode = 'P0001',

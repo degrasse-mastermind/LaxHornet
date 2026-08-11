@@ -68,6 +68,7 @@ complete certified 17-migration chain in fresh PostgreSQL 17 containers using
 synthetic adult-only fixtures. It proves:
 
 - exact preconditions accept and drift refuses;
+- function-definition bindings canonicalize CRLF/LF newlines before hashing;
 - v1 active/v2 dormant before cutover;
 - atomic v2 enable plus v1/direct disable;
 - bounded stale-v285 rejection with no mutation;
@@ -78,8 +79,9 @@ synthetic adult-only fixtures. It proves:
 - post-evidence recovery fail-closes without restoring legacy authority;
 - zero disposable container residue.
 
-Initial focused result: `26/26 PASS`. Broader preservation and CI results are
-recorded in the draft PR and final task closeout after the exact diff stabilizes.
+Focused result: `26/26 PASS`. Complete local Level 3 regression result:
+`70 passed, 0 failed`. Exact-head CI and independent review remain separately
+required on the final pushed SHA.
 
 ## Production boundary
 

@@ -22,8 +22,12 @@ begin
       message = 'R207_RECOVERY_REFUSED:ACTIVATION_CONTRACT_MISSING';
   end if;
 
-  if pg_catalog.md5(pg_catalog.pg_get_functiondef(
-      'public.laxhornet_sync_game(jsonb)'::regprocedure
+  if pg_catalog.md5(pg_catalog.replace(
+      pg_catalog.pg_get_functiondef(
+        'public.laxhornet_sync_game(jsonb)'::regprocedure
+      ),
+      pg_catalog.chr(13),
+      ''
     )) <> '5ed65c9a743d18d894389940402f5331'
   then
     raise exception using errcode = 'P0001',
