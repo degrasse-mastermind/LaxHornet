@@ -83,7 +83,8 @@ in-flight writers and cannot complete ahead of a later v2 commit.
 ## Disposable certification
 
 `node tools/test_r207_forward_migration_b_activation.mjs` reconstructs the
-complete certified 18-migration pre-activation chain in fresh PostgreSQL 17 containers using
+complete certified 19-migration pre-activation chain (18 certified migrations plus the exact
+production-policy reconciliation prerequisite) in fresh PostgreSQL 17 containers using
 synthetic adult-only fixtures. It proves:
 
 - exact preconditions accept and drift refuses;
@@ -108,7 +109,7 @@ synthetic adult-only fixtures. It proves:
 - post-evidence recovery fail-closes without restoring legacy authority;
 - zero disposable container residue.
 
-Focused result: `40/40 PASS`. Complete local Level 3 regression result:
+Focused result: `54/54 PASS`. Complete local Level 3 regression result:
 `70 passed, 0 failed`. Exact-head CI and independent review remain separately
 required on the final pushed SHA.
 

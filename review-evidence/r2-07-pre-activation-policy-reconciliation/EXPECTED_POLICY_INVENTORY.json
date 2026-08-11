@@ -1,0 +1,20 @@
+{
+  "source": "Fresh disposable PostgreSQL 17 with the exact 18-migration chain through 20260811131042",
+  "canonicalization": "table|name|permissive|command|comma-sorted-roles|pg_get_expr(using)|pg_get_expr(with_check), aggregate sorted by the complete canonical row and joined with LF",
+  "aggregateDigest": "0c9fc6789e1401e149592e2d8c7f0334",
+  "count": 11,
+  "policies": [
+    {"schema":"public","table":"events","name":"laxhornet delete own events","command":"d","permissive":true,"roles":["authenticated"],"using":"owner of a personal-game event OR laxhornet_can_track_roster_player for the event/team game","withCheck":"","digest":"6be6f8b2d1cc7521be73dceb4d22b28c"},
+    {"schema":"public","table":"events","name":"laxhornet insert own events","command":"a","permissive":true,"roles":["authenticated"],"using":"","withCheck":"auth.uid() = user_id AND parent game is personally owned or laxhornet_can_track_roster_player","digest":"8d16c93b260c0f574f6c04b9db78a4da"},
+    {"schema":"public","table":"events","name":"laxhornet read own or shared events","command":"r","permissive":true,"roles":["authenticated"],"using":"auth.uid() = user_id OR laxhornet_can_track_roster_player OR parent game is shared","withCheck":"","digest":"7e03a93f867cd73a229bcd5cc1ea1d7b"},
+    {"schema":"public","table":"events","name":"laxhornet update own events","command":"w","permissive":true,"roles":["authenticated"],"using":"owner of a personal-game event OR laxhornet_can_track_roster_player for the event/team game","withCheck":"USING authority AND parent game is personally owned or laxhornet_can_track_roster_player","digest":"c707f9f1a888d15fcaafd854d9d356bd"},
+    {"schema":"public","table":"game_conflict_resolutions","name":"game_conflict_resolutions_select_r207d","command":"r","permissive":true,"roles":["authenticated"],"using":"matching conflict exists AND lh_sync_private.r207_conflict_current_authority(conflict.game_id)","withCheck":"","digest":"9e2af148e4f37576ed08ef6766257576"},
+    {"schema":"public","table":"game_conflicts","name":"game_conflicts_select_r207d","command":"r","permissive":true,"roles":["authenticated"],"using":"lh_sync_private.r207_conflict_current_authority(game_id)","withCheck":"","digest":"27ba97aeac8667de70ead68538d21b6d"},
+    {"schema":"public","table":"games","name":"laxhornet delete own games","command":"d","permissive":true,"roles":["authenticated"],"using":"personal game owner OR laxhornet_can_track_roster_player for team game","withCheck":"","digest":"1aa01478ee1109f98ee6de683c7ad52a"},
+    {"schema":"public","table":"games","name":"laxhornet insert own games","command":"a","permissive":true,"roles":["authenticated"],"using":"","withCheck":"auth.uid() = user_id AND (personal game OR laxhornet_can_track_roster_player)","digest":"25513685f4b5b102fd6bb104a429e957"},
+    {"schema":"public","table":"games","name":"laxhornet read own or shared games","command":"r","permissive":true,"roles":["authenticated"],"using":"is_shared OR auth.uid() = user_id OR laxhornet_can_track_roster_player","withCheck":"","digest":"a26c48c48fd9687ff8c51743cf67d713"},
+    {"schema":"public","table":"games","name":"laxhornet update own games","command":"w","permissive":true,"roles":["authenticated"],"using":"personal game owner OR laxhornet_can_track_roster_player for team game","withCheck":"same as USING","digest":"667c60fd9cfc84f1045ef5f659cff96d"},
+    {"schema":"public","table":"legacy_game_tombstones","name":"laxhornet read authorized legacy game tombstones","command":"r","permissive":true,"roles":["authenticated"],"using":"owner_user_id = auth.uid() OR platform reviewer OR laxhornet_can_track_roster_player","withCheck":"","digest":"a13fafc8883a20d57238b05660a5ca11"}
+  ],
+  "note": "The human-readable expression summaries are not hash inputs. The permanent test and migration recompute every digest from PostgreSQL pg_get_expr catalog text; the recorded per-policy digests are the exact canonical bindings."
+}

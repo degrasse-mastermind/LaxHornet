@@ -1,0 +1,26 @@
+{
+  "connector": "supabase_production_readonly-2",
+  "projectRef": "ulbmjcvnyznvmjgpstno",
+  "readOnly": true,
+  "aggregateDigest": "e7bc2b4dab7dda61af7967dad18b50ca",
+  "count": 23,
+  "inventoryComposition": {
+    "certifiedPolicies": "The exact 11 records and per-policy digests in EXPECTED_POLICY_INVENTORY.json; all 11 matched production exactly.",
+    "extraPolicies": 12
+  },
+  "extraPolicies": [
+    {"schema":"public","table":"events","name":"events_delete_team","command":"d","permissive":true,"roles":["authenticated"],"using":"EXISTS (SELECT 1 FROM team_members tm WHERE tm.team_id = events.team_id AND tm.user_id = auth.uid())","withCheck":"","digest":"8c3cc2e9c68a467899d27d6b15ee568a"},
+    {"schema":"public","table":"events","name":"events_insert_team","command":"a","permissive":true,"roles":["authenticated"],"using":"","withCheck":"EXISTS (SELECT 1 FROM team_members tm WHERE tm.team_id = events.team_id AND tm.user_id = auth.uid())","digest":"5c19ec6438bf1e8ef11bf8d52fce05ac"},
+    {"schema":"public","table":"events","name":"events_select_team","command":"r","permissive":true,"roles":["authenticated"],"using":"EXISTS (SELECT 1 FROM team_members tm WHERE tm.team_id = events.team_id AND tm.user_id = auth.uid())","withCheck":"","digest":"0c42fefb5bdca4d43b2fd65a542825ae"},
+    {"schema":"public","table":"events","name":"events_update_team","command":"w","permissive":true,"roles":["authenticated"],"using":"EXISTS (SELECT 1 FROM team_members tm WHERE tm.team_id = events.team_id AND tm.user_id = auth.uid())","withCheck":"same as USING","digest":"6f186ac99a9c16d7a31bb016f3f540fd"},
+    {"schema":"public","table":"games","name":"games_delete_team","command":"d","permissive":true,"roles":["authenticated"],"using":"EXISTS (SELECT 1 FROM team_members tm WHERE tm.team_id = games.team_id AND tm.user_id = auth.uid())","withCheck":"","digest":"99bb6f286879671c080ef26ff96613ab"},
+    {"schema":"public","table":"games","name":"games_insert_team","command":"a","permissive":true,"roles":["authenticated"],"using":"","withCheck":"EXISTS (SELECT 1 FROM team_members tm WHERE tm.team_id = games.team_id AND tm.user_id = auth.uid())","digest":"45fcb502fdb887439d378719763388cf"},
+    {"schema":"public","table":"games","name":"games_select_team","command":"r","permissive":true,"roles":["authenticated"],"using":"EXISTS (SELECT 1 FROM team_members tm WHERE tm.team_id = games.team_id AND tm.user_id = auth.uid())","withCheck":"","digest":"d3346aa91cd6aac09acbb6433ac6f449"},
+    {"schema":"public","table":"games","name":"games_update_team","command":"w","permissive":true,"roles":["authenticated"],"using":"EXISTS (SELECT 1 FROM team_members tm WHERE tm.team_id = games.team_id AND tm.user_id = auth.uid())","withCheck":"same as USING","digest":"73ebc5bef7bb6371c3192519cd12f696"},
+    {"schema":"public","table":"lh_game_clock_states","name":"lh_game_clock_states_delete_team","command":"d","permissive":true,"roles":["authenticated"],"using":"EXISTS (SELECT 1 FROM team_members tm WHERE tm.team_id = lh_game_clock_states.team_id AND tm.user_id = auth.uid())","withCheck":"","digest":"0aecb742675ea958c660c4245e977506"},
+    {"schema":"public","table":"lh_game_clock_states","name":"lh_game_clock_states_insert_team","command":"a","permissive":true,"roles":["authenticated"],"using":"","withCheck":"EXISTS (SELECT 1 FROM team_members tm WHERE tm.team_id = lh_game_clock_states.team_id AND tm.user_id = auth.uid())","digest":"d04277dec07f42d5fcf51f1504072545"},
+    {"schema":"public","table":"lh_game_clock_states","name":"lh_game_clock_states_select_team","command":"r","permissive":true,"roles":["authenticated"],"using":"EXISTS (SELECT 1 FROM team_members tm WHERE tm.team_id = lh_game_clock_states.team_id AND tm.user_id = auth.uid())","withCheck":"","digest":"21dd01077cacd84da4cab147aa5d3ef7"},
+    {"schema":"public","table":"lh_game_clock_states","name":"lh_game_clock_states_update_team","command":"w","permissive":true,"roles":["authenticated"],"using":"EXISTS (SELECT 1 FROM team_members tm WHERE tm.team_id = lh_game_clock_states.team_id AND tm.user_id = auth.uid())","withCheck":"same as USING","digest":"4303a30c429738ab480dc38a969effc5"}
+  ],
+  "dataClassification": "Catalog metadata only; no user rows, secrets, or credentials."
+}

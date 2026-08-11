@@ -2,7 +2,8 @@
 --
 -- This artifact is inert until it is applied under separately authorized
 -- R2-07F production-release authority. It is deliberately bound to the exact
--- 18-migration certified pre-activation shape, including the inert cutover gate.
+-- 19-migration certified pre-activation shape, including the inert cutover gate
+-- and the exact production-policy reconciliation prerequisite.
 
 begin;
 
@@ -21,7 +22,8 @@ declare
     '20260727000000', '20260728193942', '20260730004700',
     '20260730134439', '20260730151714', '20260806143128',
     '20260809155442', '20260809164435', '20260809173500',
-    '20260809201608', '20260811010813', '20260811131042'
+    '20260809201608', '20260811010813', '20260811131042',
+    '20260811211414'
   ];
   actual_versions text[];
   relation_hash text;
