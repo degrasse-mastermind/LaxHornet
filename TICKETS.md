@@ -2665,11 +2665,13 @@ event, and clock mutation bypass without activating production in this task.
 
 #### Acceptance
 
-- [x] Bind to the exact 17-migration certified schema, RPC definitions,
-  relation hash, RLS/FORCE RLS state, grants, dormant capability, v1 function,
-  and zero pre-activation R2-07 evidence; deterministic drift refusal.
+- [x] Bind the exact 17-migration certified schema plus the inert pre-cutover
+  gate, RPC definitions, relation/trigger hashes, RLS/FORCE RLS state, grants,
+  dormant capability, v1 function, and zero pre-activation R2-07 evidence;
+  deterministic drift refusal.
 - [x] Execute capability, function, table-grant, and legacy-RPC changes in one
-  transaction with a release lock and committed no-dual-authority postflight.
+  transaction with a shared/exclusive writer gate, both-order concurrency
+  probes, and committed no-dual-authority postflight.
 - [x] Retain v1 as bounded `client_upgrade_required` with no mutation/private
   detail and retain durable R2-06 tombstone authority.
 - [x] Add production-capable dormant client configuration with authoritative

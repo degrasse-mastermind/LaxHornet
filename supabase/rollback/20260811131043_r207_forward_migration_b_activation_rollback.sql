@@ -36,12 +36,14 @@ begin
 end;
 $preflight$;
 
--- Every reviewed v2 writer reads this table before mutation. AccessExclusive
--- therefore drains in-flight writers and prevents a commit after recovery.
-lock table public.r207_preview_control in access exclusive mode;
+-- The exclusive cutover advisory lock drains writers that already passed the
+-- canonical trigger and blocks later arrivals until fail_closed is committed.
+-- Do not also take AccessExclusive on the capability relation: v2 writers read
+-- that relation before reaching the trigger, and the inverse order deadlocks.
 
 update public.r207_preview_control
 set preview_enabled = false,
+    cutover_mode = 'fail_closed',
     updated_at = statement_timestamp()
 where control_id;
 
@@ -78,6 +80,7 @@ grant execute on function public.laxhornet_sync_game(jsonb) to authenticated;
 do $postflight$
 begin
   if coalesce((select preview_enabled from public.r207_preview_control where control_id), true)
+    or coalesce((select cutover_mode from public.r207_preview_control where control_id), '') <> 'fail_closed'
     or pg_catalog.has_table_privilege('authenticated', 'public.games', 'update')
     or pg_catalog.has_table_privilege('authenticated', 'public.events', 'update')
     or pg_catalog.has_function_privilege(

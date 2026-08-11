@@ -2,7 +2,7 @@
 --
 -- This artifact is inert until it is applied under separately authorized
 -- R2-07F production-release authority. It is deliberately bound to the exact
--- 17-migration R2-07E certified pre-activation shape.
+-- 18-migration certified pre-activation shape, including the inert cutover gate.
 
 begin;
 
@@ -21,7 +21,7 @@ declare
     '20260727000000', '20260728193942', '20260730004700',
     '20260730134439', '20260730151714', '20260806143128',
     '20260809155442', '20260809164435', '20260809173500',
-    '20260809201608', '20260811010813'
+    '20260809201608', '20260811010813', '20260811131042'
   ];
   actual_versions text[];
   relation_hash text;
@@ -98,9 +98,9 @@ begin
         'game_clock_commands', 'game_clock_batches'
       ])
   ) as shape;
-  if relation_hash is distinct from '4567f943c9bff20f9510a28c8c7bbf98' then
+  if relation_hash is distinct from '41a0bbcbf5f3f486c14bd074635fd976' then
     raise exception using errcode = 'P0001',
-      message = 'R207_ACTIVATION_PREFLIGHT_FAILED:RELATION_SHAPE_DRIFT';
+      message = 'R207_ACTIVATION_PREFLIGHT_FAILED:RELATION_SHAPE_DRIFT:' || coalesce(relation_hash, 'null');
   end if;
 
   select pg_catalog.md5(pg_catalog.string_agg(policy.item, E'\n' order by policy.item))
@@ -133,10 +133,25 @@ begin
       message = 'R207_ACTIVATION_PREFLIGHT_FAILED:POLICY_DRIFT';
   end if;
 
+  if (
+    select pg_catalog.md5(pg_catalog.string_agg(
+      pg_catalog.pg_get_triggerdef(trigger.oid, true), E'\n' order by class.relname
+    ))
+    from pg_catalog.pg_trigger as trigger
+    join pg_catalog.pg_class as class on class.oid = trigger.tgrelid
+    join pg_catalog.pg_namespace as namespace on namespace.oid = class.relnamespace
+    where namespace.nspname = 'public'
+      and trigger.tgname like 'laxhornet_r207_cutover_%'
+  ) is distinct from '54c058c1a496ca6dadebe6af88d97c87' then
+    raise exception using errcode = 'P0001',
+      message = 'R207_ACTIVATION_PREFLIGHT_FAILED:CUTOVER_TRIGGER_DRIFT';
+  end if;
+
   for signature, expected_hash in
     select binding.signature, binding.expected_hash
     from (values
       ('public.laxhornet_sync_game(jsonb)', 'b768a13ed661414af84c72f16194c0b6'),
+      ('public.laxhornet_r207_cutover_write_gate()', 'e138afc2fef38b637dad719f85ebf122'),
       ('public.laxhornet_r207_preview_capability()', 'c72cc295ab1536e8ae361901bd1228bd'),
       ('public.laxhornet_sync_game_v2(jsonb)', '7b053d29f37620c6e1f2334a5f58c944'),
       ('public.laxhornet_sync_event_v2(jsonb)', '0414e1bd5f1ac670e1da9c533a9c5e5a'),
@@ -530,8 +545,26 @@ grant execute on function public.laxhornet_read_game_conflicts_v1(jsonb)
 grant execute on function public.laxhornet_resolve_game_conflict_v1(jsonb)
   to authenticated;
 
+-- The inert pre-cutover triggers reject canonical mutation in v2 mode unless
+-- the reviewed versioned entrypoint marks its transaction. Function-level SET
+-- applies before the first statement in each RPC and cannot be supplied by a
+-- browser caller.
+alter function public.laxhornet_sync_game_v2(jsonb)
+  set "laxhornet.r207_versioned_write" to 'true';
+alter function public.laxhornet_sync_event_v2(jsonb)
+  set "laxhornet.r207_versioned_write" to 'true';
+alter function public.lh_apply_game_clock_operation_v2(jsonb)
+  set "laxhornet.r207_versioned_write" to 'true';
+alter function public.lh_apply_game_clock_batch_v2(jsonb)
+  set "laxhornet.r207_versioned_write" to 'true';
+alter function public.laxhornet_resolve_game_conflict_v1(jsonb)
+  set "laxhornet.r207_versioned_write" to 'true';
+alter function public.laxhornet_delete_game_durable(jsonb)
+  set "laxhornet.r207_versioned_write" to 'true';
+
 update public.r207_preview_control
 set preview_enabled = true,
+    cutover_mode = 'v2',
     updated_at = statement_timestamp()
 where control_id;
 
@@ -542,6 +575,7 @@ where control_id;
 do $postflight$
 begin
   if not coalesce((select preview_enabled from public.r207_preview_control where control_id), false)
+    or coalesce((select cutover_mode from public.r207_preview_control where control_id), '') <> 'v2'
     or not pg_catalog.has_function_privilege(
       'authenticated', 'public.laxhornet_sync_game(jsonb)', 'execute')
     or pg_catalog.has_table_privilege('authenticated', 'public.games', 'insert')

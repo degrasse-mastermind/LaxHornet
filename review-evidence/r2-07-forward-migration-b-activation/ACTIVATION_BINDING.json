@@ -4,18 +4,27 @@
   "startingMainSha": "b7269194a4ce8b9068b0d46c44d840efc4048c69",
   "certificationEvidenceSha": "c2726b0c1cd979a7af2b04bc9a0a25865f4636ea",
   "historicalPreflightPr": 73,
+  "cutoverGate": {
+    "path": "supabase/migrations/20260811131042_r207_forward_migration_b_cutover_gate.sql",
+    "sha256": "8548cb480c499a5da8626d43d19e1819464eecd2695f3ddde5495951dd353748",
+    "modeAfter": "legacy",
+    "productionActivation": false
+  },
   "activation": {
     "path": "supabase/migrations/20260811131043_r207_forward_migration_b_activation.sql",
-    "sha256": "fa425f77673048665703e7c3fbacaf3f1a5f2adebc7513f8321537477d4606cf",
+    "sha256": "06089f64363e7ebd114e08e27d6dc322aaa392c257bf1bb419fc8dc847b1debd",
     "capabilityBefore": false,
     "capabilityAfter": true,
+    "cutoverModeBefore": "legacy",
+    "cutoverModeAfter": "v2",
     "transactional": true,
     "replayBehavior": "R207_ACTIVATION_ALREADY_APPLIED"
   },
   "recovery": {
     "path": "supabase/rollback/20260811131043_r207_forward_migration_b_activation_rollback.sql",
-    "sha256": "abe91140754da66c33a90babbf82d780566ae669fd09bd08b52da995697900fb",
+    "sha256": "b009054726010d947b04df29f58e0d3dd51c7a0101efc6218a94ef64b9f0e3be",
     "mode": "fail_closed_forward_recovery",
+    "cutoverModeAfter": "fail_closed",
     "restoresLegacyMutation": false
   },
   "client": {
@@ -32,12 +41,14 @@
     }
   },
   "preActivationCatalog": {
-    "relationShapeMd5": "4567f943c9bff20f9510a28c8c7bbf98",
+    "relationShapeMd5": "41a0bbcbf5f3f486c14bd074635fd976",
     "policyDefinitionMd5": "0c9fc6789e1401e149592e2d8c7f0334",
+    "cutoverGateFunctionMd5": "e138afc2fef38b637dad719f85ebf122",
+    "cutoverTriggerSetMd5": "54c058c1a496ca6dadebe6af88d97c87",
     "v1Signature": "public.laxhornet_sync_game(jsonb)",
     "v1FunctionMd5": "b768a13ed661414af84c72f16194c0b6",
     "v1PostActivationFunctionMd5": "5ed65c9a743d18d894389940402f5331",
-    "expectedMigrationCount": 17,
+    "expectedMigrationCount": 18,
     "expectedR207EvidenceCount": 0
   },
   "grants": {

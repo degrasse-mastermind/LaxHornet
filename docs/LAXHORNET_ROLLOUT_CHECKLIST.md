@@ -1259,9 +1259,10 @@ Do not combine these into one large Codex task. Each item requires one approved 
 
 - [x] Preserve PR #73 as the historical preflight that stopped before the
   first production mutation because Forward Migration B was absent.
-- [x] Add one exact-schema-bound transactional activation migration that
-  enables reviewed v2 authority and disables v1/direct legacy authority with no
-  committed dual-authority state.
+- [x] Add an inert pre-cutover shared/exclusive writer gate followed by one
+  exact-schema-bound transactional activation migration that enables reviewed
+  v2 authority and disables v1/direct legacy authority with no committed or
+  cutover-race dual-authority state.
 - [x] Keep v1 as a bounded actionable `client_upgrade_required` stub for the
   approved sunset period.
 - [x] Add production-capable dormant client configuration driven by the

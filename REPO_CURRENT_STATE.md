@@ -540,8 +540,9 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   mutation because the certified source had no Forward Migration B activation
   artifact or production-capable client configuration. The new Level 3 branch
   `feature/r2-07-forward-migration-b-activation` adds an exact-schema-bound
-  transactional cutover, bounded v1 upgrade stub, unversioned grant/RPC
-  revocations, server-authoritative dormant client profile, permanent
+  transactional cutover preceded by an inert shared/exclusive canonical-write
+  gate, bounded v1 upgrade stub, unversioned grant/RPC revocations,
+  server-authoritative dormant client profile, permanent
   disposable activation tests, and fail-closed recovery that never restores
   v285 writes. It changes no release/cache marker and remains unapplied and
   undeployed pending exact-head CI, independent review, merge decision, fresh

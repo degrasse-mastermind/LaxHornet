@@ -26,6 +26,7 @@ const migrations = [
   "20260809173500_r207c_versioned_event_corrections.sql",
   "20260809201608_r207d_conflict_resolution_foundation.sql",
   "20260811010813_r207_clock_command_batch_integration.sql",
+  "20260811131042_r207_forward_migration_b_cutover_gate.sql",
 ];
 const OWNER = "00000000-0000-4000-8000-00000000000a";
 const OTHER = "00000000-0000-4000-8000-00000000000b";
@@ -243,18 +244,22 @@ try {
     return `${file}|${actual}`;
   }).join("\n");
   check(
-    gitBlobSha256(path.join(root, binding.activation.path)) === binding.activation.sha256
+    gitBlobSha256(path.join(root, binding.cutoverGate.path)) === binding.cutoverGate.sha256
+      && gitBlobSha256(path.join(root, binding.activation.path)) === binding.activation.sha256
       && gitBlobSha256(path.join(root, binding.recovery.path)) === binding.recovery.sha256
       && crypto.createHash("sha256").update(exactRuntimeSet).digest("hex")
         === binding.client.runtimeClientSetSha256,
     "activation, recovery, and runtime evidence bind canonical exact Git-blob bytes",
   );
   check(
-    releaseManifest.r207ForwardMigrationBActivation.activationMigrationSha256 === binding.activation.sha256
+    releaseManifest.r207ForwardMigrationBActivation.cutoverGateMigrationSha256 === binding.cutoverGate.sha256
+      && releaseManifest.r207ForwardMigrationBActivation.activationMigrationSha256 === binding.activation.sha256
       && releaseManifest.r207ForwardMigrationBActivation.recoveryArtifactSha256 === binding.recovery.sha256
       && releaseManifest.r207ForwardMigrationBActivation.runtimeClientSetSha256 === binding.client.runtimeClientSetSha256
       && releaseManifest.r207ForwardMigrationBActivation.preActivationRelationShapeMd5 === binding.preActivationCatalog.relationShapeMd5
-      && releaseManifest.r207ForwardMigrationBActivation.preActivationPolicyDefinitionMd5 === binding.preActivationCatalog.policyDefinitionMd5,
+      && releaseManifest.r207ForwardMigrationBActivation.preActivationPolicyDefinitionMd5 === binding.preActivationCatalog.policyDefinitionMd5
+      && releaseManifest.r207ForwardMigrationBActivation.preActivationCutoverGateFunctionMd5 === binding.preActivationCatalog.cutoverGateFunctionMd5
+      && releaseManifest.r207ForwardMigrationBActivation.preActivationCutoverTriggerSetMd5 === binding.preActivationCatalog.cutoverTriggerSetMd5,
     "release manifest binds the exact activation, recovery, runtime set, and relation shape",
   );
   const loadCloudGamesSource = appSource.slice(
@@ -299,6 +304,15 @@ try {
     "pre-activation v1 is active and v2 is dormant");
   check(psql(main, "select has_table_privilege('authenticated','public.games','update')::text||','||has_table_privilege('authenticated','public.events','update')::text;").stdout === "true,true",
     "pre-activation direct legacy grants match the certified envelope");
+  const cutoverGateBinding = psql(main, `select
+    md5(replace(pg_get_functiondef('public.laxhornet_r207_cutover_write_gate()'::regprocedure), chr(13), ''))||'|'||
+    md5(string_agg(pg_get_triggerdef(trigger.oid, true), E'\\n' order by class.relname))
+    from pg_trigger as trigger
+    join pg_class as class on class.oid=trigger.tgrelid
+    join pg_namespace as namespace on namespace.oid=class.relnamespace
+    where namespace.nspname='public' and trigger.tgname like 'laxhornet_r207_cutover_%';`).stdout;
+  check(cutoverGateBinding === "e138afc2fef38b637dad719f85ebf122|54c058c1a496ca6dadebe6af88d97c87",
+    "pre-activation cutover gate function and triggers match the certified binding");
 
   psql(main, read("migrations", migrationFile));
   psql(main, "insert into supabase_migrations.schema_migrations values ('20260811131043','r207_forward_migration_b_activation');");
@@ -476,6 +490,47 @@ try {
   check(legacyWriterResult.status === 0 && activationElapsedMs >= 1200,
     "activation drains an in-flight legacy RowExclusive writer before v2 authority commits",
     `elapsed=${activationElapsedMs} stderr=${legacyWriterResult.stderr}`);
+
+  const arrivalRace = await start("activation-arrival-race");
+  psql(arrivalRace, `insert into auth.users(id,email) values ('${OWNER}','arrival@example.invalid');
+    ${gameInsert("activation-arrival-game")}${clockInsert("activation-arrival-game")}`);
+  const pausedActivationSql = read("migrations", migrationFile).replace(
+    "lock table public.lh_game_clock_states in share row exclusive mode;",
+    "lock table public.lh_game_clock_states in share row exclusive mode; select pg_sleep(2);",
+  );
+  const arrivingActivation = psqlAsync(arrivalRace, pausedActivationSql);
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  const staleClockPayload = {
+    game_id: "activation-arrival-game",
+    base_revision: 1,
+    current_period: "Q1",
+    clock_seconds_remaining: 719,
+    is_running: false,
+    started_at: null,
+    paused_at: "2026-08-11T12:00:01Z",
+    client_updated_at: "2026-08-11T12:00:01Z",
+    recovery_state: "complete",
+  };
+  const arrivingLegacyClock = psqlAsync(arrivalRace, `${claims(OWNER)}
+    select public.lh_update_game_clock($json$${JSON.stringify(staleClockPayload)}$json$::jsonb)::text;
+    reset role;`);
+  const arrivingDirectWrite = psqlAsync(arrivalRace, `${claims(OWNER)}
+    update public.games set opponent='queued direct write' where id='activation-arrival-game';
+    reset role;`);
+  const arrivingActivationResult = await arrivingActivation;
+  const arrivingLegacyClockResult = await arrivingLegacyClock;
+  const arrivingDirectWriteResult = await arrivingDirectWrite;
+  const arrivalClockState = psql(arrivalRace, `select revision||','||clock_seconds_remaining
+    from public.lh_game_clock_states where game_id='activation-arrival-game';`).stdout;
+  const arrivalOpponent = psql(arrivalRace, `select opponent from public.games
+    where id='activation-arrival-game';`).stdout;
+  check(arrivingActivationResult.status === 0
+    && arrivingLegacyClockResult.status !== 0
+    && arrivingDirectWriteResult.status !== 0
+    && arrivalClockState === "1,720"
+    && arrivalOpponent === "Initial",
+  "legacy RPC and direct DML arriving during activation cannot commit after v2 authority",
+  `rpc_status=${arrivingLegacyClockResult.status} direct_status=${arrivingDirectWriteResult.status} clock=${arrivalClockState} opponent=${arrivalOpponent}`);
 
   const raceOperation = gameOperation("recovery-race-operation", "recovery-race", 1, { opponent: "Drained before recovery" });
   const inFlight = psqlAsync(main, `begin; ${claims(OWNER)}

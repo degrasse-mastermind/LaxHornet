@@ -69,6 +69,7 @@ const additivePaths = [
   "supabase/rollback/20260809201608_r207d_conflict_resolution_foundation_rollback.sql",
   "supabase/migrations/20260811010813_r207_clock_command_batch_integration.sql",
   "supabase/rollback/20260811010813_r207_clock_command_batch_integration_rollback.sql",
+  "supabase/migrations/20260811131042_r207_forward_migration_b_cutover_gate.sql",
   "supabase/migrations/20260811131043_r207_forward_migration_b_activation.sql",
   "supabase/rollback/20260811131043_r207_forward_migration_b_activation_rollback.sql",
 ].join(",");

@@ -20,20 +20,28 @@ execution authority for this artifact.
 
 ## Approved activation model
 
-The additive migration binds to the exact certified migration inventory,
+The inert cutover-gate migration first binds every canonical game, event, and
+clock mutation to a shared transaction advisory gate while preserving legacy
+mode. The additive activation migration then binds to the exact certified migration inventory,
 relation shape, public RPC definitions, RLS/FORCE RLS state, grants, dormant
 capability, legacy v1 definition, and zero pre-activation R2-07 evidence. Any
 drift raises a stable `R207_ACTIVATION_PREFLIGHT_FAILED:*` error before cutover.
 The relation binding includes durable game tombstones, and a separate exact
 policy-definition digest prevents permissive-policy substitution.
 
-Within one PostgreSQL transaction it acquires a release advisory lock, gates
+Within one PostgreSQL transaction it acquires the exclusive side of that gate, gates
 the canonical game/event/clock tables, performs the final legacy
 status-to-lifecycle reconciliation, installs the bounded v1 rejection stub,
 revokes unversioned game/event/clock authority, retains reviewed v2 and durable
-tombstone contracts, and finally enables the server capability. PostgreSQL DDL,
+tombstone contracts, marks reviewed v2 RPC transactions, changes cutover mode
+from `legacy` to `v2`, and finally enables the server capability. PostgreSQL DDL,
 ACL, function replacement, data update, and capability update commit or roll
 back together.
+
+Legacy writers already in flight hold the shared gate and drain before
+activation. Legacy RPCs or direct DML arriving after activation owns the
+exclusive gate wait, then deterministically reject when they observe `v2`
+mode. This closes both concurrency orderings around the cutover boundary.
 
 ## No dual authority and stale v1
 
@@ -63,7 +71,7 @@ R2-07F deployment authorization installs the reviewed profile.
 ## Recovery
 
 The companion recovery SQL is intentionally not a reverse migration. It
-disables the capability, revokes v2 mutation execution, retains normal reads
+changes the gate to `fail_closed`, disables the capability, revokes v2 mutation execution, retains normal reads
 and Live Share, retains the v1 upgrade-required stub, and reasserts every
 legacy mutation revocation. It works after evidence exists and never restores
 v285 last-write-wins authority. Repair/reactivation requires a new reviewed
@@ -75,7 +83,7 @@ in-flight writers and cannot complete ahead of a later v2 commit.
 ## Disposable certification
 
 `node tools/test_r207_forward_migration_b_activation.mjs` reconstructs the
-complete certified 17-migration chain in fresh PostgreSQL 17 containers using
+complete certified 18-migration pre-activation chain in fresh PostgreSQL 17 containers using
 synthetic adult-only fixtures. It proves:
 
 - exact preconditions accept and drift refuses;
@@ -90,6 +98,8 @@ synthetic adult-only fixtures. It proves:
 - deterministic activation replay refusal;
 - injected post-capability failure rolls the entire transaction back;
 - activation drains an in-flight legacy writer before v2 authority commits;
+- stale legacy RPC and direct DML arrivals during activation cannot commit
+  after v2 authority;
 - reconnect processes retained game creation before dependent clock intent;
 - interrupted `syncing` operations recover as retryable durable work;
 - game-create idempotency uses a server-derived canonical request hash;
@@ -98,7 +108,7 @@ synthetic adult-only fixtures. It proves:
 - post-evidence recovery fail-closes without restoring legacy authority;
 - zero disposable container residue.
 
-Focused result: `34/34 PASS`. Complete local Level 3 regression result:
+Focused result: `36/36 PASS`. Complete local Level 3 regression result:
 `70 passed, 0 failed`. Exact-head CI and independent review remain separately
 required on the final pushed SHA.
 
