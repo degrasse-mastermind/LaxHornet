@@ -2538,6 +2538,75 @@ Evidence:
 
 - `review-evidence/r2-07d-needs-attention-conflict-resolution/R2-07D_IMPLEMENTATION_EVIDENCE.md`
 
+### R2-07 clock command and atomic batch integration
+
+Status: `P1 REMEDIATED — NEW EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
+
+Risk level: `LEVEL 3`
+
+Branch: `feature/r2-07-clock-command-batch-integration`
+
+Starting main: `08e7abf01d22cb60fc88422c961104a952b9b7e9`
+
+#### Goal
+
+Remediate only the R2-07E certification gap: replace the dormant approved
+clock wrappers with default-off Preview/test implementations and connect the
+existing local-first tracked clock to permanent online commands and ordered
+atomic reconnect batches.
+
+#### Authorized scope
+
+- Server-authoritative initialize/start/pause/resume/persist/advance/correct/
+  complete commands with optimistic clock/status/lifecycle bases, server
+  anchors, immutable receipts, current canonical authority, tombstone
+  precedence, and the universal operation-identity then game-lock order.
+- All-or-zero offline batches with one revision and receipt per accepted
+  command, exact replay, bounded whole-batch conflicts, no predicted versions,
+  and rollback of command identity/evidence on any failure.
+- The existing durable tracked-clock queue, server-anchor projection,
+  receipt-first reconciliation, centralized error classification, future-
+  schema write block, and minimum safe Needs Attention copy.
+- Additive migration/rollback, focused server/client/two-context browser
+  matrices, A/B/C/D and tombstone preservation, full regression, evidence,
+  and one draft implementation PR.
+
+#### Explicit exclusions
+
+- No production capability activation, migration application, data access,
+  deployment, release/cache marker, retention, v1 production-path removal,
+  rich clock adjudication, R2-07E rerun, R2-07F, merge, or rewrite of PR #70's
+  historical failed-certification evidence.
+
+#### Acceptance record
+
+- [x] Exact baseline and dormant-wrapper/no-client-call root cause confirmed.
+- [x] Online command and atomic batch RPCs are functional only when the
+  existing Preview control is explicitly enabled; all repository defaults
+  remain false.
+- [x] Preserve the independent Level 3 FAIL at exact head
+  `895612d17ec52bd101f126cf77696023b908f3b9`: offline elapsed time was lost,
+  exact-prefix/new-suffix replay was rejected, and the server could commit a
+  JavaScript-unsafe clock revision.
+- [x] Remediate all three P1s with append-only batch versions and exact prefix
+  proof, bounded server-anchor chronology, and pre-mutation single/batch
+  revision-capacity guards.
+- [x] Server clock matrix passes `55/55`, including the dedicated P1 real-RPC
+  group `19/19`; client passes `15/15`; real two-context desktop/mobile
+  browser passes `18/18`.
+- [x] R2-07A `71/71`; B `32/32`, `12/12`, `13/13`; C `30/30`, `37/37`,
+  `7/7`, `25/25`; D `32/32`, dismiss `13/13`, browser `10/10`, SQL
+  `23/23`; tombstone concurrency `8/8` all pass.
+- [x] New remediation-head complete canonical-plus-additive regression,
+  secret/host scan, diff hygiene, and zero-residue checks pass.
+- [x] New remediation-head Docker, portable regression, automatic isolated
+  Supabase Preview, Vercel, and Preview Comments checks pass.
+- [ ] Independent exact-PR-SHA Level 3 review returns PASS before merge.
+
+Evidence:
+
+- `review-evidence/r2-07-clock-command-batch-integration/R2-07_CLOCK_COMMAND_BATCH_IMPLEMENTATION_EVIDENCE.md`
+
 ### R2-07E — Disposable integrated certification
 
 Status: `FAILED — MATERIAL CLOCK IMPLEMENTATION GAP`

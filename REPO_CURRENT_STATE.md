@@ -149,9 +149,31 @@ This file is the concise orientation document for ChatGPT, Codex, and human revi
   returned clock state matches the queued payload.
 - Canonical team-event RPCs have durable client operation IDs, server event
   versions, replay protection, conflicts, and permanent tombstones. Those
-  guarantees do not currently extend to legacy game fields, tracked clock
-  writes, or account-scope transitions. R2-06 independently covers
-  cross-device legacy game deletion without modifying Trust Spine.
+  guarantees do not currently extend to account-scope transitions. R2-06
+  independently covers cross-device legacy game deletion without modifying
+  Trust Spine.
+- The R2-07 clock command/batch implementation branch adds a default-off
+  Preview/test bridge for the existing tracked clock. It uses authenticated
+  server-authoritative commands, server anchors, optimistic bigint clock and
+  status bases, immutable command/batch receipts, current canonical personal
+  or team authority, tombstone precedence, lifecycle validation, and the
+  universal operation-identity then per-game lock order. The existing durable
+  clock queue sends one online command or an all-or-zero ordered reconnect
+  batch, retains whole-batch conflicts for minimum Needs Attention review,
+  stores accepted versions only from receipts, and projects local ticking from
+  the authoritative anchor. Both the runtime flag and server control remain
+  false by default. This is unmerged Level 3 implementation state: exact-head
+  independent review and CI are required, and no production migration,
+  activation, deployment, release marker, or public disclosure changed.
+  Independent review failed PR #71 head `895612d17ec52bd101f126cf77696023b908f3b9`
+  on three adversarial contracts: exact-prefix/new-suffix replay, offline
+  elapsed chronology, and JavaScript-safe revision exhaustion. The same
+  unmerged branch now preserves append-only batch request versions, replays an
+  exact stored prefix before applying only its atomic suffix, reconstructs
+  bounded offline intervals on server anchors or returns Needs Attention with
+  zero mutation, and rejects single/batch revisions before exceeding
+  `Number.MAX_SAFE_INTEGER`. Fresh exact-head CI and independent Level 3 review
+  remain required; R2-07E has not restarted.
 - `main` contains the reviewed Tracked Playing Time foundation from merged PR #24 and the opt-in Phase 1 UI from merged PR #25.
 - The v284 frontend is deployed through the allowlisted Pages workflow. The
   completed rollback/restore proof restored approved source SHA

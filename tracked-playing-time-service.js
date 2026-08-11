@@ -13,6 +13,17 @@
     quarters: Object.freeze(["Q1", "Q2", "Q3", "Q4", "OT"]),
     halves: Object.freeze(["H1", "H2", "OT"]),
   });
+  const CLOCK_COMMANDS = Object.freeze([
+    "initialize",
+    "start",
+    "pause",
+    "resume",
+    "persist_position",
+    "advance_period",
+    "set_remaining",
+    "correct_remaining",
+    "complete",
+  ]);
 
   function requiredFunction(value, name) {
     if (typeof value !== "function") {
@@ -76,6 +87,20 @@
       ? clock.recoveryState
       : "complete";
     const clientUpdatedAt = isoTimestamp(clock.clientUpdatedAt || Date.now());
+    const serverClockVersion = finiteInteger(
+      clock.serverClockVersion ?? clock.clockVersion ?? 0,
+      "serverClockVersion",
+    );
+    const anchorServerAt = clock.anchorServerAt
+      ? isoTimestamp(clock.anchorServerAt)
+      : null;
+    const anchorClockSecondsRemaining = clock.anchorClockSecondsRemaining === null
+      || clock.anchorClockSecondsRemaining === undefined
+      ? null
+      : Math.min(maximum, finiteInteger(
+          clock.anchorClockSecondsRemaining,
+          "anchorClockSecondsRemaining",
+        ));
 
     return {
       version: 1,
@@ -95,6 +120,9 @@
       clientUpdatedAt,
       recoveryState,
       revision: finiteInteger(clock.revision ?? 1, "revision", 1),
+      serverClockVersion,
+      anchorServerAt,
+      anchorClockSecondsRemaining,
     };
   }
 
@@ -134,15 +162,31 @@
     const normalized = normalizeClockState(clock);
     if (!normalized.isRunning || normalized.clockSecondsRemaining === 0) return normalized;
     const nowMilliseconds = typeof now === "number" ? now : timestampMilliseconds(now, "now");
-    const updatedMilliseconds = timestampMilliseconds(normalized.clientUpdatedAt, "clientUpdatedAt");
+    const hasServerAnchor = normalized.anchorServerAt
+      && normalized.anchorClockSecondsRemaining !== null;
+    const updatedMilliseconds = timestampMilliseconds(
+      hasServerAnchor ? normalized.anchorServerAt : normalized.clientUpdatedAt,
+      hasServerAnchor ? "anchorServerAt" : "clientUpdatedAt",
+    );
+    const projectedRemaining = hasServerAnchor
+      ? normalized.anchorClockSecondsRemaining
+      : normalized.clockSecondsRemaining;
     const elapsedSeconds = Math.max(0, Math.floor((nowMilliseconds - updatedMilliseconds) / 1000));
     if (!elapsedSeconds) return normalized;
     return {
       ...normalized,
-      clockSecondsRemaining: Math.max(0, normalized.clockSecondsRemaining - elapsedSeconds),
-      isRunning: normalized.clockSecondsRemaining - elapsedSeconds > 0,
-      pausedAt: normalized.clockSecondsRemaining - elapsedSeconds > 0 ? null : isoTimestamp(nowMilliseconds),
+      clockSecondsRemaining: Math.max(0, projectedRemaining - elapsedSeconds),
+      isRunning: projectedRemaining - elapsedSeconds > 0,
+      pausedAt: projectedRemaining - elapsedSeconds > 0 ? null : isoTimestamp(nowMilliseconds),
       clientUpdatedAt: isoTimestamp(nowMilliseconds),
+    };
+  }
+
+  function withoutServerAnchor(clock) {
+    return {
+      ...clock,
+      anchorServerAt: null,
+      anchorClockSecondsRemaining: null,
     };
   }
 
@@ -150,27 +194,27 @@
     const normalized = projectClock(clock, now);
     if (normalized.isRunning || normalized.clockSecondsRemaining === 0) return normalized;
     const timestamp = isoTimestamp(now);
-    return {
+    return withoutServerAnchor({
       ...normalized,
       isRunning: true,
       startedAt: normalized.startedAt || timestamp,
       pausedAt: null,
       clientUpdatedAt: timestamp,
       revision: normalized.revision + 1,
-    };
+    });
   }
 
   function pauseClock(clock, now = Date.now()) {
     const projected = projectClock(clock, now);
     if (!projected.isRunning) return projected;
     const timestamp = isoTimestamp(now);
-    return {
+    return withoutServerAnchor({
       ...projected,
       isRunning: false,
       pausedAt: timestamp,
       clientUpdatedAt: timestamp,
       revision: projected.revision + 1,
-    };
+    });
   }
 
   function resumeClock(clock, now = Date.now()) {
@@ -180,11 +224,11 @@
   function persistClockPosition(clock, now = Date.now()) {
     const projected = projectClock(clock, now);
     const timestamp = isoTimestamp(now);
-    return {
+    return withoutServerAnchor({
       ...projected,
       clientUpdatedAt: timestamp,
       revision: projected.revision + 1,
-    };
+    });
   }
 
   function transitionPeriod(clock, nextPeriod, now = Date.now()) {
@@ -193,7 +237,7 @@
       throw new TypeError(`Invalid ${projected.periodFormat} period: ${nextPeriod}`);
     }
     const timestamp = isoTimestamp(now);
-    return {
+    return withoutServerAnchor({
       ...projected,
       currentPeriod: nextPeriod,
       clockSecondsRemaining: periodDurationSeconds(projected, nextPeriod),
@@ -203,7 +247,7 @@
       clientUpdatedAt: timestamp,
       recoveryState: "complete",
       revision: projected.revision + 1,
-    };
+    });
   }
 
   function gameEndClosureContext(clock, now = Date.now()) {
@@ -375,6 +419,47 @@
       payload.base_revision = finiteInteger(options.baseRevision ?? normalized.revision, "baseRevision", 1);
     }
     return payload;
+  }
+
+  function clockCommandPayload(clock, options = {}) {
+    const normalized = normalizeClockState(clock);
+    const command = String(options.command || "");
+    if (!CLOCK_COMMANDS.includes(command)) throw new TypeError("Unsupported clock command");
+    const expectedLifecycle = String(options.expectedLifecycle || "");
+    if (!["active", "paused", "completed"].includes(expectedLifecycle)) {
+      throw new TypeError("expectedLifecycle must be active, paused, or completed");
+    }
+    const statusBaseVersion = finiteInteger(
+      options.statusBaseVersion,
+      "statusBaseVersion",
+      1,
+    );
+    const baseClockVersion = command === "initialize"
+      ? 0
+      : finiteInteger(
+          options.baseClockVersion ?? normalized.serverClockVersion,
+          "baseClockVersion",
+          1,
+        );
+    const argumentsValue = command === "initialize"
+      ? {
+          period_format: normalized.periodFormat,
+          regulation_period_duration_seconds: normalized.regulationPeriodDurationSeconds,
+          overtime_duration_seconds: normalized.overtimeDurationSeconds,
+          current_period: normalized.currentPeriod,
+          clock_seconds_remaining: normalized.clockSecondsRemaining,
+        }
+      : { ...(options.arguments || {}) };
+    return Object.freeze({
+      contract: "r207_clock_v2",
+      gameId: normalized.gameId,
+      command,
+      arguments: argumentsValue,
+      baseClockVersion,
+      statusBaseVersion,
+      expectedLifecycle,
+      clientOccurredAt: normalized.clientUpdatedAt,
+    });
   }
 
   function trackedPlayingTimeState(game) {
@@ -597,12 +682,15 @@
       : canUseCloud;
     const reportError = typeof hooks.reportError === "function" ? hooks.reportError : () => {};
 
-    function initializeClock({ game, clockState }) {
+    function initializeClock({ game, clockState, commandContext = {} }) {
       const local = trackedPlayingTimeState(game);
       local.clockState = normalizeClockState(clockState);
       persistLocal();
       const cloudPromise = canQueueClock()
-        ? Promise.resolve(sendClock(clockRpcPayload(local.clockState, { initialize: true }))).catch((error) => {
+        ? Promise.resolve(sendClock(
+            clockRpcPayload(local.clockState, { initialize: true }),
+            { ...commandContext, afterClock: local.clockState },
+          )).catch((error) => {
             reportError(error);
             return false;
           })
@@ -610,12 +698,15 @@
       return { game, clockState: local.clockState, cloudPromise };
     }
 
-    function updateClock({ game, clockState, baseRevision }) {
+    function updateClock({ game, clockState, baseRevision, commandContext = {} }) {
       const local = trackedPlayingTimeState(game);
       local.clockState = normalizeClockState(clockState);
       persistLocal();
       const cloudPromise = canQueueClock()
-        ? Promise.resolve(sendClock(clockRpcPayload(local.clockState, { baseRevision }))).catch((error) => {
+        ? Promise.resolve(sendClock(
+            clockRpcPayload(local.clockState, { baseRevision }),
+            { ...commandContext, afterClock: local.clockState },
+          )).catch((error) => {
             reportError(error);
             return false;
           })
@@ -692,6 +783,7 @@
     RECOVERY_STATES,
     OPERATION_SOURCES,
     PERIODS,
+    CLOCK_COMMANDS,
     createClockState,
     normalizeClockState,
     periodDurationSeconds,
@@ -706,6 +798,7 @@
     normalizeParticipationOperation,
     participationRpcPayload,
     clockRpcPayload,
+    clockCommandPayload,
     trackedPlayingTimeState,
     resolveEffectiveParticipationOperations,
     configuredGameDurationSeconds,

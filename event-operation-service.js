@@ -1670,6 +1670,11 @@
       baseRevision: Number.isInteger(baseRevision) && baseRevision >= 0
         ? baseRevision
         : null,
+      batchRequired: operation.operationType === OPERATION_TYPES.clock
+        && operation.batchRequired === true,
+      batchId: operation.operationType === OPERATION_TYPES.clock
+        ? String(operation.batchId || "").trim().slice(0, 200)
+        : "",
       lastError: storedState === "syncing"
         ? {
             category: FAILURE_CATEGORIES.retryableTransport,
@@ -1814,6 +1819,7 @@
       || /^stale_.*_revision$/.test(code)
       || code.includes("revision_conflict")
       || code.includes("clock_acknowledgment_mismatch")
+      || code === "clock_chronology_needs_review"
       || code === "game_deleted"
       || code === "game_already_deleted"
       || code === "newer_game_revision"
@@ -1852,6 +1858,7 @@
       httpStatus === 400
       || httpStatus === 422
       || code === "validation_rejected"
+      || code === "clock_revision_exhausted"
       || code.startsWith("invalid_")
       || code.startsWith("unsupported_")
       || /^pgrst1\d\d$/.test(code)
@@ -1912,6 +1919,15 @@
     const persistState = requiredFunction(hooks.persistState, "persistState");
     const currentAccountId = requiredFunction(hooks.currentAccountId, "currentAccountId");
     const executeOperation = requiredFunction(hooks.executeOperation, "executeOperation");
+    const executeClockBatch = typeof hooks.executeClockBatch === "function"
+      ? hooks.executeClockBatch
+      : null;
+    const onClockAccepted = typeof hooks.onClockAccepted === "function"
+      ? hooks.onClockAccepted
+      : () => {};
+    const onClockConflict = typeof hooks.onClockConflict === "function"
+      ? hooks.onClockConflict
+      : () => {};
     const isOffline = typeof hooks.isOffline === "function" ? hooks.isOffline : () => false;
     const createId = typeof hooks.createId === "function"
       ? hooks.createId
@@ -2049,6 +2065,11 @@
             && Number.isInteger(Number(options.baseRevision))
             ? Number(options.baseRevision)
             : null,
+          batchRequired: operationType === OPERATION_TYPES.clock
+            && options.batchRequired === true,
+          batchId: operationType === OPERATION_TYPES.clock
+            ? String(options.batchId || "").trim().slice(0, 200)
+            : "",
           nextAttemptAt: null,
           lastError: null,
           receipt: existing.receipt,
@@ -2075,6 +2096,11 @@
             && Number.isInteger(Number(options.baseRevision))
             ? Number(options.baseRevision)
             : null,
+          batchRequired: operationType === OPERATION_TYPES.clock
+            && options.batchRequired === true,
+          batchId: operationType === OPERATION_TYPES.clock
+            ? String(options.batchId || "").trim().slice(0, 200)
+            : "",
           lastError: null,
           receipt: null,
         });
@@ -2093,10 +2119,29 @@
       return queue(OPERATION_TYPES.game, gameId, payload, { accountId });
     }
 
-    function queueClock({ accountId, gameId, payload, baseRevision = null }) {
+    function queueClock({
+      accountId,
+      gameId,
+      payload,
+      baseRevision = null,
+      batchRequired = false,
+    }) {
+      const state = supportedState();
+      const batchId = batchRequired
+        ? state?.operations.find((operation) =>
+            operation.operationType === OPERATION_TYPES.clock
+            && operation.accountId === accountId
+            && sameGameIdentity(operation.gameId, gameId)
+            && operation.batchRequired
+            && operation.batchId
+            && ["pending", "retryable"].includes(operation.state))?.batchId
+          || createId("clock-batch")
+        : "";
       return queue(OPERATION_TYPES.clock, gameId, payload, {
         accountId,
         baseRevision,
+        batchRequired,
+        batchId,
       });
     }
 
@@ -2600,6 +2645,82 @@
       return true;
     }
 
+    function clockBatchFor(state, operation) {
+      if (
+        !executeClockBatch
+        || operation.operationType !== OPERATION_TYPES.clock
+        || !operation.batchRequired
+        || !operation.batchId
+      ) {
+        return [];
+      }
+      return state.operations
+        .filter((candidate) =>
+          candidate.operationType === OPERATION_TYPES.clock
+          && candidate.accountId === operation.accountId
+          && sameGameIdentity(candidate.gameId, operation.gameId)
+          && candidate.batchRequired
+          && candidate.batchId === operation.batchId
+          && ["pending", "retryable"].includes(candidate.state))
+        .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
+    }
+
+    async function runClockBatch(accountId, batchOperations) {
+      const attempted = [];
+      for (const operation of batchOperations) {
+        const marked = markAttempt(operation.operationId);
+        if (!marked) break;
+        attempted.push(marked);
+      }
+      if (attempted.length !== batchOperations.length) return false;
+      let result;
+      try {
+        result = await executeClockBatch(copy(attempted));
+      } catch (error) {
+        result = classifyFailure(error, { source: "r207_clock_batch_rpc" });
+      }
+      if (currentAccountId() !== accountId) return false;
+      if (result?.outcome === "accepted") {
+        const operationResults = Array.isArray(result.operationResults)
+          ? result.operationResults
+          : [];
+        const byId = new Map(operationResults.map((item) => [String(item?.operationId || ""), item]));
+        if (
+          byId.size !== attempted.length
+          || attempted.some((operation) => !byId.has(operation.operationId))
+        ) {
+          const mismatch = classifyFailure({
+            outcome: "conflicted",
+            code: "clock_batch_acknowledgment_mismatch",
+          }, { source: "r207_clock_batch_rpc" });
+          for (const operation of attempted) applyFailure(operation.operationId, mismatch);
+          onClockConflict(copy(attempted), mismatch);
+          return false;
+        }
+        let accepted = false;
+        for (const operation of attempted) {
+          accepted = applyAcceptance(operation, byId.get(operation.operationId)) || accepted;
+        }
+        onClockAccepted(copy(attempted), copy(result));
+        return accepted;
+      }
+      const classified = Object.values(FAILURE_CATEGORIES).includes(result?.category)
+        ? result
+        : classifyFailure(result || {}, {
+            source: result?.source || "r207_clock_batch_rpc",
+          });
+      for (const operation of attempted) {
+        applyFailure(operation.operationId, {
+          ...classified,
+          receipt: result?.receipt || null,
+        });
+      }
+      if (classified.outcome === "conflicted") {
+        onClockConflict(copy(attempted), copy(result || classified));
+      }
+      return false;
+    }
+
     async function runForAccount(accountId) {
       if (!accountId) return false;
       if (isOffline()) {
@@ -2620,6 +2741,11 @@
         if (!state) break;
         const operation = eligibleOperation(state, accountId, Date.parse(isoTimestamp(now())));
         if (!operation) break;
+        const clockBatch = clockBatchFor(state, operation);
+        if (clockBatch.length) {
+          anyAccepted = await runClockBatch(accountId, clockBatch) || anyAccepted;
+          continue;
+        }
         const attempted = markAttempt(operation.operationId);
         if (!attempted) break;
         let result;
@@ -2630,7 +2756,11 @@
         }
         if (currentAccountId() !== accountId) break;
         if (result?.outcome === "accepted") {
-          anyAccepted = applyAcceptance(attempted, result) || anyAccepted;
+          const accepted = applyAcceptance(attempted, result);
+          anyAccepted = accepted || anyAccepted;
+          if (accepted && attempted.operationType === OPERATION_TYPES.clock) {
+            onClockAccepted(copy(attempted), copy(result));
+          }
         } else {
           const classified = Object.values(FAILURE_CATEGORIES).includes(result?.category)
             ? result
@@ -2644,6 +2774,12 @@
               receipt: result?.receipt || null,
             },
           );
+          if (
+            attempted.operationType === OPERATION_TYPES.clock
+            && classified.outcome === "conflicted"
+          ) {
+            onClockConflict(copy(attempted), copy(result || classified));
+          }
         }
       }
       return anyAccepted;

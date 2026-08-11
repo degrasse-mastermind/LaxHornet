@@ -1216,6 +1216,43 @@ Do not combine these into one large Codex task. Each item requires one approved 
 - [ ] Rerun all R2-07E matrices from the new exact merged-main SHA.
 - [ ] R2-07F production authorization remains blocked.
 
+## R2-07 clock command and atomic batch remediation gate
+
+- [x] Start from merged main `08e7abf01d22cb60fc88422c961104a952b9b7e9`
+  on a new implementation branch; leave PR #70 and its failed certification
+  evidence unchanged.
+- [x] Replace only the dormant clock command/batch wrappers through one
+  additive migration; repository runtime and Preview control default false.
+- [x] Preserve server anchors, monotonic bigint clock revisions, exact bases,
+  immutable command identity/history, no device lease, tombstone precedence,
+  lifecycle/status validation, and current personal/team authority.
+- [x] Serialize operation identities before one shared game lock and prove
+  same-game start/start, stale command, replay/mismatch, unrelated-game
+  progress, and injected rollback behavior.
+- [x] Apply reconnect batches in local semantic order only when the base is
+  unchanged; otherwise retain the whole local timeline with zero server prefix
+  or receipt mutation.
+- [x] Route the existing tracked clock to online commands/offline batches only
+  under the Preview flag; persist locally first, store acknowledged versions,
+  project from the server anchor, and never predict server revisions.
+- [x] Preserve future-schema read-only behavior, bounded error storage,
+  account isolation, non-retryable conflicts, and minimum safe clock copy.
+- [x] Preserve the exact-head Level 3 FAIL at `895612d17ec52bd101f126cf77696023b908f3b9`
+  and remediate its three P1 findings without merging or starting R2-07E.
+- [x] Append-only exact prefix/new-suffix replay, bounded server-anchor offline
+  chronology, and pre-mutation JavaScript-safe revision guards pass a
+  dedicated real-RPC adversarial matrix `19/19`.
+- [x] Focused server `55/55`, client `15/15`, and two-context browser `18/18`
+  matrices pass, including `390x844`, completion, offline success/conflict,
+  no partial application, and no console error.
+- [x] A/B/C/D, R2-07D dismiss, tracked-time, and tombstone preservation pass.
+- [x] New remediation-head complete regression, secret/host scan, diff hygiene,
+  focused hydration, and zero-residue proof pass.
+- [x] New remediation-head GitHub, automatic isolated Supabase Preview, and
+  Vercel checks pass.
+- [ ] Independent exact-head Level 3 implementation review passes before
+  merge; R2-07E remains blocked until review and merge.
+
 A feature PR is not automatically a production release.
 
 - [ ] Feature PR merged to `main`.

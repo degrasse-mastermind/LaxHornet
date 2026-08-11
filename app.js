@@ -428,6 +428,7 @@ const RUNTIME_CONFIG = window.LAXHORNET_RUNTIME_CONFIG || {};
 const R207B_CONTROLLED_PREVIEW = RUNTIME_CONFIG.r207bControlledPreview === true;
 const R207C_VERSIONED_EVENTS = RUNTIME_CONFIG.r207cVersionedEventCorrections === true;
 const R207D_CONFLICT_RESOLUTION = RUNTIME_CONFIG.r207dConflictResolution === true;
+const R207_CLOCK_COMMAND_BATCH = RUNTIME_CONFIG.r207ClockCommandBatch === true;
 const SUPABASE_CONFIG = {
   url: RUNTIME_CONFIG.supabaseUrl || "https://ulbmjcvnyznvmjgpstno.supabase.co",
   publishableKey: RUNTIME_CONFIG.supabasePublishableKey || "sb_publishable_-RUc79OPosRLNP5B6JIH2A_f3I_2A0M",
@@ -3858,14 +3859,27 @@ function reportTrackedPlayingTimeSyncError(error) {
 function initializeTrackedTimeForGame(game) {
   const local = trackedTimeState(game);
   if (!local) return;
-  trackedTimeService().initializeClock({ game, clockState: local.clockState });
+  trackedTimeService().initializeClock({
+    game,
+    clockState: local.clockState,
+    commandContext: {
+      command: "initialize",
+      expectedLifecycle: game.lifecycleState || "active",
+      beforeClock: null,
+    },
+  });
 }
 
-function updateTrackedClock(game, nextClock, baseRevision) {
+function updateTrackedClock(game, nextClock, baseRevision, commandContext = {}) {
   const local = trackedTimeState(game);
   if (!local) return;
   local.recoveryIssue = "";
-  trackedTimeService().updateClock({ game, clockState: nextClock, baseRevision });
+  trackedTimeService().updateClock({
+    game,
+    clockState: nextClock,
+    baseRevision,
+    commandContext,
+  });
   game.currentQuarter = nextClock.currentPeriod;
   game.savedAt = new Date().toISOString();
   persistAll();
@@ -3918,11 +3932,19 @@ function changeTrackedClock(action) {
   const local = trackedTimeState(game);
   if (!local) return;
   const before = projectedTrackedClock(game);
+  const expectedLifecycle = game.lifecycleState || "active";
   let next = before;
   if (action === "start") next = window.LaxHornetTrackedPlayingTime.startClock(before);
   if (action === "pause") next = window.LaxHornetTrackedPlayingTime.pauseClock(before);
   if (action === "resume") next = window.LaxHornetTrackedPlayingTime.resumeClock(before);
-  updateTrackedClock(game, next, local.clockState.revision);
+  updateTrackedClock(game, next, local.clockState.revision, {
+    command: action,
+    expectedLifecycle,
+    beforeClock: before,
+  });
+  if (R207_CLOCK_COMMAND_BATCH && action === "pause") game.lifecycleState = "paused";
+  if (R207_CLOCK_COMMAND_BATCH && action === "resume") game.lifecycleState = "active";
+  persistAll();
   render();
 }
 
@@ -3939,6 +3961,7 @@ function endTrackedPeriod() {
   const local = trackedTimeState(game);
   if (!local) return;
   const projected = projectedTrackedClock(game);
+  const expectedLifecycle = game.lifecycleState || "active";
   const summary = trackedTimeSummary(game);
   const endedClock = {
     ...projected,
@@ -3960,10 +3983,22 @@ function endTrackedPeriod() {
   const nextPeriod = nextTrackedPeriod(endedClock);
   if (nextPeriod) {
     const nextClock = window.LaxHornetTrackedPlayingTime.transitionPeriod(endedClock, nextPeriod);
-    updateTrackedClock(game, nextClock, projected.revision);
+    updateTrackedClock(game, nextClock, projected.revision, {
+      command: "advance_period",
+      arguments: { next_period: nextPeriod },
+      expectedLifecycle,
+      beforeClock: projected,
+    });
+    if (R207_CLOCK_COMMAND_BATCH) game.lifecycleState = "paused";
   } else {
-    updateTrackedClock(game, endedClock, projected.revision);
+    updateTrackedClock(game, endedClock, projected.revision, {
+      command: "set_remaining",
+      arguments: { clock_seconds_remaining: 0 },
+      expectedLifecycle,
+      beforeClock: projected,
+    });
   }
+  persistAll();
   render();
   showToast(summary.onField
     ? `Shift closed at 0:00${nextPeriod ? `; ${nextPeriod} ready` : ""}`
@@ -3973,8 +4008,9 @@ function endTrackedPeriod() {
 function closeTrackedShiftForGameEnd(game) {
   const local = trackedTimeState(game);
   const summary = trackedTimeSummary(game);
-  if (!local || !summary?.onField) return false;
+  if (!local) return false;
   const baseRevision = local.clockState.revision;
+  const expectedLifecycle = game.lifecycleState || "active";
   const context = window.LaxHornetTrackedPlayingTime.gameEndClosureContext(local.clockState);
   const closedClock = window.LaxHornetTrackedPlayingTime.persistClockPosition({
     ...projectedTrackedClock(game),
@@ -3982,16 +4018,22 @@ function closeTrackedShiftForGameEnd(game) {
     pausedAt: context.occurredAt,
     clientUpdatedAt: context.occurredAt,
   }, context.occurredAt);
-  appendTrackedParticipation(game, createParticipationOperation(game, "player_out", {
-    clockState: closedClock,
-    period: context.period,
-    gameClockSeconds: context.gameClockSeconds,
-    occurredAt: context.occurredAt,
-    source: context.source,
-    systemCloseReason: context.systemCloseReason,
-  }));
-  updateTrackedClock(game, closedClock, baseRevision);
-  return true;
+  if (summary?.onField) {
+    appendTrackedParticipation(game, createParticipationOperation(game, "player_out", {
+      clockState: closedClock,
+      period: context.period,
+      gameClockSeconds: context.gameClockSeconds,
+      occurredAt: context.occurredAt,
+      source: context.source,
+      systemCloseReason: context.systemCloseReason,
+    }));
+  }
+  updateTrackedClock(game, closedClock, baseRevision, {
+    command: "complete",
+    expectedLifecycle,
+    beforeClock: projectedTrackedClock(game),
+  });
+  return summary?.onField === true;
 }
 
 function calculateTotals(events = [], player = state.player) {
@@ -4778,6 +4820,7 @@ function confirmEndGame() {
   }
   const trackedShiftClosed = closeTrackedShiftForGameEnd(state.activeGame);
   state.activeGame.status = "complete";
+  if (R207_CLOCK_COMMAND_BATCH) state.activeGame.lifecycleState = "completed";
   state.activeGame.endedAt = new Date().toISOString();
   state.activeGame.savedAt = new Date().toISOString();
   if (hasScoreContext(state.activeGame)) {
@@ -8032,6 +8075,9 @@ function durableSyncService() {
         message: "This synchronization operation is not supported.",
       };
     },
+    executeClockBatch: performR207TrackedClockBatch,
+    onClockAccepted: applyTrackedClockAcceptance,
+    onClockConflict: applyTrackedClockConflict,
   });
   return durableSyncOperationService;
 }
@@ -8558,7 +8604,302 @@ function clockResponseMatchesPayload(clockState = {}, payload = {}, initialize =
     && equalTimestamp(clockState.clientUpdatedAt, payload.client_updated_at);
 }
 
+function isR207ClockPayload(payload = {}) {
+  return payload?.contract === "r207_clock_v2"
+    && window.LaxHornetTrackedPlayingTime.CLOCK_COMMANDS.includes(payload.command)
+    && payload.gameId;
+}
+
+function unresolvedR207ClockOperations(gameId, options = {}) {
+  if (state.syncOperations?.schemaVersion !== window.LaxHornetDurableSyncOperations.SCHEMA_VERSION) {
+    return [];
+  }
+  return (state.syncOperations.operations || []).filter((operation) =>
+    operation.operationType === window.LaxHornetDurableSyncOperations.OPERATION_TYPES.clock
+    && operation.gameId === gameId
+    && operation.accountId === currentUserId()
+    && isR207ClockPayload(operation.payload)
+    && !["accepted", "superseded"].includes(operation.state)
+    && (!options.excludeOperationIds || !options.excludeOperationIds.has(operation.operationId)));
+}
+
+function r207ClockCommandAvailable(game, command) {
+  if (!R207B_CONTROLLED_PREVIEW || !R207_CLOCK_COMMAND_BATCH || !game || !currentUserId()) {
+    return false;
+  }
+  const local = trackedTimeState(game);
+  const statusVersion = Number(game.serverVersions?.statusVersion || (command === "initialize" ? 1 : 0));
+  const serverClockVersion = Number(local?.clockState?.serverClockVersion || 0);
+  if (!Number.isSafeInteger(statusVersion) || statusVersion < 1) return false;
+  if (command === "initialize") return serverClockVersion === 0;
+  return serverClockVersion >= 1
+    || unresolvedR207ClockOperations(game.id).some((operation) => operation.payload.command === "initialize");
+}
+
+function r207ClockRpcRequest(operation) {
+  const payload = operation?.payload || {};
+  if (!isR207ClockPayload(payload) || payload.gameId !== operation.gameId) return null;
+  return {
+    client_operation_id: operation.operationId,
+    device_id: operation.deviceId,
+    game_id: operation.gameId,
+    base_clock_version: payload.baseClockVersion,
+    status_base_version: payload.statusBaseVersion,
+    expected_lifecycle: payload.expectedLifecycle,
+    command: payload.command,
+    arguments: { ...(payload.arguments || {}) },
+    client_occurred_at: payload.clientOccurredAt,
+  };
+}
+
+function r207ClockReceipt(data = {}, fallbackCode = "clock_command_accepted") {
+  const serverRevision = Number(data.clock_version);
+  return {
+    code: String(data.code || fallbackCode),
+    acknowledgment: "r207_clock_command_response",
+    serverRevision: Number.isSafeInteger(serverRevision) && serverRevision >= 0
+      ? serverRevision
+      : null,
+    serverTimestamp: data.clock_state?.server_updated_at || null,
+  };
+}
+
+function r207ClockCanonical(data = {}) {
+  const clockState = data.clock_state;
+  const clockVersion = Number(data.clock_version ?? clockState?.clock_version);
+  const statusVersion = Number(data.status_version);
+  if (
+    !clockState
+    || typeof clockState !== "object"
+    || !Number.isSafeInteger(clockVersion)
+    || clockVersion < 1
+    || !Number.isSafeInteger(statusVersion)
+    || statusVersion < 1
+    || !["active", "paused", "completed"].includes(data.lifecycle_state)
+  ) {
+    return null;
+  }
+  return {
+    clockState: { ...clockState },
+    clockVersion,
+    statusVersion,
+    lifecycleState: data.lifecycle_state,
+  };
+}
+
+async function performR207TrackedClockOperation(operation) {
+  const request = r207ClockRpcRequest(operation);
+  if (!request) {
+    return { outcome: "rejected", code: "invalid_clock_operation" };
+  }
+  if (!(await r207PreviewCapabilityAvailable())) {
+    return durableSyncFailure(
+      { outcome: "rejected", code: "r207_not_activated" },
+      { source: "r207_clock_rpc" },
+    );
+  }
+  const { data, error, status } = await supabaseClient.rpc(
+    "lh_apply_game_clock_operation_v2",
+    { p_operation: request },
+  );
+  if (error) return durableSyncFailure({ error, httpStatus: status }, { source: "r207_clock_rpc" });
+  if (data?.outcome === "conflicted") {
+    return {
+      outcome: "conflicted",
+      category: window.LaxHornetDurableSyncOperations.FAILURE_CATEGORIES.conflict,
+      code: data.code || "clock_conflict",
+      receipt: r207ClockReceipt(data, "clock_conflict"),
+    };
+  }
+  if (data?.outcome !== "accepted") {
+    return durableSyncFailure(
+      { outcome: data?.outcome || "rejected", code: data?.code || "clock_rejected" },
+      { source: "r207_clock_rpc" },
+    );
+  }
+  const canonical = r207ClockCanonical(data);
+  if (!canonical || data.client_operation_id !== operation.operationId) {
+    return {
+      outcome: "conflicted",
+      category: window.LaxHornetDurableSyncOperations.FAILURE_CATEGORIES.conflict,
+      code: "clock_acknowledgment_mismatch",
+      receipt: r207ClockReceipt(data, "clock_acknowledgment_mismatch"),
+    };
+  }
+  return {
+    outcome: "accepted",
+    receipt: r207ClockReceipt(data),
+    canonical,
+  };
+}
+
+async function performR207TrackedClockBatch(operations = []) {
+  if (!operations.length || operations.some((operation) => !r207ClockRpcRequest(operation))) {
+    return { outcome: "rejected", code: "invalid_clock_batch" };
+  }
+  const gameId = operations[0].gameId;
+  const game = state.activeGame?.id === gameId
+    ? state.activeGame
+    : state.games.find((candidate) => candidate.id === gameId);
+  const local = trackedTimeState(game);
+  const baseClockVersion = Number(local?.clockState?.serverClockVersion || 0);
+  const statusBaseVersion = Number(game?.serverVersions?.statusVersion || 0);
+  if (
+    !game
+    || operations.some((operation) => operation.gameId !== gameId)
+    || !Number.isSafeInteger(baseClockVersion)
+    || baseClockVersion < 1
+    || !Number.isSafeInteger(statusBaseVersion)
+    || statusBaseVersion < 1
+  ) {
+    return { outcome: "rejected", code: "invalid_clock_batch_base" };
+  }
+  if (!(await r207PreviewCapabilityAvailable())) {
+    return durableSyncFailure(
+      { outcome: "rejected", code: "r207_not_activated" },
+      { source: "r207_clock_batch_rpc" },
+    );
+  }
+  const batch = {
+    client_batch_id: operations[0].batchId,
+    game_id: gameId,
+    base_clock_version: baseClockVersion,
+    status_base_version: statusBaseVersion,
+    expected_lifecycle: operations[0].payload.expectedLifecycle,
+    commands: operations.map((operation) => ({
+      client_operation_id: operation.operationId,
+      device_id: operation.deviceId,
+      expected_lifecycle: operation.payload.expectedLifecycle,
+      command: operation.payload.command,
+      arguments: { ...(operation.payload.arguments || {}) },
+      client_occurred_at: operation.payload.clientOccurredAt,
+    })),
+  };
+  const { data, error, status } = await supabaseClient.rpc(
+    "lh_apply_game_clock_batch_v2",
+    { p_batch: batch },
+  );
+  if (error) return durableSyncFailure({ error, httpStatus: status }, { source: "r207_clock_batch_rpc" });
+  if (data?.outcome === "conflicted") {
+    return {
+      outcome: "conflicted",
+      category: window.LaxHornetDurableSyncOperations.FAILURE_CATEGORIES.conflict,
+      code: data.code || "clock_conflict",
+      receipt: r207ClockReceipt(data, "clock_conflict"),
+    };
+  }
+  if (data?.outcome !== "accepted") {
+    return durableSyncFailure(
+      { outcome: data?.outcome || "rejected", code: data?.code || "clock_batch_rejected" },
+      { source: "r207_clock_batch_rpc" },
+    );
+  }
+  const canonical = r207ClockCanonical(data);
+  const receipts = Array.isArray(data.receipts) ? data.receipts : [];
+  const receiptById = new Map(receipts.map((receipt) => [receipt.client_operation_id, receipt]));
+  if (
+    !canonical
+    || data.client_batch_id !== operations[0].batchId
+    || receiptById.size !== operations.length
+    || operations.some((operation) => !receiptById.has(operation.operationId))
+  ) {
+    return {
+      outcome: "conflicted",
+      category: window.LaxHornetDurableSyncOperations.FAILURE_CATEGORIES.conflict,
+      code: "clock_batch_acknowledgment_mismatch",
+      receipt: r207ClockReceipt(data, "clock_batch_acknowledgment_mismatch"),
+    };
+  }
+  return {
+    outcome: "accepted",
+    canonical,
+    operationResults: operations.map((operation) => {
+      const receipt = receiptById.get(operation.operationId);
+      return {
+        operationId: operation.operationId,
+        receipt: r207ClockReceipt({
+          ...data,
+          code: receipt.code,
+          clock_version: receipt.clock_version,
+        }),
+      };
+    }),
+  };
+}
+
+function applyTrackedClockAcceptance(operations, result = {}) {
+  const accepted = Array.isArray(operations) ? operations : [operations];
+  const gameId = accepted[0]?.gameId || "";
+  const canonical = result.canonical;
+  if (!gameId || !canonical) return;
+  const acceptedIds = new Set(accepted.map((operation) => operation.operationId));
+  const hasLaterLocalCommands = unresolvedR207ClockOperations(gameId, {
+    excludeOperationIds: acceptedIds,
+  }).length > 0;
+  const apply = (game) => {
+    if (!game || game.id !== gameId) return game;
+    const local = trackedTimeState(game);
+    if (!local?.clockState) return game;
+    const clock = canonical.clockState || {};
+    const versionOnly = {
+      ...local.clockState,
+      serverClockVersion: canonical.clockVersion,
+    };
+    local.clockState = window.LaxHornetTrackedPlayingTime.normalizeClockState(
+      hasLaterLocalCommands
+        ? versionOnly
+        : {
+            ...versionOnly,
+            currentPeriod: clock.current_period,
+            clockSecondsRemaining: clock.clock_seconds_remaining,
+            isRunning: clock.is_running,
+            startedAt: clock.started_at,
+            pausedAt: clock.paused_at,
+            clientUpdatedAt: clock.client_updated_at || clock.server_updated_at,
+            recoveryState: clock.recovery_state,
+            revision: Math.max(Number(local.clockState.revision || 1), canonical.clockVersion),
+            anchorServerAt: clock.anchor_server_at,
+            anchorClockSecondsRemaining: clock.anchor_clock_seconds_remaining,
+          },
+    );
+    local.syncIssue = "";
+    game.serverVersions = {
+      ...(game.serverVersions || {}),
+      statusVersion: canonical.statusVersion,
+    };
+    if (!hasLaterLocalCommands) {
+      game.lifecycleState = canonical.lifecycleState;
+      game.status = canonical.lifecycleState === "completed" ? "complete" : "in-progress";
+      game.currentQuarter = local.clockState.currentPeriod;
+    }
+    return game;
+  };
+  state.games = state.games.map(apply);
+  state.activeGame = apply(state.activeGame);
+  state.syncStatus = "Synced";
+  persistAll();
+  render();
+}
+
+function applyTrackedClockConflict(operations) {
+  const conflicted = Array.isArray(operations) ? operations : [operations];
+  const gameId = conflicted[0]?.gameId || "";
+  const game = state.activeGame?.id === gameId
+    ? state.activeGame
+    : state.games.find((candidate) => candidate.id === gameId);
+  const local = trackedTimeState(game);
+  if (local) {
+    local.syncIssue = "The game clock changed on another device. Your clock actions are saved and need review.";
+  }
+  state.syncStatus = "Sync needs attention";
+  persistAll();
+  render();
+}
+
 async function performTrackedClockOperation(operation) {
+  if (isR207ClockPayload(operation.payload)) {
+    return performR207TrackedClockOperation(operation);
+  }
   const rpcName = String(operation.payload?.rpcName || "");
   const clockPayload = operation.payload?.clock;
   if (
@@ -8629,10 +8970,32 @@ async function performTrackedClockOperation(operation) {
       serverRevision,
       serverTimestamp: data.clockState.serverUpdatedAt || null,
     },
+    canonical: {
+      clockState: {
+        current_period: data.clockState.currentPeriod,
+        clock_seconds_remaining: data.clockState.clockSecondsRemaining,
+        is_running: data.clockState.isRunning,
+        started_at: data.clockState.startedAt,
+        paused_at: data.clockState.pausedAt,
+        client_updated_at: data.clockState.clientUpdatedAt,
+        recovery_state: data.clockState.recoveryState,
+        anchor_server_at: data.clockState.serverUpdatedAt || null,
+        anchor_clock_seconds_remaining: data.clockState.clockSecondsRemaining,
+      },
+      clockVersion: serverRevision,
+      statusVersion: Number(
+        (state.activeGame?.id === operation.gameId
+          ? state.activeGame
+          : state.games.find((game) => game.id === operation.gameId))?.serverVersions?.statusVersion || 1,
+      ),
+      lifecycleState: (state.activeGame?.id === operation.gameId
+        ? state.activeGame
+        : state.games.find((game) => game.id === operation.gameId))?.lifecycleState || "active",
+    },
   };
 }
 
-async function syncTrackedClockPayload(clockPayload) {
+async function syncTrackedClockPayload(clockPayload, commandContext = {}) {
   const accountId = currentUserId();
   const gameId = String(clockPayload?.game_id || "");
   const game = state.activeGame?.id === gameId
@@ -8642,6 +9005,53 @@ async function syncTrackedClockPayload(clockPayload) {
 
   const gameOperation = queueLegacyGameOperation(game);
   if (!gameOperation) return false;
+  const command = String(commandContext.command || "");
+  if (command && r207ClockCommandAvailable(game, command)) {
+    const afterClock = commandContext.afterClock || trackedTimeState(game)?.clockState;
+    let payload;
+    try {
+      payload = window.LaxHornetTrackedPlayingTime.clockCommandPayload(afterClock, {
+        command,
+        arguments: commandContext.arguments || {},
+        expectedLifecycle: commandContext.expectedLifecycle || game.lifecycleState || "active",
+        baseClockVersion: command === "initialize"
+          ? 0
+          : Number(
+              commandContext.beforeClock?.serverClockVersion
+              ?? afterClock?.serverClockVersion
+              ?? 0,
+            ),
+        statusBaseVersion: Number(
+          game.serverVersions?.statusVersion || (command === "initialize" ? 1 : 0),
+        ),
+      });
+    } catch {
+      return false;
+    }
+    const batchRequired = command !== "initialize"
+      && (state.isOffline || unresolvedR207ClockOperations(gameId).length > 0);
+    const clockOperation = durableSyncService().queueClock({
+      accountId,
+      gameId,
+      payload,
+      baseRevision: payload.baseClockVersion,
+      batchRequired,
+    });
+    if (!clockOperation) return false;
+    if (state.isOffline) {
+      state.syncStatus = "Saved on this phone";
+      persistAll();
+      return false;
+    }
+    await processDurableSyncOperations();
+    const accepted = durableSyncService().isAcknowledged(
+      window.LaxHornetDurableSyncOperations.OPERATION_TYPES.clock,
+      gameId,
+      payload,
+    );
+    if (accepted) trackedPlayingTimeCloudAvailability = "available";
+    return accepted;
+  }
   const initialize = Object.hasOwn(clockPayload, "period_format");
   const payload = {
     rpcName: initialize ? "lh_initialize_game_clock" : "lh_update_game_clock",
@@ -11703,8 +12113,15 @@ function renderTrackedPlayingTimeLive(game) {
       ? `<button class="btn secondary tracked-clock-button" type="button" data-action="tracked-clock-pause">Pause</button>`
       : `<button class="btn positive tracked-clock-button" type="button" data-action="${clock.startedAt ? "tracked-clock-resume" : "tracked-clock-start"}">${clock.startedAt ? "Resume" : "Start"}</button>`;
   const nextPeriod = nextTrackedPeriod(clock);
+  const clockConflict = unresolvedR207ClockOperations(game.id)
+    .some((operation) => operation.state === "conflicted");
   return `
     <section class="tracked-time-live card pad" aria-labelledby="trackedTimeLiveTitle">
+      ${clockConflict ? `
+        <p class="r207-clock-conflict-notice" role="status" aria-live="polite">
+          The game clock changed on another device. Your clock actions are saved and need review.
+        </p>
+      ` : ""}
       <div class="tracked-clock-heading">
         <div>
           <span class="eyebrow" id="trackedTimeLiveTitle">Private playing time</span>

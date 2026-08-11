@@ -48,7 +48,7 @@ jobs:
           database_candidate="$(jq -r '.databaseCandidate' release/laxhornet-release-manifest.json)"
           pre_cutover_runtime="$(jq -r '.preCutoverRuntime' release/laxhornet-release-manifest.json)"
           cleanup_candidate="$(jq -r '.cleanupCandidate' release/laxhornet-release-manifest.json)"
-          additive_paths="supabase/migrations/20260723040000_event_pipeline_capabilities.sql,supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql,supabase/migrations/20260727000000_tracked_playing_time_operations.sql,supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql,supabase/tests/tracked_playing_time_foundation.sql,supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql,supabase/rollback/20260728193942_v284_public_event_semantic_boundary_rollback.sql,supabase/tests/v284_public_event_semantic_boundary.sql,supabase/migrations/20260730004700_team_members_rls_recursion.sql,supabase/rollback/20260730004700_team_members_rls_recursion_rollback.sql,supabase/tests/team_members_rls_recursion.sql,supabase/tests/team_members_rls_recursion_reproduction.sql,supabase/migrations/20260730134439_durable_game_tombstones.sql,supabase/rollback/20260730134439_durable_game_tombstones_rollback.sql,supabase/tests/durable_game_tombstones.sql,supabase/migrations/20260730151714_durable_game_tombstone_concurrency.sql,supabase/rollback/20260730151714_durable_game_tombstone_concurrency_rollback.sql,supabase/tests/durable_game_tombstone_concurrency.sql,supabase/migrations/20260806143128_r207a_dormant_concurrency_foundation.sql,supabase/rollback/20260806143128_r207a_dormant_concurrency_foundation_rollback.sql,supabase/migrations/20260809155442_r207b_controlled_preview_integration.sql,supabase/rollback/20260809155442_r207b_controlled_preview_integration_rollback.sql,supabase/seed.sql,supabase/migrations/20260809164435_r207b_qualify_preview_game_update.sql,supabase/rollback/20260809164435_r207b_qualify_preview_game_update_rollback.sql,supabase/migrations/20260809173500_r207c_versioned_event_corrections.sql,supabase/rollback/20260809173500_r207c_versioned_event_corrections_rollback.sql,supabase/migrations/20260809201608_r207d_conflict_resolution_foundation.sql,supabase/rollback/20260809201608_r207d_conflict_resolution_foundation_rollback.sql"
+          additive_paths="supabase/migrations/20260723040000_event_pipeline_capabilities.sql,supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql,supabase/migrations/20260727000000_tracked_playing_time_operations.sql,supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql,supabase/tests/tracked_playing_time_foundation.sql,supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql,supabase/rollback/20260728193942_v284_public_event_semantic_boundary_rollback.sql,supabase/tests/v284_public_event_semantic_boundary.sql,supabase/migrations/20260730004700_team_members_rls_recursion.sql,supabase/rollback/20260730004700_team_members_rls_recursion_rollback.sql,supabase/tests/team_members_rls_recursion.sql,supabase/tests/team_members_rls_recursion_reproduction.sql,supabase/migrations/20260730134439_durable_game_tombstones.sql,supabase/rollback/20260730134439_durable_game_tombstones_rollback.sql,supabase/tests/durable_game_tombstones.sql,supabase/migrations/20260730151714_durable_game_tombstone_concurrency.sql,supabase/rollback/20260730151714_durable_game_tombstone_concurrency_rollback.sql,supabase/tests/durable_game_tombstone_concurrency.sql,supabase/migrations/20260806143128_r207a_dormant_concurrency_foundation.sql,supabase/rollback/20260806143128_r207a_dormant_concurrency_foundation_rollback.sql,supabase/migrations/20260809155442_r207b_controlled_preview_integration.sql,supabase/rollback/20260809155442_r207b_controlled_preview_integration_rollback.sql,supabase/seed.sql,supabase/migrations/20260809164435_r207b_qualify_preview_game_update.sql,supabase/rollback/20260809164435_r207b_qualify_preview_game_update_rollback.sql,supabase/migrations/20260809173500_r207c_versioned_event_corrections.sql,supabase/rollback/20260809173500_r207c_versioned_event_corrections_rollback.sql,supabase/migrations/20260809201608_r207d_conflict_resolution_foundation.sql,supabase/rollback/20260809201608_r207d_conflict_resolution_foundation_rollback.sql,supabase/migrations/20260811010813_r207_clock_command_batch_integration.sql,supabase/rollback/20260811010813_r207_clock_command_batch_integration_rollback.sql"
 
           if git merge-base --is-ancestor "$database_candidate" HEAD \
             && git merge-base --is-ancestor "$cleanup_candidate" HEAD; then
@@ -138,6 +138,9 @@ jobs:
       - name: R2-06 browser runtime and failure-envelope contracts
         run: node tools/test_r206_browser_runtime.mjs
 
+      - name: R2-07 clock command and atomic batch client
+        run: node tools/test_r207_clock_command_batch_client.mjs
+
       - name: Install ephemeral shared browser and embedded database test dependencies
         run: npm install --no-save --no-package-lock --ignore-scripts @electric-sql/pglite@0.5.4 playwright@1.61.1
 
@@ -153,6 +156,9 @@ jobs:
       - name: Install pinned Chromium for reviewed runner and browser verification
         run: node tools/r206-browser-runtime/node_modules/playwright/cli.js install --with-deps chromium
 
+      - name: R2-07 clock command and atomic batch two-context browser
+        run: node tools/test_r207_clock_command_batch_two_context_browser.cjs
+
       - name: Verify credential-free R2-06 browser readiness
         run: node tools/run_r206_synthetic_verification.mjs --check-browser-runtime
 
@@ -167,6 +173,9 @@ jobs:
 
       - name: R2-07A dormant concurrency foundation
         run: node tools/test_r207a_dormant_concurrency.mjs
+
+      - name: R2-07 clock command and atomic batch migration
+        run: node tools/test_r207_clock_command_batch_integration.mjs
 
       - name: R2-06 disposable synthetic verification
         run: node tools/test_r206_synthetic_verification_disposable.mjs
