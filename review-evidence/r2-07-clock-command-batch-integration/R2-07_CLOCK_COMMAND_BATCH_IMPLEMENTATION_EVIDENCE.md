@@ -89,9 +89,14 @@ schema, but no functional Preview/test wrapper or client route connected it.
   `13/13 PASS`. R2-07C: client `30/30`, client safety `37/37`, browser `7/7`,
   migration `25/25 PASS`. R2-07D: client `32/32`, event dismiss `13/13`, dismiss
   browser `10/10`, migration `23/23 PASS`. Tombstone concurrency: `8/8 PASS`.
-- Complete canonical-plus-additive regression, final secret/host scan, diff
-  hygiene, exact-head CI, Preview, and Vercel results are recorded after the
-  final diff/PR exists.
+- Complete canonical-plus-additive regression: `69/69 PASS`. An earlier
+  consolidated attempt exposed one pre-existing transient hydration-browser
+  `page.reload ERR_ABORTED`, which passed immediately on focused rerun, plus
+  review-package expected-list omissions fixed before the clean final run.
+  Secret/host scan and `git diff --check` passed. Zero `laxhornet-r207*`
+  containers and zero headless Playwright processes remained. Exact-head CI,
+  automatic isolated Preview, and Vercel results are recorded after the draft
+  PR exists.
 
 ## File identity
 

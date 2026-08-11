@@ -1220,8 +1220,8 @@ Do not combine these into one large Codex task. Each item requires one approved 
   matrices pass, including `390x844`, completion, offline success/conflict,
   no partial application, and no console error.
 - [x] A/B/C/D, R2-07D dismiss, tracked-time, and tombstone preservation pass.
-- [ ] Complete regression, secret/host scan, diff hygiene, and zero-residue
-  proof pass after the final documentation diff stabilizes.
+- [x] Complete regression `69/69`, secret/host scan, diff hygiene, focused
+  hydration rerun, and zero-residue proof pass.
 - [ ] Draft PR exact-head GitHub, automatic isolated Supabase Preview, and
   Vercel checks pass.
 - [ ] Independent exact-head Level 3 implementation review passes before

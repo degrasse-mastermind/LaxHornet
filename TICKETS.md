@@ -2585,8 +2585,8 @@ atomic reconnect batches.
 - [x] R2-07A `71/71`; B `32/32`, `12/12`, `13/13`; C `30/30`, `37/37`,
   `7/7`, `25/25`; D `32/32`, dismiss `13/13`, browser `10/10`, SQL
   `23/23`; tombstone concurrency `8/8` all pass.
-- [ ] Complete canonical-plus-additive regression and final hygiene pass after
-  documentation stabilizes.
+- [x] Complete canonical-plus-additive regression passes `69/69`; focused
+  hydration rerun, secret/host scan, diff hygiene, and zero-residue checks pass.
 - [ ] Draft PR exact-head CI, automatic isolated Supabase Preview, and Vercel
   Preview pass.
 - [ ] Independent exact-PR-SHA Level 3 review returns PASS before merge.
