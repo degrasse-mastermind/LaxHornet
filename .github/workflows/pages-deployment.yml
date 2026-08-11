@@ -109,6 +109,12 @@ jobs:
       - name: Run deployment safety contracts
         run: node tools/test_pages_deployment.mjs
 
+      - name: Install exact reviewed R2-07 production runtime profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e "const fs=require('fs'),crypto=require('crypto'); const source='release/r2-07-forward-migration-b-runtime-config.js'; const expected='9f3170ef6dee5cf8837162a8335c8deaf3ed7b074d168ff11dd33408f22388f8'; const bytes=fs.readFileSync(source); const actual=crypto.createHash('sha256').update(bytes).digest('hex'); if(actual!==expected) throw new Error('R2-07 runtime profile hash mismatch: '+actual); fs.copyFileSync(source,'runtime-config.js');"
+
       - name: Build allowlisted artifact
         run: node tools/build_pages_artifact.mjs --source-sha=${{ steps.source.outputs.sha }}
 
@@ -197,7 +203,11 @@ jobs:
 
       - name: Rebuild reviewed production manifest without deploying
         working-directory: deployed-source
-        run: node tools/build_pages_artifact.mjs --source-sha=${{ needs.build.outputs.production_source_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e "const fs=require('fs'),crypto=require('crypto'); const source='release/r2-07-forward-migration-b-runtime-config.js'; const expected='9f3170ef6dee5cf8837162a8335c8deaf3ed7b074d168ff11dd33408f22388f8'; const bytes=fs.readFileSync(source); const actual=crypto.createHash('sha256').update(bytes).digest('hex'); if(actual!==expected) throw new Error('R2-07 runtime profile hash mismatch: '+actual); fs.copyFileSync(source,'runtime-config.js');"
+          node tools/build_pages_artifact.mjs --source-sha=${{ needs.build.outputs.production_source_sha }}
 
       - name: Verify Pages source, custom domain, HTTPS, runtime, and cache markers
         env:

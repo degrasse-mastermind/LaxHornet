@@ -282,6 +282,14 @@ try {
     assert.match(workflow, /name: github-pages/);
     assert.match(workflow, /node tools\/build_pages_artifact\.mjs/);
     assert.match(workflow, /node tools\/validate_pages_artifact\.mjs/);
+    assert.match(workflow, /Install exact reviewed R2-07 production runtime profile/);
+    assert.match(workflow, /release\/r2-07-forward-migration-b-runtime-config\.js/);
+    assert.match(workflow, /9f3170ef6dee5cf8837162a8335c8deaf3ed7b074d168ff11dd33408f22388f8/);
+    assert.ok(
+      workflow.indexOf("Install exact reviewed R2-07 production runtime profile")
+        < workflow.indexOf("Build allowlisted artifact"),
+    );
+    assert.match(workflow, /working-directory: deployed-source[\s\S]*r2-07-forward-migration-b-runtime-config\.js[\s\S]*build_pages_artifact\.mjs/);
     assert.match(workflow, /node tools\/verify_pages_settings\.mjs/);
     assert.match(workflow, /--expected-runtime-marker=\$\{\{ needs\.build\.outputs\.release_marker \}\}/);
     assert.match(workflow, /--expected-cache-marker=\$\{\{ needs\.build\.outputs\.cache_marker \}\}/);
