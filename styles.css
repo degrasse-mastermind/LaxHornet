@@ -616,6 +616,69 @@ button:focus-visible,
   margin-top: 0;
 }
 
+.r207-conflict-list,
+.r207-conflict-item,
+.r207-conflict-values,
+.r207-patch-fields {
+  display: grid;
+  gap: var(--lh-space-3);
+}
+
+.r207-conflict-item {
+  padding-top: var(--lh-space-4);
+  border-top: 1px solid var(--lh-line-light);
+}
+
+.r207-conflict-value-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.8fr) repeat(2, minmax(0, 1fr));
+  gap: var(--lh-space-3);
+  align-items: start;
+  overflow-wrap: anywhere;
+}
+
+.r207-conflict-value-row span {
+  display: grid;
+  gap: var(--lh-space-1);
+}
+
+.r207-conflict-value-row small {
+  color: var(--lh-muted-dark);
+  font-weight: 800;
+}
+
+.r207-resolution-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--lh-space-2);
+}
+
+.r207-conflict-notice .btn.ghost {
+  border-color: rgba(17, 19, 23, 0.24);
+  color: var(--lh-text-dark);
+  background: rgba(17, 19, 23, 0.06);
+}
+
+.r207-patch-details {
+  padding: var(--lh-space-3);
+  border: 1px solid var(--lh-line-light);
+  border-radius: var(--lh-radius-md);
+  background: var(--lh-surface-raised);
+}
+
+.r207-patch-details summary {
+  min-height: var(--lh-tap-min);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.r207-patch-details .btn {
+  width: 100%;
+  margin-top: var(--lh-space-3);
+}
+
 .lh-notice,
 .lh-notice-privacy {
   border: 1px solid rgba(232, 16, 16, 0.22);
@@ -6606,6 +6669,11 @@ form.account-card,
 
   .home-next-card .action-grid.compact,
   .confirm-modal .edit-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .r207-conflict-value-row,
+  .r207-resolution-actions {
     grid-template-columns: 1fr;
   }
 

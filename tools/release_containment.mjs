@@ -67,6 +67,11 @@ export const R207C_VERSIONED_EVENT_REVIEW_DB_PATHS = Object.freeze([
   "supabase/rollback/20260809173500_r207c_versioned_event_corrections_rollback.sql",
 ]);
 
+export const R207D_CONFLICT_RESOLUTION_REVIEW_DB_PATHS = Object.freeze([
+  "supabase/migrations/20260809201608_r207d_conflict_resolution_foundation.sql",
+  "supabase/rollback/20260809201608_r207d_conflict_resolution_foundation_rollback.sql",
+]);
+
 export const APPROVED_HISTORICAL_PROVENANCE_PATHS = Object.freeze([
   "supabase/migrations/20260723010607_remote_schema.sql",
   "supabase/production-history/20260723010607_remote_schema.sql",

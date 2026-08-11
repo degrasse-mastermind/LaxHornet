@@ -65,6 +65,8 @@ const additivePaths = [
   "supabase/rollback/20260809164435_r207b_qualify_preview_game_update_rollback.sql",
   "supabase/migrations/20260809173500_r207c_versioned_event_corrections.sql",
   "supabase/rollback/20260809173500_r207c_versioned_event_corrections_rollback.sql",
+  "supabase/migrations/20260809201608_r207d_conflict_resolution_foundation.sql",
+  "supabase/rollback/20260809201608_r207d_conflict_resolution_foundation_rollback.sql",
 ].join(",");
 
 const rootJavaScript = readdirSync(root)
@@ -90,6 +92,9 @@ const tests = [
   { name: "R2-07C client safety remediation", command: process.execPath, args: ["tools/test_r207c_client_safety_remediation.mjs"] },
   { name: "R2-07C versioned event migration", command: process.execPath, args: ["tools/test_r207c_preview_migration.mjs"] },
   { name: "R2-07C two-session browser", command: process.execPath, args: ["tools/test_r207c_two_session_browser.cjs"] },
+  { name: "R2-07D conflict resolution client", command: process.execPath, args: ["tools/test_r207d_conflict_resolution_client.mjs"] },
+  { name: "R2-07D event dismiss browser", command: process.execPath, args: ["tools/test_r207d_event_dismiss_browser.cjs"] },
+  { name: "R2-07D conflict resolution migration", command: process.execPath, args: ["tools/test_r207d_preview_migration.mjs"] },
   { name: "sync error classification contracts", command: process.execPath, args: ["tools/test_sync_error_classification.mjs"] },
   { name: "sync characterization contracts", command: process.execPath, args: ["tools/test_sync_characterization.mjs"] },
   { name: "tracked playing time service contracts", command: process.execPath, args: ["tools/test_tracked_playing_time_service.mjs"] },

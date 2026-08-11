@@ -538,7 +538,8 @@
             state.conflicts[active.eventId] = {
               eventId: active.eventId, gameId: active.gameId, clientOperationId: active.clientOperationId,
               code: String(result.code || "event_conflict"), message: CONFLICT_MESSAGE,
-              serverEventVersion: Number(result.server_event_version || record.serverEventVersion), detectedAt: now(),
+              serverEventVersion: Number(result.server_event_version || record.serverEventVersion),
+              proposedValues: copy(active.payload.changes || {}), currentValues: {}, detectedAt: now(),
             };
             onConflict(active, result);
           } else if (result?.outcome === "deleted") {
@@ -557,24 +558,421 @@
       return true;
     }
 
-    function markConflictRefreshed(game, event) {
+    function markConflictRefreshed(game, event, options = {}) {
       return mutate((state) => {
         const record = recordFor(state, game, event);
         record.serverEventVersion = Number(event.serverEventVersion ?? event.server_event_version ?? record.serverEventVersion);
         record.acceptedSnapshot = eventSnapshot(event);
-        delete state.conflicts[record.eventId];
-        state.operations = state.operations.map((operation) => operation.eventId === record.eventId && operation.state === "conflicted"
-          ? { ...operation, state: "superseded" } : operation);
+        if (options.preserve === true && state.conflicts[record.eventId]) {
+          const conflict = state.conflicts[record.eventId];
+          const fields = Object.keys(conflict.proposedValues || {});
+          conflict.currentValues = Object.fromEntries(fields.map((field) => [field, copy(record.acceptedSnapshot[field])]));
+          conflict.serverEventVersion = record.serverEventVersion;
+          conflict.refreshedAt = now();
+        } else {
+          delete state.conflicts[record.eventId];
+          state.operations = state.operations.map((operation) => operation.eventId === record.eventId && operation.state === "conflicted"
+            ? { ...operation, state: "superseded" } : operation);
+        }
       });
     }
 
-    return Object.freeze({ hydrate, queueEvent, queueTombstone, process, markConflictRefreshed });
+    function resolveConflict(game, eventId, action) {
+      return mutate((state) => {
+        const conflict = state.conflicts[eventId];
+        const record = state.records[eventId];
+        if (!conflict || !record || !["keep_server", "apply_proposed", "dismiss"].includes(action)) return;
+        state.operations = state.operations.map((operation) => operation.eventId === eventId && operation.state === "conflicted"
+          ? { ...operation, state: "superseded" } : operation);
+        if (action === "apply_proposed") {
+          record.desiredSnapshot = { ...record.acceptedSnapshot, ...copy(conflict.proposedValues || {}) };
+        } else if (action === "keep_server") {
+          record.desiredSnapshot = copy(record.acceptedSnapshot);
+        }
+        delete state.conflicts[eventId];
+        if (action !== "dismiss") {
+          materialize(state, record, lifecycle(game));
+          record.updatedAt = now();
+        }
+      });
+    }
+
+    return Object.freeze({ hydrate, queueEvent, queueTombstone, process, markConflictRefreshed, resolveConflict });
   }
 
   global.LaxHornetR207EventOperations = Object.freeze({
     SCHEMA_VERSION, CURRENT_SUPPORTED_SCHEMA_VERSION, CONFLICT_MESSAGE, CLIENT_UPGRADE_REQUIRED_MESSAGE,
     EVENT_FIELDS, emptyState, isStoredState, storedSchemaVersion, requiresClientUpgrade,
     normalizeState, classifyRpcFailure, eventSnapshot, eventChanges, createEventOperationService,
+  });
+})(window);
+
+(function initializeR207ConflictResolution(global) {
+  "use strict";
+
+  const SCHEMA_VERSION = 1;
+  const ACTIONS = Object.freeze(["keep_server", "apply_proposed", "apply_patch", "dismiss"]);
+  const FIELDS = Object.freeze({
+    metadata: ["game_date", "game_type", "location", "opponent"],
+    score: ["score_against", "score_for"],
+    status: ["lifecycle_state"],
+    roster_context: ["player_id"],
+    sharing: ["is_shared"],
+    clock: ["clock_seconds_remaining", "command", "is_running"],
+  });
+  const LABELS = Object.freeze({
+    game_date: "Game date",
+    game_type: "Game type",
+    location: "Location",
+    opponent: "Opponent",
+    score_against: "Opponent score",
+    score_for: "Our score",
+    lifecycle_state: "Game status",
+    player_id: "Tracked player",
+    is_shared: "Live Share",
+    clock_seconds_remaining: "Time remaining",
+    command: "Clock action",
+    is_running: "Clock state",
+    clock: "Game clock",
+  });
+  const copy = (value) => JSON.parse(JSON.stringify(value));
+  const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  const now = () => new Date().toISOString();
+  const operationId = () => global.crypto?.randomUUID?.()
+    || `r207d-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  function emptyState(accountId = "") {
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      accountId: String(accountId || ""),
+      conflicts: {},
+      operations: [],
+      receipts: [],
+    };
+  }
+
+  function isStoredState(value) {
+    return isObject(value)
+      && Number.isInteger(Number(value.schemaVersion))
+      && typeof value.accountId === "string"
+      && isObject(value.conflicts || {})
+      && Array.isArray(value.operations || [])
+      && Array.isArray(value.receipts || []);
+  }
+
+  function requiresClientUpgrade(value) {
+    return Number(value?.schemaVersion || 0) > SCHEMA_VERSION;
+  }
+
+  function safeVersions(value = {}) {
+    if (!isObject(value)) return null;
+    const result = {};
+    for (const [key, raw] of Object.entries(value)) {
+      const number = Number(raw);
+      if (!Number.isSafeInteger(number) || number < 0) return null;
+      result[String(key)] = number;
+    }
+    return result;
+  }
+
+  function safeValue(field, value) {
+    if (["score_against", "score_for", "clock_seconds_remaining"].includes(field)) {
+      const number = Number(value);
+      return Number.isSafeInteger(number) && number >= 0 && number <= 999999 ? number : undefined;
+    }
+    if (["is_shared", "is_running"].includes(field)) return typeof value === "boolean" ? value : undefined;
+    if (field === "lifecycle_state") {
+      return ["active", "paused", "completed"].includes(value) ? value : undefined;
+    }
+    if (field === "command") {
+      return ["start", "pause", "set_remaining"].includes(value) ? value : undefined;
+    }
+    if (field === "player_id" && value === null) return "";
+    if (["game_date", "game_type", "location", "opponent", "player_id"].includes(field)) {
+      return typeof value === "string" && value.length <= 200 ? value : undefined;
+    }
+    return undefined;
+  }
+
+  function safeValues(group, value = {}) {
+    if (!isObject(value) || !FIELDS[group]) return null;
+    const result = {};
+    for (const [field, raw] of Object.entries(value)) {
+      if (!FIELDS[group].includes(field)) return null;
+      const safe = safeValue(field, raw);
+      if (safe === undefined) return null;
+      result[field] = safe;
+    }
+    return result;
+  }
+
+  function safeConflict(value = {}) {
+    const group = String(value.field_group || value.fieldGroup || "");
+    const conflictId = String(value.conflict_id || value.conflictId || "");
+    const gameId = String(value.game_id || value.gameId || "");
+    const currentValues = safeValues(group, value.current_values || value.currentValues || {});
+    const proposedValues = safeValues(group, value.proposed_values || value.proposedValues || {});
+    const serverVersions = safeVersions(value.server_versions || value.serverVersions || {});
+    const fields = Array.isArray(value.overlapping_fields || value.overlappingFields)
+      ? [...new Set((value.overlapping_fields || value.overlappingFields).map(String))].sort()
+      : [];
+    if (!conflictId || !gameId || !FIELDS[group] || !currentValues || !proposedValues || !serverVersions
+      || !fields.length || fields.some((field) => !FIELDS[group].includes(field) && field !== "clock")) {
+      return null;
+    }
+    return {
+      conflictId,
+      gameId,
+      fieldGroup: group,
+      overlappingFields: fields,
+      currentValues,
+      proposedValues,
+      serverVersions,
+      resolutionStatus: ["open", "resolved", "superseded_by_delete"].includes(value.resolution_status)
+        ? value.resolution_status
+        : "open",
+      createdAt: String(value.created_at || value.createdAt || ""),
+      resolvedAt: String(value.resolved_at || value.resolvedAt || ""),
+    };
+  }
+
+  function normalizeState(value = null, accountId = "") {
+    if (!isStoredState(value)) return emptyState(accountId);
+    if (requiresClientUpgrade(value)) return copy(value);
+    if (String(value.accountId || "") !== String(accountId || "")) return emptyState(accountId);
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      accountId: String(accountId || ""),
+      conflicts: Object.fromEntries(Object.values(value.conflicts || {})
+        .map(safeConflict).filter(Boolean).map((conflict) => [conflict.conflictId, conflict])),
+      operations: (value.operations || []).filter((operation) => isObject(operation)
+        && operation.clientResolutionOperationId && isObject(operation.request)),
+      receipts: (value.receipts || []).filter(isObject).slice(-100),
+    };
+  }
+
+  function canonicalValue(value) {
+    if (Array.isArray(value)) return value.map(canonicalValue);
+    if (!isObject(value)) return value;
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalValue(value[key])]));
+  }
+
+  async function sha256(value) {
+    const bytes = new TextEncoder().encode(JSON.stringify(canonicalValue(value)));
+    const digest = await global.crypto.subtle.digest("SHA-256", bytes);
+    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+
+  function fieldLabel(field) {
+    return LABELS[field] || "Changed field";
+  }
+
+  function formatValue(field, value) {
+    if (field === "player_id") return value ? "Selected player" : "No player selected";
+    if (field === "is_shared") return value ? "On" : "Off";
+    if (field === "is_running") return value ? "Running" : "Paused";
+    if (field === "lifecycle_state") return ({ active: "Active", paused: "Paused", completed: "Completed" })[value] || "Changed";
+    if (field === "command") return ({ start: "Start", pause: "Pause", set_remaining: "Set time" })[value] || "Changed";
+    if (field === "clock_seconds_remaining") {
+      const seconds = Number(value || 0);
+      return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+    }
+    return String(value ?? "Not set").slice(0, 160) || "Not set";
+  }
+
+  function patchableFields(conflict = {}) {
+    return (conflict.overlappingFields || []).filter((field) => [
+      "game_date", "game_type", "location", "opponent", "score_against",
+      "score_for", "lifecycle_state", "is_shared", "clock_seconds_remaining",
+    ].includes(field));
+  }
+
+  function createConflictResolutionService(hooks = {}) {
+    const getState = hooks.getState;
+    const setState = hooks.setState;
+    const persistState = hooks.persistState;
+    const currentAccountId = hooks.currentAccountId;
+    const read = hooks.read;
+    const resolveRpc = hooks.resolve;
+    const isOffline = hooks.isOffline;
+    const onChange = typeof hooks.onChange === "function" ? hooks.onChange : () => {};
+    let processing = null;
+    if (![getState, setState, persistState, currentAccountId, read, resolveRpc, isOffline]
+      .every((value) => typeof value === "function")) {
+      throw new TypeError("R2-07D conflict resolution hooks are incomplete");
+    }
+
+    function writableState() {
+      const source = getState();
+      if (requiresClientUpgrade(source)) return null;
+      return normalizeState(source, currentAccountId());
+    }
+
+    function save(next) {
+      setState(next);
+      const saved = persistState(next) === true;
+      if (saved) onChange();
+      return saved;
+    }
+
+    function clearGameConflicts(next, gameId) {
+      next.conflicts = Object.fromEntries(Object.entries(next.conflicts)
+        .filter(([, conflict]) => conflict.gameId !== gameId));
+    }
+
+    function revokeGame(next, gameId, code = "authorization_denied") {
+      clearGameConflicts(next, gameId);
+      next.operations = next.operations.map((operation) => operation.gameId === gameId
+        ? { ...operation, state: "blocked", lastError: { code } }
+        : operation);
+    }
+
+    async function load(gameId) {
+      if (!gameId || isOffline()) return false;
+      const accountId = String(currentAccountId() || "");
+      if (!accountId || !writableState()) return false;
+      let response;
+      try {
+        response = await read({ game_id: String(gameId), include_resolved: false });
+      } catch (error) {
+        return false;
+      }
+      if (String(currentAccountId() || "") !== accountId) return false;
+      const next = writableState();
+      if (!next) return false;
+      if (response?.outcome === "accepted" && Array.isArray(response.conflicts)) {
+        clearGameConflicts(next, String(gameId));
+        response.conflicts.map(safeConflict).filter(Boolean).forEach((conflict) => {
+          next.conflicts[conflict.conflictId] = conflict;
+        });
+      } else if (["deleted", "rejected"].includes(response?.outcome)
+        && ["game_deleted", "authorization_denied"].includes(response?.code)) {
+        revokeGame(next, String(gameId), String(response.code));
+      } else {
+        return false;
+      }
+      return save(next);
+    }
+
+    async function queue(conflictId, action, patch = {}) {
+      const next = writableState();
+      if (!next || !ACTIONS.includes(action)) return false;
+      const conflict = next.conflicts[conflictId];
+      if (!conflict || conflict.resolutionStatus !== "open") return false;
+      const safePatch = action === "apply_patch" ? safeValues(conflict.fieldGroup, patch) : {};
+      if (action === "apply_patch" && (!safePatch || !Object.keys(safePatch).length)) return false;
+      const request = {
+        client_resolution_operation_id: operationId(),
+        conflict_id: conflict.conflictId,
+        game_id: conflict.gameId,
+        action,
+        expected_versions: copy(conflict.serverVersions),
+        patch: safePatch || {},
+        client_created_at: now(),
+      };
+      request.request_hash = await sha256(request);
+      next.operations.push({
+        accountId: next.accountId,
+        clientResolutionOperationId: request.client_resolution_operation_id,
+        conflictId: conflict.conflictId,
+        gameId: conflict.gameId,
+        state: "pending",
+        attempts: 0,
+        request: copy(request),
+        createdAt: request.client_created_at,
+        lastError: null,
+      });
+      if (!save(next)) return false;
+      return process();
+    }
+
+    async function run() {
+      if (isOffline()) return false;
+      const accountId = String(currentAccountId() || "");
+      const snapshot = writableState();
+      if (!snapshot || !accountId) return false;
+      for (const queued of snapshot.operations.filter((item) => item.accountId === accountId
+        && ["pending", "retryable"].includes(item.state))) {
+        let active;
+        const attempting = writableState();
+        if (!attempting) return false;
+        active = attempting.operations.find((item) => item.clientResolutionOperationId === queued.clientResolutionOperationId);
+        if (!active) continue;
+        active.state = "attempting";
+        active.attempts += 1;
+        active.lastAttemptAt = now();
+        save(attempting);
+        let response;
+        try {
+          response = await resolveRpc(copy(active.request));
+        } catch (error) {
+          const failure = global.LaxHornetR207EventOperations.classifyRpcFailure(error);
+          if (String(currentAccountId() || "") !== accountId) return false;
+          const failed = writableState();
+          const operation = failed?.operations.find((item) => item.clientResolutionOperationId === active.clientResolutionOperationId);
+          if (operation) {
+            operation.state = failure.retryable ? "retryable" : "blocked";
+            operation.lastError = { code: failure.code };
+            save(failed);
+          }
+          continue;
+        }
+        if (String(currentAccountId() || "") !== accountId) return false;
+        const next = writableState();
+        if (!next) return false;
+        const operation = next.operations.find((item) => item.clientResolutionOperationId === active.clientResolutionOperationId);
+        if (!operation) continue;
+        if (response?.outcome === "accepted") {
+          delete next.conflicts[operation.conflictId];
+          next.receipts.push({
+            clientResolutionOperationId: operation.clientResolutionOperationId,
+            conflictId: operation.conflictId,
+            code: String(response.code || "resolution_applied"),
+            persistedAt: now(),
+          });
+          next.receipts = next.receipts.slice(-100);
+          next.operations = next.operations.filter((item) => item !== operation);
+        } else if (response?.outcome === "conflicted" && response.code === "resolution_stale") {
+          delete next.conflicts[operation.conflictId];
+          const replacement = safeConflict(response.conflict || {});
+          if (replacement) next.conflicts[replacement.conflictId] = replacement;
+          operation.state = "conflicted";
+          operation.lastError = { code: "resolution_stale" };
+        } else if (response?.outcome === "deleted" || response?.code === "game_deleted") {
+          revokeGame(next, operation.gameId, "game_deleted");
+        } else {
+          const failure = global.LaxHornetR207EventOperations.classifyRpcFailure(response || {});
+          operation.state = failure.retryable ? "retryable" : "blocked";
+          operation.lastError = { code: failure.code };
+          if (response?.code === "authorization_denied") revokeGame(next, operation.gameId);
+        }
+        save(next);
+      }
+      return true;
+    }
+
+    function process() {
+      if (!processing) processing = run().finally(() => { processing = null; });
+      return processing;
+    }
+
+    return Object.freeze({ load, queue, process });
+  }
+
+  global.LaxHornetR207ConflictResolution = Object.freeze({
+    SCHEMA_VERSION,
+    ACTIONS,
+    FIELDS,
+    emptyState,
+    isStoredState,
+    requiresClientUpgrade,
+    normalizeState,
+    safeConflict,
+    safeValues,
+    fieldLabel,
+    formatValue,
+    patchableFields,
+    createConflictResolutionService,
   });
 })(window);
 

@@ -13,6 +13,7 @@ import {
   R207A_DORMANT_CONCURRENCY_REVIEW_DB_PATHS,
   R207B_CONTROLLED_PREVIEW_REVIEW_DB_PATHS,
   R207C_VERSIONED_EVENT_REVIEW_DB_PATHS,
+  R207D_CONFLICT_RESOLUTION_REVIEW_DB_PATHS,
   TEAM_MEMBERS_RLS_REMEDIATION_DB_PATHS,
   TRACKED_PLAYING_TIME_REVIEW_DB_PATHS,
   V284_PUBLIC_EVENT_BOUNDARY_DB_PATHS,
@@ -1103,6 +1104,7 @@ if (requireCombined) {
         ...R207A_DORMANT_CONCURRENCY_REVIEW_DB_PATHS,
         ...R207B_CONTROLLED_PREVIEW_REVIEW_DB_PATHS,
         ...R207C_VERSIONED_EVENT_REVIEW_DB_PATHS,
+        ...R207D_CONFLICT_RESOLUTION_REVIEW_DB_PATHS,
       ],
       headRef: combinedRef,
     });
@@ -1140,6 +1142,8 @@ const allowedCleanupMigrations = new Set([
   ...R207B_CONTROLLED_PREVIEW_REVIEW_DB_PATHS.filter((file) =>
     file.startsWith("supabase/migrations/")),
   ...R207C_VERSIONED_EVENT_REVIEW_DB_PATHS.filter((file) =>
+    file.startsWith("supabase/migrations/")),
+  ...R207D_CONFLICT_RESOLUTION_REVIEW_DB_PATHS.filter((file) =>
     file.startsWith("supabase/migrations/")),
 ]);
 for (const file of cleanupMigrations) {
