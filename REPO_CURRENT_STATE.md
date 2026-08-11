@@ -11,9 +11,12 @@ R2-07A through R2-07D merged; the historical R2-07E disposable certification
 failed because public/client clock command-batch integration was absent;
 clock remediation later merged as
 `b7269194a4ce8b9068b0d46c44d840efc4048c69`. Fresh R2-07E V2 disposable
-integrated certification is in progress on an evidence-only branch: focused
-synthetic PostgreSQL/client/browser matrices pass, while exact-head regression,
-CI, and independent certification review remain required. Production remains
+integrated certification product and evidence/CI gates pass on an evidence-only
+branch: a fresh PostgreSQL 17 complete-chain gate applies all 17 migrations,
+executes all 14 applicable zero-evidence rollbacks, and exact-head hosted
+regression/Docker/Vercel checks pass; Supabase Preview is truthfully not
+applicable because the PR changes no Supabase source. Independent exact-head
+certification review remains required. Production remains
 v285 with all R2-07 controls false; R2-07F is not authorized.
 
 This file is the concise orientation document for ChatGPT, Codex, and human reviewers. Update it after an approved feature changes architecture, behavior, data contracts, deployment, or verification requirements. Do not use it as a substitute for inspecting the code.

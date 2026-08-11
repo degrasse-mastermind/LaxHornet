@@ -1265,7 +1265,10 @@ Do not combine these into one large Codex task. Each item requires one approved 
 - [x] Pass integrated concurrency, conflict, offline, account, revocation,
   future-schema, sanitization, RLS/privacy, disclosure, browser/accessibility,
   performance-structure, and A/B/C/D preservation gates.
-- [ ] Pass complete regression and exact-head draft-PR CI.
+- [x] Pass hosted complete regression `69/69`, Docker, Vercel, Preview
+  Comments, diff hygiene, and fresh disposable complete-chain migration/
+  rollback proof; classify the evidence-only PR's skipped Supabase Preview as
+  `NOT APPLICABLE` without claiming automatic Preview migration verification.
 - [ ] Obtain independent exact-SHA Level 3 integrated-certification PASS.
 - [ ] Stop before R2-07F; production release requires separate authorization.
 

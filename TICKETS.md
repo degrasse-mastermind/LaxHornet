@@ -2660,7 +2660,11 @@ Evidence:
   revocation, future-schema, sanitization, RLS/privacy, disclosure, browser,
   accessibility, query-plan, and preservation gates pass on disposable
   synthetic infrastructure.
-- [ ] Exact final certification head passes complete regression and CI.
+- [x] Evidence-fix source/tooling head passes hosted complete regression
+  `69/69`, Docker, Vercel, Preview Comments, clean diff hygiene, and a fresh
+  disposable PostgreSQL 17 complete chain `17/17` with applicable rollbacks
+  `14/14`; Supabase Preview is explicitly `NOT APPLICABLE` for the
+  evidence/tooling-only diff and reported `SKIPPED` without creating a branch.
 - [ ] Independent exact-SHA integrated-certification review returns PASS.
 - [ ] R2-07F remains blocked pending separate production-release authorization.
 
