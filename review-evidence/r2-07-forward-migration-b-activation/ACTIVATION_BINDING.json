@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "status": "R2-07 FORWARD MIGRATION B ACTIVATION ARTIFACT READY FOR EXACT-HEAD REVIEW",
+  "startingMainSha": "b7269194a4ce8b9068b0d46c44d840efc4048c69",
+  "certificationEvidenceSha": "c2726b0c1cd979a7af2b04bc9a0a25865f4636ea",
+  "historicalPreflightPr": 73,
+  "activation": {
+    "path": "supabase/migrations/20260811131043_r207_forward_migration_b_activation.sql",
+    "sha256": "d0bcb9b10c976c21ec67af52eb4dcc76f71d98853ab85cd6bfcefd632fe1c6ff",
+    "capabilityBefore": false,
+    "capabilityAfter": true,
+    "transactional": true,
+    "replayBehavior": "R207_ACTIVATION_ALREADY_APPLIED"
+  },
+  "recovery": {
+    "path": "supabase/rollback/20260811131043_r207_forward_migration_b_activation_rollback.sql",
+    "sha256": "651396438c3c8b2407810e0172d9ab704d49439b348c8c822166d518b050882d",
+    "mode": "fail_closed_forward_recovery",
+    "restoresLegacyMutation": false
+  },
+  "client": {
+    "activatedConfigPath": "release/r2-07-forward-migration-b-runtime-config.js",
+    "activatedConfigSha256": "9f3170ef6dee5cf8837162a8335c8deaf3ed7b074d168ff11dd33408f22388f8",
+    "runtimeClientSetSha256": "130eb9811c052ea892fcb02a7952a5471fbfe3e0ceb565c481d2d040aa0dbbaf",
+    "runtimeClientFiles": {
+      "app.html": "76e9d32f21e5b896ed342723049cc498a5de30ae2298ff6157fc4075d2824cd2",
+      "app.js": "ca833c471c584837652702493ea05150b4f33e7a8f2724230310bc7dffbe2717",
+      "event-operation-service.js": "186fe19dd20e322735b410ba56e72b5d20e8c2827ce7f7fc119b4be451c13646",
+      "tracked-playing-time-service.js": "c09d62c4723bfc21e19f90d135178aa8a84f7b8be17d37126b1323aa72c4a3bc",
+      "runtime-config.js": "92feed04afb519687b503a11fa647860df6157d54379c9cc5fd39453114c439b",
+      "release/r2-07-forward-migration-b-runtime-config.js": "9f3170ef6dee5cf8837162a8335c8deaf3ed7b074d168ff11dd33408f22388f8"
+    }
+  },
+  "preActivationCatalog": {
+    "relationShapeMd5": "4529b8192848e429d76d67d6021d78be",
+    "v1Signature": "public.laxhornet_sync_game(jsonb)",
+    "v1FunctionMd5": "54b6ca6bf4752f1bb3ef2fe98ae1e393",
+    "v1PostActivationFunctionMd5": "5ed65c9a743d18d894389940402f5331",
+    "expectedMigrationCount": 17,
+    "expectedR207EvidenceCount": 0
+  },
+  "grants": {
+    "removed": [
+      "INSERT UPDATE DELETE public.games from PUBLIC anon authenticated",
+      "INSERT UPDATE DELETE public.events from PUBLIC anon authenticated",
+      "EXECUTE public.laxhornet_delete_game(text) from PUBLIC anon authenticated",
+      "EXECUTE public.laxhornet_delete_event(text) from PUBLIC anon authenticated",
+      "EXECUTE public.lh_initialize_game_clock(jsonb) from PUBLIC anon authenticated",
+      "EXECUTE public.lh_update_game_clock(jsonb) from PUBLIC anon authenticated",
+      "EXECUTE public.lh_reconcile_game_clock(jsonb) from PUBLIC anon authenticated"
+    ],
+    "addedOrRetained": [
+      "EXECUTE public.laxhornet_sync_game(jsonb) to authenticated as rejection-only stub",
+      "EXECUTE reviewed R2-07 v2 write/read/resolution RPCs to authenticated",
+      "existing SELECT and Live Share grants unchanged",
+      "EXECUTE public.laxhornet_delete_game_durable(jsonb) retained for R2-06 tombstone authority"
+    ]
+  },
+  "production": {
+    "connectedForMutation": false,
+    "migrationApplied": false,
+    "capabilityChanged": false,
+    "grantsChanged": false,
+    "runtimeDeployed": false,
+    "releaseMarkerChanged": false,
+    "cacheMarkerChanged": false,
+    "smokeStarted": false
+  }
+}

@@ -1168,6 +1168,7 @@ test(
         state,
         supabaseClient,
         uniqueIds: (values = []) => [...new Set(values.filter(Boolean))],
+        r207LegacyMutationAvailable: async () => true,
         reportCloudDeleteError: () => assert.fail("unexpected delete error"),
         reportCloudDeleteNeedsUpdate: () =>
           assert.fail("hidden row was unexpectedly treated as visible"),

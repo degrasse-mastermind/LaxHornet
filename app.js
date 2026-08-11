@@ -429,6 +429,7 @@ const R207B_CONTROLLED_PREVIEW = RUNTIME_CONFIG.r207bControlledPreview === true;
 const R207C_VERSIONED_EVENTS = RUNTIME_CONFIG.r207cVersionedEventCorrections === true;
 const R207D_CONFLICT_RESOLUTION = RUNTIME_CONFIG.r207dConflictResolution === true;
 const R207_CLOCK_COMMAND_BATCH = RUNTIME_CONFIG.r207ClockCommandBatch === true;
+const R207_PRODUCTION_ACTIVATION_CLIENT = RUNTIME_CONFIG.r207ProductionActivation === true;
 const SUPABASE_CONFIG = {
   url: RUNTIME_CONFIG.supabaseUrl || "https://ulbmjcvnyznvmjgpstno.supabase.co",
   publishableKey: RUNTIME_CONFIG.supabasePublishableKey || "sb_publishable_-RUc79OPosRLNP5B6JIH2A_f3I_2A0M",
@@ -1001,7 +1002,13 @@ let durableSyncOperationService = null;
 let r207FieldOperationService = null;
 let r207EventOperationService = null;
 let r207ConflictResolutionService = null;
-let r207PreviewCapabilityState = { enabled: false, checkedAt: 0, error: "" };
+let r207PreviewCapabilityState = {
+  enabled: false,
+  productionActivation: false,
+  authoritative: false,
+  checkedAt: 0,
+  error: "",
+};
 let trackedPlayingTimeService = null;
 let trackedPlayingTimeCloudAvailability = "unknown";
 let cloudGameHydrationGeneration = 0;
@@ -7963,7 +7970,9 @@ function r207EventService() {
 }
 
 function useR207VersionedEvents() {
-  return R207B_CONTROLLED_PREVIEW && R207C_VERSIONED_EVENTS;
+  return R207B_CONTROLLED_PREVIEW
+    && R207C_VERSIONED_EVENTS
+    && (!R207_PRODUCTION_ACTIVATION_CLIENT || r207ProductionActivationConfirmed());
 }
 
 function queueR207VersionedEvent(game, event) {
@@ -8095,13 +8104,18 @@ function persistR207FieldSyncState(nextState = state.r207FieldSync) {
 }
 
 function r207ConflictForGame(gameId = "") {
-  if (!R207B_CONTROLLED_PREVIEW) return null;
+  if (
+    !R207B_CONTROLLED_PREVIEW
+    || (R207_PRODUCTION_ACTIVATION_CLIENT && !r207ProductionActivationConfirmed())
+  ) return null;
   const conflict = state.r207FieldSync?.conflicts?.[gameId] || null;
   return conflict?.refreshedAt ? null : conflict;
 }
 
 function useR207ConflictResolution() {
-  return R207B_CONTROLLED_PREVIEW && R207D_CONFLICT_RESOLUTION;
+  return R207B_CONTROLLED_PREVIEW
+    && R207D_CONFLICT_RESOLUTION
+    && (!R207_PRODUCTION_ACTIVATION_CLIENT || r207ProductionActivationConfirmed());
 }
 
 function r207ServerConflictsForGame(gameId = "") {
@@ -8173,16 +8187,48 @@ async function r207PreviewCapabilityAvailable(options = {}) {
   const now = Date.now();
   if (!R207B_CONTROLLED_PREVIEW || !supabaseClient || state.isOffline) return false;
   if (!options.force && now - r207PreviewCapabilityState.checkedAt < 30_000) {
-    return r207PreviewCapabilityState.enabled;
+    return R207_PRODUCTION_ACTIVATION_CLIENT
+      ? r207ProductionActivationConfirmed()
+      : r207PreviewCapabilityState.enabled && !r207PreviewCapabilityState.productionActivation;
   }
   const { data, error } = await supabaseClient.rpc("laxhornet_r207_preview_capability");
   const value = Array.isArray(data) ? data[0] : data;
+  const enabled = value?.enabled === true;
+  const productionActivation = value?.productionActivation === true;
+  const authoritative = !error
+    && typeof value?.enabled === "boolean"
+    && typeof value?.productionActivation === "boolean"
+    && !(productionActivation && !enabled);
   r207PreviewCapabilityState = {
-    enabled: !error && value?.enabled === true && value?.productionActivation === false,
+    enabled: authoritative && enabled,
+    productionActivation: authoritative && productionActivation,
+    authoritative,
     checkedAt: now,
     error: readableSupabaseError(error),
   };
-  return r207PreviewCapabilityState.enabled;
+  return R207_PRODUCTION_ACTIVATION_CLIENT
+    ? r207ProductionActivationConfirmed()
+    : r207PreviewCapabilityState.enabled && !r207PreviewCapabilityState.productionActivation;
+}
+
+function r207ProductionActivationConfirmed() {
+  return R207_PRODUCTION_ACTIVATION_CLIENT
+    && r207PreviewCapabilityState.authoritative
+    && r207PreviewCapabilityState.enabled
+    && r207PreviewCapabilityState.productionActivation;
+}
+
+function r207DormantLegacyMutationConfirmed() {
+  return R207_PRODUCTION_ACTIVATION_CLIENT
+    && r207PreviewCapabilityState.authoritative
+    && !r207PreviewCapabilityState.enabled
+    && !r207PreviewCapabilityState.productionActivation;
+}
+
+async function r207LegacyMutationAvailable(options = {}) {
+  if (!R207_PRODUCTION_ACTIVATION_CLIENT) return true;
+  await r207PreviewCapabilityAvailable(options);
+  return r207DormantLegacyMutationConfirmed();
 }
 
 function applyR207AcceptedResult(operation, result = {}) {
@@ -8357,6 +8403,13 @@ async function performLegacyGameOperation(operation) {
       message: "The current account cannot edit this team game.",
     };
   }
+  if (!(await r207LegacyMutationAvailable())) {
+    return {
+      outcome: "rejected",
+      code: "client_upgrade_required",
+      message: window.LaxHornetR207EventOperations.CLIENT_UPGRADE_REQUIRED_MESSAGE,
+    };
+  }
   const execute = (row) => supabaseClient.rpc("laxhornet_sync_game", {
     p_operation: {
       operation_id: operation.operationId,
@@ -8398,6 +8451,15 @@ async function performLegacyGameOperation(operation) {
         serverRevision: null,
         serverTimestamp: data.deletedAt || null,
       },
+    };
+  }
+  if (data?.code === "client_upgrade_required") {
+    await r207PreviewCapabilityAvailable({ force: true });
+    state.syncStatus = "Update required";
+    return {
+      outcome: "rejected",
+      code: "client_upgrade_required",
+      message: window.LaxHornetR207EventOperations.CLIENT_UPGRADE_REQUIRED_MESSAGE,
     };
   }
   if (data?.outcome !== "accepted") {
@@ -8506,6 +8568,10 @@ async function performLegacyGameDeleteOperation(operation) {
 async function syncLegacyGameEvents(game, accountId) {
   const normalized = normalizeGame(game);
   if (!normalized.events.length) return true;
+  if (!(await r207LegacyMutationAvailable())) {
+    state.syncStatus = "Update required";
+    return false;
+  }
   let eventsPayload = normalized.events.map((event) =>
     eventToSupabaseRow({ ...event, userId: accountId }));
   let { error, skipped } = await upsertWithOptionalColumns(
@@ -8624,7 +8690,13 @@ function unresolvedR207ClockOperations(gameId, options = {}) {
 }
 
 function r207ClockCommandAvailable(game, command) {
-  if (!R207B_CONTROLLED_PREVIEW || !R207_CLOCK_COMMAND_BATCH || !game || !currentUserId()) {
+  if (
+    !R207B_CONTROLLED_PREVIEW
+    || !R207_CLOCK_COMMAND_BATCH
+    || (R207_PRODUCTION_ACTIVATION_CLIENT && !r207ProductionActivationConfirmed())
+    || !game
+    || !currentUserId()
+  ) {
     return false;
   }
   const local = trackedTimeState(game);
@@ -8912,6 +8984,13 @@ async function performTrackedClockOperation(operation) {
       message: "The saved clock operation is incomplete.",
     };
   }
+  if (!(await r207LegacyMutationAvailable())) {
+    return {
+      outcome: "rejected",
+      code: "client_upgrade_required",
+      message: window.LaxHornetR207EventOperations.CLIENT_UPGRADE_REQUIRED_MESSAGE,
+    };
+  }
   const {
     data,
     error,
@@ -9129,6 +9208,10 @@ async function syncLoggedEvent(game, event) {
   }
   const gameSynced = await syncGameToSupabase(game);
   if (!gameSynced) return false;
+  if (!(await r207LegacyMutationAvailable())) {
+    state.syncStatus = "Update required";
+    return false;
+  }
   let eventRow = eventToSupabaseRow(event);
   let detachedMissingTeam = false;
   let { error, skipped } = await upsertWithOptionalColumns("events", eventRow, [
@@ -9166,6 +9249,10 @@ async function syncLoggedEvent(game, event) {
 
 async function deleteSupabaseEvent(eventId, options = {}) {
   if (!supabaseClient || !eventId) return;
+  if (!(await r207LegacyMutationAvailable())) {
+    state.syncStatus = "Update required";
+    return false;
+  }
   const rpcResult = await supabaseClient.rpc("laxhornet_delete_event", { p_event_id: eventId });
   if (!rpcResult.error || isCloudDeleteNotFoundError(rpcResult.error, "event")) {
     forgetDeletedEvent(eventId);
@@ -16387,6 +16474,7 @@ function handleSubmit(event) {
     syncActivePlayer();
     state.reviewGameId = updatedGame.id;
     const versionedPreviewGame = R207B_CONTROLLED_PREVIEW
+      && (!R207_PRODUCTION_ACTIVATION_CLIENT || r207ProductionActivationConfirmed())
       && window.LaxHornetR207FieldOperations.hasRequiredVersions(game.serverVersions);
     if (
       versionedPreviewGame

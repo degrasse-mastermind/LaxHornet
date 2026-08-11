@@ -1438,6 +1438,9 @@
   }
 
   function classificationCode(category, sourceCode = "") {
+    if (/^client_upgrade_required$/i.test(sourceCode)) {
+      return "client_upgrade_required";
+    }
     if (
       category === FAILURE_CATEGORIES.conflict
       && /stale_clock_revision/i.test(sourceCode)
@@ -1851,6 +1854,7 @@
       /^pgrst20[0-5]$/.test(code)
       || code === "42883"
       || code === "capability_unavailable"
+      || code === "client_upgrade_required"
       || /schema cache|could not find the function|function .* does not exist|function signature|unsupported backend capability|feature not deployed|backend capability/i.test(text)
     ) {
       category = FAILURE_CATEGORIES.capabilityUnavailable;
@@ -1894,7 +1898,9 @@
           : "rejected",
       category,
       code: classificationCode(category, sourceCode),
-      message: FAILURE_MESSAGES[category],
+      message: code === "client_upgrade_required"
+        ? "Update LaxHornet before retrying. This saved operation remains on this device."
+        : FAILURE_MESSAGES[category],
       httpStatus,
       retryable,
       attentionRequired: !retryable,

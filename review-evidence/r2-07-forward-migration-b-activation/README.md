@@ -1,0 +1,90 @@
+# R2-07 Forward Migration B Activation Artifact
+
+Status: `IMPLEMENTED — EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
+
+Risk: `LEVEL 3 — MIGRATION, RLS/GRANTS, SYNCHRONIZATION, RECOVERY, RELEASE CONTROL`
+
+Starting main: `b7269194a4ce8b9068b0d46c44d840efc4048c69`
+
+R2-07E evidence: `c2726b0c1cd979a7af2b04bc9a0a25865f4636ea`
+
+## Why PR #73 stopped
+
+Historical production preflight PR #73 proved the certified 17-migration
+schema was present, the capability was dormant, all R2-07 evidence counts were
+zero, v1 remained active, and direct legacy mutation remained available. It
+correctly stopped before the first production mutation because no reviewed
+Forward Migration B or production-capable client configuration existed. PR #73
+remains unchanged historical failed-preflight evidence and supplies no
+execution authority for this artifact.
+
+## Approved activation model
+
+The additive migration binds to the exact certified migration inventory,
+relation shape, public RPC definitions, RLS/FORCE RLS state, grants, dormant
+capability, legacy v1 definition, and zero pre-activation R2-07 evidence. Any
+drift raises a stable `R207_ACTIVATION_PREFLIGHT_FAILED:*` error before cutover.
+
+Within one PostgreSQL transaction it acquires a release advisory lock, gates
+the canonical game/event/clock tables, performs the final legacy
+status-to-lifecycle reconciliation, installs the bounded v1 rejection stub,
+revokes unversioned game/event/clock authority, retains reviewed v2 and durable
+tombstone contracts, and finally enables the server capability. PostgreSQL DDL,
+ACL, function replacement, data update, and capability update commit or roll
+back together.
+
+## No dual authority and stale v1
+
+The committed postflight requires all of the following at once:
+
+- canonical capability enabled with `productionActivation: true`;
+- v1 `laxhornet_sync_game(jsonb)` executable only as a rejection stub;
+- v1 response `rejected / client_upgrade_required / update_required`;
+- no game/event direct DML for app roles;
+- no legacy event delete, game-delete wrapper, or absolute-snapshot clock RPC;
+- reviewed v2 game, event, clock, conflict read, and resolution RPCs retained.
+
+The v1 response contains no game identifier, stored row, raw exception, or
+private database detail. The durable client classifier keeps the operation and
+shows actionable update copy. The production-capable runtime profile treats
+the server capability response as authoritative, uses legacy mutation only
+after an explicit dormant response, and refuses v1 fallback after confirmed
+production activation. The checked-in default remains dormant until a separate
+R2-07F deployment authorization installs the reviewed profile.
+
+## Recovery
+
+The companion recovery SQL is intentionally not a reverse migration. It
+disables the capability, revokes v2 mutation execution, retains normal reads
+and Live Share, retains the v1 upgrade-required stub, and reasserts every
+legacy mutation revocation. It works after evidence exists and never restores
+v285 last-write-wins authority. Repair/reactivation requires a new reviewed
+forward artifact.
+
+## Disposable certification
+
+`node tools/test_r207_forward_migration_b_activation.mjs` reconstructs the
+complete certified 17-migration chain in fresh PostgreSQL 17 containers using
+synthetic adult-only fixtures. It proves:
+
+- exact preconditions accept and drift refuses;
+- v1 active/v2 dormant before cutover;
+- atomic v2 enable plus v1/direct disable;
+- bounded stale-v285 rejection with no mutation;
+- metadata, event, clock command, clock batch, conflict, and resolution paths;
+- RLS/FORCE RLS, non-enumeration, tombstone precedence, and Live Share bytes;
+- deterministic activation replay refusal;
+- injected post-capability failure rolls the entire transaction back;
+- post-evidence recovery fail-closes without restoring legacy authority;
+- zero disposable container residue.
+
+Initial focused result: `26/26 PASS`. Broader preservation and CI results are
+recorded in the draft PR and final task closeout after the exact diff stabilizes.
+
+## Production boundary
+
+No production connector was used for mutation. No migration was applied, no
+capability or grant changed, no runtime was deployed, no release/cache marker
+changed, no production data was used, and no production smoke began. This
+artifact requires a fresh reviewed R2-07F authorization and preflight before
+any production action.
