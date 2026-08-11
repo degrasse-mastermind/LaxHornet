@@ -6,13 +6,13 @@
   "historicalPreflightPr": 73,
   "cutoverGate": {
     "path": "supabase/migrations/20260811131042_r207_forward_migration_b_cutover_gate.sql",
-    "sha256": "41980999fd3b9ad813f93b8ef15305a5eb946d95b37f8d6d0a797104056499e7",
+    "sha256": "4d6018e2aae3c5f0c7aeaf4ef1817a1ab2f008348c95e7453b4a4a66ff7d998c",
     "modeAfter": "legacy",
     "productionActivation": false
   },
   "activation": {
     "path": "supabase/migrations/20260811131043_r207_forward_migration_b_activation.sql",
-    "sha256": "06089f64363e7ebd114e08e27d6dc322aaa392c257bf1bb419fc8dc847b1debd",
+    "sha256": "6ae8e7ed11bb48789658fe03052065e365b0f8059949b04db33400f386892038",
     "capabilityBefore": false,
     "capabilityAfter": true,
     "cutoverModeBefore": "legacy",
@@ -43,8 +43,11 @@
   "preActivationCatalog": {
     "relationShapeMd5": "41a0bbcbf5f3f486c14bd074635fd976",
     "policyDefinitionMd5": "0c9fc6789e1401e149592e2d8c7f0334",
-    "cutoverGateFunctionMd5": "e138afc2fef38b637dad719f85ebf122",
+    "cutoverGateFunctionMd5": "cff9d350bf904bc083d573dd762edd7f",
     "cutoverTriggerSetMd5": "54c058c1a496ca6dadebe6af88d97c87",
+    "writeAuthorizationFunctionMd5": "71fb779bdb6fbc781421eed30be8db74",
+    "writerInstrumentationFunctionMd5": "4727f35d8a21a0b167a9f9b09f76e89f",
+    "writeAuthorizationRelationMd5": "bcf664c5e4d80beca53d7998add20398",
     "v1Signature": "public.laxhornet_sync_game(jsonb)",
     "v1FunctionMd5": "b768a13ed661414af84c72f16194c0b6",
     "v1PostActivationFunctionMd5": "5ed65c9a743d18d894389940402f5331",

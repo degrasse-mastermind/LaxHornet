@@ -57,19 +57,86 @@ alter table public.r207_preview_control
   constraint r207_preview_control_cutover_mode_check
   check (cutover_mode in ('legacy', 'v2', 'fail_closed'));
 
+-- A v2 writer proves its authority with a transaction/backend-scoped row that
+-- only the reviewed SECURITY DEFINER functions can issue. Persisted rows are
+-- harmless after commit because transaction IDs are never reused concurrently.
+create table lh_sync_private.r207_write_authorizations (
+  backend_pid integer not null,
+  transaction_id xid8 not null,
+  authorized_at timestamptz not null default statement_timestamp(),
+  primary key (backend_pid, transaction_id)
+);
+
+revoke all on table lh_sync_private.r207_write_authorizations
+  from public, anon, authenticated;
+
+create or replace function lh_sync_private.r207_authorize_versioned_write()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+begin
+  delete from lh_sync_private.r207_write_authorizations
+  where backend_pid = pg_catalog.pg_backend_pid()
+     or authorized_at < statement_timestamp() - interval '1 day';
+
+  insert into lh_sync_private.r207_write_authorizations(backend_pid, transaction_id)
+  values (pg_catalog.pg_backend_pid(), pg_catalog.pg_current_xact_id())
+  on conflict do nothing;
+end;
+$function$;
+
+revoke all on function lh_sync_private.r207_authorize_versioned_write()
+  from public, anon, authenticated;
+
+-- Instrument only definitions whose exact pre-activation hashes are certified
+-- by the activation preflight. This keeps historical dormant migrations intact.
+create or replace function lh_sync_private.r207_instrument_versioned_writer(
+  p_function regprocedure
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  definition text := pg_catalog.pg_get_functiondef(p_function);
+  marker constant text := 'perform lh_sync_private.r207_authorize_versioned_write();';
+begin
+  if pg_catalog.strpos(pg_catalog.lower(definition), marker) > 0 then
+    return;
+  end if;
+  if definition !~* '[[:space:]]+begin[[:space:]]+' then
+    raise exception using errcode = 'P0001',
+      message = 'R207_VERSIONED_WRITER_INSTRUMENTATION_FAILED:' || p_function::text;
+  end if;
+  definition := pg_catalog.regexp_replace(
+    definition,
+    '[[:space:]]+begin[[:space:]]+',
+    E'\nbegin\n  perform lh_sync_private.r207_authorize_versioned_write();\n',
+    'i'
+  );
+  execute definition;
+end;
+$function$;
+
+revoke all on function lh_sync_private.r207_instrument_versioned_writer(regprocedure)
+  from public, anon, authenticated;
+
 -- A persistent isolated PR Preview may already contain an earlier reviewed
 -- activation attempt. Repair only that exact active shape by installing the
--- same unforgeable function-level marker the fresh activation installs. A
+-- same private transaction authorization the fresh activation installs. A
 -- fresh dormant target remains in legacy mode with unchanged v2 definitions.
 do $active_preview_repair$
 begin
   if coalesce((select preview_enabled from public.r207_preview_control where control_id), false) then
-    execute 'alter function public.laxhornet_sync_game_v2(jsonb) set "laxhornet.r207_versioned_write" to ''true''';
-    execute 'alter function public.laxhornet_sync_event_v2(jsonb) set "laxhornet.r207_versioned_write" to ''true''';
-    execute 'alter function public.lh_apply_game_clock_operation_v2(jsonb) set "laxhornet.r207_versioned_write" to ''true''';
-    execute 'alter function public.lh_apply_game_clock_batch_v2(jsonb) set "laxhornet.r207_versioned_write" to ''true''';
-    execute 'alter function public.laxhornet_resolve_game_conflict_v1(jsonb) set "laxhornet.r207_versioned_write" to ''true''';
-    execute 'alter function public.laxhornet_delete_game_durable(jsonb) set "laxhornet.r207_versioned_write" to ''true''';
+    perform lh_sync_private.r207_instrument_versioned_writer('public.laxhornet_sync_game_v2(jsonb)'::regprocedure);
+    perform lh_sync_private.r207_instrument_versioned_writer('public.laxhornet_sync_event_v2(jsonb)'::regprocedure);
+    perform lh_sync_private.r207_instrument_versioned_writer('public.lh_apply_game_clock_operation_v2(jsonb)'::regprocedure);
+    perform lh_sync_private.r207_instrument_versioned_writer('public.lh_apply_game_clock_batch_v2(jsonb)'::regprocedure);
+    perform lh_sync_private.r207_instrument_versioned_writer('public.laxhornet_resolve_game_conflict_v1(jsonb)'::regprocedure);
+    perform lh_sync_private.r207_instrument_versioned_writer('public.laxhornet_delete_game_durable(jsonb)'::regprocedure);
     update public.r207_preview_control set cutover_mode = 'v2' where control_id;
   end if;
 end;
@@ -83,10 +150,7 @@ set search_path = ''
 as $function$
 declare
   mode text;
-  versioned_write boolean := coalesce(
-    pg_catalog.current_setting('laxhornet.r207_versioned_write', true),
-    'false'
-  ) = 'true';
+  versioned_write boolean;
 begin
   perform pg_catalog.pg_advisory_xact_lock_shared(
     pg_catalog.hashtextextended('laxhornet:r207-forward-migration-b-activation', 0)
@@ -95,6 +159,13 @@ begin
   into mode
   from public.r207_preview_control as control
   where control.control_id;
+
+  select exists (
+    select 1
+    from lh_sync_private.r207_write_authorizations as auth_row
+    where auth_row.backend_pid = pg_catalog.pg_backend_pid()
+      and auth_row.transaction_id = pg_catalog.pg_current_xact_id()
+  ) into versioned_write;
 
   if mode = 'legacy' or (mode = 'v2' and versioned_write) then
     return case when tg_op = 'DELETE' then old else new end;

@@ -49,7 +49,7 @@ function docker(args, options = {}) {
     timeout: 180_000,
   });
   if (result.status !== 0 && !options.allowFailure) {
-    throw new Error(`${result.stdout || ""}\n${result.stderr || ""}`);
+    throw new Error(`docker exit=${result.status} signal=${result.signal || "none"}\n${result.stdout || ""}\n${result.stderr || ""}`);
   }
   return result;
 }
@@ -259,7 +259,10 @@ try {
       && releaseManifest.r207ForwardMigrationBActivation.preActivationRelationShapeMd5 === binding.preActivationCatalog.relationShapeMd5
       && releaseManifest.r207ForwardMigrationBActivation.preActivationPolicyDefinitionMd5 === binding.preActivationCatalog.policyDefinitionMd5
       && releaseManifest.r207ForwardMigrationBActivation.preActivationCutoverGateFunctionMd5 === binding.preActivationCatalog.cutoverGateFunctionMd5
-      && releaseManifest.r207ForwardMigrationBActivation.preActivationCutoverTriggerSetMd5 === binding.preActivationCatalog.cutoverTriggerSetMd5,
+      && releaseManifest.r207ForwardMigrationBActivation.preActivationCutoverTriggerSetMd5 === binding.preActivationCatalog.cutoverTriggerSetMd5
+      && releaseManifest.r207ForwardMigrationBActivation.preActivationWriteAuthorizationFunctionMd5 === binding.preActivationCatalog.writeAuthorizationFunctionMd5
+      && releaseManifest.r207ForwardMigrationBActivation.preActivationWriterInstrumentationFunctionMd5 === binding.preActivationCatalog.writerInstrumentationFunctionMd5
+      && releaseManifest.r207ForwardMigrationBActivation.preActivationWriteAuthorizationRelationMd5 === binding.preActivationCatalog.writeAuthorizationRelationMd5,
     "release manifest binds the exact activation, recovery, runtime set, and relation shape",
   );
   const loadCloudGamesSource = appSource.slice(
@@ -311,8 +314,25 @@ try {
     join pg_class as class on class.oid=trigger.tgrelid
     join pg_namespace as namespace on namespace.oid=class.relnamespace
     where namespace.nspname='public' and trigger.tgname like 'laxhornet_r207_cutover_%';`).stdout;
-  check(cutoverGateBinding === "e138afc2fef38b637dad719f85ebf122|54c058c1a496ca6dadebe6af88d97c87",
-    "pre-activation cutover gate function and triggers match the certified binding");
+  check(cutoverGateBinding === "cff9d350bf904bc083d573dd762edd7f|54c058c1a496ca6dadebe6af88d97c87",
+    "pre-activation cutover gate function and triggers match the certified binding", cutoverGateBinding);
+  const writerAuthorizationBinding = psql(main, `select
+    md5(replace(pg_get_functiondef('lh_sync_private.r207_authorize_versioned_write()'::regprocedure), chr(13), ''))||'|'||
+    md5(replace(pg_get_functiondef('lh_sync_private.r207_instrument_versioned_writer(regprocedure)'::regprocedure), chr(13), ''))||'|'||
+    md5(string_agg(attribute.attname||'|'||format_type(attribute.atttypid, attribute.atttypmod)||'|'||attribute.attnotnull::text||'|'||coalesce(pg_get_expr(default_value.adbin, default_value.adrelid),''), E'\\n' order by attribute.attnum))
+    from pg_class as class
+    join pg_namespace as namespace on namespace.oid=class.relnamespace
+    join pg_attribute as attribute on attribute.attrelid=class.oid and attribute.attnum>0 and not attribute.attisdropped
+    left join pg_attrdef as default_value on default_value.adrelid=class.oid and default_value.adnum=attribute.attnum
+    where namespace.nspname='lh_sync_private' and class.relname='r207_write_authorizations';`).stdout;
+  check(writerAuthorizationBinding === "71fb779bdb6fbc781421eed30be8db74|4727f35d8a21a0b167a9f9b09f76e89f|bcf664c5e4d80beca53d7998add20398",
+    "private versioned-writer authority matches the certified binding", writerAuthorizationBinding);
+  check(psql(main, `select
+    has_table_privilege('authenticated','lh_sync_private.r207_write_authorizations','select')::text||','||
+    has_table_privilege('authenticated','lh_sync_private.r207_write_authorizations','insert')::text||','||
+    has_function_privilege('authenticated','lh_sync_private.r207_authorize_versioned_write()','execute')::text||','||
+    has_function_privilege('anon','lh_sync_private.r207_authorize_versioned_write()','execute')::text;`).stdout === "false,false,false,false",
+    "browser roles cannot forge private versioned-writer authority");
 
   psql(main, read("migrations", migrationFile));
   psql(main, "insert into supabase_migrations.schema_migrations values ('20260811131043','r207_forward_migration_b_activation');");

@@ -25,6 +25,7 @@ declare
   ];
   actual_versions text[];
   relation_hash text;
+  authorization_relation_hash text;
   policy_hash text;
   signature text;
   expected_hash text;
@@ -103,6 +104,26 @@ begin
       message = 'R207_ACTIVATION_PREFLIGHT_FAILED:RELATION_SHAPE_DRIFT:' || coalesce(relation_hash, 'null');
   end if;
 
+  select pg_catalog.md5(pg_catalog.string_agg(
+    attribute.attname || '|' || pg_catalog.format_type(attribute.atttypid, attribute.atttypmod)
+      || '|' || attribute.attnotnull::text || '|'
+      || coalesce(pg_catalog.pg_get_expr(default_value.adbin, default_value.adrelid), ''),
+    E'\n' order by attribute.attnum
+  ))
+  into authorization_relation_hash
+  from pg_catalog.pg_class as class
+  join pg_catalog.pg_namespace as namespace on namespace.oid = class.relnamespace
+  join pg_catalog.pg_attribute as attribute
+    on attribute.attrelid = class.oid and attribute.attnum > 0 and not attribute.attisdropped
+  left join pg_catalog.pg_attrdef as default_value
+    on default_value.adrelid = class.oid and default_value.adnum = attribute.attnum
+  where namespace.nspname = 'lh_sync_private'
+    and class.relname = 'r207_write_authorizations';
+  if authorization_relation_hash is distinct from 'bcf664c5e4d80beca53d7998add20398' then
+    raise exception using errcode = 'P0001',
+      message = 'R207_ACTIVATION_PREFLIGHT_FAILED:WRITE_AUTHORITY_SHAPE_DRIFT';
+  end if;
+
   select pg_catalog.md5(pg_catalog.string_agg(policy.item, E'\n' order by policy.item))
   into policy_hash
   from (
@@ -151,7 +172,9 @@ begin
     select binding.signature, binding.expected_hash
     from (values
       ('public.laxhornet_sync_game(jsonb)', 'b768a13ed661414af84c72f16194c0b6'),
-      ('public.laxhornet_r207_cutover_write_gate()', 'e138afc2fef38b637dad719f85ebf122'),
+      ('public.laxhornet_r207_cutover_write_gate()', 'cff9d350bf904bc083d573dd762edd7f'),
+      ('lh_sync_private.r207_authorize_versioned_write()', '71fb779bdb6fbc781421eed30be8db74'),
+      ('lh_sync_private.r207_instrument_versioned_writer(regprocedure)', '4727f35d8a21a0b167a9f9b09f76e89f'),
       ('public.laxhornet_r207_preview_capability()', 'c72cc295ab1536e8ae361901bd1228bd'),
       ('public.laxhornet_sync_game_v2(jsonb)', '7b053d29f37620c6e1f2334a5f58c944'),
       ('public.laxhornet_sync_event_v2(jsonb)', '0414e1bd5f1ac670e1da9c533a9c5e5a'),
@@ -181,6 +204,27 @@ begin
         message = 'R207_ACTIVATION_PREFLIGHT_FAILED:FUNCTION_DRIFT:' || signature;
     end if;
   end loop;
+
+  if pg_catalog.has_table_privilege(
+      'authenticated', 'lh_sync_private.r207_write_authorizations', 'select')
+    or pg_catalog.has_table_privilege(
+      'authenticated', 'lh_sync_private.r207_write_authorizations', 'insert')
+    or pg_catalog.has_table_privilege(
+      'authenticated', 'lh_sync_private.r207_write_authorizations', 'update')
+    or pg_catalog.has_table_privilege(
+      'authenticated', 'lh_sync_private.r207_write_authorizations', 'delete')
+    or pg_catalog.has_table_privilege(
+      'anon', 'lh_sync_private.r207_write_authorizations', 'select')
+    or pg_catalog.has_function_privilege(
+      'authenticated', 'lh_sync_private.r207_authorize_versioned_write()', 'execute')
+    or pg_catalog.has_function_privilege(
+      'authenticated', 'lh_sync_private.r207_instrument_versioned_writer(regprocedure)', 'execute')
+    or pg_catalog.has_function_privilege(
+      'anon', 'lh_sync_private.r207_authorize_versioned_write()', 'execute')
+  then
+    raise exception using errcode = 'P0001',
+      message = 'R207_ACTIVATION_PREFLIGHT_FAILED:WRITE_AUTHORITY_GRANT_DRIFT';
+  end if;
 
   for relation_name, expected_force in
     select binding.relation_name, binding.expected_force
@@ -546,21 +590,19 @@ grant execute on function public.laxhornet_resolve_game_conflict_v1(jsonb)
   to authenticated;
 
 -- The inert pre-cutover triggers reject canonical mutation in v2 mode unless
--- the reviewed versioned entrypoint marks its transaction. Function-level SET
--- applies before the first statement in each RPC and cannot be supplied by a
--- browser caller.
-alter function public.laxhornet_sync_game_v2(jsonb)
-  set "laxhornet.r207_versioned_write" to 'true';
-alter function public.laxhornet_sync_event_v2(jsonb)
-  set "laxhornet.r207_versioned_write" to 'true';
-alter function public.lh_apply_game_clock_operation_v2(jsonb)
-  set "laxhornet.r207_versioned_write" to 'true';
-alter function public.lh_apply_game_clock_batch_v2(jsonb)
-  set "laxhornet.r207_versioned_write" to 'true';
-alter function public.laxhornet_resolve_game_conflict_v1(jsonb)
-  set "laxhornet.r207_versioned_write" to 'true';
-alter function public.laxhornet_delete_game_durable(jsonb)
-  set "laxhornet.r207_versioned_write" to 'true';
+-- the reviewed SECURITY DEFINER entrypoint issues the private transaction row.
+select lh_sync_private.r207_instrument_versioned_writer(
+  'public.laxhornet_sync_game_v2(jsonb)'::regprocedure);
+select lh_sync_private.r207_instrument_versioned_writer(
+  'public.laxhornet_sync_event_v2(jsonb)'::regprocedure);
+select lh_sync_private.r207_instrument_versioned_writer(
+  'public.lh_apply_game_clock_operation_v2(jsonb)'::regprocedure);
+select lh_sync_private.r207_instrument_versioned_writer(
+  'public.lh_apply_game_clock_batch_v2(jsonb)'::regprocedure);
+select lh_sync_private.r207_instrument_versioned_writer(
+  'public.laxhornet_resolve_game_conflict_v1(jsonb)'::regprocedure);
+select lh_sync_private.r207_instrument_versioned_writer(
+  'public.laxhornet_delete_game_durable(jsonb)'::regprocedure);
 
 update public.r207_preview_control
 set preview_enabled = true,
