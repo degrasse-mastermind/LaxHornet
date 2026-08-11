@@ -547,6 +547,15 @@ The verified Windows local migration workflow is documented in `docs/LOCAL_SUPAB
   v285 writes. It changes no release/cache marker and remains unapplied and
   undeployed pending exact-head CI, independent review, merge decision, fresh
   production authorization, and a new preflight.
+- A later read-only R2-07F production gate found the sole known blocker was RLS
+  policy digest drift: certified `0c9fc6789e1401e149592e2d8c7f0334`
+  versus production `e7bc2b4dab7dda61af7967dad18b50ca`. Exact catalog
+  comparison proved production has 12 unversioned team-wide game/event/clock
+  policies beyond the certified 11. The repository-only Level 3 branch
+  `codex/r207-policy-reconciliation` adds a fail-closed policy-only prerequisite,
+  re-versions the still-unapplied activation package after it, and changes no
+  runtime, release/cache marker, or production state. Merge, a fresh authorized
+  production preflight, and all production actions remain separate gates.
 - There is no general-purpose Node.js or Python application server.
 - Do not introduce a separate backend server when Supabase Auth, Postgres/RLS, RPCs, Realtime, or Edge Functions meet the requirement.
 - The repository cache marker is `laxhornet-v285`. The updated service worker purges

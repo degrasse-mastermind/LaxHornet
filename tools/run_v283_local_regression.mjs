@@ -70,9 +70,10 @@ const additivePaths = [
   "supabase/migrations/20260811010813_r207_clock_command_batch_integration.sql",
   "supabase/rollback/20260811010813_r207_clock_command_batch_integration_rollback.sql",
   "supabase/migrations/20260811131042_r207_forward_migration_b_cutover_gate.sql",
-  "supabase/migrations/20260811131043_r207_forward_migration_b_activation.sql",
-  "supabase/migrations/20260811131044_r207_forward_migration_b_postactivation_verification.sql",
-  "supabase/rollback/20260811131043_r207_forward_migration_b_activation_rollback.sql",
+  "supabase/migrations/20260811211414_r207_pre_activation_policy_reconciliation.sql",
+  "supabase/migrations/20260811211415_r207_forward_migration_b_activation.sql",
+  "supabase/migrations/20260811211416_r207_forward_migration_b_postactivation_verification.sql",
+  "supabase/rollback/20260811211415_r207_forward_migration_b_activation_rollback.sql",
 ].join(",");
 
 const rootJavaScript = readdirSync(root)
@@ -104,7 +105,12 @@ const tests = [
   { name: "R2-07 clock command and batch client", command: process.execPath, args: ["tools/test_r207_clock_command_batch_client.mjs"] },
   { name: "R2-07 clock command and batch migration", command: process.execPath, args: ["tools/test_r207_clock_command_batch_integration.mjs"] },
   { name: "R2-07 clock command and batch browser", command: process.execPath, args: ["tools/test_r207_clock_command_batch_two_context_browser.cjs"] },
-  { name: "R2-07 Forward Migration B activation", command: process.execPath, args: ["tools/test_r207_forward_migration_b_activation.mjs"] },
+  {
+    name: "R2-07 Forward Migration B activation",
+    command: process.execPath,
+    args: ["tools/test_r207_forward_migration_b_activation.mjs"],
+    timeoutMs: 600000,
+  },
   { name: "sync error classification contracts", command: process.execPath, args: ["tools/test_sync_error_classification.mjs"] },
   { name: "sync characterization contracts", command: process.execPath, args: ["tools/test_sync_characterization.mjs"] },
   { name: "tracked playing time service contracts", command: process.execPath, args: ["tools/test_tracked_playing_time_service.mjs"] },
@@ -212,7 +218,7 @@ for (const test of tests) {
   const result = spawnSync(test.command, test.args, {
     cwd: root,
     encoding: "utf8",
-    timeout: 180000,
+    timeout: test.timeoutMs || 180000,
     env: {
       ...process.env,
       LAXHORNET_RELEASE_BASE_REF: baseRef,

@@ -10,9 +10,18 @@
     "modeAfter": "legacy",
     "productionActivation": false
   },
+  "policyReconciliation": {
+    "path": "supabase/migrations/20260811211414_r207_pre_activation_policy_reconciliation.sql",
+    "sha256": "1bf988db7e097f45f26592cad9845aec3c463826f00551e93d43515cff075495",
+    "observedPolicyDefinitionMd5": "e7bc2b4dab7dda61af7967dad18b50ca",
+    "reconciledPolicyDefinitionMd5": "0c9fc6789e1401e149592e2d8c7f0334",
+    "dropsExactPolicyCount": 12,
+    "productionActivation": false,
+    "replayBehavior": "verified_no_op_on_exact_certified_digest"
+  },
   "activation": {
-    "path": "supabase/migrations/20260811131043_r207_forward_migration_b_activation.sql",
-    "sha256": "6ae8e7ed11bb48789658fe03052065e365b0f8059949b04db33400f386892038",
+    "path": "supabase/migrations/20260811211415_r207_forward_migration_b_activation.sql",
+    "sha256": "5e714a33602f1a39cadf306361f0d94a909b11b355408de8c60235b73f61cb78",
     "capabilityBefore": false,
     "capabilityAfter": true,
     "cutoverModeBefore": "legacy",
@@ -21,13 +30,13 @@
     "replayBehavior": "R207_ACTIVATION_ALREADY_APPLIED"
   },
   "postActivationVerification": {
-    "path": "supabase/migrations/20260811131044_r207_forward_migration_b_postactivation_verification.sql",
+    "path": "supabase/migrations/20260811211416_r207_forward_migration_b_postactivation_verification.sql",
     "sha256": "7bdf456e464d7437e1a4bb84d7602ac6b7a43302c70f7175e263d2f7c5d54ece",
     "mutatesState": false,
     "requiresActivatedExactState": true
   },
   "recovery": {
-    "path": "supabase/rollback/20260811131043_r207_forward_migration_b_activation_rollback.sql",
+    "path": "supabase/rollback/20260811211415_r207_forward_migration_b_activation_rollback.sql",
     "sha256": "b009054726010d947b04df29f58e0d3dd51c7a0101efc6218a94ef64b9f0e3be",
     "mode": "fail_closed_forward_recovery",
     "cutoverModeAfter": "fail_closed",
@@ -57,7 +66,7 @@
     "v1Signature": "public.laxhornet_sync_game(jsonb)",
     "v1FunctionMd5": "b768a13ed661414af84c72f16194c0b6",
     "v1PostActivationFunctionMd5": "5ed65c9a743d18d894389940402f5331",
-    "expectedMigrationCount": 18,
+    "expectedMigrationCount": 19,
     "expectedR207EvidenceCount": 0
   },
   "grants": {

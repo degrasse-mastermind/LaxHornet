@@ -1,0 +1,19 @@
+{
+  "differenceCount": 12,
+  "onlyDifferenceType": "extra policy",
+  "classification": "semantic drift",
+  "differences": [
+    "public.events.events_delete_team", "public.events.events_insert_team",
+    "public.events.events_select_team", "public.events.events_update_team",
+    "public.games.games_delete_team", "public.games.games_insert_team",
+    "public.games.games_select_team", "public.games.games_update_team",
+    "public.lh_game_clock_states.lh_game_clock_states_delete_team",
+    "public.lh_game_clock_states.lh_game_clock_states_insert_team",
+    "public.lh_game_clock_states.lh_game_clock_states_select_team",
+    "public.lh_game_clock_states.lh_game_clock_states_update_team"
+  ],
+  "expectedDefinition": "No policy with this name exists in the certified 18-migration catalog.",
+  "productionDefinitionsAndDigests": "See PRODUCTION_POLICY_INVENTORY.json extraPolicies.",
+  "semanticProof": "The disposable exact-digest fixture showed a team member with no roster-player claim could see the private team game and event before reconciliation (1,1), but saw neither after reconciliation (0,0). The certified policies require personal authority, sharing, platform review, or laxhornet_can_track_roster_player for the exact roster player. Clock policies are also unversioned drift, although direct browser table privileges are absent in the certified grant envelope.",
+  "canonicalizationOnlyDifferences": 0
+}

@@ -6,9 +6,10 @@ import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
 const image = "postgres:17-alpine";
-const migrationFile = "20260811131043_r207_forward_migration_b_activation.sql";
-const verificationFile = "20260811131044_r207_forward_migration_b_postactivation_verification.sql";
-const recoveryFile = "20260811131043_r207_forward_migration_b_activation_rollback.sql";
+const reconciliationFile = "20260811211414_r207_pre_activation_policy_reconciliation.sql";
+const migrationFile = "20260811211415_r207_forward_migration_b_activation.sql";
+const verificationFile = "20260811211416_r207_forward_migration_b_postactivation_verification.sql";
+const recoveryFile = "20260811211415_r207_forward_migration_b_activation_rollback.sql";
 const migrations = [
   "20260723000000_laxhornet_legacy_baseline.sql",
   "20260723010000_trust_spine_release_1.sql",
@@ -31,6 +32,8 @@ const migrations = [
 ];
 const OWNER = "00000000-0000-4000-8000-00000000000a";
 const OTHER = "00000000-0000-4000-8000-00000000000b";
+const TEAM_MEMBER = "00000000-0000-4000-8000-00000000000c";
+const TEAM_TRACKER = "00000000-0000-4000-8000-00000000000d";
 const NOW_MINUS_ONE_SECOND = new Date(Date.now() - 1_000).toISOString();
 const NOW = new Date().toISOString();
 const containers = new Set();
@@ -83,6 +86,7 @@ function psqlAsync(container, sql) {
 const read = (folder, name) => fs.readFileSync(path.join(root, "supabase", folder, name), "utf8");
 const claims = (actor) => `select set_config('request.jwt.claims', '{"sub":"${actor}","role":"authenticated"}', false); set role authenticated;`;
 const parse = (text) => JSON.parse(text.split(/\r?\n/).reverse().find((line) => line.startsWith("{")));
+const lastLine = (text) => text.split(/\r?\n/).filter(Boolean).at(-1) || "";
 const hash = (value) => Buffer.from(String(value)).toString("hex").padEnd(64, "0").slice(0, 64);
 const gitBlobSha256 = (filePath) => crypto.createHash("sha256")
   .update(Buffer.from(fs.readFileSync(filePath, "utf8").replace(/\r\n/g, "\n"), "utf8"))
@@ -136,6 +140,82 @@ async function start(label, migrationNames = migrations) {
     psql(container, `insert into supabase_migrations.schema_migrations values ('${match[1]}','${match[2]}');`);
   }
   return container;
+}
+
+function installProductionPolicyDrift(container) {
+  psql(container, `
+    create policy events_delete_team on public.events for delete to authenticated using (
+      exists (select 1 from public.team_members tm where tm.team_id = events.team_id and tm.user_id = auth.uid())
+    );
+    create policy events_insert_team on public.events for insert to authenticated with check (
+      exists (select 1 from public.team_members tm where tm.team_id = events.team_id and tm.user_id = auth.uid())
+    );
+    create policy events_select_team on public.events for select to authenticated using (
+      exists (select 1 from public.team_members tm where tm.team_id = events.team_id and tm.user_id = auth.uid())
+    );
+    create policy events_update_team on public.events for update to authenticated using (
+      exists (select 1 from public.team_members tm where tm.team_id = events.team_id and tm.user_id = auth.uid())
+    ) with check (
+      exists (select 1 from public.team_members tm where tm.team_id = events.team_id and tm.user_id = auth.uid())
+    );
+    create policy games_delete_team on public.games for delete to authenticated using (
+      exists (select 1 from public.team_members tm where tm.team_id = games.team_id and tm.user_id = auth.uid())
+    );
+    create policy games_insert_team on public.games for insert to authenticated with check (
+      exists (select 1 from public.team_members tm where tm.team_id = games.team_id and tm.user_id = auth.uid())
+    );
+    create policy games_select_team on public.games for select to authenticated using (
+      exists (select 1 from public.team_members tm where tm.team_id = games.team_id and tm.user_id = auth.uid())
+    );
+    create policy games_update_team on public.games for update to authenticated using (
+      exists (select 1 from public.team_members tm where tm.team_id = games.team_id and tm.user_id = auth.uid())
+    ) with check (
+      exists (select 1 from public.team_members tm where tm.team_id = games.team_id and tm.user_id = auth.uid())
+    );
+    create policy lh_game_clock_states_delete_team on public.lh_game_clock_states for delete to authenticated using (
+      exists (select 1 from public.team_members tm where tm.team_id = lh_game_clock_states.team_id and tm.user_id = auth.uid())
+    );
+    create policy lh_game_clock_states_insert_team on public.lh_game_clock_states for insert to authenticated with check (
+      exists (select 1 from public.team_members tm where tm.team_id = lh_game_clock_states.team_id and tm.user_id = auth.uid())
+    );
+    create policy lh_game_clock_states_select_team on public.lh_game_clock_states for select to authenticated using (
+      exists (select 1 from public.team_members tm where tm.team_id = lh_game_clock_states.team_id and tm.user_id = auth.uid())
+    );
+    create policy lh_game_clock_states_update_team on public.lh_game_clock_states for update to authenticated using (
+      exists (select 1 from public.team_members tm where tm.team_id = lh_game_clock_states.team_id and tm.user_id = auth.uid())
+    ) with check (
+      exists (select 1 from public.team_members tm where tm.team_id = lh_game_clock_states.team_id and tm.user_id = auth.uid())
+    );
+  `);
+}
+
+function applyPolicyReconciliation(container) {
+  installProductionPolicyDrift(container);
+  psql(container, read("migrations", reconciliationFile));
+  psql(container, "insert into supabase_migrations.schema_migrations values ('20260811211414','r207_pre_activation_policy_reconciliation');");
+}
+
+async function startReconciled(label) {
+  const container = await start(label);
+  applyPolicyReconciliation(container);
+  return container;
+}
+
+function policyDigest(container) {
+  return psql(container, `select md5(string_agg(policy.item,E'\\n' order by policy.item)) from (
+    select class.relname||'|'||rule.polname||'|'||rule.polpermissive::text||'|'||rule.polcmd::text||'|'||coalesce((
+      select string_agg(case when role_oid=0 then 'PUBLIC' else pg_get_userbyid(role_oid) end,',' order by role_oid)
+      from unnest(rule.polroles) role_oid
+    ),'')||'|'||coalesce(pg_get_expr(rule.polqual,rule.polrelid),'')||'|'||coalesce(pg_get_expr(rule.polwithcheck,rule.polrelid),'') item
+    from pg_policy rule join pg_class class on class.oid=rule.polrelid
+    join pg_namespace namespace on namespace.oid=class.relnamespace
+    where namespace.nspname='public' and class.relname=any(array[
+      'games','events','legacy_game_tombstones','r207_preview_control','game_sync_operations',
+      'game_sync_operation_attempts','game_field_changes','game_conflicts','game_conflict_resolutions',
+      'legacy_event_sync_operations','legacy_event_sync_operation_attempts','legacy_event_field_changes',
+      'legacy_event_tombstones','lh_game_clock_states','game_clock_commands','game_clock_batches'
+    ])
+  ) policy;`).stdout;
 }
 
 function gameInsert(game, owner = OWNER) {
@@ -246,6 +326,8 @@ try {
   }).join("\n");
   check(
     gitBlobSha256(path.join(root, binding.cutoverGate.path)) === binding.cutoverGate.sha256
+      && gitBlobSha256(path.join(root, binding.policyReconciliation.path))
+        === binding.policyReconciliation.sha256
       && gitBlobSha256(path.join(root, binding.activation.path)) === binding.activation.sha256
       && gitBlobSha256(path.join(root, binding.postActivationVerification.path))
         === binding.postActivationVerification.sha256
@@ -256,6 +338,8 @@ try {
   );
   check(
     releaseManifest.r207ForwardMigrationBActivation.cutoverGateMigrationSha256 === binding.cutoverGate.sha256
+      && releaseManifest.r207ForwardMigrationBActivation.policyReconciliationMigrationSha256
+        === binding.policyReconciliation.sha256
       && releaseManifest.r207ForwardMigrationBActivation.activationMigrationSha256 === binding.activation.sha256
       && releaseManifest.r207ForwardMigrationBActivation.postActivationVerificationMigrationSha256
         === binding.postActivationVerification.sha256
@@ -294,7 +378,8 @@ try {
   const main = await start("main");
   psql(main, `
     insert into auth.users(id,email) values
-      ('${OWNER}','owner@example.invalid'),('${OTHER}','other@example.invalid');
+      ('${OWNER}','owner@example.invalid'),('${OTHER}','other@example.invalid'),
+      ('${TEAM_MEMBER}','member@example.invalid'),('${TEAM_TRACKER}','tracker@example.invalid');
     ${gameInsert("metadata-game")}
     ${gameInsert("event-game")}
     ${gameInsert("clock-single")}${clockInsert("clock-single")}
@@ -302,7 +387,28 @@ try {
     ${gameInsert("conflict-game")}
     ${gameInsert("deleted-game")}
     ${gameInsert("recovery-race")}
+    insert into public.teams(id,name,invite_code,created_by)
+      values ('policy-team','Synthetic Adult Team','POLICY01','${OWNER}');
+    insert into public.team_members(id,team_id,user_id,role)
+      values ('policy-member','policy-team','${TEAM_MEMBER}','member'),
+        ('policy-tracker','policy-team','${TEAM_TRACKER}','member');
+    insert into public.roster_players(id,team_id,name,number)
+      values ('policy-player','policy-team','Synthetic Adult','00');
+    insert into public.player_claims(id,team_id,roster_player_id,user_id)
+      values ('policy-claim','policy-team','policy-player','${TEAM_TRACKER}');
+    insert into public.games(id,user_id,team_id,roster_player_id,share_code,opponent,game_date,status,lifecycle_state)
+      values ('policy-game','${OWNER}','policy-team','policy-player','POLICYGM','Private opponent','2026-08-11','in-progress','active');
+    insert into public.events(id,game_id,user_id,team_id,roster_player_id,timestamp,quarter,stat_type,stat_label,category)
+      values ('policy-event','policy-game','${OWNER}','policy-team','policy-player',statement_timestamp(),'Q1','goal','Goal','Offense');
   `);
+  installProductionPolicyDrift(main);
+  const productionPolicyHash = policyDigest(main);
+  const teamWideVisibilityBefore = lastLine(psql(main, `${claims(TEAM_MEMBER)} select
+    (select count(*) from public.games where id='policy-game')||','||
+    (select count(*) from public.events where id='policy-event'); reset role;`).stdout);
+  check(productionPolicyHash === "e7bc2b4dab7dda61af7967dad18b50ca" && teamWideVisibilityBefore === "1,1",
+    "disposable fixture exactly reproduces production drift and its broader team-member visibility",
+    `${productionPolicyHash}|${teamWideVisibilityBefore}`);
 
   const liveShareHashBefore = psql(main, "select md5(pg_get_functiondef('public.lh_public_live_share_game(text)'::regprocedure));").stdout;
   const legacy = legacyRequest("legacy-game");
@@ -339,11 +445,46 @@ try {
     has_function_privilege('anon','lh_sync_private.r207_authorize_versioned_write()','execute')::text;`).stdout === "false,false,false,false",
     "browser roles cannot forge private versioned-writer authority");
 
+  psql(main, read("migrations", reconciliationFile));
+  psql(main, "insert into supabase_migrations.schema_migrations values ('20260811211414','r207_pre_activation_policy_reconciliation');");
+  const teamWideVisibilityAfter = lastLine(psql(main, `${claims(TEAM_MEMBER)} select
+    (select count(*) from public.games where id='policy-game')||','||
+    (select count(*) from public.events where id='policy-event'); reset role;`).stdout);
+  check(teamWideVisibilityAfter === "0,0",
+    "policy reconciliation removes unclaimed team-member visibility before activation");
+  const authorityMatrix = [OWNER, TEAM_TRACKER, TEAM_MEMBER, OTHER].map((actor) => lastLine(psql(main,
+    `${claims(actor)} select (select count(*) from public.games where id='policy-game')||','||
+      (select count(*) from public.events where id='policy-event'); reset role;`).stdout)).join("|");
+  const anonProbe = psql(main, `set role anon; select
+    (select count(*) from public.games where id='policy-game')||','||
+    (select count(*) from public.events where id='policy-event'); reset role;`, true);
+  const unclaimedUpdate = lastLine(psql(main, `${claims(TEAM_MEMBER)} with changed as (
+    update public.games set opponent='must-not-write' where id='policy-game' returning 1
+  ) select count(*) from changed; reset role;`).stdout);
+  const unclaimedDelete = lastLine(psql(main, `${claims(TEAM_MEMBER)} with changed as (
+    delete from public.events where id='policy-event' returning 1
+  ) select count(*) from changed; reset role;`).stdout);
+  const unclaimedInsert = psql(main, `${claims(TEAM_MEMBER)} insert into public.events(
+    id,game_id,user_id,team_id,roster_player_id,timestamp,quarter,stat_type,stat_label,category
+  ) values ('must-not-insert','policy-game','${TEAM_MEMBER}','policy-team','policy-player',
+    statement_timestamp(),'Q1','goal','Goal','Offense'); reset role;`, true);
+  const trackerUpdate = psql(main, `begin; ${claims(TEAM_TRACKER)} update public.games
+    set opponent='authorized-current-team' where id='policy-game'; rollback;`);
+  check(authorityMatrix === "1,1|1,1|0,0|0,0" && anonProbe.status !== 0
+    && unclaimedUpdate === "0" && unclaimedDelete === "0" && unclaimedInsert.status !== 0
+    && trackerUpdate.status === 0
+    && psql(main, "select has_table_privilege('authenticated','public.lh_game_clock_states','select,insert,update,delete');").stdout === "f",
+  "post-reconciliation access matrix preserves owner/current-claim authority and blocks unclaimed, unrelated, anon, direct writes, and clock-table access");
+  psql(main, "delete from public.player_claims where id='policy-claim';");
+  const revokedVisibility = lastLine(psql(main, `${claims(TEAM_TRACKER)} select
+    (select count(*) from public.games where id='policy-game')||','||
+    (select count(*) from public.events where id='policy-event'); reset role;`).stdout);
+  check(revokedVisibility === "0,0", "revoked team claim immediately loses reconciled policy authority");
   psql(main, read("migrations", migrationFile));
-  psql(main, "insert into supabase_migrations.schema_migrations values ('20260811131043','r207_forward_migration_b_activation');");
+  psql(main, "insert into supabase_migrations.schema_migrations values ('20260811211415','r207_forward_migration_b_activation');");
   check(true, "activation preconditions accept the exact certified schema");
   psql(main, read("migrations", verificationFile));
-  psql(main, "insert into supabase_migrations.schema_migrations values ('20260811131044','r207_forward_migration_b_postactivation_verification');");
+  psql(main, "insert into supabase_migrations.schema_migrations values ('20260811211416','r207_forward_migration_b_postactivation_verification');");
   check(true, "inert post-activation verification accepts the exact committed state");
 
   const capability = parse(psql(main, `${claims(OWNER)} select public.laxhornet_r207_preview_capability()::text; reset role;`).stdout);
@@ -468,26 +609,109 @@ try {
   check(replay.status !== 0 && /R207_ACTIVATION_ALREADY_APPLIED/.test(replay.stderr),
     "activation replay deterministically refuses without recreating legacy grants");
 
-  const drift = await start("drift");
+  const alreadyReconciled = await start("reconciliation-already-applied");
+  const alreadyResult = psql(alreadyReconciled, read("migrations", reconciliationFile), true);
+  check(alreadyResult.status === 0
+    && policyDigest(alreadyReconciled) === "0c9fc6789e1401e149592e2d8c7f0334",
+  "policy reconciliation cleanly no-ops on the already-certified state");
+
+  const thirdDigest = await start("reconciliation-third-digest");
+  installProductionPolicyDrift(thirdDigest);
+  psql(thirdDigest, "drop policy events_delete_team on public.events;");
+  const thirdDigestBefore = policyDigest(thirdDigest);
+  const thirdDigestResult = psql(thirdDigest, read("migrations", reconciliationFile), true);
+  check(thirdDigestResult.status !== 0
+    && /UNRECOGNIZED_POLICY_DRIFT/.test(thirdDigestResult.stderr)
+    && policyDigest(thirdDigest) === thirdDigestBefore,
+  "unknown third policy digest refuses without adapting or mutating state");
+
+  const unexpectedPolicy = await start("reconciliation-unexpected-policy");
+  installProductionPolicyDrift(unexpectedPolicy);
+  psql(unexpectedPolicy, "create policy r207_unexpected_probe on public.games for select to authenticated using (true);");
+  const unexpectedResult = psql(unexpectedPolicy, read("migrations", reconciliationFile), true);
+  check(unexpectedResult.status !== 0 && /UNRECOGNIZED_POLICY_DRIFT/.test(unexpectedResult.stderr),
+    "one extra unexpected policy refuses");
+
+  const missingCertifiedPolicy = await start("reconciliation-missing-certified-policy");
+  installProductionPolicyDrift(missingCertifiedPolicy);
+  psql(missingCertifiedPolicy, "drop policy \"laxhornet read own or shared games\" on public.games;");
+  const missingCertifiedResult = psql(missingCertifiedPolicy, read("migrations", reconciliationFile), true);
+  check(missingCertifiedResult.status !== 0 && /UNRECOGNIZED_POLICY_DRIFT/.test(missingCertifiedResult.stderr),
+    "one missing certified policy refuses");
+
+  const alteredUsing = await start("reconciliation-altered-using");
+  installProductionPolicyDrift(alteredUsing);
+  psql(alteredUsing, "alter policy events_select_team on public.events using (true);");
+  const alteredUsingResult = psql(alteredUsing, read("migrations", reconciliationFile), true);
+  check(alteredUsingResult.status !== 0 && /UNRECOGNIZED_POLICY_DRIFT/.test(alteredUsingResult.stderr),
+    "altered USING expression refuses");
+
+  const alteredCheck = await start("reconciliation-altered-with-check");
+  installProductionPolicyDrift(alteredCheck);
+  psql(alteredCheck, "alter policy games_insert_team on public.games with check (true);");
+  const alteredCheckResult = psql(alteredCheck, read("migrations", reconciliationFile), true);
+  check(alteredCheckResult.status !== 0 && /UNRECOGNIZED_POLICY_DRIFT/.test(alteredCheckResult.stderr),
+    "altered WITH CHECK expression refuses");
+
+  const roleDrift = await start("reconciliation-role-drift");
+  installProductionPolicyDrift(roleDrift);
+  psql(roleDrift, "alter policy games_select_team on public.games to anon;");
+  const roleDriftResult = psql(roleDrift, read("migrations", reconciliationFile), true);
+  check(roleDriftResult.status !== 0 && /UNRECOGNIZED_POLICY_DRIFT/.test(roleDriftResult.stderr),
+    "policy role drift refuses");
+
+  const commandDrift = await start("reconciliation-command-drift");
+  installProductionPolicyDrift(commandDrift);
+  psql(commandDrift, `drop policy events_delete_team on public.events;
+    create policy events_delete_team on public.events for select to authenticated using (
+      exists (select 1 from public.team_members tm where tm.team_id=events.team_id and tm.user_id=auth.uid())
+    );`);
+  const commandDriftResult = psql(commandDrift, read("migrations", reconciliationFile), true);
+  check(commandDriftResult.status !== 0 && /UNRECOGNIZED_POLICY_DRIFT/.test(commandDriftResult.stderr),
+    "policy command drift refuses");
+
+  const authorizationDrift = await start("reconciliation-authorization-drift");
+  installProductionPolicyDrift(authorizationDrift);
+  psql(authorizationDrift,
+    "alter function public.laxhornet_can_track_roster_player(text,text) security invoker;");
+  const authorizationDriftResult = psql(authorizationDrift, read("migrations", reconciliationFile), true);
+  check(authorizationDriftResult.status !== 0
+    && /AUTHORIZATION_FUNCTION_DRIFT/.test(authorizationDriftResult.stderr)
+    && policyDigest(authorizationDrift) === "e7bc2b4dab7dda61af7967dad18b50ca",
+  "authorization-function drift refuses before any policy mutation");
+
+  const reconciliationFailure = await start("reconciliation-atomicity");
+  installProductionPolicyDrift(reconciliationFailure);
+  const injectedReconciliation = read("migrations", reconciliationFile).replace(
+    "-- R207_POLICY_RECONCILIATION_FAILURE_INJECTION_BOUNDARY",
+    "raise exception 'R207_SYNTHETIC_RECONCILIATION_FAILURE';",
+  );
+  const reconciliationFailureResult = psql(reconciliationFailure, injectedReconciliation, true);
+  check(reconciliationFailureResult.status !== 0
+    && /R207_SYNTHETIC_RECONCILIATION_FAILURE/.test(reconciliationFailureResult.stderr)
+    && policyDigest(reconciliationFailure) === "e7bc2b4dab7dda61af7967dad18b50ca",
+  "mid-reconciliation failure atomically restores all 12 drift policies");
+
+  const drift = await startReconciled("drift");
   psql(drift, "alter function public.laxhornet_sync_game(jsonb) security definer;");
   const driftApply = psql(drift, read("migrations", migrationFile), true);
   check(driftApply.status !== 0 && /FUNCTION_DRIFT:public.laxhornet_sync_game\(jsonb\)/.test(driftApply.stderr)
     && psql(drift, "select preview_enabled from public.r207_preview_control where control_id;").stdout === "f",
   "certified-schema drift refuses before capability activation");
 
-  const policyDrift = await start("policy-drift");
+  const policyDrift = await startReconciled("policy-drift");
   psql(policyDrift, "drop policy \"laxhornet insert own games\" on public.games; create policy r207_permissive_probe on public.games for insert to authenticated with check (true);");
   const policyDriftApply = psql(policyDrift, read("migrations", migrationFile), true);
   check(policyDriftApply.status !== 0 && /POLICY_DRIFT/.test(policyDriftApply.stderr),
     "policy-definition drift refuses before capability activation");
 
-  const rlsDrift = await start("rls-drift");
+  const rlsDrift = await startReconciled("rls-drift");
   psql(rlsDrift, "alter table public.games disable row level security;");
   const rlsDriftApply = psql(rlsDrift, read("migrations", migrationFile), true);
   check(rlsDriftApply.status !== 0 && /RLS_DRIFT:games/.test(rlsDriftApply.stderr),
     "critical-table RLS drift refuses before capability activation");
 
-  const failure = await start("failure");
+  const failure = await startReconciled("failure");
   const injected = read("migrations", migrationFile).replace(
     "-- R207_ACTIVATION_FAILURE_INJECTION_BOUNDARY",
     "do $injected$ begin raise exception 'R207_SYNTHETIC_ACTIVATION_FAILURE'; end; $injected$;",
@@ -518,7 +742,7 @@ try {
       && activeGateState === "true,false",
     "cutover gate deterministically refuses an active capability without adapting state");
 
-  const activationRace = await start("activation-race");
+  const activationRace = await startReconciled("activation-race");
   psql(activationRace, `insert into auth.users(id,email) values ('${OWNER}','race@example.invalid'); ${gameInsert("activation-race-game")}`);
   const legacyWriter = psqlAsync(activationRace, `begin;
     update public.games set opponent='legacy transaction completed' where id='activation-race-game';
@@ -532,7 +756,7 @@ try {
     "activation drains an in-flight legacy RowExclusive writer before v2 authority commits",
     `elapsed=${activationElapsedMs} stderr=${legacyWriterResult.stderr}`);
 
-  const arrivalRace = await start("activation-arrival-race");
+  const arrivalRace = await startReconciled("activation-arrival-race");
   psql(arrivalRace, `insert into auth.users(id,email) values ('${OWNER}','arrival@example.invalid');
     ${gameInsert("activation-arrival-game")}${clockInsert("activation-arrival-game")}`);
   const pausedActivationSql = read("migrations", migrationFile).replace(

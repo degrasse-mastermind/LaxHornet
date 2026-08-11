@@ -2691,6 +2691,44 @@ Evidence:
 - `review-evidence/r2-07-forward-migration-b-activation/README.md`
 - `review-evidence/r2-07-forward-migration-b-activation/ACTIVATION_BINDING.json`
 
+### R2-07F prerequisite — Production policy reconciliation
+
+Status: `IMPLEMENTED — EXACT-HEAD LEVEL 3 REVIEW REQUIRED`
+
+Risk level: `LEVEL 3`
+
+Branch: `codex/r207-policy-reconciliation`
+
+Starting main: `429b0352d969ba2a4f8ac4ce11429e35094f5673`
+
+#### Goal
+
+Reconcile only the exact 12 unversioned, semantically broader production RLS
+policies proven by read-only forensic comparison, restoring the certified
+pre-activation policy digest before any fresh R2-07F preflight or production
+activation is authorized.
+
+#### Acceptance
+
+- [x] Independently reproduce certified `0c9fc6789e1401e149592e2d8c7f0334`
+  and production `e7bc2b4dab7dda61af7967dad18b50ca` digests.
+- [x] Prove all 12 differences are extra semantic drift and no certified policy
+  differs canonically or semantically.
+- [x] Add one fail-closed, transactional, policy-only prerequisite that accepts
+  only the exact observed production catalog and leaves capability dormant.
+- [x] Reproduce actual drift in PostgreSQL 17, prove narrower access, then pass
+  the complete reconciliation → activation → inert-verifier chain.
+- [x] Permanently test unknown/extra/missing/expression/role/command/helper drift,
+  idempotent refusal, atomic rollback, RLS/FORCE RLS, and zero residue.
+- [ ] Exact-head CI is green and independent exact-head Level 3 review passes.
+- [ ] Merge, fresh production preflight, reconciliation application, Forward
+  Migration B application, deployment, and activation remain unauthorized.
+
+Evidence:
+
+- `review-evidence/r2-07-pre-activation-policy-reconciliation/README.md`
+- `review-evidence/r2-07-pre-activation-policy-reconciliation/POLICY_DIFF.json`
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets
