@@ -23,18 +23,22 @@ Branch: `feature/r2-07e-integrated-certification`
 
 ## Exact-SHA binding
 
-The complete ordered migration/rollback list, exact Git-blob SHA-256 values,
+The complete ordered 16-migration/13-rollback repository list, exact Git-blob SHA-256 values,
 runtime hashes, release/cache markers, and default-disabled capability values
 are recorded in `BASELINE_MANIFEST.md`.
 
 ## Disposable environment and production boundary
 
 The executed probe used one disposable `postgres:17-alpine` container, a
-Supabase-compatible `auth.uid()`/JWT role harness, the complete repository
-migration chain through R2-07D, one synthetic adult account, and no network
-connection to any Supabase project. The password was a fixed synthetic-only
-fixture value. No production credentials, data, user identity, youth/player
-record, Vercel deployment, or production host was used.
+Supabase-compatible `auth.uid()`/JWT role harness, and the 14 migrations
+applicable to that isolated clock probe through R2-07D. It excludes the
+comment-only remote-schema marker and the environment-specific team-members
+ACL preflight migration, neither of which defines a clock wrapper. The complete
+16-migration/13-rollback inventory remains independently hashed in
+`BASELINE_MANIFEST.md`. The probe used one synthetic adult account and no
+network connection to any Supabase project. The password was a fixed
+synthetic-only fixture value. No production credentials, data, user identity,
+youth/player record, Vercel deployment, or production host was used.
 
 ## Material finding
 
@@ -66,8 +70,8 @@ Command:
 Result: `4/4 CONFIRMED`; process exit `0` means the material gap was reproduced,
 not that R2-07E passed.
 
-- Preview-enabled exact migration chain leaves online clock wrapper dormant.
-- Preview-enabled exact migration chain leaves offline clock-batch wrapper
+- Preview-enabled applicable migration chain leaves online clock wrapper dormant.
+- Preview-enabled applicable migration chain leaves offline clock-batch wrapper
   dormant.
 - No post-R2-07A migration replaces the dormant wrappers.
 - Client runtime has no clock-command/batch path.
