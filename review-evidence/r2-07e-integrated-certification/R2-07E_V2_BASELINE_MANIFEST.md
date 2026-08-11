@@ -82,4 +82,3 @@ identities and records, and isolated local browser contexts. Test tooling is
 bound to localhost/container endpoints and does not consume a Supabase project
 connector, production URL, production credential, production data, Vercel
 deployment, or GitHub Pages host. No production connectivity is authorized.
-
