@@ -351,7 +351,11 @@ try {
   const failedApply = psql(failure, injected, true);
   const failedState = psql(failure, `select preview_enabled::text||','||
     has_table_privilege('authenticated','public.games','update')::text||','||
-    (md5(pg_get_functiondef('public.laxhornet_sync_game(jsonb)'::regprocedure))='54b6ca6bf4752f1bb3ef2fe98ae1e393')::text
+    (md5(replace(
+      pg_get_functiondef('public.laxhornet_sync_game(jsonb)'::regprocedure),
+      chr(13),
+      ''
+    ))='b768a13ed661414af84c72f16194c0b6')::text
     from public.r207_preview_control where control_id;`).stdout;
   check(failedApply.status !== 0 && /R207_SYNTHETIC_ACTIVATION_FAILURE/.test(failedApply.stderr)
     && failedState === "false,true,true",
