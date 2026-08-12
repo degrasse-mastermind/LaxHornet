@@ -2902,7 +2902,7 @@ authorized merge. No Docker-based verification is permitted.
 
 ## LH-25 — Atomic scored-event command
 
-Status: `APPROVED — IMPLEMENTATION`
+Status: `REVIEW`
 
 Risk level: `LEVEL 3`
 
@@ -2987,7 +2987,7 @@ split-transaction risk.
 - `docs/LH25_ATOMIC_SCORED_EVENT_CONTRACT.md`
 - `supabase/migrations/*_atomic_scored_event_command.sql`
 - `supabase/rollback/*_atomic_scored_event_command_rollback.sql`
-- `tools/test_atomic_scored_event_command.mjs`
+- `tools/test_atomic_scored_event_embedded.mjs`
 - `event-operation-service.js`
 - `app.js`
 - focused JavaScript/PostgreSQL test runners
@@ -2997,7 +2997,7 @@ split-transaction risk.
 ```powershell
 node --check app.js
 node --check event-operation-service.js
-node tools/test_atomic_scored_event_command.mjs
+node tools/test_atomic_scored_event_embedded.mjs
 node tools/test_event_operation_service.mjs
 node tools/test_r207c_event_client.mjs
 node tools/test_r207_clock_command_batch.mjs
@@ -3024,22 +3024,32 @@ git diff --check
 
 ### Completion record
 
-Commit/PR: Pending
+Commit/PR: Draft PR #78; final no-Docker head pending push.
 
-Files changed: Pending
+Files changed: Additive migration/rollback, atomic event queue integration,
+default-off runtime/Preview flag, portable workflow and release containment,
+contract/evidence, embedded SQL and client tests.
 
-Focused checks: Pending
+Focused checks: Atomic client `13/13`; embedded atomic transaction matrix
+`18/18`; exact activation binding `5/5`; release manifest validation PASS;
+existing event, R2-07, auth, clock, conflict, and tracked-time focused suites
+PASS on the implementation chain.
 
-Broad checks or CI: Pending
+Broad checks or CI: Supabase Preview successfully applied the migration on the
+prior PR #78 head. The final no-Docker head requires fresh portable CI,
+Supabase Preview, Vercel Preview, and exact-SHA independent review.
 
-Known limitations: Pending
+Known limitations: Embedded PostgreSQL does not prove real concurrent sessions.
+Concurrent same-base serialization and zero-evidence rollback must be probed by
+the independent reviewer against the isolated Supabase Preview branch.
 
 Production or external state changed: `NO`
 
 `REPO_CURRENT_STATE.md` updated: `NOT REQUIRED UNTIL MERGE/ACTIVATION`
 
-Remaining work: Implementation, exact-SHA review, and separately authorized
-merge/release.
+Remaining work: Push the no-Docker head, verify Preview/portable CI, integrate
+the vNext UX branch, complete browser QA, and obtain exact-SHA review. Merge and
+release remain separately authorized.
 
 ## Ticket template
 

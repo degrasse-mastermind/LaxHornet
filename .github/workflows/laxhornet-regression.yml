@@ -176,8 +176,8 @@ jobs:
       - name: R2-07 Forward Migration B exact binding
         run: node tools/test_r207_forward_migration_b_activation.mjs --binding-only
 
-      - name: LH-25 atomic scored-event PostgreSQL matrix
-        run: node tools/test_atomic_scored_event_command.mjs
+      - name: LH-25 embedded atomic scored-event matrix
+        run: node tools/test_atomic_scored_event_embedded.mjs
 
       - name: R2-06 disposable synthetic verification
         run: node tools/test_r206_synthetic_verification_disposable.mjs
