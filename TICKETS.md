@@ -3051,6 +3051,102 @@ Remaining work: Independent exact-PR-SHA Level 3 review, including adversarial
 multi-session probes against the isolated Preview branch. Merge, production
 activation, and release remain separately unauthorized.
 
+## LH-24 — vNext production UX overhaul
+
+Branch: `codex/vnext-production-ux-overhaul`
+
+Approved starting SHA: `3b866d35d48fc2d54837952241de237d785523cf`
+
+Goal:
+
+Apply the approved sporty vNext mobile interaction and visual direction to the
+current v288 production architecture while preserving local-first capture,
+R2-07 operations and conflicts, authoritative clock behavior, tracked playing
+time, auth startup, authorization, disclosure, and PWA/release controls.
+
+In scope:
+
+- Home, Track, Games, Season, and More app-shell information architecture.
+- Pregame quarters/halves and suggested or custom regulation duration using the
+  existing tracked-time clock model.
+- Live scoreboard, clock, unmistakable Player In/Out state, event controls,
+  last-action correction, and completion presentation.
+- Saved-game cards and a Snapshot, Story, Evidence review composition.
+- Focused adversarial tests, mobile/browser QA, accessibility inspection, and
+  one full local Level 3 regression after the final diff stabilizes.
+
+Critical invariants:
+
+- Do not introduce a second game, timer, event, participation, sync, conflict,
+  authorization, or disclosure model.
+- Keep event capture synchronous and locally durable before governed cloud work.
+- Keep the Supabase auth-state callback synchronous and render authenticated UI
+  before deferred cloud hydration.
+- Preserve permanent operation identity, receipts, retries, replay, versioned
+  corrections, tombstones, clock batching, conflict review, and lifecycle
+  enforcement.
+- Do not change migrations, RLS, grants, production data, activation flags,
+  release/cache markers, Pages deployment controls, or production deployment.
+
+Acceptance criteria:
+
+- The integration map in `docs/VNEXT_PRODUCTION_UX_INTEGRATION_MAP.md` identifies
+  the production owners, change, risk, and verification for all 34 requested
+  areas.
+- The mobile UI follows the approved Home, Track, Games, Season, More hierarchy
+  and feels fast, athletic, high-contrast, and usable one-handed outdoors.
+- Newly started games use the existing authoritative tracked clock and show an
+  explicit game-structure summary before entry to Live mode.
+- OFF FIELD visibly locks ordinary event controls and `logEvent()` independently
+  rejects a stale or delegated invocation through the production gate.
+- Game Review is organized as Snapshot, Story, Evidence and the Story surface
+  presents traceable recorded facts without unsupported claims.
+- Needs Attention remains distinct from local, syncing, synced, and rejected
+  states and is never auto-adjudicated.
+- Existing focused and complete local regressions pass, or every failure is
+  reported without weakening tests.
+- A draft pull request is opened for independent exact-PR-SHA Level 3 review;
+  no merge or deployment occurs.
+
+Stopped subsection:
+
+- Goal/Assist event plus score coupling and its Undo cannot be made server-atomic
+  with the currently separate R2-07 event and score-field RPC transactions.
+  `LH-24` preserves the current locally atomic behavior but does not claim the
+  requested cross-contract guarantee. The integration map documents the minimum
+  additive idempotent composite server command required for a follow-up ticket.
+
+Implementation record:
+
+- Reworked the production vanilla app shell, Home, setup, live tracker, Games,
+  Game Review, Season, and More surfaces without adding a framework, dependency,
+  data model, timer, sync path, or disclosure path.
+- New games initialize the existing private tracked-time clock, start paused and
+  OFF FIELD, and preserve the production event gate, local operation journal,
+  R2-07 command/batch path, and correction/tombstone behavior.
+- Added deterministic Snapshot, Story, and Evidence review modes. Story copy is
+  built only from recorded events, periods, timestamps, score context, and event
+  IDs and explicitly refuses unsupported player or coaching inference.
+- Browser QA passed the authenticated synthetic lifecycle `33/33` at 390x844
+  and 1280x900, and secure disclosure passed `73/73` with zero hosted Supabase
+  requests and no browser-console errors. In-app Browser checks also passed at
+  390x844 and 1440x900 with no horizontal overflow or framework overlay.
+- The stabilized complete regression reported `61 passed, 9 failed`. After the
+  CI-pinned ephemeral PGlite dependency was installed, five environment-only
+  failures passed in focused reruns; the one UX-sensitive secure-disclosure
+  browser failure was corrected and passed. The remaining three failures were
+  reproduced unchanged on the approved starting SHA: stale v285/current-release
+  assertions and an exact historical `app.html` hash binding that already
+  differs on v288 main. Tests were not weakened to conceal those baseline gaps.
+- No migration, rollback, RLS, grant, RPC, backend configuration, production
+  access, production write, release/cache marker, manifest, Pages configuration,
+  merge, or deployment occurred. `REPO_CURRENT_STATE.md` remains unchanged
+  because this review branch has not changed current production state.
+- Merge/release recommendation: `REVISE`. The UI branch is ready for independent
+  exact-SHA review, but the stopped atomic Goal/Assist plus score contract needs
+  a separately approved additive server-command ticket before the full request
+  can be represented as production-complete.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets
