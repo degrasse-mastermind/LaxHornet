@@ -2729,6 +2729,94 @@ Evidence:
 - `review-evidence/r2-07-pre-activation-policy-reconciliation/README.md`
 - `review-evidence/r2-07-pre-activation-policy-reconciliation/POLICY_DIFF.json`
 
+## LH-26 — v288 release-control baseline reconciliation
+
+Status: `REVIEW`
+
+Risk level: `LEVEL 3`
+
+Branch: `codex/lh-26-release-baseline-reconciliation`
+
+### Goal
+
+Restore fail-closed release and activation verification after the authorized
+v286-v288 releases advanced current runtime files beyond historical v285 and
+R2-07 activation evidence. Preserve every historical binding at its exact
+reviewed/deployed SHA while validating the current v288 runtime independently.
+
+### In scope
+
+- Reconcile stale `v285` manifest/stylesheet query markers on root public HTML
+  pages to the already-current `v288` release marker.
+- Make the post-R2-06 test verify v285 runtime bytes at the recorded v285
+  deployed SHA and current runtime identity against `version.json`.
+- Make R2-07 activation certification verify its immutable runtime hash set at
+  the exact reviewed runtime SHA, while continuing to exercise current client
+  invariants and the disposable activation database matrix.
+- Add no runtime behavior, release bump, deployment, schema, or production
+  state change.
+
+### Current behavior
+
+On clean `main` at `3b866d35d48fc2d54837952241de237d785523cf`,
+`tools/test_update_release.mjs` reports 16 stale root-page query markers,
+`tools/test_post_r206_stabilization_release.mjs` compares current v288 files to
+historical v285 expectations, and
+`tools/test_r207_forward_migration_b_activation.mjs` compares the current
+`app.html` to the immutable pre-v286 reviewed hash. These are independently
+reproduced baseline failures, not changes caused by LH-25 or the vNext UX.
+
+### Acceptance criteria
+
+- Current root HTML release-controlled asset query markers match `version.json`
+  (`v288`) without changing `version.json`, service-worker cache names, the
+  release manifest, or production runtime configuration.
+- Historical v285 assertions read exact bytes from the recorded v285 deployed
+  SHA; current assertions validate current v288 bytes.
+- Historical R2-07 activation client hashes read exact bytes from reviewed
+  runtime SHA `844db75ef6d0d42af474290dd0f160679bf07af8`.
+- Current authentication/activation invariants and disposable database
+  certification remain exercised rather than bypassed.
+- The three previously failing tests pass, broader release controls pass, and
+  `git diff --check` passes.
+- A draft PR receives independent exact-PR-SHA Level 3 review before merge.
+
+### Level 3 critical surface and rollback
+
+- Critical surface: release/cache verification and immutable activation
+  evidence interpretation.
+- The change must not rewrite historical evidence or weaken exact-byte checks;
+  it changes the ref at which historical bytes are read.
+- Rollback is a normal commit revert. No data, migration, deployment, cache,
+  or production recovery is involved.
+- Merge and deployment require separate authorization.
+
+### Completion record
+
+Commit/PR: Draft PR pending creation from this branch.
+
+Focused checks: `test_update_release` PASS for v288; post-R2-06
+stabilization `17/17`; R2-07 activation disposable certification `54` checks
+PASS with zero container residue; release manifest, reconciliation, R2-06
+closeout, Pages deployment, Pages settings, and diff hygiene PASS.
+
+Broad checks or CI: Complete local runner reached `37` passes before a
+pre-existing Playwright locator detached during the tracked-time browser test;
+the exact failed test then passed `33/33` in isolation. A prior attempt's
+hydration-browser navigation race also passed immediately in isolation. Draft
+PR CI remains the required uninterrupted aggregate.
+
+Known limitations: The complete browser-heavy local runner is susceptible to
+transient navigation/DOM-detachment races. No deterministic failure was
+reproduced, but an uninterrupted local aggregate was not obtained.
+
+Production or external state changed: `NO`
+
+`REPO_CURRENT_STATE.md` updated: `NOT REQUIRED — no durable behavior changed`
+
+Remaining work: Draft PR CI, exact-PR-SHA independent review, and separately
+authorized merge.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets
