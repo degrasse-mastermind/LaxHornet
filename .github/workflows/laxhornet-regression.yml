@@ -74,6 +74,9 @@ jobs:
             node --check "$file"
           done < <(find . -maxdepth 1 -type f -name '*.js' -print0 | sort -z)
 
+      - name: Active no-container verification paths
+        run: node tools/test_no_container_active_paths.mjs
+
       - name: Event operation service contracts
         run: node tools/test_event_operation_service.mjs
 
@@ -170,17 +173,8 @@ jobs:
       - name: Durable legacy game tombstone migration and rollback
         run: node tools/test_game_tombstone_migration.mjs
 
-      - name: Durable legacy game tombstone concurrency
-        run: node tools/test_game_tombstone_concurrency.mjs
-
-      - name: R2-07A dormant concurrency foundation
-        run: node tools/test_r207a_dormant_concurrency.mjs
-
-      - name: R2-07 clock command and atomic batch migration
-        run: node tools/test_r207_clock_command_batch_integration.mjs
-
-      - name: R2-07 Forward Migration B activation
-        run: node tools/test_r207_forward_migration_b_activation.mjs
+      - name: R2-07 Forward Migration B exact binding
+        run: node tools/test_r207_forward_migration_b_activation.mjs --binding-only
 
       - name: R2-06 disposable synthetic verification
         run: node tools/test_r206_synthetic_verification_disposable.mjs
@@ -221,11 +215,8 @@ jobs:
           node tools/validate_pages_artifact.mjs
           node tools/test_pages_artifact_browser.cjs
 
-      - name: Remove generated Pages artifacts before complete regression
+      - name: Remove generated Pages artifacts
         run: >-
           node -e 'const fs = require("node:fs");
           for (const target of [".pages-artifact", ".pages-artifact-metadata"])
           fs.rmSync(target, { recursive: true, force: true });'
-
-      - name: Complete canonical-plus-additive regression
-        run: node tools/run_v283_local_regression.mjs --fail-fast

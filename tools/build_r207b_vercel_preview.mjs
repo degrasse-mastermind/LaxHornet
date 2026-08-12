@@ -16,8 +16,18 @@ const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
   || process.env.SUPABASE_ANON_KEY
   || "";
 
-assert.match(supabaseUrl, /^https:\/\/[a-z0-9-]+\.supabase\.co$/i, "isolated Preview Supabase URL is required");
-assert.ok(publishableKey.length >= 20, "isolated Preview publishable credential is required");
+const hasSupabaseUrl = Boolean(supabaseUrl);
+const hasPublishableKey = Boolean(publishableKey);
+assert.equal(
+  hasSupabaseUrl,
+  hasPublishableKey,
+  "isolated Preview Supabase URL and publishable credential must be supplied together",
+);
+const connectedPreview = hasSupabaseUrl && hasPublishableKey;
+if (connectedPreview) {
+  assert.match(supabaseUrl, /^https:\/\/[a-z0-9-]+\.supabase\.co$/i, "isolated Preview Supabase URL is invalid");
+  assert.ok(publishableKey.length >= 20, "isolated Preview publishable credential is invalid");
+}
 
 buildArtifact({ root, outputPath: output, metadataPath: metadata });
 
@@ -27,15 +37,28 @@ assert.ok(runtime.includes("r207bControlledPreview: false"), "default-off R2-07B
 assert.ok(runtime.includes("r207cVersionedEventCorrections: false"), "default-off R2-07C flag is missing");
 assert.ok(runtime.includes("r207dConflictResolution: false"), "default-off R2-07D flag is missing");
 assert.ok(runtime.includes("r207ClockCommandBatch: false"), "default-off R2-07 clock command/batch flag is missing");
-const previewRuntime = runtime
-  .replace("r207bControlledPreview: false", "r207bControlledPreview: true")
-  .replace("r207cVersionedEventCorrections: false", "r207cVersionedEventCorrections: true")
-  .replace("r207dConflictResolution: false", "r207dConflictResolution: true")
-  .replace("r207ClockCommandBatch: false", "r207ClockCommandBatch: true")
-  .replace(
-    "...(window.LAXHORNET_RUNTIME_CONFIG || {}),",
-    `...(window.LAXHORNET_RUNTIME_CONFIG || {}),\n  supabaseUrl: ${JSON.stringify(supabaseUrl)},\n  supabasePublishableKey: ${JSON.stringify(publishableKey)},`,
-  );
+const previewRuntime = connectedPreview
+  ? runtime
+    .replace("r207bControlledPreview: false", "r207bControlledPreview: true")
+    .replace("r207cVersionedEventCorrections: false", "r207cVersionedEventCorrections: true")
+    .replace("r207dConflictResolution: false", "r207dConflictResolution: true")
+    .replace("r207ClockCommandBatch: false", "r207ClockCommandBatch: true")
+    .replace(
+      "...(window.LAXHORNET_RUNTIME_CONFIG || {}),",
+      `...(window.LAXHORNET_RUNTIME_CONFIG || {}),\n  supabaseUrl: ${JSON.stringify(supabaseUrl)},\n  supabasePublishableKey: ${JSON.stringify(publishableKey)},`,
+    )
+  : runtime
+    .replace("publicLiveShareRpc: true", "publicLiveShareRpc: false")
+    .replace("liveShareTokenRpc: true", "liveShareTokenRpc: false")
+    .replace("exportAuditRpc: true", "exportAuditRpc: false")
+    .replace(
+      "...(window.LAXHORNET_RUNTIME_CONFIG || {}),",
+      "...(window.LAXHORNET_RUNTIME_CONFIG || {}),\n  cloudDisabled: true,",
+    );
 fs.writeFileSync(runtimePath, previewRuntime, "utf8");
 
-process.stdout.write("R2-07B isolated Vercel Preview artifact ready.\n");
+process.stdout.write(
+  connectedPreview
+    ? "R2-07B isolated connected Vercel Preview artifact ready.\n"
+    : "LaxHornet device-only Vercel Preview artifact ready; cloud runtime disabled.\n",
+);

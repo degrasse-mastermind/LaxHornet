@@ -1,11 +1,11 @@
 # LaxHornet Repository Current State
 
-Last reviewed: 2026-08-11
+Last reviewed: 2026-08-12
 Baseline branch: `main`
-Baseline commit: `b7269194a4ce8b9068b0d46c44d840efc4048c69`
-Current repository release marker: `v285`
-Current production marker: `v285` from Pages run `31061426334` at approved SHA
-`9e434e33534a1b348b19e2081b91d7e0724299fc`;
+Baseline commit: `3b866d35d48fc2d54837952241de237d785523cf`
+Current repository release marker: `v288`
+Current production marker: `v288` from allowlisted Pages run `31547430998`
+at SHA `3b866d35d48fc2d54837952241de237d785523cf`;
 R2-06 release closeout approved through reconciled mixed evidence;
 R2-07A through R2-07D and the clock command/batch remediation are merged;
 R2-07E V2 certified the product baseline, while historical production
@@ -231,10 +231,21 @@ The release manifest records:
 
 Do not rewrite, reorder, squash, rename, or silently regenerate these migration files. Any new migration must be additive, timestamped, reviewed, tested locally, and reflected in release-control documentation.
 
-The verified Windows local migration workflow is documented in `docs/LOCAL_SUPABASE_WORKFLOW.md`. It uses Docker Desktop, the Supabase CLI, explicit local-only commands, and a reduced stack where Storage-related services are excluded. It must not be replaced with linked or production-mutating commands.
+The historical Windows local migration workflow is documented in
+`docs/LOCAL_SUPABASE_WORKFLOW.md`, but it is no longer an active verification
+path. Current work must not start Docker or a Docker-compatible local Supabase
+stack. Use credential-free embedded checks for deterministic contracts and the
+automatic, isolated, data-less Supabase Preview branch for real PostgreSQL
+migration application. This does not authorize linked or production-mutating
+commands.
 
 ## Deployment and release control
 
+- Vercel Preview has two fail-closed modes. Migration PRs with a complete
+  isolated Supabase URL/publishable-key pair enable the reviewed Preview-only
+  R2-07 capabilities. UI-only PRs without that pair build device-only: the
+  Supabase client and trusted-disclosure flags are disabled, with no production
+  fallback. A partial credential pair fails the build.
 - Static production deployment uses the custom `Allowlisted GitHub Pages`
   workflow. It constructs `.pages-artifact` from the all-files-explicit
   `release/pages-deployment-allowlist.json`, validates hashes, references,
@@ -596,26 +607,43 @@ node tools/test_pages_artifact_browser.cjs
 node tools/test_r206_browser_runtime.mjs
 node tools/test_r206_synthetic_verification.mjs
 node tools/run_r206_synthetic_verification.mjs --check-browser-runtime
-supabase test db --local supabase/tests/tracked_playing_time_foundation.sql
-supabase test db --local supabase/tests/v284_public_event_semantic_boundary.sql
+node tools/test_game_tombstone_migration.mjs
+node tools/run_trust_spine_pglite.mjs
+node tools/test_no_container_active_paths.mjs
 ```
 
-The current broad local regression entry point is:
+The current broad local regression entry point is the portable-only command:
 
 ```powershell
 node tools/run_v283_local_regression.mjs
 ```
 
-That runner covers JavaScript syntax, event-operation contracts, tracked-playing-time service and static foundation contracts, game-scope capabilities, R2-06 browser/failure-envelope and disposable-runner contracts, update/release checks, release-manifest validation and reconciliation characterization, containment and hygiene, minimum disclosure, secure disclosure, Product Alignment, Trust Spine contracts, SQL acceptance/rollback tests, deletion permissions, cleanup, secret scanning, and `git diff --check`.
+That runner covers JavaScript syntax, event-operation contracts, PGlite
+migration and rollback behavior, client and two-context browser contracts,
+tracked-playing-time service and static foundation contracts, game-scope
+capabilities, R2-06 browser/failure-envelope and disposable-runner contracts,
+exact R2-07 activation bindings, update/release checks, release-manifest
+validation and reconciliation characterization, containment and hygiene,
+minimum disclosure, secure disclosure, Product Alignment, Trust Spine
+contracts, deletion permissions, cleanup, secret scanning, active no-container
+path enforcement, and `git diff --check`. It does not invoke a container-backed
+test or local Supabase service.
 
-Release preparation starts with the reusable preflight and uses one fail-fast local command:
+Release preparation starts with the reusable portable preflight and uses one
+fail-fast portable command:
 
 ```powershell
-node tools/run_release_preflight.mjs --check --release v284
-node tools/run_release_verification.mjs v284
+node tools/run_release_preflight.mjs --check
+node tools/run_release_verification.mjs
 ```
 
-`docs/RELEASE_VERIFICATION_WORKFLOW.md` records the exact modes, pinned disposable dependencies, cleanup behavior, resume rules, and production prohibition. The release command starts and stops only the documented local Supabase stack, preserves external failure logs, and does not contact production.
+`docs/RELEASE_VERIFICATION_WORKFLOW.md` records the exact modes, pinned
+disposable dependencies, cleanup behavior, and production prohibition. The
+release command does not start a database service. Real PostgreSQL migration,
+authorization, concurrency, atomicity, and replay evidence must come from the
+automatic isolated Supabase Preview plus the independent authenticated matrix
+in `docs/ISOLATED_PREVIEW_REVIEW_GATE.md`; a green migration-application status
+alone is insufficient.
 
 ### GitHub Actions regression
 

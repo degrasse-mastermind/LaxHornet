@@ -20,6 +20,7 @@ const checklist = read("docs/LAXHORNET_ROLLOUT_CHECKLIST.md");
 const tickets = read("TICKETS.md");
 const app = read("app.js");
 const worker = read("service-worker.js");
+const currentVersion = JSON.parse(read("version.json")).version;
 const evidence = read(stabilization.releaseEvidence);
 const audit = read(stabilization.auditEvidence);
 const tests = [];
@@ -70,25 +71,42 @@ test("no new R2-06 production authorization exists", () => {
   assert.equal(reconciliation.newProductionAuthorizationCreatedDuringCloseout, false);
 });
 
-test("latest production runtime identity remains bound to the deployed app runtime", () => {
-  assert.equal(manifest.release, "v285");
+test("historical v285 runtime identity remains bound to its deployed app runtime", () => {
   assert.equal(stabilization.releaseMarker, "v285");
-  assert.match(app, /const APP_VERSION = "v285";/);
+  assert.match(
+    execFileSync("git", ["show", `${stabilization.approvedAndDeployedSha}:app.js`], { cwd: root, encoding: "utf8" }),
+    /const APP_VERSION = "v285";/,
+  );
   assert.equal(
     stabilization.runtimeSha256["app.js"],
     normalizedShaAtRef(stabilization.approvedAndDeployedSha, "app.js"),
   );
 });
 
-test("PWA cache marker matches the latest runtime marker", () => {
-  assert.equal(stabilization.cacheMarker, `laxhornet-${stabilization.releaseMarker}`);
-  assert.match(worker, /const CACHE_NAME = "laxhornet-v285";/);
+test("current release identity is self-consistent without rewriting v285 history", () => {
+  assert.equal(currentVersion, "v288");
+  assert.equal(manifest.release, currentVersion);
+  assert.match(app, new RegExp(`const APP_VERSION = "${currentVersion}";`));
+  assert.match(worker, new RegExp(`const CACHE_NAME = "laxhornet-${currentVersion}";`));
+  assert.equal(stabilization.releaseMarker, "v285");
 });
 
-test("service-worker assets carry the current release inventory marker", () => {
-  assert.match(worker, /\.\/app\.js\?v=285/);
-  assert.match(worker, /\.\/styles\.css\?v=285/);
-  assert.doesNotMatch(worker, /\.\/(?:app|styles)\.(?:js|css)\?v=284/);
+test("historical PWA cache marker matches its deployed runtime marker", () => {
+  assert.equal(stabilization.cacheMarker, `laxhornet-${stabilization.releaseMarker}`);
+  assert.match(
+    execFileSync("git", ["show", `${stabilization.approvedAndDeployedSha}:service-worker.js`], { cwd: root, encoding: "utf8" }),
+    /const CACHE_NAME = "laxhornet-v285";/,
+  );
+});
+
+test("historical service-worker assets carry their deployed release inventory marker", () => {
+  const historicalWorker = execFileSync(
+    "git", ["show", `${stabilization.approvedAndDeployedSha}:service-worker.js`],
+    { cwd: root, encoding: "utf8" },
+  );
+  assert.match(historicalWorker, /\.\/app\.js\?v=285/);
+  assert.match(historicalWorker, /\.\/styles\.css\?v=285/);
+  assert.doesNotMatch(historicalWorker, /\.\/(?:app|styles)\.(?:js|css)\?v=284/);
 });
 
 test("both Important QA fixes are represented in release evidence", () => {
@@ -123,10 +141,11 @@ test("authorized automatic v285 deployment is reconciled without a second deploy
   assert.equal(manifest.productionRelease, "v285");
 });
 
-test("proposed R2-07 remains proposed and unstarted", () => {
+test("historical proposed R2-07 context remains preserved beside current activation", () => {
   assert.match(tickets, /R2-07[\s\S]*?(?:Proposed|proposed)/);
-  assert.doesNotMatch(tickets, /R2-07[\s\S]{0,160}\*\*Status:\*\* (?:Approved|In progress|Complete)/);
   assert.match(checklist, /Recommended next rollout ticket:[\s\S]*?proposed R2-07/);
+  assert.equal(manifest.r207ForwardMigrationBActivation.productionApplied, true);
+  assert.equal(manifest.r207ForwardMigrationBActivation.status, "production_database_and_runtime_active_v288_release");
 });
 
 test("no unrelated rollout stage is advanced", () => {

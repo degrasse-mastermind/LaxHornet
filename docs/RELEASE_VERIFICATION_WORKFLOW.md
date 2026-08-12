@@ -1,92 +1,90 @@
-# Local Release Verification Workflow
+# Portable Release Verification Workflow
 
-Use this workflow for release preparation only. It is local, fail-fast, and never links to, migrates, queries, or deploys production.
+Use this workflow for release preparation only. It is portable, fail-fast, and
+does not start a local database stack, contact production, apply a migration,
+or deploy anything.
 
 ## Canonical command
 
-From the isolated release worktree:
+From an isolated release worktree:
 
 ```powershell
-node tools/run_release_verification.mjs v284
+node tools/run_release_verification.mjs
 ```
 
 The command:
 
-1. validates the repository, release branch, main SHA, reviewed checksum, manifest, migration identity, and diff hygiene;
-2. verifies Node, Python, Docker Linux, Compose, Supabase CLI, PGlite, Playwright, and a local browser;
-3. restores pinned PGlite `0.5.4` and Playwright `1.61.1` into a disposable directory outside the repository when needed;
-4. starts the documented reduced local Supabase stack once;
-5. runs production-ledger provenance, blank and production-shaped database paths, pgTAP, both rollback cases, and lint;
-6. runs the complete application/release regression once with fail-fast behavior;
-7. stops local services and removes the dependency junction and disposable dependency directory;
-8. preserves a timestamped external log and reports the first failed gate.
+1. validates repository, branch, main SHA, reviewed checksums, manifest,
+   migration identity, release surfaces, and diff hygiene;
+2. verifies Node and Python and restores exact PGlite and Playwright tooling
+   ephemerally when needed;
+3. runs production-ledger provenance using the portable PGlite harness;
+4. proves every active workflow, canonical runner, and release-control command
+   is container-free;
+5. runs the complete canonical-plus-additive portable regression once with
+   fail-fast behavior;
+6. removes only the ephemeral dependency junction and temporary dependency
+   directory; and
+7. preserves a timestamped external log and reports the first failed gate.
 
-The release command does not merge, contact production Supabase, migrate production, or deploy the frontend.
+This command does not establish real PostgreSQL concurrency, authenticated
+multi-session behavior, or migration application. Those facts require the
+automatic isolated Supabase Preview plus the independent gate in
+`docs/ISOLATED_PREVIEW_REVIEW_GATE.md`.
 
 ## Preflight-only commands
 
-Check the environment without changing it:
+Read-only current-repository environment check:
+
+```powershell
+node tools/run_release_preflight.mjs --check
+```
+
+Historical release-identity checks remain available for an exact historical
+release worktree. For example:
 
 ```powershell
 node tools/run_release_preflight.mjs --check --release v284 --phase preparation
 ```
 
-Restore exact disposable dependencies and start the local stack:
+Restore exact ephemeral PGlite and Playwright dependencies without starting a
+database service:
 
 ```powershell
-node tools/run_release_preflight.mjs --prepare --release v284 --phase preparation --start-supabase
+node tools/run_release_preflight.mjs --prepare --release v284 --phase preparation
 ```
 
-Preparation preflight validates a `release/v284-*` branch against the manifest's
-pre-release base and requires release changes to descend from that base.
-
-After the release PR merges, production rollout uses:
+Production-phase identity checks remain separately authorized and use:
 
 ```powershell
 node tools/run_release_preflight.mjs --check --release v284 --phase production
 ```
 
-Production preflight requires clean `main` at the manifest's exact approved
-merge SHA, verifies that the pre-release base is an ancestor, and proves the
-release head was incorporated by ancestry or an exact Git-tree match for a
-squash merge. It also rechecks the release marker, cache, asset queries,
-reviewed hashes, and public Live Share SQL identity. If a separately authorized post-merge
-release-control correction is required, supply its exact merged SHA:
+An authorized post-merge release-control correction supplies its exact merged
+SHA:
 
 ```powershell
 node tools/run_release_preflight.mjs --check --release v284 --phase production --approved-rollout-sha <approved-sha>
 ```
 
-The pre-release base, release head, approved release merge, and any explicitly
-approved rollout SHA are distinct identities. Never compare post-merge `main`
-directly to the pre-release base or accept an unspecified later commit.
-
-Clean the disposable environment:
+Cleanup removes only ephemeral dependency material:
 
 ```powershell
 node tools/run_release_preflight.mjs --cleanup
 ```
 
-Preflight results use `PASS`, `FAIL`, `NOT REQUIRED`, or `RESTORED EPHEMERALLY`.
-Root application package metadata remains absent. The separately reviewed
-R2-06 synthetic runner owns only its isolated pinned tooling package under
-`tools/r206-browser-runtime`; release preflight's disposable dependency
-junction remains independent of that production-runner provisioning.
+## Non-substitution and stop rules
 
-## Resume rules
-
-- Preserve verified work in an isolated release worktree.
-- Record the last passed gate and resume there after an environmental interruption.
-- Restore exact ephemeral dependencies automatically; do not add a root package
-  system or runtime dependency to the static app. Runner-local reviewed tooling
-  metadata is kept separate.
-- Check Docker and Supabase health before database testing.
-- Run a focused failed test before the full regression.
-- Run the complete regression once after focused fixes pass.
-- Keep product implementation, release preparation, production migration, and frontend deployment separate.
-- Production rollout always requires a separate explicit authorization task.
-- Production rollout prompts must use `--phase production` and an exact
-  `--approved-rollout-sha` when an authorized post-merge correction exists.
+- Portable/PGlite and browser-mock success never substitutes for isolated
+  Preview migration application or authenticated multi-session adversarial
+  evidence.
+- A migration PR cannot be recommended for merge merely because its Supabase
+  Preview status is green. The exact head must pass the matrix and evidence
+  requirements in `docs/ISOLATED_PREVIEW_REVIEW_GATE.md`.
+- A credential-free Vercel Preview is device-only and cannot satisfy a
+  connected Preview gate.
+- Production rollout, schema application, capability activation, deployment,
+  and release publication remain separately authorized.
 
 ## Tracked-time authorization fixture
 
@@ -101,3 +99,9 @@ create, correct, and tombstone authority to scoped parents and coaches.
 There is no standalone Trust Spine `tracker` capability. Record the exact
 grant role, scope, latest lifecycle event, expiry, claim or team relationship,
 game scope, and player scope before calling the authorization gate.
+
+## Historical v284 evidence
+
+The former local-stack workflow is immutable historical evidence at the
+reviewed v284 SHAs. Current commands do not reproduce or invoke that workflow.
+Use exact-SHA `git show` checks when historical byte identity is required.

@@ -18,7 +18,13 @@ Tracked clock state, participation operations, shift history, corrections, recov
 
 ## Release verification
 
-The local release candidate passed the canonical fail-fast workflow, including both database paths, 37/37 pgTAP assertions, rollback refusal/preservation, disclosure checks, browser checks with no unexpected console/page errors, containment 32/32, and the complete 29/29 regression. Future release sessions start with `tools/run_release_preflight.mjs` and run `node tools/run_release_verification.mjs v284`; both remain local-only and clean up disposable dependencies and services.
+The historical local release candidate passed the then-canonical fail-fast
+workflow, including both database paths, 37/37 pgTAP assertions, rollback
+refusal/preservation, disclosure checks, browser checks with no unexpected
+console/page errors, containment 32/32, and the complete 29/29 regression. That
+local-stack workflow is retained only as exact-SHA historical evidence. Current
+release sessions use the portable commands in
+`docs/RELEASE_VERIFICATION_WORKFLOW.md` plus the isolated Preview gate.
 
 ## Release order
 

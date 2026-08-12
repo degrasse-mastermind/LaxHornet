@@ -2729,6 +2729,203 @@ Evidence:
 - `review-evidence/r2-07-pre-activation-policy-reconciliation/README.md`
 - `review-evidence/r2-07-pre-activation-policy-reconciliation/POLICY_DIFF.json`
 
+## LH-26 — v288 release-control baseline reconciliation
+
+Status: `REVIEW`
+
+Risk level: `LEVEL 3`
+
+Branch: `codex/lh-26-release-baseline-reconciliation`
+
+### Goal
+
+Restore fail-closed release and activation verification after the authorized
+v286-v288 releases advanced current runtime files beyond historical v285 and
+R2-07 activation evidence. Preserve every historical binding at its exact
+reviewed/deployed SHA while validating the current v288 runtime independently.
+
+### In scope
+
+- Reconcile stale `v285` manifest/stylesheet query markers on root public HTML
+  pages to the already-current `v288` release marker.
+- Make the post-R2-06 test verify v285 runtime bytes at the recorded v285
+  deployed SHA and current runtime identity against `version.json`.
+- Make R2-07 activation certification verify its immutable runtime hash set at
+  the exact reviewed runtime SHA, while continuing to exercise current client
+  invariants and the disposable activation database matrix.
+- Add no runtime behavior, release bump, deployment, schema, or production
+  state change.
+
+### Current behavior
+
+On clean `main` at `3b866d35d48fc2d54837952241de237d785523cf`,
+`tools/test_update_release.mjs` reports 16 stale root-page query markers,
+`tools/test_post_r206_stabilization_release.mjs` compares current v288 files to
+historical v285 expectations, and
+`tools/test_r207_forward_migration_b_activation.mjs` compares the current
+`app.html` to the immutable pre-v286 reviewed hash. These are independently
+reproduced baseline failures, not changes caused by LH-25 or the vNext UX.
+
+### Acceptance criteria
+
+- Current root HTML release-controlled asset query markers match `version.json`
+  (`v288`) without changing `version.json`, service-worker cache names, the
+  release manifest, or production runtime configuration.
+- Historical v285 assertions read exact bytes from the recorded v285 deployed
+  SHA; current assertions validate current v288 bytes.
+- Historical R2-07 activation client hashes read exact bytes from reviewed
+  runtime SHA `844db75ef6d0d42af474290dd0f160679bf07af8`.
+- Current authentication/activation invariants and disposable database
+  certification remain exercised rather than bypassed.
+- The three previously failing tests pass, broader release controls pass, and
+  `git diff --check` passes.
+- A draft PR receives independent exact-PR-SHA Level 3 review before merge.
+
+### Level 3 critical surface and rollback
+
+- Critical surface: release/cache verification and immutable activation
+  evidence interpretation.
+- The change must not rewrite historical evidence or weaken exact-byte checks;
+  it changes the ref at which historical bytes are read.
+- Rollback is a normal commit revert. No data, migration, deployment, cache,
+  or production recovery is involved.
+- Merge and deployment require separate authorization.
+
+### Completion record
+
+Commit/PR: Draft PR #77.
+
+Focused checks: `test_update_release` PASS for v288; post-R2-06
+stabilization `17/17`; R2-07 no-container exact-binding verification `5/5`;
+R2-07B controlled Preview contracts `37/37`; release manifest,
+reconciliation, R2-06 closeout, Pages deployment, Pages settings, auth startup,
+and diff hygiene PASS.
+
+Broad checks or CI: Exact-head portable CI and the credential-free device-only
+Vercel Preview pass on PR #77. Supabase Preview is correctly skipped because
+this PR adds no migration.
+
+Known limitations: Real PostgreSQL migration and multi-session concurrency are
+not exercised because this PR adds no migration. Migration PRs use the isolated
+Supabase Preview gate.
+
+Production or external state changed: `NO`
+
+`REPO_CURRENT_STATE.md` updated: `NOT REQUIRED — no durable behavior changed`
+
+Remaining work: Independent exact-PR-SHA Level 3 review and separately
+authorized merge.
+
+## LH-27 — Retire Docker from active development and CI
+
+Status: `REVIEW`
+
+Risk level: `LEVEL 3`
+
+Branch: `codex/lh-26-release-baseline-reconciliation`
+
+### Goal
+
+Honor the owner decision that LaxHornet will no longer use Docker. Remove every
+active Docker-triggering GitHub workflow and replace the Docker-dependent
+review path with portable checks plus isolated Supabase Preview verification.
+
+### In scope
+
+- Remove the pull-request Docker test workflow and main-branch Docker image
+  build/push workflow.
+- Stop the portable workflow from invoking container-backed PostgreSQL tests.
+- Retain the exact historical activation-byte proof through a new
+  `--binding-only` mode that performs no container or network work.
+- Keep browser, PGlite, client, security, disclosure, release, Pages, and
+  secret-scanning gates active.
+- Make credential-free Vercel UI previews explicitly device-only, with the
+  cloud client and trusted-disclosure flags disabled rather than falling back
+  to production configuration.
+- Require the automatic isolated, data-less Supabase Preview check for actual
+  migration application on migration PRs.
+
+### Out of scope
+
+- No production migration, deployment, release, or Supabase configuration
+  change.
+- No rewriting historical Docker evidence or claiming that embedded tests
+  prove real multi-session PostgreSQL concurrency.
+- Legacy Docker artifacts remain inert historical material; removal can be a
+  later repository-hygiene change after protected evidence references are
+  reviewed.
+
+### Acceptance criteria
+
+- No GitHub workflow builds, runs, or publishes a Docker image.
+- Portable CI contains no command that invokes a Docker-dependent test.
+- Exact R2-07 activation/runtime bindings remain fail-closed and independently
+  hashed from their reviewed SHA.
+- Migration PRs require a successful Supabase Preview check before they can be
+  recommended for merge.
+- Migration PRs that change authorization, operation identity, atomicity,
+  concurrency, or conflict semantics also require the exact-head independent
+  authenticated multi-session matrix in
+  `docs/ISOLATED_PREVIEW_REVIEW_GATE.md`; migration application alone is not
+  sufficient.
+- Documentation distinguishes embedded contract coverage from real Preview
+  migration/concurrency evidence.
+- No production or external runtime state changes.
+
+### Level 3 critical surface and rollback
+
+- Critical surface: CI verification and release controls.
+- Rollback is a normal commit revert; it would re-enable Docker and therefore
+  requires a new owner decision.
+- The loss of local container concurrency testing is explicit. Supabase Preview
+  is the authoritative real-PostgreSQL gate, while exact adversarial
+  concurrency review remains required for migration PRs.
+- Merge and deployment remain separately authorized.
+
+### Completion record
+
+Commit/PR: Draft PR #77.
+
+Focused checks: Active workflow and invocation-graph guard finds no active
+container/local-stack command; R2-07 no-container exact binding `5/5`; R2-07B
+controlled Preview contracts `37/37`; authentication responsiveness and diff
+hygiene PASS.
+
+Broad checks or CI: Exact-head portable CI and device-only Vercel Preview PASS.
+The dependent migration PR #78 separately passes its automatic isolated,
+data-less Supabase Preview check.
+
+Known limitations: Preview credentials are not exposed to ordinary repository
+tests. Real PostgreSQL concurrency, transactional failure, revocation, replay,
+and exactly-once claims therefore remain blocked until an independent reviewer
+runs the non-substitutable authenticated matrix against the isolated Preview
+branch.
+
+Production or external state changed: `NO`
+
+`REPO_CURRENT_STATE.md` updated: `YES`
+
+Remediation after exact-head review failure: The canonical regression no longer
+invokes the six container-backed PostgreSQL matrices and uses the exact-binding
+activation mode. Release preflight and release verification are portable-only;
+local-stack startup is retired. The new active-path guard follows canonical
+tool invocations and fails on a container-backed command. The isolated Preview
+review gate now explicitly prevents treating embedded/PGlite/browser or green
+migration-application status as authenticated server evidence.
+
+Remediation verification: portable v288 release preflight PASS;
+production-ledger PGlite provenance PASS; active-path guard PASS across 8
+control files and 57 canonical tool invocations; complete
+canonical-plus-additive portable regression `65/65`; release baseline,
+historical v285 preservation `17/17`, manifest reconciliation `10/10`, phase
+preflight `22/22`, exact activation binding `5/5`, controlled Preview contracts
+`37/37`, and diff hygiene PASS. No database service or external runtime was
+contacted or changed.
+
+Remaining work: Push the remediation head, obtain green exact-head CI and
+Preview checks, then obtain a fresh independent exact-PR-SHA Level 3 review.
+No container-based verification is permitted.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

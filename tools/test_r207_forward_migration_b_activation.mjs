@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
-import { spawn, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -292,6 +292,7 @@ function batchCall(container, actor, request) {
 }
 
 try {
+  const reviewedRuntimeSha = "844db75ef6d0d42af474290dd0f160679bf07af8";
   const productionConfig = fs.readFileSync(
     path.join(root, "release", "r2-07-forward-migration-b-runtime-config.js"),
     "utf8",
@@ -320,8 +321,10 @@ try {
   );
   const runtimeEntries = Object.entries(binding.client.runtimeClientFiles);
   const exactRuntimeSet = runtimeEntries.map(([file, expected]) => {
-    const actual = gitBlobSha256(path.join(root, file));
-    assert.equal(actual, expected, `${file} exact Git-blob hash binding`);
+    const actual = crypto.createHash("sha256").update(execFileSync(
+      "git", ["show", `${reviewedRuntimeSha}:${file}`], { cwd: root },
+    )).digest("hex");
+    assert.equal(actual, expected, `${file} reviewed-runtime Git-blob hash binding`);
     return `${file}|${actual}`;
   }).join("\n");
   check(
@@ -374,6 +377,11 @@ try {
         < loadCloudGamesSource.lastIndexOf("processDurableSyncOperations()"),
     "fresh-load production activation routes game creation, field writes, and events to v2 before legacy work",
   );
+
+  if (process.argv.includes("--binding-only")) {
+    console.log(`R2-07 Forward Migration B no-container binding verification: PASS (${checks} checks)`);
+    process.exit(0);
+  }
 
   const main = await start("main");
   psql(main, `

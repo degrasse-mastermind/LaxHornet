@@ -170,6 +170,13 @@ application, production or persistent shared-environment application,
 migration-history repair, deployment/activation, production data, or production
 credentials.
 
+A green Supabase Preview status proves automatic migration application only.
+For Level 3 work involving server-side authorization, operation identity,
+atomicity, concurrency, or conflict behavior, the exact PR head must also pass
+the independent authenticated multi-session matrix in
+`docs/ISOLATED_PREVIEW_REVIEW_GATE.md`. Portable, PGlite, embedded, and
+browser-mock results are complementary and cannot substitute for that gate.
+
 ## Implementation workflow
 
 ### 1. Inspect and classify
@@ -210,6 +217,10 @@ stable:
 ```powershell
 node tools/run_v283_local_regression.mjs
 ```
+
+This is the canonical-plus-additive portable regression. It must not start or
+require a container or local Supabase stack. Real PostgreSQL and authenticated
+multi-session behavior are verified only through the isolated Preview gate.
 
 Rerun the complete suite only when a later edit materially changes shared
 behavior. Do not run unrelated database, release, disclosure, service-worker,

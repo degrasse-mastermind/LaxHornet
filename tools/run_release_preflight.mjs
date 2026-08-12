@@ -460,63 +460,11 @@ function checkRepository(results, release, phase, approvedRolloutSha) {
   return { manifest, releaseEnv };
 }
 
-function checkRuntime(results, releaseRequired, prepare) {
+function checkRuntime(results) {
   addResult(results, "Node.js", "PASS", process.version);
 
   const python = resolvePython();
   addResult(results, "Python", python ? "PASS" : "FAIL", python?.version || "not found");
-
-  let docker = command("docker", [
-    "version",
-    "--format",
-    "{{.Client.Version}}|{{.Server.Version}}|{{.Server.Os}}",
-  ]);
-  if (docker.status !== 0 && prepare) {
-    const restart = command("docker", ["desktop", "restart"], { timeout: 120000 });
-    if (restart.status === 0) {
-      docker = command("docker", [
-        "version",
-        "--format",
-        "{{.Client.Version}}|{{.Server.Version}}|{{.Server.Os}}",
-      ]);
-    }
-    addResult(
-      results,
-      "Docker Desktop recovery",
-      docker.status === 0 ? "PASS" : "FAIL",
-      docker.status === 0 ? "Docker Desktop restarted" : trimmed(restart) || "restart failed",
-    );
-  }
-  const dockerParts = docker.status === 0 ? trimmed(docker).split("|") : [];
-  addResult(
-    results,
-    "Docker client/server",
-    docker.status === 0 ? "PASS" : releaseRequired ? "FAIL" : "NOT REQUIRED",
-    docker.status === 0 ? `client ${dockerParts[0]}, server ${dockerParts[1]}` : "Docker engine unavailable",
-  );
-  addResult(
-    results,
-    "Docker Linux engine",
-    docker.status === 0 && dockerParts[2] === "linux" ? "PASS" : releaseRequired ? "FAIL" : "NOT REQUIRED",
-    docker.status === 0 ? dockerParts[2] || "unknown server OS" : "not running",
-  );
-
-  const compose = command("docker", ["compose", "version", "--short"]);
-  addResult(
-    results,
-    "Docker Compose",
-    compose.status === 0 ? "PASS" : releaseRequired ? "FAIL" : "NOT REQUIRED",
-    compose.status === 0 ? trimmed(compose) : "not available",
-  );
-
-  const supabase = command("supabase", ["--version"]);
-  addResult(
-    results,
-    "Supabase CLI",
-    supabase.status === 0 ? "PASS" : releaseRequired ? "FAIL" : "NOT REQUIRED",
-    supabase.status === 0 ? trimmed(supabase) : "not available",
-  );
-
   return { python };
 }
 
@@ -531,6 +479,12 @@ function ensureDependencies(results, prepare, releaseRequired) {
       const stats = lstatSync(repositoryNodeModules);
       if (!stats.isSymbolicLink()) {
         addResult(results, "Ephemeral dependency bootstrap", "FAIL", "repository node_modules exists and is not a junction");
+        return { pglite, playwright };
+      }
+      const target = readlinkSync(repositoryNodeModules);
+      const resolvedTarget = path.resolve(path.dirname(repositoryNodeModules), target);
+      if (resolvedTarget.toLowerCase() !== dependencyNodeModules.toLowerCase()) {
+        addResult(results, "Ephemeral dependency bootstrap", "FAIL", `refused unrelated junction to ${target}`);
         return { pglite, playwright };
       }
       rmSync(repositoryNodeModules);
@@ -616,51 +570,21 @@ function ensureDependencies(results, prepare, releaseRequired) {
   return { pglite, playwright, browser };
 }
 
-function startLocalSupabase(results) {
-  const status = command("supabase", ["status"]);
-  if (status.status === 0) {
-    addResult(results, "Local Supabase stack", "PASS", "already running and healthy");
-    return true;
-  }
-  const start = command("supabase", [
-    "start",
-    "--exclude",
-    "storage-api,imgproxy,logflare,vector",
-  ], { timeout: 180000 });
-  if (start.status !== 0) {
-    addResult(results, "Local Supabase stack", "FAIL", trimmed(start));
-    return false;
-  }
-  const healthy = command("supabase", ["status"]);
-  addResult(
-    results,
-    "Local Supabase stack",
-    healthy.status === 0 ? "PASS" : "FAIL",
-    healthy.status === 0 ? "reduced local stack started and healthy" : "stack did not become healthy",
-  );
-  return healthy.status === 0;
-}
-
-export function cleanupReleasePreflight({ stopSupabase = true } = {}) {
+export function cleanupReleasePreflight() {
   const results = [];
-  if (stopSupabase) {
-    const status = command("supabase", ["status"]);
-    if (status.status === 0) {
-      const stop = command("supabase", ["stop", "--no-backup"], { timeout: 120000 });
-      addResult(results, "Local Supabase cleanup", stop.status === 0 ? "PASS" : "FAIL", "disposable stack stopped");
-    } else {
-      addResult(results, "Local Supabase cleanup", "NOT REQUIRED", "no local stack running");
-    }
-  }
-
   if (existsSync(repositoryNodeModules)) {
     const stats = lstatSync(repositoryNodeModules);
     if (!stats.isSymbolicLink()) {
-      addResult(results, "Dependency junction cleanup", "FAIL", "refused to remove non-junction node_modules");
+      addResult(results, "Dependency junction cleanup", "NOT REQUIRED", "pre-existing non-junction node_modules preserved");
     } else {
       const target = readlinkSync(repositoryNodeModules);
-      rmSync(repositoryNodeModules);
-      addResult(results, "Dependency junction cleanup", "PASS", `removed junction to ${target}`);
+      const resolvedTarget = path.resolve(path.dirname(repositoryNodeModules), target);
+      if (resolvedTarget.toLowerCase() !== dependencyNodeModules.toLowerCase()) {
+        addResult(results, "Dependency junction cleanup", "FAIL", `refused unrelated junction to ${target}`);
+      } else {
+        rmSync(repositoryNodeModules);
+        addResult(results, "Dependency junction cleanup", "PASS", `removed junction to ${target}`);
+      }
     }
   } else {
     addResult(results, "Dependency junction cleanup", "NOT REQUIRED", "junction absent");
@@ -680,7 +604,7 @@ export function runReleasePreflight({
   release = "",
   phase = "",
   approvedRolloutSha = "",
-  startSupabase = false,
+  localStackRequested = false,
 } = {}) {
   const results = [];
   const normalizedRelease = release && !release.startsWith("v") ? `v${release}` : release;
@@ -708,10 +632,16 @@ export function runReleasePreflight({
     versionMatches ? "PASS" : "FAIL",
     normalizedRelease || "general preflight",
   );
-  const runtime = checkRuntime(results, Boolean(normalizedRelease), prepare);
+  const runtime = checkRuntime(results);
   const dependencies = ensureDependencies(results, prepare, Boolean(normalizedRelease));
-  if (startSupabase) startLocalSupabase(results);
-  else addResult(results, "Local Supabase stack", "NOT REQUIRED", "start only with --start-supabase");
+  addResult(
+    results,
+    "Local database stack",
+    localStackRequested ? "FAIL" : "NOT REQUIRED",
+    localStackRequested
+      ? "local-stack startup is retired; use the automatic isolated Supabase Preview and independent authenticated review"
+      : "real PostgreSQL verification belongs to the isolated Supabase Preview gate",
+  );
 
   const metadataCreated = packageMetadata.filter((file) => existsSync(path.join(root, file)));
   addResult(
@@ -737,10 +667,11 @@ export function runReleasePreflight({
 }
 
 function parseArguments(args) {
+  const retiredLocalStackFlag = ["--start", "supabase"].join("-");
   const options = {
     prepare: args.includes("--prepare"),
     cleanup: args.includes("--cleanup"),
-    startSupabase: args.includes("--start-supabase"),
+    localStackRequested: args.includes(retiredLocalStackFlag),
     release: "",
     phase: "",
     approvedRolloutSha: "",
