@@ -1106,6 +1106,7 @@ const state = {
   pendingCancelGame: false,
   gameSavedSummaryId: "",
   liveSharePromptGameId: "",
+  reviewTab: "snapshot",
   pendingTeamAccessReview: null,
   trackedTimeEditorMode: "",
   trackedTimeEditingShiftId: "",
@@ -3782,10 +3783,10 @@ function liveEventCaptureGate(game, now = Date.now()) {
     };
   }
   const message = !clockRunning && !playerOnField
-    ? "Start the clock and tap PLAYER IN to record events."
+    ? "OFF FIELD — event buttons locked. Start the clock, then tap PUT IN."
     : !clockRunning
-      ? "Start or resume the game clock to record events."
-      : "Tap PLAYER IN to record events.";
+      ? "Clock paused — event buttons locked. Tap Run to continue."
+      : "OFF FIELD — event buttons locked. Tap PUT IN to record a play.";
   return {
     required: true,
     allowed: false,
@@ -3937,7 +3938,7 @@ function togglePlayerParticipation() {
   game.savedAt = new Date().toISOString();
   persistAll();
   render();
-  showToast(operationKind === "player_in" ? "Player is on field" : "Player is off field");
+  showToast(operationKind === "player_in" ? "ON FIELD — events enabled" : "OFF FIELD — event buttons locked");
 }
 
 function changeTrackedClock(action) {
@@ -4523,7 +4524,11 @@ function visibleGamesForPlayer(player = state.player) {
 function currentReviewGame() {
   const games = visibleGames();
   if (state.reviewGameId) {
-    return games.find((game) => game.id === state.reviewGameId) || state.activeGame;
+    const visibleGame = games.find((game) => game.id === state.reviewGameId);
+    if (visibleGame) return visibleGame;
+    const accountScopedGame = state.games.find((game) => game.id === state.reviewGameId);
+    if (accountScopedGame && canShowGameForCurrentAccess(accountScopedGame)) return accountScopedGame;
+    return state.activeGame;
   }
   return state.activeGame || games[0] || null;
 }
@@ -10354,11 +10359,12 @@ function renderEndGameModal() {
   return `
     <section class="modal-backdrop" role="presentation">
       <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="endGameTitle">
-        <h3 id="endGameTitle">End game and save review?</h3>
-        <p class="muted small">You can still reopen this game to edit events, tags, notes, and game details.</p>
+        <span class="completion-kicker">Finish tracking</span>
+        <h3 id="endGameTitle">Capture this game?</h3>
+        <p class="muted small">The clock and any open shift will close locally first. Completed-game correction rules still apply in Game Review.</p>
         <div class="edit-actions">
           <button class="btn secondary" type="button" data-action="cancel-end-game">Keep Tracking</button>
-          <button class="btn danger" type="button" data-action="confirm-end-game">End Game &amp; Review</button>
+          <button class="btn danger" type="button" data-action="confirm-end-game">Capture Game</button>
         </div>
       </div>
     </section>
@@ -10373,12 +10379,12 @@ function renderGameSavedModal() {
   return `
     <section class="modal-backdrop" role="presentation">
       <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="gameSavedTitle">
-        <h3 id="gameSavedTitle">Game saved. Review ${escapeHTML(possessiveName(playerFirstName(player)))} impact.</h3>
-        <p class="muted small">The game is saved in Past Games and can be reopened for corrections.</p>
+        <span class="completion-kicker">Locally safe</span>
+        <h3 id="gameSavedTitle">Game captured.</h3>
+        <p class="muted small">${escapeHTML(playerTitle(player))}&apos;s game is saved on this device. ${escapeHTML(gameSyncPresentation(game).detail)}</p>
         <div class="edit-actions">
-          <button class="btn positive" type="button" data-action="open-saved-review" data-game-id="${escapeHTML(game.id)}">Open Game Review</button>
-          <button class="btn secondary" type="button" data-action="copy-family-summary" data-game-id="${escapeHTML(game.id)}">Copy Recap</button>
-          <button class="btn ghost modal-ghost" type="button" data-action="close-saved-game">Back Home</button>
+          <button class="btn positive" type="button" data-action="open-saved-review" data-game-id="${escapeHTML(game.id)}">View Game Review</button>
+          <button class="btn secondary" type="button" data-action="close-saved-game">Review later</button>
         </div>
       </div>
     </section>
@@ -10468,7 +10474,7 @@ function renderBottomNav() {
   const navItems = [
     { screen: "home", label: "Home", icon: "home", active: state.screen === "home" },
     { screen: trackTarget, label: state.activeGame ? "Live" : "Track", icon: "track", active: ["start", "live"].includes(state.screen) },
-    { screen: "past", label: "Review", icon: "games", active: ["past", "review"].includes(state.screen) },
+    { screen: "past", label: "Games", icon: "games", active: ["past", "review"].includes(state.screen) },
     { screen: "dashboard", label: "Season", icon: "season", active: state.screen === "dashboard" },
     { screen: "more", label: "More", icon: "manage", active: ["more", "player", "settings", "team", "teamAccess", "profileSetup", "tutorial", "help", "launchKit", "promoDemo", "demo"].includes(state.screen) },
   ];
@@ -11277,27 +11283,30 @@ function renderHome() {
   if (isPlatformReviewer()) return renderAdminPortal();
 
   const season = calculateSeasonTotals();
+  const latestGame = latestVisibleGame();
   const hasApprovedPlayer = visiblePlayers().length > 0 && playerAccessStatus(state.player) === "Approved";
 
   return renderShell(`
-    <section class="screen-title home-title">
-      <h2>What should I do next?</h2>
-      <p>Start tracking, review a game, or check the season story.</p>
+    <section class="screen-title home-title vnext-home-title">
+      <span class="eyebrow">Game day</span>
+      <h2>${state.activeGame ? "Your game is waiting." : "Ready for the whistle."}</h2>
+      <p>${state.activeGame ? "Resume the locally saved live game without rebuilding its state." : "Set the game, track the shift, capture the play."}</p>
     </section>
 
-    <section class="stack">
+    <section class="stack vnext-home-stack">
       ${renderApprovedPlayerCallout()}
       ${hasApprovedPlayer ? renderHomeReadyCard() : renderNoApprovedPlayerHome()}
-      ${hasApprovedPlayer ? renderHomeNextGameFocusCard() : ""}
-      ${renderHomeQuickActions()}
+      ${hasApprovedPlayer && latestGame ? renderHomeLatestGameCard(latestGame) : ""}
 
-      <div class="metric-grid">
+      <div class="metric-grid home-season-strip" aria-label="Season at a glance">
         <div class="metric"><strong>${season.gamesPlayed}</strong><span>Games</span></div>
-        <div class="metric"><strong>${signedMetric(season.possessionValue)}</strong><span>Possession Value</span></div>
+        <div class="metric"><strong>${formatPlayingTime(trackedSeasonSeconds(visibleGames()))}</strong><span>Tracked</span></div>
         <div class="metric"><strong>${season.goals}</strong><span>Goals</span></div>
         <div class="metric"><strong>${season.assists}</strong><span>Assists</span></div>
       </div>
+      ${hasApprovedPlayer ? renderHomeNextGameFocusCard() : ""}
       ${renderGameDayStatusCard()}
+      ${renderHomeQuickActions()}
     </section>
   `);
 }
@@ -11456,6 +11465,8 @@ function renderMore() {
         </div>
         ${renderAccountAppHelper()}
       </section>
+
+      ${renderDataToolsCard()}
 
       ${adminTools}
 
@@ -11930,6 +11941,73 @@ function latestVisibleGame() {
   })[0] || null;
 }
 
+function gameFinalScore(game = {}) {
+  const normalized = normalizeGame(game);
+  const scoreFor = optionalScoreNumber(normalized.finalScoreFor);
+  const scoreAgainst = optionalScoreNumber(normalized.finalScoreAgainst);
+  if (scoreFor !== null && scoreAgainst !== null) return `${scoreFor}–${scoreAgainst}`;
+  if (normalized.status === "complete" && normalized.scoreTrackingTouched) {
+    return `${normalized.scoreFor}–${normalized.scoreAgainst}`;
+  }
+  return "";
+}
+
+function gameOutcome(game = {}) {
+  const normalized = normalizeGame(game);
+  const scoreFor = optionalScoreNumber(normalized.finalScoreFor);
+  const scoreAgainst = optionalScoreNumber(normalized.finalScoreAgainst);
+  if (scoreFor === null || scoreAgainst === null) return null;
+  if (scoreFor === scoreAgainst) return { label: "T", tone: "tie" };
+  return scoreFor > scoreAgainst
+    ? { label: "W", tone: "win" }
+    : { label: "L", tone: "loss" };
+}
+
+function trackedSeasonSeconds(games = visibleGames()) {
+  return games.reduce((total, game) => total + Number(trackedTimeSummary(game)?.totalSeconds || 0), 0);
+}
+
+function gameSyncPresentation(game = {}) {
+  const gameId = String(game.id || "");
+  const fieldOperations = (state.r207FieldSync?.operations || []).filter((operation) => operation.gameId === gameId);
+  const eventOperations = (state.r207EventSync?.operations || []).filter((operation) => operation.gameId === gameId);
+  const clockOperations = unresolvedR207ClockOperations(gameId);
+  const participationOperations = (trackedTimeState(game)?.participationOperations || [])
+    .filter((operation) => ["pending", "syncing", "retryable", "conflicted", "rejected"].includes(operation.syncState));
+  const allOperations = [...fieldOperations, ...eventOperations, ...clockOperations];
+  const attention = Boolean(
+    state.r207FieldSync?.conflicts?.[gameId]
+    || r207ServerConflictsForGame(gameId).length
+    || allOperations.some((operation) => ["conflicted", "rejected", "blocked"].includes(operation.state))
+    || participationOperations.some((operation) => ["conflicted", "rejected"].includes(operation.syncState)),
+  );
+  if (attention) {
+    return {
+      label: "Needs Attention",
+      tone: "attention",
+      detail: "A saved operation needs review before cloud state can be considered synchronized.",
+    };
+  }
+  const pending = allOperations.some((operation) => ["pending", "syncing", "retryable", "attempting"].includes(operation.state))
+    || participationOperations.length > 0;
+  if (pending) {
+    return state.isOffline
+      ? { label: "Saved locally", tone: "local", detail: "Cloud synchronization will resume when this device reconnects." }
+      : { label: "Syncing", tone: "syncing", detail: "The local save is safe while governed operations wait for receipts." };
+  }
+  const hasServerBase = window.LaxHornetR207FieldOperations?.hasRequiredVersions?.(game.serverVersions) === true;
+  if (currentUserId() && hasServerBase && !state.cloudError) {
+    return { label: "Synced", tone: "synced", detail: "Governed cloud operations have no unresolved work for this game." };
+  }
+  return {
+    label: "Saved locally",
+    tone: "local",
+    detail: currentUserId()
+      ? "The game is safe on this device; a cloud receipt is not yet confirmed."
+      : "The game is safe on this device and is not connected to an account receipt.",
+  };
+}
+
 function playerReadySubcopy(player = state.player) {
   const teamName = player.team || teamById(player.teamId)?.name || "Team not linked";
   const jersey = player.number ? `#${player.number}` : "No jersey";
@@ -11951,20 +12029,40 @@ function renderNoApprovedPlayerHome() {
 }
 
 function renderHomeReadyCard() {
-  const lastGame = latestVisibleGame();
   const activeGame = state.activeGame;
   const player = activeGame ? gamePlayerSnapshot(activeGame) : state.player;
   const playerName = normalizePlayer(player).name || playerTitle(player);
   return `
-    <section class="card pad home-next-card">
+    <section class="card pad home-next-card ${activeGame ? "active-game-command" : "new-game-command"}">
+      <span class="command-kicker">${activeGame ? "Active game · saved locally" : "Primary action"}</span>
       <div>
-        <h3>${activeGame ? `${escapeHTML(playerName)}&apos;s game is in progress` : `Ready to track ${escapeHTML(playerName)}?`}</h3>
-        <p class="muted small">${activeGame ? `${escapeHTML(activeGame.currentQuarter)} vs ${escapeHTML(activeGame.opponent || "Opponent")}` : escapeHTML(playerReadySubcopy(state.player))}</p>
+        <h3>${activeGame ? `Resume ${escapeHTML(playerName)}&apos;s game` : `Track ${escapeHTML(playerName)}`}</h3>
+        <p class="muted small">${activeGame ? `${escapeHTML(activeGame.currentQuarter)} · ${escapeHTML(scoreLabel(activeGame))} · vs ${escapeHTML(activeGame.opponent || "Opponent")}` : escapeHTML(playerReadySubcopy(state.player))}</p>
       </div>
-      <div class="action-grid compact">
-        <button class="btn brand positive" type="button" data-nav="${activeGame ? "live" : "start"}">${activeGame ? "Resume Live Game" : "Start New Game"}</button>
-        <button class="btn brand neutral" type="button" ${lastGame ? `data-review="${escapeHTML(lastGame.id)}"` : `data-nav="past"`}>Review Last Game</button>
+      <div class="home-command-actions">
+        <button class="btn brand positive home-primary-command" type="button" data-nav="${activeGame ? "live" : "start"}">${activeGame ? "Resume Game" : "Track a Game"}</button>
+        ${activeGame ? `<button class="btn brand neutral" type="button" data-nav="start">Set up another game</button>` : ""}
       </div>
+    </section>
+  `;
+}
+
+function renderHomeLatestGameCard(game) {
+  const player = gamePlayerSnapshot(game);
+  const totals = calculateTotals(game.events || [], player);
+  const outcome = gameOutcome(game);
+  const score = gameFinalScore(game);
+  return `
+    <section class="card pad home-latest-game">
+      <div class="section-head compact-head">
+        <div>
+          <span class="eyebrow">Latest game</span>
+          <h3>${escapeHTML(playerTitle(player))} vs ${escapeHTML(game.opponent || "Opponent")}</h3>
+          <p class="muted small">${formatDate(game.date)} · ${score ? escapeHTML(score) : `${totals.eventCount} recorded events`}</p>
+        </div>
+        ${outcome ? `<span class="game-outcome ${outcome.tone}">${escapeHTML(outcome.label)}</span>` : ""}
+      </div>
+      <button class="text-action" type="button" data-review="${escapeHTML(game.id)}">Open Game Review <span aria-hidden="true">→</span></button>
     </section>
   `;
 }
@@ -12049,8 +12147,8 @@ function renderGameDayStatusCard() {
 
 function renderHomeQuickActions() {
   const actions = [
-    { label: "Season Dashboard", screen: "dashboard", icon: "season", show: visiblePlayers().length > 0 },
-    { label: "Past Games", screen: "past", icon: "games", show: visiblePlayers().length > 0 },
+    { label: "Season", screen: "dashboard", icon: "season", show: visiblePlayers().length > 0 },
+    { label: "All Games", screen: "past", icon: "games", show: visiblePlayers().length > 0 },
     { label: "Players & Teams", screen: "player", icon: "player", show: state.authUser },
     { label: "Help / Tracker Guide", screen: "tutorial", icon: "help", show: true },
   ].filter((item) => item.show);
@@ -12122,6 +12220,22 @@ function renderSettings() {
   return renderPlayerPage();
 }
 
+function gameStructureSummary(periodFormat = "quarters", regulationMinutes = 12) {
+  const halves = periodFormat === "halves";
+  const count = halves ? 2 : 4;
+  const label = halves ? "halves" : "quarters";
+  const minutes = Math.max(1, Math.min(90, Math.round(Number(regulationMinutes) || (halves ? 25 : 12))));
+  return `${count} ${label} · ${minutes} minutes each`;
+}
+
+function updateGameStructureSummary(form = document.querySelector('[data-form="start-game"]')) {
+  if (!form) return;
+  const format = form.querySelector("#periodFormat")?.value || "quarters";
+  const minutes = form.querySelector("#regulationPeriodMinutes")?.value || (format === "halves" ? 25 : 12);
+  const summary = form.querySelector("[data-game-structure-summary]");
+  if (summary) summary.textContent = gameStructureSummary(format, minutes);
+}
+
 function renderStartGame() {
   const viewOnlyTeamPlayer = isTeamPlayer(state.player) && !canTrackPlayer(state.player);
   const availablePlayers = visiblePlayers();
@@ -12134,13 +12248,14 @@ function renderStartGame() {
   });
   const liveShareAvailable = liveShareEligibility.available;
   return renderShell(`
-    <section class="screen-title">
-      <h2>Set up game</h2>
-      <p>You can edit game details later.</p>
+    <section class="screen-title vnext-setup-title">
+      <span class="eyebrow">Track</span>
+      <h2>Set the game.</h2>
+      <p>Confirm the sideline structure before the opening whistle.</p>
     </section>
 
     <form class="start-game-form" data-form="start-game">
-      <section class="card pad form-grid">
+      <section class="card pad form-grid setup-player-card">
         ${renderPlayerSwitcher({
           title: availablePlayers.length > 1 ? "Who Are You Tracking?" : "Player For This Game",
           helper: viewOnlyTeamPlayer
@@ -12172,18 +12287,18 @@ function renderStartGame() {
           : ""
       }
 
-      <section class="card pad form-grid">
+      <section class="card pad form-grid vnext-game-setup-card">
         <div class="section-head compact-head">
           <div>
-            <h3>Game Details</h3>
-            <p class="muted small">Keep setup quick so you can get to the sideline tracker.</p>
+            <h3>Game details</h3>
+            <p class="muted small">${escapeHTML(playerReadySubcopy(state.player))}</p>
           </div>
         </div>
         <div class="field">
           <label for="opponent">Opponent</label>
           <input id="opponent" name="opponent" placeholder="Opponent team" required />
         </div>
-        <div class="form-grid two">
+        <div class="form-grid two setup-structure-fields">
           <div class="field">
             <label for="date">Date</label>
             <input id="date" name="date" type="date" value="${todayISO()}" required />
@@ -12196,50 +12311,50 @@ function renderStartGame() {
             </select>
           </div>
         </div>
-        <div class="form-grid two">
-          <div class="field">
-            <label for="startingPeriod">Starting period</label>
-            <select id="startingPeriod" name="startingPeriod">
-              <option value="Q1">Q1</option>
-              <option value="H1">H1</option>
-            </select>
+        <input id="trackPlayingTime" name="trackPlayingTime" type="hidden" value="on" />
+        <section class="tracked-time-setup vnext-clock-setup" aria-labelledby="gameClockSetupTitle">
+          <div class="section-head compact-head">
+            <div>
+              <h3 id="gameClockSetupTitle">Game clock</h3>
+              <p class="muted small">Private, authoritative, and saved on this device first.</p>
+            </div>
+            <span class="setup-lock-label">Player starts OFF FIELD</span>
           </div>
-          <div class="field">
-            <label for="liveShare">Live Share</label>
-            <select id="liveShare" name="liveShare" ${liveShareAvailable ? "" : "disabled"}>
-              <option value="off">Off</option>
-              ${liveShareAvailable ? `<option value="on">On</option>` : ""}
-            </select>
-            ${
-              liveShareAvailable
-                ? ""
-                : `<p class="field-help">${escapeHTML(liveShareEligibility.message)}</p>`
-            }
-          </div>
-        </div>
-        <section class="tracked-time-setup">
-          <label class="confirm-check tracked-time-choice">
-            <input id="trackPlayingTime" name="trackPlayingTime" type="checkbox" data-track-playing-time-toggle />
-            <span>
-              <strong>Track playing time for this game</strong>
-              <small>Optional and private. Starts with the player off field.</small>
-            </span>
-          </label>
-          <div class="tracked-time-duration-fields" data-track-playing-time-fields hidden>
+          <div class="tracked-time-duration-fields" data-track-playing-time-fields>
             <div class="form-grid two">
               <div class="field">
                 <label for="regulationPeriodMinutes">Minutes per period</label>
-                <input id="regulationPeriodMinutes" name="regulationPeriodMinutes" type="number" min="1" max="90" step="1" value="12" required disabled />
+                <input id="regulationPeriodMinutes" name="regulationPeriodMinutes" type="number" min="1" max="90" step="1" value="12" list="periodDurationOptions" required />
+                <datalist id="periodDurationOptions">
+                  <option value="10"></option>
+                  <option value="12"></option>
+                  <option value="15"></option>
+                  <option value="20"></option>
+                  <option value="25"></option>
+                </datalist>
+                <p class="field-help">Choose a common value or enter a custom duration.</p>
               </div>
               <div class="field">
                 <label for="overtimeMinutes">Overtime minutes <span class="muted">(optional)</span></label>
-                <input id="overtimeMinutes" name="overtimeMinutes" type="number" min="1" max="30" step="1" placeholder="4" disabled />
+                <input id="overtimeMinutes" name="overtimeMinutes" type="number" min="1" max="30" step="1" placeholder="4" />
               </div>
             </div>
-            <p class="field-help">The private game clock is stored on this device first. It is not added to Live Share or public recaps.</p>
           </div>
+          <div class="game-structure-summary" role="status" aria-live="polite">
+            <span>Game structure</span>
+            <strong data-game-structure-summary>${gameStructureSummary("quarters", 12)}</strong>
+          </div>
+          <p class="field-help">Clock, field state, and tracked playing time stay private and are excluded from Live Share and public recaps.</p>
         </section>
-        <button class="btn positive" type="submit" ${viewOnlyTeamPlayer ? "disabled" : ""}>Start Tracking</button>
+        <div class="field setup-live-share-field">
+          <label for="liveShare">Live Share</label>
+          <select id="liveShare" name="liveShare" ${liveShareAvailable ? "" : "disabled"}>
+            <option value="off">Off</option>
+            ${liveShareAvailable ? `<option value="on">On</option>` : ""}
+          </select>
+          ${liveShareAvailable ? "" : `<p class="field-help">${escapeHTML(liveShareEligibility.message)}</p>`}
+        </div>
+        <button class="btn positive setup-start-button" type="submit" ${viewOnlyTeamPlayer ? "disabled" : ""}>Start Live Tracking</button>
       </section>
     </form>
   `);
@@ -12452,15 +12567,58 @@ function renderImportDialog() {
 function renderLiveScoreControl(game) {
   const normalized = normalizeGame(game);
   return `
-    <section class="lh-score-control" aria-label="Score control">
-      <div class="lh-score-chip">
-        <span>Score</span>
-        <strong>${escapeHTML(scoreLabel(normalized))}</strong>
-      </div>
+    <details class="manual-score-control">
+      <summary>Manual score correction</summary>
+      <p>Use only when the scoreboard needs a direct correction. Changes continue through the governed score path.</p>
       <div class="lh-score-actions">
-        <button class="mini-btn light" type="button" data-action="score-goal-for">Goal For</button>
-        <button class="mini-btn light" type="button" data-action="score-goal-against">Goal Against</button>
-        <button class="mini-btn light" type="button" data-action="edit-score">Edit Score</button>
+        <button class="mini-btn light" type="button" data-action="score-goal-for">+1 Us</button>
+        <button class="mini-btn light" type="button" data-action="score-goal-against">+1 Opponent</button>
+        <button class="mini-btn light" type="button" data-action="edit-score">Enter score</button>
+      </div>
+      <span class="sr-only">Current score ${escapeHTML(scoreLabel(normalized))}</span>
+    </details>
+  `;
+}
+
+function renderLiveScoreboard(game) {
+  const normalized = normalizeGame(game);
+  const player = gamePlayerSnapshot(normalized);
+  const teamName = player.team || teamById(normalized.teamId)?.name || "Us";
+  const opponent = normalized.opponent || "Opponent";
+  const clock = projectedTrackedClock(normalized);
+  const sync = gameSyncPresentation(normalized);
+  const clockConflict = unresolvedR207ClockOperations(normalized.id)
+    .some((operation) => operation.state === "conflicted");
+  const clockAction = !clock || clock.clockSecondsRemaining === 0
+    ? ""
+    : clock.isRunning
+      ? `<button class="scoreboard-clock-action pause" type="button" data-action="tracked-clock-pause">Pause</button>`
+      : `<button class="scoreboard-clock-action run" type="button" data-action="${clock.startedAt ? "tracked-clock-resume" : "tracked-clock-start"}">${clock.startedAt ? "Run" : "Start"}</button>`;
+  return `
+    <section class="vnext-scoreboard" aria-label="Live scoreboard">
+      <div class="scoreboard-status-line">
+        <span class="live-indicator"><i aria-hidden="true"></i> Live</span>
+        <span class="game-sync-badge ${sync.tone}">${escapeHTML(sync.label)}</span>
+      </div>
+      ${clockConflict ? `<p class="r207-clock-conflict-notice" role="status">Clock actions are saved and need review after another-device change.</p>` : ""}
+      <div class="scoreboard-main">
+        <div class="scoreboard-team tracked-team">
+          <span>${escapeHTML(teamName)}</span>
+          <strong>${normalized.scoreFor}</strong>
+        </div>
+        <div class="scoreboard-clock">
+          <span>${escapeHTML(clock?.currentPeriod || normalized.currentQuarter)}</span>
+          <strong data-tracked-clock>${clock ? formatPlayingTime(clock.clockSecondsRemaining) : "—"}</strong>
+          <small data-tracked-clock-state>${clock ? (clock.isRunning ? "Running" : "Paused") : "Legacy game"}</small>
+        </div>
+        <div class="scoreboard-team opponent-team">
+          <span>${escapeHTML(opponent)}</span>
+          <strong>${normalized.scoreAgainst}</strong>
+        </div>
+      </div>
+      <div class="scoreboard-controls">
+        ${clockAction || `<span class="scoreboard-clock-complete">${clock ? "Period complete" : "Clock not enabled"}</span>`}
+        ${renderLiveScoreControl(normalized)}
       </div>
     </section>
   `;
@@ -12474,48 +12632,39 @@ function renderTrackedPlayingTimeLive(game) {
   const activeSeconds = summary.onField && summary.activeStart?.period === clock.currentPeriod
     ? Math.max(0, summary.activeStart.gameClockSeconds - clock.clockSecondsRemaining)
     : 0;
-  const clockAction = clock.clockSecondsRemaining === 0
-    ? ""
-    : clock.isRunning
-      ? `<button class="btn secondary tracked-clock-button" type="button" data-action="tracked-clock-pause">Pause</button>`
-      : `<button class="btn positive tracked-clock-button" type="button" data-action="${clock.startedAt ? "tracked-clock-resume" : "tracked-clock-start"}">${clock.startedAt ? "Resume" : "Start"}</button>`;
   const nextPeriod = nextTrackedPeriod(clock);
-  const clockConflict = unresolvedR207ClockOperations(game.id)
-    .some((operation) => operation.state === "conflicted");
+  const player = gamePlayerSnapshot(game);
+  const jersey = player.number ? `#${player.number}` : "No jersey";
+  const nextPeriodLabel = clock.periodFormat === "halves" ? "Next Half" : "Next Quarter";
   return `
-    <section class="tracked-time-live card pad" aria-labelledby="trackedTimeLiveTitle">
-      ${clockConflict ? `
-        <p class="r207-clock-conflict-notice" role="status" aria-live="polite">
-          The game clock changed on another device. Your clock actions are saved and need review.
-        </p>
-      ` : ""}
-      <div class="tracked-clock-heading">
+    <section class="tracked-time-live card pad vnext-player-state ${summary.onField ? "player-is-on" : "player-is-off"}" aria-labelledby="trackedTimeLiveTitle">
+      <div class="player-state-identity">
         <div>
-          <span class="eyebrow" id="trackedTimeLiveTitle">Private playing time</span>
-          <strong class="tracked-clock-period">${escapeHTML(clock.currentPeriod)}</strong>
+          <span class="eyebrow" id="trackedTimeLiveTitle">Tracked player</span>
+          <strong>${escapeHTML(player.name || "Player")} <small>${escapeHTML(jersey)}</small></strong>
         </div>
-        <div class="tracked-clock-readout">
-          <strong data-tracked-clock>${formatPlayingTime(clock.clockSecondsRemaining)}</strong>
-          <span data-tracked-clock-state>${clock.isRunning ? "Running" : "Paused"}</span>
+        <div class="tracked-total-readout">
+          <span>Tracked time</span>
+          <strong data-tracked-total>${formatPlayingTime(summary.totalSeconds + activeSeconds)}</strong>
         </div>
-      </div>
-      <div class="tracked-clock-actions">
-        ${clockAction}
-        <button class="btn neutral tracked-clock-button" type="button" data-action="tracked-period-end">
-          End Period${nextPeriod ? ` &amp; Open ${escapeHTML(nextPeriod)}` : ""}
-        </button>
       </div>
       <div class="participation-state ${summary.onField ? "on-field" : "off-field"}" data-participation-state>
         <div>
-          <span class="participation-state-label">${summary.onField ? "ON FIELD" : "OFF FIELD"}</span>
-          <strong data-active-shift>${summary.onField ? `Playing ${formatPlayingTime(activeSeconds)}` : "Ready for next shift"}</strong>
+          <span class="participation-state-label">${summary.onField ? "&#9679; ON FIELD — EVENTS ENABLED" : "&#9675; OFF FIELD — EVENT BUTTONS LOCKED"}</span>
+          <strong data-active-shift>${summary.onField ? `Current shift ${formatPlayingTime(activeSeconds)}` : "Put the player in before recording a play"}</strong>
         </div>
         <button
           class="participation-button ${summary.onField ? "player-out" : "player-in"}"
           type="button"
           data-action="tracked-player-toggle"
           aria-label="${summary.onField ? "Record Player Out" : "Record Player In"}"
-        >${summary.onField ? "PLAYER OUT" : "PLAYER IN"}</button>
+        >${summary.onField ? "SUB OUT" : "PUT IN"}</button>
+      </div>
+      <div class="period-lifecycle-row">
+        <span>${escapeHTML(gameStructureSummary(clock.periodFormat, clock.regulationPeriodDurationSeconds / 60))}</span>
+        <button class="btn neutral tracked-period-button" type="button" data-action="tracked-period-end">
+          ${nextPeriod ? `${nextPeriodLabel} · ${escapeHTML(nextPeriod)}` : "Close Final Period"}
+        </button>
       </div>
       <p class="field-help">${
         trackedPlayingTimeCloudAvailability === "unavailable"
@@ -12539,10 +12688,9 @@ function renderLiveTracker() {
 
   const game = state.activeGame;
   const player = gamePlayerSnapshot(game);
-  const totals = calculateTotals(game.events, player);
   const recentEvents = [...game.events].reverse().slice(0, 5);
   const periods = periodsForGame(game);
-  const statusLine = `${escapeHTML(game.currentQuarter)} <span aria-hidden="true">&middot;</span> vs ${escapeHTML(game.opponent || "Opponent")}`;
+  const statusLine = `Tracking ${escapeHTML(playerTitle(player))}`;
   const liveShareEligibility = secureLiveShareEligibility(game);
   const liveShareAvailable = liveShareEligibility.available;
   const eventCaptureGate = liveEventCaptureGate(game);
@@ -12552,7 +12700,8 @@ function renderLiveTracker() {
     .join(' <span aria-hidden="true">&middot;</span> ');
 
   return renderShell(`
-    <section class="screen-title live-title">
+    <section class="screen-title live-title vnext-live-title">
+      <span class="eyebrow">Track</span>
       <h2>${statusLine}</h2>
       <p class="live-meta">
         <span>${liveMeta}</span>
@@ -12566,34 +12715,13 @@ function renderLiveTracker() {
       ${renderLiveStatusChips(game)}
     </section>
 
-    ${renderLivePlayerCard(player)}
-    ${renderLastEventConfirmation(game)}
+    ${renderLiveScoreboard(game)}
 
-    ${
-      hasTrackedPlayingTime(game)
-        ? `<div class="period-tabs tracked-period-tabs" role="list" aria-label="Game periods">
-            ${periods.map(
-              (period) =>
-                `<span class="period-tab ${game.currentQuarter === period ? "active" : ""}" role="listitem">${period}</span>`,
-            ).join("")}
-          </div>`
-        : `<div class="period-tabs" role="group" aria-label="Period selector">
-            ${periods.map(
-              (period) =>
-                `<button class="period-tab ${game.currentQuarter === period ? "active" : ""}" type="button" data-quarter="${period}">${period}</button>`,
-            ).join("")}
-          </div>`
-    }
+    ${hasTrackedPlayingTime(game) ? renderTrackedPlayingTimeLive(game) : renderLivePlayerCard(player)}
 
-    ${renderTrackedPlayingTimeLive(game)}
-
-    ${renderLiveScoreControl(game)}
-
-    <section class="live-summary" aria-label="Live game summary">
-      ${renderLiveImpactPill(game, totals)}
-      <div class="live-pill"><strong>${totals.points}</strong><span>Points</span></div>
-      <div class="live-pill"><strong>${game.events.length}</strong><span>Events</span></div>
-    </section>
+    ${hasTrackedPlayingTime(game) ? "" : `<div class="period-tabs" role="group" aria-label="Period selector">
+      ${periods.map((period) => `<button class="period-tab ${game.currentQuarter === period ? "active" : ""}" type="button" data-quarter="${period}">${period}</button>`).join("")}
+    </div>`}
 
     <div class="live-event-capture-state" data-live-event-capture-state="${eventCaptureGate.code}">
       ${
@@ -12604,6 +12732,8 @@ function renderLiveTracker() {
     </div>
 
     ${renderLiveStatGroups({ player, captureGate: eventCaptureGate })}
+
+    ${renderLastEventConfirmation(game)}
 
     <section class="card pad live-recent-log" style="margin-top: 12px;">
       <h3>Recent Log</h3>
@@ -15028,23 +15158,18 @@ function nextLevelFocusForSeason(totals) {
 }
 
 function renderReviewSummarySection(game, player, totals) {
-  const topContribution = topContributionForTotals(totals);
-  const showPossession = Number(totals.possessionValue || 0) !== 0 || Number(totals.extraPossessions || 0) !== 0 || topContribution.label === "Possession";
-  const activityLabel = totals.points > 0 ? "Points" : "Events";
-  const activityValue = totals.points > 0 ? totals.points : totals.eventCount;
-  const activityHelper = totals.points > 0 ? `${totals.goals}G ${totals.assists}A` : "tracked plays";
   const context = gameContextSummary(game, totals);
+  const tracked = trackedTimeSummary(game);
+  const recordStatus = gameSyncPresentation(game);
   const snapshotCards = [
-    insightCard("Recorded Events", escapeHTML(String(totals.eventCount)), "Tracked plays", { className: "snapshot-card" }),
-    insightCard("Top Contribution", escapeHTML(topContribution.display), topContribution.label, { className: "snapshot-card" }),
-    showPossession
-      ? insightCard("Possession", escapeHTML(signedMetric(totals.possessionValue)), `${signedMetric(totals.extraPossessions)} extra ${Math.abs(Number(totals.extraPossessions || 0)) === 1 ? "chance" : "chances"}`, { className: "snapshot-card" })
-      : "",
-    activityLabel === "Points" ? insightCard(activityLabel, escapeHTML(String(activityValue)), activityHelper, { className: "snapshot-card" }) : "",
     context.hasFinal
       ? insightCard("Final Score", escapeHTML(`${context.finalScoreFor}-${context.finalScoreAgainst}`), "final", { className: "snapshot-card" })
-      : "",
-    insightCard("LaxHornet Impact", renderImpactScore(totals.impact), "Selected recorded events", { className: "snapshot-card impact-snapshot-card" }),
+      : insightCard("Score", escapeHTML(scoreLabel(game)), "current recorded score", { className: "snapshot-card" }),
+    insightCard("Tracked Time", escapeHTML(tracked ? formatPlayingTime(tracked.totalSeconds) : "—"), tracked ? trackedTimeStatusLabel(tracked.status) : "not tracked", { className: "snapshot-card" }),
+    insightCard("Goals", escapeHTML(String(totals.goals)), "recorded", { className: "snapshot-card" }),
+    insightCard("Assists", escapeHTML(String(totals.assists)), "recorded", { className: "snapshot-card" }),
+    insightCard("Ground Balls", escapeHTML(String(totals.groundBalls)), "recorded", { className: "snapshot-card" }),
+    insightCard("Caused Turnovers", escapeHTML(String(totals.causedTurnovers)), "recorded", { className: "snapshot-card" }),
   ].filter(Boolean);
   return `
     <section class="review-section review-snapshot-section lh-review-snapshot">
@@ -15056,11 +15181,82 @@ function renderReviewSummarySection(game, player, totals) {
       <div class="insight-grid review-snapshot-grid">
         ${snapshotCards.join("")}
       </div>
-      <div class="impact-limitations snapshot-impact-limitations" role="note">
-        <p>${escapeHTML(GAME_IMPACT_LIMITATION)}</p>
-        <p>${escapeHTML(GAME_IMPACT_EVIDENCE_LIMIT)}</p>
+      <div class="snapshot-record-status ${recordStatus.tone}" role="status">
+        <span>Record status</span>
+        <strong>${escapeHTML(recordStatus.label)}</strong>
+        <p>${escapeHTML(recordStatus.detail)}</p>
       </div>
     </section>
+  `;
+}
+
+function evidenceReference(event = {}, index = 0) {
+  const id = String(event.id || `event-${index + 1}`);
+  return id.length > 18 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id;
+}
+
+function renderEvidenceBasedStory(game, player, totals) {
+  const events = [...(game.events || [])].sort((left, right) => {
+    const timeDifference = Date.parse(left.timestamp || 0) - Date.parse(right.timestamp || 0);
+    return timeDifference || String(left.id || "").localeCompare(String(right.id || ""));
+  });
+  const periodEntries = periodsForGame(game)
+    .map((period) => ({ period, events: events.filter((event) => event.quarter === period) }))
+    .filter((entry) => entry.events.length);
+  const finalScore = gameFinalScore(game);
+  const intro = [
+    `${escapeHTML(playerTitle(player))} had ${totals.eventCount} recorded ${totals.eventCount === 1 ? "event" : "events"}.`,
+    finalScore ? `The recorded final score was ${escapeHTML(finalScore)}.` : "No final score was recorded.",
+  ].join(" ");
+  return `
+    <section class="review-section evidence-story" aria-labelledby="gameStoryEvidenceTitle">
+      <div class="card pad">
+        <div class="section-head compact-head">
+          <div>
+            <span class="eyebrow">Recorded sequence</span>
+            <h3 id="gameStoryEvidenceTitle">The game, from the evidence.</h3>
+          </div>
+        </div>
+        <p>${intro}</p>
+        ${periodEntries.length ? `<div class="evidence-story-periods">
+          ${periodEntries.map(({ period, events: periodEvents }) => {
+            const counts = periodEvents.reduce((result, event) => {
+              result[event.statLabel] = (result[event.statLabel] || 0) + 1;
+              return result;
+            }, {});
+            const eventText = Object.entries(counts)
+              .map(([label, count]) => `${count} × ${label}`)
+              .join(", ");
+            const finalContext = [...periodEvents].reverse().find((event) => eventScoreDisplay(event));
+            return `<article class="evidence-story-period">
+              <span>${escapeHTML(period)}</span>
+              <p>${escapeHTML(`${periodEvents.length} recorded ${periodEvents.length === 1 ? "event" : "events"}: ${eventText}.`)}${finalContext ? ` The last recorded score context in this period was ${escapeHTML(eventScoreDisplay(finalContext))}.` : ""}</p>
+              <small>Evidence: ${periodEvents.map(evidenceReference).map(escapeHTML).join(", ")}</small>
+            </article>`;
+          }).join("")}
+        </div>` : `<div class="empty-state-inline"><strong>No event story yet.</strong><p>There are no recorded events to narrate for this game.</p></div>`}
+        <p class="safety-note">This Story reports only recorded event, period, time, and score context. It does not infer positioning, assignment, intent, matchup, effort, decision quality, or coaching responsibility.</p>
+      </div>
+    </section>
+  `;
+}
+
+function renderReviewTabs(activeTab = "snapshot") {
+  return `
+    <div class="review-mode-tabs" role="tablist" aria-label="Game Review sections">
+      ${[
+        ["snapshot", "Snapshot"],
+        ["story", "Story"],
+        ["evidence", "Evidence"],
+      ].map(([value, label]) => `<button
+        type="button"
+        role="tab"
+        class="review-mode-tab ${activeTab === value ? "active" : ""}"
+        aria-selected="${activeTab === value}"
+        data-action="set-review-tab"
+        data-review-tab="${value}"
+      >${label}</button>`).join("")}
+    </div>
   `;
 }
 
@@ -15285,9 +15481,6 @@ function renderReview() {
 
   const player = gamePlayerSnapshot(game);
   const totals = calculateTotals(game.events, player);
-  const topContribution = topContributionForTotals(totals);
-  const seasonContext = calculateSeasonTotalsForPlayer(player);
-  const postGameIntelligence = buildPostGameIntelligence(game, game.events || [], player, totals, seasonContext);
   const canEditCurrentGame = canEditGame(game);
   const editingEvent = state.editingEventId
     ? game.events.find((event) => event.id === state.editingEventId)
@@ -15299,57 +15492,61 @@ function renderReview() {
   const canShowGameEdit = canEditCurrentGame && !correctionPanelOpen;
   const canShowAddEvent = canEditCurrentGame && !correctionPanelOpen;
   const opponent = String(game.opponent || "").trim();
+  const activeTab = ["snapshot", "story", "evidence"].includes(state.reviewTab) ? state.reviewTab : "snapshot";
+  const snapshotContent = renderReviewSummarySection(game, player, totals);
+  const storyContent = renderEvidenceBasedStory(game, player, totals);
+  const evidenceContent = `
+    ${renderTrackedPlayingTimeReview(game, canEditCurrentGame)}
+    ${renderReviewStatsSection(totals, game.events || [])}
+    <section class="review-section lh-timeline-section">
+      <div class="card pad">
+        <div class="section-head compact-head">
+          <div>
+            <span class="eyebrow">Canonical event record</span>
+            <h3>Evidence timeline</h3>
+          </div>
+        </div>
+        <p class="muted small">Recorded event timing, period, score context, notes, tags, and governed corrections.</p>
+        <p class="safety-note">Avoid private, medical, or sensitive information. Notes and process tags stay in private reviews and account exports; they do not appear in Live Share.</p>
+        ${game.events.length
+          ? `<div class="event-list">${[...game.events]
+              .reverse()
+              .map((event) => renderEventRow(event, { editable: canEditCurrentGame, gameId: game.id }))
+              .join("")}</div>`
+          : `<p class="muted small">No events were logged for this game.</p>`}
+      </div>
+    </section>
+    ${canEditCurrentGame ? `
+      <section class="review-section">
+        <div class="card pad edit-tools-card">
+          <h3>Correction tools</h3>
+          <p class="safety-note">Changes use production correction and tombstone semantics and update factual totals.</p>
+          ${canShowAddEvent || canShowGameEdit ? `<div class="review-tool-actions">
+            ${canShowAddEvent ? `<button class="btn neutral" type="button" data-action="add-review-event">Add Event</button>` : ""}
+            ${canShowGameEdit ? `<button class="btn secondary" type="button" data-action="edit-game-details">Edit Game Details</button>` : ""}
+          </div>` : ""}
+        </div>
+        ${state.addingReviewEvent && canEditCurrentGame ? renderEventAddForm(game) : ""}
+        ${state.editingGameDetails && canEditCurrentGame ? renderGameEditForm(game) : ""}
+        ${editingEvent && canEditCurrentGame ? renderEventEditForm(game, editingEvent) : ""}
+        ${tagEditingEvent && canEditCurrentGame ? renderTagEditor(game, tagEditingEvent) : ""}
+      </section>
+    ` : ""}
+  `;
   return renderShell(`
-    <section class="screen-title lh-review-header">
+    <section class="screen-title lh-review-header vnext-review-header">
+      <button class="text-action review-back-action" type="button" data-nav="past"><span aria-hidden="true">←</span> Games</button>
       <h2 id="gameReviewTitle" tabindex="-1">Game Review</h2>
-      <p>${escapeHTML(playerTitle(player))}${opponent ? ` vs ${escapeHTML(opponent)}` : ""} &middot; ${formatDate(game.date)}</p>
+      <p>${escapeHTML(playerTitle(player))}${opponent ? ` vs ${escapeHTML(opponent)}` : ""} · ${formatDate(game.date)}${gameFinalScore(game) ? ` · ${escapeHTML(gameFinalScore(game))}` : ""}</p>
     </section>
 
     <section class="stack review-screen-stack lh-review-page">
       ${renderR207ConflictNotice(game)}
       ${renderR207EventConflictNotice(game)}
-      ${renderReviewSummarySection(game, player, totals)}
-      ${renderTrackedPlayingTimeReview(game, canEditCurrentGame)}
-      ${renderGameStorySection(postGameIntelligence)}
-      ${renderDevelopmentTakeaway(totals, player, topContribution.label, game, postGameIntelligence)}
-      ${renderFamilyRecapSection(game, player, totals, postGameIntelligence)}
-      ${renderConversationStarters(totals, player, game, postGameIntelligence)}
-      ${renderReviewStatsSection(totals, game.events || [], postGameIntelligence)}
-      <section class="review-section lh-timeline-section">
-        <div class="card pad">
-          <h3>Timeline &amp; Edits</h3>
-          <p class="muted small">Review each tracked play, add notes or tags, and make corrections if needed.</p>
-          <p class="safety-note">Avoid private, medical, or sensitive information. Notes and process tags stay in private reviews and account exports; they do not appear in Live Share.</p>
-        ${
-          game.events.length
-            ? `<div class="event-list">${[...game.events]
-                .reverse()
-                .map((event) => renderEventRow(event, { editable: canEditCurrentGame, gameId: game.id }))
-                .join("")}</div>`
-            : `<p class="muted small">No events were logged for this game.</p>`
-        }
-        </div>
-      </section>
-      ${canEditCurrentGame ? `
-        <section class="review-section">
-          <div class="card pad edit-tools-card">
-            <h3>Edit Tools</h3>
-            <p class="safety-note">Changes update this game&apos;s totals, Game Impact, possession metrics, tags, and season dashboard.</p>
-            ${
-              canShowAddEvent || canShowGameEdit
-                ? `<div class="review-tool-actions">
-                    ${canShowAddEvent ? `<button class="btn neutral" type="button" data-action="add-review-event">Add Event</button>` : ""}
-                    ${canShowGameEdit ? `<button class="btn secondary" type="button" data-action="edit-game-details">Edit Game Details</button>` : ""}
-                  </div>`
-                : ""
-            }
-          </div>
-          ${state.addingReviewEvent && canEditCurrentGame ? renderEventAddForm(game) : ""}
-          ${state.editingGameDetails && canEditCurrentGame ? renderGameEditForm(game) : ""}
-          ${editingEvent && canEditCurrentGame ? renderEventEditForm(game, editingEvent) : ""}
-          ${tagEditingEvent && canEditCurrentGame ? renderTagEditor(game, tagEditingEvent) : ""}
-        </section>
-      ` : ""}
+      ${renderReviewTabs(activeTab)}
+      <div class="review-mode-panel" role="tabpanel" data-review-panel="${activeTab}">
+        ${activeTab === "snapshot" ? snapshotContent : activeTab === "story" ? storyContent : evidenceContent}
+      </div>
     </section>
   `);
 }
@@ -15607,11 +15804,11 @@ function renderSeasonTotalsGroups(totals) {
 
 function renderPastGames() {
   const games = visibleGames();
-  const exportExpanded = state.exportToolsExpanded;
   return renderShell(`
-    <section class="screen-title">
-      <h2>Past Games</h2>
-      <p>Showing saved games for ${escapeHTML(playerContextLine(state.player))}.</p>
+    <section class="screen-title vnext-games-title">
+      <span class="eyebrow">Games</span>
+      <h2>Captured games.</h2>
+      <p>Saved history for ${escapeHTML(playerContextLine(state.player))}.</p>
     </section>
 
     <section class="stack">
@@ -15620,64 +15817,81 @@ function renderPastGames() {
         helper: "Switch players to review another player's saved games.",
       })}
 
-      <section class="card">
+      <section class="games-card-list" aria-label="Saved games">
         ${
           games.length
             ? games.map(renderGameListRow).join("")
-            : `<div class="empty empty-state-card">
+            : `<div class="card pad empty empty-state-card">
                 <h3>No games tracked yet</h3>
-                <p class="muted small">Start your first game to build a timeline, stats, Game Impact, and season dashboard.</p>
-                <button class="mini-btn" type="button" data-nav="start">Start New Game</button>
+                <p class="muted small">Track a game to create its factual Snapshot, Story, and Evidence record.</p>
+                <button class="btn positive" type="button" data-nav="start">Track a Game</button>
               </div>`
-        }
-      </section>
-
-      <section class="card pad export-card ${exportExpanded ? "expanded" : "collapsed"}">
-        <div class="collapsible-card-head">
-          <div>
-            <h3>Backup & Export</h3>
-            <p class="muted small">CSV, JSON backup, and restore tools.</p>
-          </div>
-          <button class="collapse-icon" type="button" data-action="toggle-export-tools" aria-expanded="${exportExpanded}" aria-label="${exportExpanded ? "Minimize Backup and Export" : "Expand Backup and Export"}">
-            <span aria-hidden="true">${exportExpanded ? "v" : ">"}</span>
-          </button>
-        </div>
-        ${
-          exportExpanded
-            ? `<div class="export-card-body">
-                <p class="muted small">Choose a purpose before downloading. CSV is a scoped data export; Full Backup is a sensitive private recovery file.</p>
-                <div class="export-actions">
-                  <button class="btn neutral" type="button" data-action="open-csv-export">Export Selected CSV</button>
-                  <button class="btn neutral" type="button" data-action="open-full-backup">Create Private Backup</button>
-                  <label class="btn secondary import-label" for="jsonImport">Restore Private Backup</label>
-                  <input class="import-input" id="jsonImport" type="file" accept="application/json,.json" data-import-json />
-                </div>
-                <p class="field-help">Live Share, recap sharing, CSV data export, and private backup are separate output modes with different contents.</p>
-              </div>`
-            : ""
         }
       </section>
     </section>
   `);
 }
 
+function renderDataToolsCard() {
+  const expanded = state.exportToolsExpanded;
+  return `
+    <section class="card pad more-card export-card ${expanded ? "expanded" : "collapsed"}">
+      <div class="collapsible-card-head">
+        <div>
+          <h3>Data &amp; backup</h3>
+          <p class="muted small">Scoped export, private recovery, and restore tools.</p>
+        </div>
+        <button class="collapse-icon" type="button" data-action="toggle-export-tools" aria-expanded="${expanded}" aria-label="${expanded ? "Collapse data and backup tools" : "Expand data and backup tools"}">
+          <span aria-hidden="true">${expanded ? "−" : "+"}</span>
+        </button>
+      </div>
+      ${expanded ? `<div class="export-card-body">
+        <p class="muted small">Choose a purpose before downloading. CSV is scoped; Full Backup is a sensitive private recovery file.</p>
+        <div class="export-actions">
+          <button class="btn neutral" type="button" data-action="open-csv-export">Export selected CSV</button>
+          <button class="btn neutral" type="button" data-action="open-full-backup">Create private backup</button>
+          <label class="btn secondary import-label" for="jsonImport">Restore private backup</label>
+          <input class="import-input" id="jsonImport" type="file" accept="application/json,.json" data-import-json />
+        </div>
+        <p class="field-help">Live Share, recap sharing, data export, and private backup remain separate disclosure modes.</p>
+      </div>` : ""}
+    </section>
+  `;
+}
+
 function renderGameListRow(game) {
   const player = gamePlayerSnapshot(game);
   const totals = calculateTotals(game.events, player);
   const editable = canEditGame(game);
+  const outcome = gameOutcome(game);
+  const score = gameFinalScore(game);
+  const tracked = trackedTimeSummary(game);
+  const sync = gameSyncPresentation(game);
+  const teamName = player.team || teamById(gameTeamId(game))?.name || "Tracked team";
   return `
-    <div class="list-row">
-      <button class="brand" type="button" data-review="${game.id}" style="color: var(--text); text-align: left;">
-        <span>
-          <h3>${escapeHTML(game.opponent)}</h3>
-          <p>${escapeHTML(playerContextLine(player))} - ${formatDate(game.date)} - ${totals.eventCount} recorded events - Possession Value ${signedMetric(totals.possessionValue)}</p>
+    <article class="game-history-card">
+      <button class="game-history-open" type="button" data-review="${escapeHTML(game.id)}" aria-label="Open Game Review for ${escapeHTML(teamName)} versus ${escapeHTML(game.opponent || "Opponent")}">
+        <span class="game-history-topline">
+          <span>${formatDate(game.date)}</span>
+          <span class="game-sync-badge ${sync.tone}">${escapeHTML(sync.label)}</span>
         </span>
+        <span class="game-history-scoreline">
+          ${outcome ? `<b class="game-outcome ${outcome.tone}">${escapeHTML(outcome.label)}</b>` : ""}
+          <span class="game-history-matchup">
+            <strong>${escapeHTML(teamName)}</strong>
+            <small>vs ${escapeHTML(game.opponent || "Opponent")}</small>
+          </span>
+          <b class="game-history-score">${score ? escapeHTML(score) : "—"}</b>
+        </span>
+        <span class="game-history-meta">
+          <span>${escapeHTML(playerTitle(player))}</span>
+          <span>${tracked ? `${formatPlayingTime(tracked.totalSeconds)} tracked` : "Playing time not tracked"}</span>
+          <span>${totals.eventCount} ${totals.eventCount === 1 ? "event" : "events"}</span>
+        </span>
+        <span class="game-history-review-link">Game Review <i aria-hidden="true">→</i></span>
       </button>
-      <div class="row-actions">
-        <button class="icon-btn wide" type="button" data-review="${game.id}" aria-label="Review and edit game">Review/Edit</button>
-        ${editable ? `<button class="icon-btn delete" type="button" data-delete="${game.id}" aria-label="Delete game">Del</button>` : ""}
-      </div>
-    </div>
+      ${editable ? `<button class="game-history-delete" type="button" data-delete="${escapeHTML(game.id)}" aria-label="Delete ${escapeHTML(teamName)} versus ${escapeHTML(game.opponent || "Opponent")}">Delete</button>` : ""}
+    </article>
   `;
 }
 
@@ -15775,9 +15989,11 @@ function renderDashboard() {
   const encouragement = seasonIntelligence.encouragement;
   const nextFocus = seasonIntelligence.nextFocus;
   const seasonEvents = seasonGames.flatMap((game) => game.events || []);
+  const trackedSeconds = trackedSeasonSeconds(seasonGames);
   return renderShell(`
-    <section class="screen-title">
-      <h2>Season Snapshot</h2>
+    <section class="screen-title vnext-season-title">
+      <span class="eyebrow">Season</span>
+      <h2>The season at a glance.</h2>
       <p>Totals for ${escapeHTML(playerContextLine(state.player))}.</p>
     </section>
 
@@ -15786,15 +16002,13 @@ function renderDashboard() {
         title: "Season For",
         helper: "Switch players to see another season dashboard.",
       })}
-      <div class="insight-grid">
-        ${insightCard("Games Tracked", escapeHTML(String(totals.gamesPlayed)), "Saved games")}
-        ${insightCard("Total Points", escapeHTML(String(totals.points)), `${totals.goals}G ${totals.assists}A`)}
-        ${insightCard("Possession Impact", escapeHTML(signedMetric(totals.possessionValue)), `${signedMetric(totals.extraPossessions)} extra chances`)}
-        ${insightCard("Average LaxHornet Impact", renderImpactScore(totals.averageImpact, { label: "average" }), "Selected recorded events")}
-      </div>
-      <div class="impact-limitations season-impact-limitations" role="note">
-        <p>${escapeHTML(GAME_IMPACT_LIMITATION)}</p>
-        <p>${escapeHTML(GAME_IMPACT_EVIDENCE_LIMIT)}</p>
+      <div class="insight-grid season-priority-grid">
+        ${insightCard("Games", escapeHTML(String(totals.gamesPlayed)), "captured")}
+        ${insightCard("Tracked Time", escapeHTML(trackedSeconds ? formatPlayingTime(trackedSeconds) : "—"), trackedSeconds ? "private playing time" : "not yet tracked")}
+        ${insightCard("Goals", escapeHTML(String(totals.goals)), "recorded")}
+        ${insightCard("Assists", escapeHTML(String(totals.assists)), "recorded")}
+        ${insightCard("Ground Balls", escapeHTML(String(totals.groundBalls)), "recorded")}
+        ${insightCard("Caused Turnovers", escapeHTML(String(totals.causedTurnovers)), "recorded")}
       </div>
       <section class="card pad development-card lh-season-story-card">
         <h3>Season Story</h3>
@@ -16907,6 +17121,7 @@ function handleClick(event) {
       const game = state.games.find((item) => item.id === action.dataset.gameId);
       if (game) selectPlayerForGame(game);
       state.reviewGameId = action.dataset.gameId;
+      state.reviewTab = "snapshot";
       state.gameSavedSummaryId = "";
       persistAll();
       navigate("review");
@@ -17014,6 +17229,14 @@ function handleClick(event) {
     if (action.dataset.action === "toggle-more-plays") {
       state.morePlaysExpanded = !state.morePlaysExpanded;
       render();
+    }
+    if (action.dataset.action === "set-review-tab") {
+      const requestedTab = action.dataset.reviewTab;
+      if (["snapshot", "story", "evidence"].includes(requestedTab)) {
+        state.reviewTab = requestedTab;
+        render();
+        document.querySelector(`[data-review-tab="${requestedTab}"]`)?.focus();
+      }
     }
     if (action.dataset.action === "cancel-delete-game") {
       state.pendingDeleteGameId = "";
@@ -17162,6 +17385,7 @@ function handleClick(event) {
   const review = event.target.closest("[data-review]");
   if (review) {
     state.reviewGameId = review.dataset.review;
+    state.reviewTab = "snapshot";
     persistAll();
     navigate("review");
     return;
@@ -17218,7 +17442,7 @@ function handleChange(event) {
     const format = event.target.value;
     const regulationInput = document.querySelector("#regulationPeriodMinutes");
     const startingPeriod = document.querySelector("#startingPeriod");
-    if (regulationInput) regulationInput.value = format === "halves" ? "24" : "12";
+    if (regulationInput) regulationInput.value = format === "halves" ? "25" : "12";
     if (startingPeriod) {
       const periods = PERIOD_FORMATS[format]?.periods || PERIOD_FORMATS.quarters.periods;
       startingPeriod.innerHTML = periods
@@ -17226,6 +17450,11 @@ function handleChange(event) {
         .map((period) => `<option value="${period}">${period}</option>`)
         .join("");
     }
+    updateGameStructureSummary(event.target.closest("form"));
+    return;
+  }
+  if (event.target.matches("#regulationPeriodMinutes")) {
+    updateGameStructureSummary(event.target.closest("form"));
   }
 }
 
@@ -17416,13 +17645,15 @@ function refreshTrackedClockDisplay() {
   const clockElement = document.querySelector("[data-tracked-clock]");
   const clockStateElement = document.querySelector("[data-tracked-clock-state]");
   const activeShiftElement = document.querySelector("[data-active-shift]");
+  const trackedTotalElement = document.querySelector("[data-tracked-total]");
   if (clockElement) clockElement.textContent = formatPlayingTime(clock.clockSecondsRemaining);
   if (clockStateElement) clockStateElement.textContent = clock.isRunning ? "Running" : "Paused";
   if (activeShiftElement && summary.onField) {
     const activeSeconds = summary.activeStart?.period === clock.currentPeriod
       ? Math.max(0, summary.activeStart.gameClockSeconds - clock.clockSecondsRemaining)
       : 0;
-    activeShiftElement.textContent = `Playing ${formatPlayingTime(activeSeconds)}`;
+    activeShiftElement.textContent = `Current shift ${formatPlayingTime(activeSeconds)}`;
+    if (trackedTotalElement) trackedTotalElement.textContent = formatPlayingTime(summary.totalSeconds + activeSeconds);
   }
 }
 

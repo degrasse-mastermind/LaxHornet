@@ -3051,6 +3051,107 @@ Remaining work: Independent exact-PR-SHA Level 3 review, including adversarial
 multi-session probes against the isolated Preview branch. Merge, production
 activation, and release remain separately unauthorized.
 
+## LH-24 — vNext production UX overhaul
+
+Branch: `codex/vnext-production-ux-overhaul`
+
+Approved starting SHA: `3b866d35d48fc2d54837952241de237d785523cf`
+
+Goal:
+
+Apply the approved sporty vNext mobile interaction and visual direction to the
+current v288 production architecture while preserving local-first capture,
+R2-07 operations and conflicts, authoritative clock behavior, tracked playing
+time, auth startup, authorization, disclosure, and PWA/release controls.
+
+In scope:
+
+- Home, Track, Games, Season, and More app-shell information architecture.
+- Pregame quarters/halves and suggested or custom regulation duration using the
+  existing tracked-time clock model.
+- Live scoreboard, clock, unmistakable Player In/Out state, event controls,
+  last-action correction, and completion presentation.
+- Saved-game cards and a Snapshot, Story, Evidence review composition.
+- Focused adversarial tests, mobile/browser QA, accessibility inspection, and
+  one full local Level 3 regression after the final diff stabilizes.
+
+Critical invariants:
+
+- Do not introduce a second game, timer, event, participation, sync, conflict,
+  authorization, or disclosure model.
+- Keep event capture synchronous and locally durable before governed cloud work.
+- Keep the Supabase auth-state callback synchronous and render authenticated UI
+  before deferred cloud hydration.
+- Preserve permanent operation identity, receipts, retries, replay, versioned
+  corrections, tombstones, clock batching, conflict review, and lifecycle
+  enforcement.
+- Do not change migrations, RLS, grants, production data, activation flags,
+  release/cache markers, Pages deployment controls, or production deployment.
+
+Acceptance criteria:
+
+- The integration map in `docs/VNEXT_PRODUCTION_UX_INTEGRATION_MAP.md` identifies
+  the production owners, change, risk, and verification for all 34 requested
+  areas.
+- The mobile UI follows the approved Home, Track, Games, Season, More hierarchy
+  and feels fast, athletic, high-contrast, and usable one-handed outdoors.
+- Newly started games use the existing authoritative tracked clock and show an
+  explicit game-structure summary before entry to Live mode.
+- OFF FIELD visibly locks ordinary event controls and `logEvent()` independently
+  rejects a stale or delegated invocation through the production gate.
+- Game Review is organized as Snapshot, Story, Evidence and the Story surface
+  presents traceable recorded facts without unsupported claims.
+- Needs Attention remains distinct from local, syncing, synced, and rejected
+  states and is never auto-adjudicated.
+- Existing focused and complete local regressions pass, or every failure is
+  reported without weakening tests.
+- A draft pull request is opened for independent exact-PR-SHA Level 3 review;
+  no merge or deployment occurs.
+
+Resolved dependency:
+
+- `LH-25` supplies the additive idempotent composite scored-event command that
+  atomically owns Goal/Assist event plus score coupling and its correction or
+  Undo. The vNext client persists one permanent prepared request, never falls
+  back to the unsafe split-write cloud path, and keeps production activation
+  default-off pending independent exact-SHA review and separate authority.
+
+Implementation record:
+
+- Reworked the production vanilla app shell, Home, setup, live tracker, Games,
+  Game Review, Season, and More surfaces without adding a framework, dependency,
+  data model, timer, sync path, or disclosure path.
+- New games initialize the existing private tracked-time clock, start paused and
+  OFF FIELD, and preserve the production event gate, local operation journal,
+  R2-07 command/batch path, and correction/tombstone behavior.
+- Added deterministic Snapshot, Story, and Evidence review modes. Story copy is
+  built only from recorded events, periods, timestamps, score context, and event
+  IDs and explicitly refuses unsupported player or coaching inference.
+- Non-migration Vercel UI previews now build in an explicit device-only mode
+  when isolated Supabase credentials are absent. That mode disables the cloud
+  client and trusted-disclosure flags instead of falling back to production;
+  credentialed isolated Preview builds retain the reviewed R2-07/LH-25 flags.
+- Browser QA passed the authenticated synthetic lifecycle `33/33` at 390x844
+  and 1280x900, and secure disclosure passed `73/73` with zero hosted Supabase
+  requests and no browser-console errors. The exact-head device-only Vercel
+  Preview also passed in-app Browser checks at 390x844 and 1440x900: FAQ/help
+  interactions changed rendered state, horizontal overflow was zero, page
+  identity/content were correct, and console warnings/errors and framework
+  overlays were absent.
+- Exact-head portable CI passes the complete active no-Docker workflow,
+  including the authenticated synthetic browser lifecycle, embedded atomic
+  transaction matrix, release containment, disclosure/security gates, and
+  allowlisted Pages artifact browser validation. Vercel Preview also passes;
+  Supabase Preview is correctly skipped because LH-24 adds no migration.
+- LH-24 adds no migration, rollback, RLS, grant, RPC, production access/write,
+  release/cache marker, manifest, Pages configuration, merge, or deployment.
+  The stacked LH-25 migration remains default-off and was validated separately
+  by its isolated Supabase Preview check.
+- Merge/release recommendation: `REVIEW`. The stacked LH-24/LH-25 implementation
+  now represents the full requested contract and its implementation gates are
+  green. Independent exact-PR-SHA Level 3 review remains required. Merge,
+  production activation, and release remain separately unauthorized.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

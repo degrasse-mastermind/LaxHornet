@@ -106,9 +106,9 @@ test("tracked live-event gate requires a running clock and on-field player", () 
     app.indexOf("function trackedTimeService"),
   );
   assert.match(gate, /clockRunning && playerOnField/);
-  assert.match(gate, /Start the clock and tap PLAYER IN to record events\./);
-  assert.match(gate, /Start or resume the game clock to record events\./);
-  assert.match(gate, /Tap PLAYER IN to record events\./);
+  assert.match(gate, /OFF FIELD — event buttons locked\. Start the clock, then tap PUT IN\./);
+  assert.match(gate, /Clock paused — event buttons locked\. Tap Run to continue\./);
+  assert.match(gate, /OFF FIELD — event buttons locked\. Tap PUT IN to record a play\./);
 });
 
 test("central live-event creation checks the gate before operations or score changes", () => {

@@ -1212,7 +1212,11 @@ async function newContext(browser, options = {}) {
     });
     const personalRequests = localApiRequests.slice(personalRequestStart);
     check(personalResult.trackedCount === 1, "personal game tracking works");
-    check(personalResult.reviewText.includes("Game Review"), "personal game save and review work");
+    check(
+      /game review/i.test(personalResult.reviewText)
+        && personalResult.reviewText.includes("Personal Demo Player"),
+      "personal game save and review work",
+    );
     check(personalResult.csvHasEvent && personalResult.backupHasGame, "personal game export and private backup remain available");
     check(personalResult.liveText.includes("Live Share unavailable"), "personal game Live Share is visibly unavailable");
     check(personalResult.promptGameId === "", "personal game does not open or retain a Live Share token prompt");

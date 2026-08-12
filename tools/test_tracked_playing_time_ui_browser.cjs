@@ -132,21 +132,24 @@ async function liveEventSnapshot(page) {
       };
       state.screen = "start";
       render();
-      return { screen: state.screen, hasToggle: Boolean(document.querySelector("#trackPlayingTime")) };
+      return { screen: state.screen, hasTrackedClock: Boolean(document.querySelector("#trackPlayingTime")) };
     });
     console.log("NAV", navigationState);
-    await page.locator("#trackPlayingTime").waitFor();
-    check((await page.locator("body").innerText()).includes("Track playing time for this game"), "setup shows conservative opt-in");
+    await page.locator("#trackPlayingTime").waitFor({ state: "attached" });
+    check(
+      (await page.locator("#trackPlayingTime").getAttribute("value")) === "on"
+        && /player starts off field/i.test(await page.locator("body").innerText()),
+      "vNext setup initializes the existing private tracked clock and explains the starting state",
+    );
     await screenshot(page, "01-mobile-clock-setup.png");
 
-    await page.locator("#trackPlayingTime").check();
-    check(await page.locator("#regulationPeriodMinutes").isEnabled(), "tracked-time duration fields activate");
+    check(await page.locator("#regulationPeriodMinutes").isEnabled(), "tracked-time duration fields are available");
     await screenshot(page, "01b-mobile-clock-duration-setup.png");
     await page.locator("#opponent").fill("Synthetic Rivals");
-    await page.getByRole("button", { name: "Start Tracking" }).click();
+    await page.getByRole("button", { name: "Start Live Tracking" }).click();
     await page.getByRole("button", { name: "Record Player In" }).waitFor();
     let bodyText = await page.locator("body").innerText();
-    check(bodyText.includes("OFF FIELD") && bodyText.includes("PLAYER IN"), "new tracked game starts visibly off field");
+    check(bodyText.includes("OFF FIELD") && bodyText.includes("PUT IN"), "new tracked game starts visibly off field");
     await page.locator(".tracked-time-live").scrollIntoViewIfNeeded();
     await screenshot(page, "02-mobile-player-in-state.png", false);
 
@@ -213,7 +216,7 @@ async function liveEventSnapshot(page) {
     );
     check(
       (await page.locator("#liveEventCaptureMessage").innerText())
-        === "Start the clock and tap PLAYER IN to record events.",
+        === "OFF FIELD — event buttons locked. Start the clock, then tap PUT IN.",
       "stopped and off-field tracked game shows the exact combined instruction",
     );
     const nonEventControlsEnabled = await page.evaluate(() => {
@@ -255,12 +258,13 @@ async function liveEventSnapshot(page) {
       stoppedOutAttempt.goalBlocked
         && stoppedOutAttempt.noteBlocked
         && stoppedOutAttempt.promptCalls === 0
-        && stoppedOutAttempt.toast === "Start the clock and tap PLAYER IN to record events."
+        && stoppedOutAttempt.toast === "OFF FIELD — event buttons locked. Start the clock, then tap PUT IN."
         && JSON.stringify(stoppedOutBefore) === JSON.stringify(stoppedOutAfter),
       "central guard blocks goal and note creation before prompts, score, event, operation, or confirmation side effects",
     );
     const scoreBeforeManualControl = stoppedOutAfter.scoreFor;
-    await page.getByRole("button", { name: "Goal For", exact: true }).click();
+    await page.locator(".manual-score-control summary").click();
+    await page.getByRole("button", { name: "+1 Us", exact: true }).click();
     check(
       (await liveEventSnapshot(page)).scoreFor === scoreBeforeManualControl + 1,
       "manual score control remains usable while performance events are gated",
@@ -281,7 +285,7 @@ async function liveEventSnapshot(page) {
       stoppedInAttempt === null
         && JSON.stringify(stoppedInBefore) === JSON.stringify(stoppedInAfter)
         && (await page.locator("#liveEventCaptureMessage").innerText())
-          === "Start or resume the game clock to record events."
+          === "Clock paused — event buttons locked. Tap Run to continue."
         && (await page.locator("[data-stat]").evaluateAll((buttons) => buttons.every((button) => button.disabled))),
       "stopped and on-field tracked game blocks Assist with the exact clock instruction",
     );
@@ -297,9 +301,9 @@ async function liveEventSnapshot(page) {
     await page.waitForTimeout(2250);
     bodyText = await page.locator("body").innerText();
     const activeShiftText = await page.locator("[data-active-shift]").innerText();
-    check(bodyText.includes("ON FIELD") && bodyText.includes("PLAYER OUT"), "Player In changes to unmistakable on-field state");
+    check(bodyText.includes("ON FIELD") && bodyText.includes("SUB OUT"), "Player In changes to unmistakable on-field state");
     check(
-      /^Playing 0:0[1-3]$/.test(activeShiftText),
+      /^Current shift 0:0[1-3]$/.test(activeShiftText),
       `active shift timer follows running game clock (observed ${activeShiftText})`,
     );
     check(
@@ -390,13 +394,13 @@ async function liveEventSnapshot(page) {
       pausedInAttempt === null
         && JSON.stringify(pausedInBefore) === JSON.stringify(pausedInAfter)
         && (await page.locator("#liveEventCaptureMessage").innerText())
-          === "Start or resume the game clock to record events.",
+          === "Clock paused — event buttons locked. Tap Run to continue.",
       "pausing mid-shift immediately blocks event creation without ending the active shift",
     );
     await screenshot(page, "04-mobile-paused-clock.png", false);
 
     console.log("STEP event gate running and off field");
-    await page.getByRole("button", { name: "Resume", exact: true }).click();
+    await page.getByRole("button", { name: "Run", exact: true }).click();
     check(
       (await page.locator("[data-stat]").evaluateAll((buttons) => buttons.every((button) => !button.disabled)))
         && (await page.locator("#liveEventCaptureMessage").count()) === 0,
@@ -416,7 +420,7 @@ async function liveEventSnapshot(page) {
         && runningOutAfter.gate.clockRunning
         && !runningOutAfter.gate.playerOnField
         && (await page.locator("#liveEventCaptureMessage").innerText())
-          === "Tap PLAYER IN to record events.",
+          === "OFF FIELD — event buttons locked. Tap PUT IN to record a play.",
       "running and off-field tracked game blocks Ground Ball and Caused Turnover with the exact Player In instruction",
     );
     await page.evaluate(() => {
@@ -443,12 +447,12 @@ async function liveEventSnapshot(page) {
       render();
     });
     await page.getByRole("button", { name: "Record Player In" }).click();
-    await page.getByRole("button", { name: /End Period/ }).click();
+    await page.getByRole("button", { name: /Next Quarter/ }).click();
     bodyText = await page.locator("body").innerText();
     check(
       bodyText.includes("Q2")
         && bodyText.includes("OFF FIELD")
-        && bodyText.includes("Start the clock and tap PLAYER IN to record events."),
+        && bodyText.includes("OFF FIELD — event buttons locked. Start the clock, then tap PUT IN."),
       "period end closes the shift, opens the next period off field, and restores the combined event gate",
     );
 
@@ -480,8 +484,9 @@ async function liveEventSnapshot(page) {
       render();
     });
     await page.getByRole("button", { name: "End Game", exact: true }).click();
-    await page.getByRole("button", { name: "End Game & Review" }).click();
-    await page.getByRole("button", { name: "Open Game Review" }).click();
+    await page.getByRole("button", { name: "Capture Game" }).click();
+    await page.getByRole("button", { name: "View Game Review" }).click();
+    await page.getByRole("tab", { name: "Evidence" }).click();
     await page.getByText("Tracked Playing Time", { exact: true }).waitFor();
     bodyText = await page.locator("body").innerText();
     check(bodyText.includes("System closed"), "Game Review identifies system-closed shifts");
