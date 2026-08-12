@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "productionProjectRef": "ulbmjcvnyznvmjgpstno",
+  "portableGate": "node tools/run_v283_local_regression.mjs",
+  "hostedGate": "node tools/run_supabase_preview_server_matrix.mjs",
+  "suites": [
+    {
+      "retiredSuite": "tools/test_game_tombstone_concurrency.mjs",
+      "responsibility": "durable game and event tombstone concurrency",
+      "portable": [
+        "tools/test_game_tombstones.mjs",
+        "tools/test_game_tombstone_migration.mjs",
+        "tools/test_hydration_tombstone_suppression.mjs"
+      ],
+      "hosted": [
+        "concurrent durable delete and stale legacy sync use independent PostgreSQL sessions",
+        "tombstone persists while the game head is absent",
+        "stale retry cannot resurrect the game",
+        "unrelated authenticated actor cannot read private tombstone state"
+      ],
+      "hostedGroup": "tombstone"
+    },
+    {
+      "retiredSuite": "tools/test_r207a_dormant_concurrency.mjs",
+      "responsibility": "R2-07 operation identity, transaction, locking, authority, and evidence",
+      "portable": [
+        "tools/test_r207_forward_migration_b_activation.mjs --binding-only",
+        "tools/test_durable_sync_operations.mjs",
+        "tools/test_game_scope_capabilities.mjs"
+      ],
+      "hosted": [
+        "permanent operation identity and stable replay",
+        "changed-payload mismatch",
+        "same-base concurrent writes serialize",
+        "unrelated actor denial is non-enumerating",
+        "injected failure rolls back canonical state and receipt evidence",
+        "auth.uid is evaluated in independent authenticated PostgreSQL sessions"
+      ],
+      "hostedGroup": "r207a-r207b"
+    },
+    {
+      "retiredSuite": "tools/test_r207b_preview_migration.mjs",
+      "responsibility": "Preview-installed game RPC, RLS, grants, and stale-write behavior",
+      "portable": [
+        "tools/test_r207b_controlled_preview.mjs",
+        "tools/test_r207b_two_session_browser.cjs"
+      ],
+      "hosted": [
+        "required migrations are present in the Preview ledger",
+        "Preview capability is enabled only on the isolated branch",
+        "authenticated public RPC executes",
+        "stale same-field conflict and concurrent serialization",
+        "FORCE RLS and authenticated-only execute grants",
+        "production project identity is rejected before mutation"
+      ],
+      "hostedGroup": "r207a-r207b"
+    },
+    {
+      "retiredSuite": "tools/test_r207c_preview_migration.mjs",
+      "responsibility": "versioned event identity, correction, deletion, locking, and authorization",
+      "portable": [
+        "tools/test_r207c_versioned_events.mjs",
+        "tools/test_r207c_client_safety_remediation.mjs",
+        "tools/test_r207c_two_session_browser.cjs"
+      ],
+      "hosted": [
+        "create and exact replay",
+        "altered replay mismatch",
+        "current correction and stale same-field conflict",
+        "event tombstone and resurrection prevention",
+        "current authority and non-enumerating denial",
+        "event operation and tombstone tables use FORCE RLS"
+      ],
+      "hostedGroup": "r207c"
+    },
+    {
+      "retiredSuite": "tools/test_r207d_preview_migration.mjs",
+      "responsibility": "private conflict reads, resolution actions, RLS, grants, revocation, and deletion",
+      "portable": [
+        "tools/test_r207d_conflict_resolution_client.mjs",
+        "tools/test_r207d_event_dismiss_browser.cjs"
+      ],
+      "hosted": [
+        "authorized and unauthorized conflict read behavior",
+        "keep_server terminal resolution",
+        "dismiss is acknowledgment-only and preserves the canonical value",
+        "authenticated direct conflict writes are denied",
+        "conflict tables use FORCE RLS",
+        "private conflict payload is not disclosed to unrelated actors"
+      ],
+      "hostedGroup": "r207d"
+    },
+    {
+      "retiredSuite": "tools/test_r207_clock_command_batch_integration.mjs",
+      "responsibility": "clock command/batch transaction, replay, locking, chronology, authority, and rollback",
+      "portable": [
+        "tools/test_r207_clock_command_batch_client.mjs",
+        "tools/test_r207_clock_command_batch_two_context_browser.cjs"
+      ],
+      "hosted": [
+        "online command and stable replay",
+        "altered replay mismatch",
+        "concurrent start/start serialization",
+        "offline batch atomic commit in chronology",
+        "changed-base batch applies zero operations",
+        "revoked or unrelated actor denial",
+        "batch evidence uses FORCE RLS and authenticated-only RPC grants"
+      ],
+      "hostedGroup": "clock-batch"
+    }
+  ]
+}

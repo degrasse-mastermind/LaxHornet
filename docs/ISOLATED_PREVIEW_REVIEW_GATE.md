@@ -4,6 +4,13 @@ This gate applies to every pull request that adds or changes a migration,
 database function, authorization policy, grant, synchronization contract, or
 server-side conflict/identity behavior.
 
+The canonical executable is
+`node tools/run_supabase_preview_server_matrix.mjs`, with the material coverage
+map in `release/hosted-postgres-verification-map.json`. GitHub executes it via
+`.github/workflows/supabase-preview-server-matrix.yml` after resolving the
+automatic branch with Supabase CLI. A prose review checklist is not a substitute
+for the executable result.
+
 ## Required environment
 
 - Use only the automatic ephemeral Supabase Preview branch attached to the

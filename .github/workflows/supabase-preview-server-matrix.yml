@@ -1,0 +1,116 @@
+name: Supabase Preview Server Matrix
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "supabase/**"
+      - "tools/run_supabase_preview_server_matrix.mjs"
+      - "release/hosted-postgres-verification-map.json"
+      - ".github/workflows/supabase-preview-server-matrix.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-preview-server-matrix-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hosted-matrix:
+    name: Authenticated hosted PostgreSQL matrix
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: Preview
+
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Require Preview management credentials
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PARENT_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_ID }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "$SUPABASE_ACCESS_TOKEN" ]] || { echo "PREVIEW_CONFIGURATION_REQUIRED: Preview environment secret SUPABASE_ACCESS_TOKEN is absent." >&2; exit 1; }
+          [[ -n "$SUPABASE_PARENT_PROJECT_REF" ]] || { echo "PREVIEW_CONFIGURATION_REQUIRED: Preview environment secret SUPABASE_PROJECT_ID is absent." >&2; exit 1; }
+          [[ "$SUPABASE_PARENT_PROJECT_REF" == "ulbmjcvnyznvmjgpstno" ]] || { echo "PARENT_PROJECT_MISMATCH: unexpected configured parent project." >&2; exit 1; }
+
+      - name: Resolve exact isolated branch credentials
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PARENT_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_ID }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch_name="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          resolved=false
+          for attempt in $(seq 1 18); do
+            if npx -y supabase@2.109.1 --experimental branches get "$branch_name" \
+              --project-ref "$SUPABASE_PARENT_PROJECT_REF" -o env > "$RUNNER_TEMP/supabase-preview.env"; then
+              resolved=true
+              break
+            fi
+            echo "Preview branch is not ready (attempt $attempt/18)."
+            sleep 10
+          done
+          [[ "$resolved" == "true" ]] || { echo "PREVIEW_BRANCH_UNAVAILABLE: automatic isolated branch was not ready." >&2; exit 1; }
+
+          declare -A values=()
+          while IFS='=' read -r key value; do
+            key="${key//[[:space:]]/}"
+            value="${value%$'\r'}"
+            value="${value#\"}"; value="${value%\"}"
+            case "$key" in
+              API_URL|SUPABASE_URL|ANON_KEY|SUPABASE_ANON_KEY|POSTGRES_URL_NON_POOLING|PROJECT_REF|SUPABASE_PROJECT_ID)
+                values["$key"]="$value"
+                ;;
+            esac
+          done < "$RUNNER_TEMP/supabase-preview.env"
+          rm -f "$RUNNER_TEMP/supabase-preview.env"
+
+          preview_url="${values[SUPABASE_URL]:-${values[API_URL]:-}}"
+          preview_key="${values[SUPABASE_ANON_KEY]:-${values[ANON_KEY]:-}}"
+          preview_db="${values[POSTGRES_URL_NON_POOLING]:-}"
+          [[ -n "$preview_url" && -n "$preview_key" && -n "$preview_db" ]] || { echo "PREVIEW_CREDENTIALS_INCOMPLETE: branch URL, anon key, and non-pooling database URL are required." >&2; exit 1; }
+          preview_ref="$(node -e "process.stdout.write(new URL(process.argv[1]).hostname.split('.')[0])" "$preview_url")"
+          [[ "$preview_ref" != "$SUPABASE_PARENT_PROJECT_REF" ]] || { echo "PRODUCTION_TARGET_REFUSED: branch URL resolved to production." >&2; exit 1; }
+
+          for value in "$preview_url" "$preview_key" "$preview_db"; do echo "::add-mask::$value"; done
+          {
+            echo "SUPABASE_PREVIEW_URL=$preview_url"
+            echo "SUPABASE_PREVIEW_ANON_KEY=$preview_key"
+            echo "SUPABASE_PREVIEW_DB_URL=$preview_db"
+            echo "SUPABASE_PREVIEW_PROJECT_REF=$preview_ref"
+            echo "SUPABASE_PREVIEW_BRANCH=$branch_name"
+            echo "SUPABASE_PREVIEW_SHA=$EXPECTED_HEAD_SHA"
+          } >> "$GITHUB_ENV"
+
+      - name: Run authenticated hosted server matrix
+        env:
+          LAXHORNET_PREVIEW_MATRIX_EVIDENCE_FILE: hosted-preview-result.json
+        run: node tools/run_supabase_preview_server_matrix.mjs
+
+      - name: Upload sanitized hosted evidence
+        if: always() && hashFiles('hosted-preview-result.json') != ''
+        uses: actions/upload-artifact@v6
+        with:
+          name: hosted-preview-result-${{ github.sha }}
+          path: hosted-preview-result.json
+          if-no-files-found: error
+          retention-days: 30
