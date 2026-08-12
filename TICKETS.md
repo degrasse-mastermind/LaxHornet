@@ -2817,6 +2817,84 @@ Production or external state changed: `NO`
 Remaining work: Draft PR CI, exact-PR-SHA independent review, and separately
 authorized merge.
 
+## LH-27 — Retire Docker from active development and CI
+
+Status: `REVIEW`
+
+Risk level: `LEVEL 3`
+
+Branch: `codex/lh-26-release-baseline-reconciliation`
+
+### Goal
+
+Honor the owner decision that LaxHornet will no longer use Docker. Remove every
+active Docker-triggering GitHub workflow and replace the Docker-dependent
+review path with portable checks plus isolated Supabase Preview verification.
+
+### In scope
+
+- Remove the pull-request Docker test workflow and main-branch Docker image
+  build/push workflow.
+- Stop the portable workflow from invoking container-backed PostgreSQL tests.
+- Retain the exact historical activation-byte proof through a new
+  `--binding-only` mode that performs no container or network work.
+- Keep browser, PGlite, client, security, disclosure, release, Pages, and
+  secret-scanning gates active.
+- Require the automatic isolated, data-less Supabase Preview check for actual
+  migration application on migration PRs.
+
+### Out of scope
+
+- No production migration, deployment, release, or Supabase configuration
+  change.
+- No rewriting historical Docker evidence or claiming that embedded tests
+  prove real multi-session PostgreSQL concurrency.
+- Legacy Docker artifacts remain inert historical material; removal can be a
+  later repository-hygiene change after protected evidence references are
+  reviewed.
+
+### Acceptance criteria
+
+- No GitHub workflow builds, runs, or publishes a Docker image.
+- Portable CI contains no command that invokes a Docker-dependent test.
+- Exact R2-07 activation/runtime bindings remain fail-closed and independently
+  hashed from their reviewed SHA.
+- Migration PRs require a successful Supabase Preview check before they can be
+  recommended for merge.
+- Documentation distinguishes embedded contract coverage from real Preview
+  migration/concurrency evidence.
+- No production or external runtime state changes.
+
+### Level 3 critical surface and rollback
+
+- Critical surface: CI verification and release controls.
+- Rollback is a normal commit revert; it would re-enable Docker and therefore
+  requires a new owner decision.
+- The loss of local container concurrency testing is explicit. Supabase Preview
+  is the authoritative real-PostgreSQL gate, while exact adversarial
+  concurrency review remains required for migration PRs.
+- Merge and deployment remain separately authorized.
+
+### Completion record
+
+Commit/PR: Draft PR #77 pending updated head.
+
+Focused checks: Pending final no-container verification.
+
+Broad checks or CI: Supabase Preview is required on migration PRs; portable CI
+pending updated head.
+
+Known limitations: Preview credentials are not exposed to ordinary repository
+tests, so custom post-migration SQL probes require independent reviewer access
+to the isolated Preview branch.
+
+Production or external state changed: `NO`
+
+`REPO_CURRENT_STATE.md` updated: `YES`
+
+Remaining work: Push updated foundation, verify no-Docker CI, and perform
+independent exact-SHA review.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

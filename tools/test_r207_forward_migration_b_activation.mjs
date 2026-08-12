@@ -378,6 +378,11 @@ try {
     "fresh-load production activation routes game creation, field writes, and events to v2 before legacy work",
   );
 
+  if (process.argv.includes("--binding-only")) {
+    console.log(`R2-07 Forward Migration B no-container binding verification: PASS (${checks} checks)`);
+    process.exit(0);
+  }
+
   const main = await start("main");
   psql(main, `
     insert into auth.users(id,email) values

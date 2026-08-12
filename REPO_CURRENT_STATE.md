@@ -231,7 +231,13 @@ The release manifest records:
 
 Do not rewrite, reorder, squash, rename, or silently regenerate these migration files. Any new migration must be additive, timestamped, reviewed, tested locally, and reflected in release-control documentation.
 
-The verified Windows local migration workflow is documented in `docs/LOCAL_SUPABASE_WORKFLOW.md`. It uses Docker Desktop, the Supabase CLI, explicit local-only commands, and a reduced stack where Storage-related services are excluded. It must not be replaced with linked or production-mutating commands.
+The historical Windows local migration workflow is documented in
+`docs/LOCAL_SUPABASE_WORKFLOW.md`, but it is no longer an active verification
+path. Current work must not start Docker or a Docker-compatible local Supabase
+stack. Use credential-free embedded checks for deterministic contracts and the
+automatic, isolated, data-less Supabase Preview branch for real PostgreSQL
+migration application. This does not authorize linked or production-mutating
+commands.
 
 ## Deployment and release control
 
