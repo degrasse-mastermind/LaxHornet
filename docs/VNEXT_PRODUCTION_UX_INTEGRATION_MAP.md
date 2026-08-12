@@ -14,22 +14,21 @@ The vNext UI will re-render and rewire the existing production capabilities.
 It will not introduce a second game, clock, event, participation, sync,
 authorization, or conflict model.
 
-Goal/Assist score coupling is the one stopped subsection. `logEvent()` applies
-the event and score increment in one synchronous local mutation and
-`createEventOperationService()` persists that local state before cloud work.
-The activated R2-07 cloud path then sends score fields through
-`laxhornet_sync_game_v2` and the event through `lh_create_event`. Those are
-separate server transactions with separate operation identities and receipts.
-The corresponding Undo path similarly sends a versioned event tombstone and a
-game score-field correction separately. This cannot guarantee the required
-all-or-nothing outcome under retry, replay, conflict, or a response-loss window.
+Goal/Assist score coupling is owned by the stacked `LH-25` contract. `logEvent()`
+still applies the event and score increment in one synchronous local mutation,
+then persists one permanent prepared composite request before cloud work. When
+the reviewed capability is enabled, scored create, correction, and Undo call
+only `laxhornet_apply_scored_event_v1`; the client has no split-write fallback.
+The server derives the governed score effect and applies the versioned event
+head and score/status versions in one PostgreSQL transaction with one durable
+receipt. Replay, tamper, authority, lifecycle, version, and tombstone rules are
+enforced by that composite owner.
 
-The minimum safe follow-up is an additive authenticated RPC/command that takes
-one permanent client operation identity and atomically applies or reverses both
-the versioned event head and its governed score delta, returning one durable
-receipt. It must enforce game lifecycle, authority, expected event version,
-expected score version, idempotent replay, and tombstone dominance. No client
-workaround or migration is included in `LH-24`.
+Production activation remains deliberately out of scope. The capability is
+default-off in `runtime-config.js` and enabled only in the isolated Preview
+builder for review. `LH-24` adds no schema of its own; the migration, rollback,
+evidence, and independent exact-SHA review requirements remain owned by
+`LH-25`.
 
 ## Requirement map
 
@@ -39,7 +38,7 @@ workaround or migration is included in `LH-24`.
 | 2 | Home | `renderHome()`, `renderHomeReadyCard()`, `latestVisibleGame()` | Make active-game resume dominant, then Track, latest game, compact season context, and secondary actions. | Medium | active/no-active browser states and rendered copy assertions |
 | 3 | Pregame/new game | `renderStartGame()`, `handleSubmit()`, `makeGame()` | Present player/team/opponent/date, quarters/halves, suggested plus custom duration, and a live structure summary. New vNext games always initialize the existing private tracked clock. | High | quarters/halves/custom-duration persistence and reload tests |
 | 4 | Active-game state | `state.activeGame`, `state.trackingSession`, `persistAll()`, `applyStoredAccountState()` | Reuse without a parallel model; only change presentation and setup defaults. | Critical | recovery, reload, cancel, completion, tombstone regression |
-| 5 | Score updates | `applyScoreIncrement()`, `updateActiveGameScore()`, `editActiveGameScore()`, `syncGameWithR207Operations()` | Keep manual controls secondary and routed through the governed field path. Do not claim atomic event coupling. | Critical | score-field version/conflict/completed-game tests |
+| 5 | Score updates | `applyScoreIncrement()`, `updateActiveGameScore()`, `editActiveGameScore()`, `syncGameWithR207Operations()` | Keep manual controls secondary and routed through the governed field path; suppress duplicate ordinary score sync while a composite scored-event intent is pending. | Critical | score-field version/conflict/completed-game and atomic client tests |
 | 6 | Regulation format | `PERIOD_FORMATS`, `periodFormatForGame()`, `periodsForGame()`, `makeGame()` | Preserve canonical `quarters`/`halves`; improve setup explanation and labels. | Medium | format initialization and period transition tests |
 | 7 | Period duration | `makeGame()`, `tracked-playing-time-service.js:createClockState()` | Expose suggested values through a datalist while retaining validated custom minutes. | High | supported/custom value, persistence, reload |
 | 8 | Authoritative clock | `changeTrackedClock()`, `updateTrackedClock()`, `syncTrackedClockPayload()`, `performR207TrackedClockOperation()`, `performR207TrackedClockBatch()` | Recompose controls inside the scoreboard; do not add a timer authority. | Critical | clock command/batch, offline, reconnect, reload, conflict tests |
@@ -49,10 +48,10 @@ workaround or migration is included in `LH-24`.
 | 12 | Canonical event vocabulary | `STAT_DEFS`, `STAT_BY_KEY`, `public-event-semantics.js` | Reorganize controls only; retain keys and labels. | High | all-key source contract and public-semantic boundary tests |
 | 13 | Event recording | `logEvent()`, `createGameEventOperation()` | Keep immediate local acknowledgement; strengthen visible OFF FIELD lock and last-action feedback. | Critical | rapid tap, offline, stale DOM, delegated click, keyboard probes |
 | 14 | Durable local operations | `createEventOperationService():applyLocalOperation()`, `persistAll()`, `event-operation-service.js` durable queues | Reuse unchanged. | Critical | event-operation, local-storage safety, interrupted-sync tests |
-| 15 | Cloud event operations | `queueR207VersionedEvent()`, `r207EventService()`, `lh_create_event` / `lh_correct_event` / `lh_tombstone_event` | Reuse unchanged for ordinary events and corrections. | Critical | R2-07C client, migration-contract, retry/replay tests |
-| 16 | Goal handling | `logEvent()`, `applyScoreIncrementForStat()` | Preserve existing local behavior; stop cloud-atomic coupling pending the additive composite command described above. | Blocked subsection | local atomicity characterization plus explicit server-contract gap |
-| 17 | Assist handling | Same as Goal | Same stopped subsection and dependency. | Blocked subsection | same matrix as Goal |
-| 18 | Undo/correction | `undoLastEvent()`, `tombstoneGameEventOperation()`, `correctGameEventOperation()` | Keep production versioned correction/tombstone UX. Do not replace with prototype deletion. Atomic score reversal remains part of the stopped composite contract. | Critical | duplicate Undo, replay, version conflict, completed lifecycle |
+| 15 | Cloud event operations | `queueR207VersionedEvent()`, `r207EventService()`, scored-event queue and `laxhornet_apply_scored_event_v1` | Preserve ordinary versioned event operations; route scored create/correct/tombstone through the one composite owner when enabled. | Critical | R2-07C client, atomic client/embedded migration, retry/replay tests |
+| 16 | Goal handling | `logEvent()`, `applyScoreIncrementForStat()`, composite scored-event queue | Preserve immediate local behavior and persist one exact prepared request for atomic cloud event-plus-score application. | Critical | lost response, replay, tamper, injected rollback, stale-version matrix |
+| 17 | Assist handling | Same as Goal | Use the same server-derived composite score effect and permanent parent identity. | Critical | same adversarial matrix as Goal |
+| 18 | Undo/correction | `undoLastEvent()`, composite correct/tombstone request, versioned child operations | Keep the production correction/tombstone UX and atomically apply the server-derived net score effect or reversal exactly once. | Critical | duplicate Undo, replay, version conflict, injected rollback, completed lifecycle |
 | 19 | Score correction | `updateActiveGameScore()`, `editActiveGameScore()`, R2-07 field operations | Restyle as a secondary disclosure panel; retain field versions and conflict routing. | Critical | manual correction and Needs Attention tests |
 | 20 | Next Period | `endTrackedPeriod()`, `nextTrackedPeriod()`, `transitionPeriod()` | Label by quarter/half and keep system Player Out closure plus clock batch ordering. | Critical | Q/H transition, period reset, offline batch |
 | 21 | End Game | `endGame()`, `confirmEndGame()`, `closeTrackedShiftForGameEnd()` | Use intentional confirmation and a Game captured result with Review now/later choices and honest sync state. | Critical | lifecycle, shift closure, completion restrictions |
@@ -83,6 +82,7 @@ workaround or migration is included in `LH-24`.
 - `docs/VNEXT_PRODUCTION_UX_INTEGRATION_MAP.md`: this implementation map.
 - `TICKETS.md`: durable Level 3 task record.
 
-No schema, migration, RLS, grant, release marker, service-worker cache name,
-runtime activation flag, deployment workflow, or production state change is
-authorized or planned.
+`LH-24` adds no schema, RLS, grant, release marker, service-worker cache name,
+deployment workflow, or production state change. Its stacked `LH-25` dependency
+adds a reviewed migration and default-off runtime flag for isolated Preview
+verification only; production activation remains separately unauthorized.

@@ -76,10 +76,11 @@ test("mobile presentation keeps tactile controls and safe-area spacing", () => {
   assert.match(styles, /@media \(prefers-reduced-motion:\s*reduce\)/);
 });
 
-test("score-event atomicity gap is stopped with a minimal server contract", () => {
-  assert.match(map, /Goal\/Assist score coupling is the one stopped subsection\./);
-  assert.match(map, /additive authenticated RPC\/command/);
-  assert.match(map, /No client\s+workaround or migration is included/);
+test("score-event atomicity is assigned to the reviewed composite owner", () => {
+  assert.match(map, /Goal\/Assist score coupling is owned by the stacked `LH-25` contract\./);
+  assert.match(map, /laxhornet_apply_scored_event_v1/);
+  assert.match(map, /client has no split-write fallback/);
+  assert.match(map, /default-off in `runtime-config\.js`/);
 });
 
 test("authentication remains responsive before cloud hydration", () => {

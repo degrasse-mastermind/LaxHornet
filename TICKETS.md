@@ -3108,13 +3108,13 @@ Acceptance criteria:
 - A draft pull request is opened for independent exact-PR-SHA Level 3 review;
   no merge or deployment occurs.
 
-Stopped subsection:
+Resolved dependency:
 
-- Goal/Assist event plus score coupling and its Undo cannot be made server-atomic
-  with the currently separate R2-07 event and score-field RPC transactions.
-  `LH-24` preserves the current locally atomic behavior but does not claim the
-  requested cross-contract guarantee. The integration map documents the minimum
-  additive idempotent composite server command required for a follow-up ticket.
+- `LH-25` supplies the additive idempotent composite scored-event command that
+  atomically owns Goal/Assist event plus score coupling and its correction or
+  Undo. The vNext client persists one permanent prepared request, never falls
+  back to the unsafe split-write cloud path, and keeps production activation
+  default-off pending independent exact-SHA review and separate authority.
 
 Implementation record:
 
@@ -3142,10 +3142,10 @@ Implementation record:
   access, production write, release/cache marker, manifest, Pages configuration,
   merge, or deployment occurred. `REPO_CURRENT_STATE.md` remains unchanged
   because this review branch has not changed current production state.
-- Merge/release recommendation: `REVISE`. The UI branch is ready for independent
-  exact-SHA review, but the stopped atomic Goal/Assist plus score contract needs
-  a separately approved additive server-command ticket before the full request
-  can be represented as production-complete.
+- Merge/release recommendation: `REVIEW`. The stacked LH-24/LH-25 implementation
+  now represents the full requested contract, but still requires final browser
+  QA, green exact-head CI, and independent exact-PR-SHA Level 3 review. Merge,
+  production activation, and release remain separately unauthorized.
 
 ## Ticket template
 
