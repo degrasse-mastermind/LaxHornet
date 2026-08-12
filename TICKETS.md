@@ -3127,6 +3127,10 @@ Implementation record:
 - Added deterministic Snapshot, Story, and Evidence review modes. Story copy is
   built only from recorded events, periods, timestamps, score context, and event
   IDs and explicitly refuses unsupported player or coaching inference.
+- Non-migration Vercel UI previews now build in an explicit device-only mode
+  when isolated Supabase credentials are absent. That mode disables the cloud
+  client and trusted-disclosure flags instead of falling back to production;
+  credentialed isolated Preview builds retain the reviewed R2-07/LH-25 flags.
 - Browser QA passed the authenticated synthetic lifecycle `33/33` at 390x844
   and 1280x900, and secure disclosure passed `73/73` with zero hosted Supabase
   requests and no browser-console errors. In-app Browser checks also passed at

@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 const app = await readFile(new URL("../app.js", import.meta.url), "utf8");
 const styles = await readFile(new URL("../styles.css", import.meta.url), "utf8");
 const map = await readFile(new URL("../docs/VNEXT_PRODUCTION_UX_INTEGRATION_MAP.md", import.meta.url), "utf8");
+const previewBuilder = await readFile(new URL("./build_r207b_vercel_preview.mjs", import.meta.url), "utf8");
 
 const tests = [];
 function test(name, fn) {
@@ -81,6 +82,14 @@ test("score-event atomicity is assigned to the reviewed composite owner", () => 
   assert.match(map, /laxhornet_apply_scored_event_v1/);
   assert.match(map, /client has no split-write fallback/);
   assert.match(map, /default-off in `runtime-config\.js`/);
+});
+
+test("credential-free UI previews fail closed into device-only mode", () => {
+  assert.match(previewBuilder, /const connectedPreview = hasSupabaseUrl && hasPublishableKey/);
+  assert.match(previewBuilder, /cloudDisabled: true/);
+  assert.match(previewBuilder, /publicLiveShareRpc: false/);
+  assert.match(previewBuilder, /device-only Vercel Preview artifact ready/);
+  assert.match(app, /!CLOUD_RUNTIME_DISABLED[\s\S]*window\.supabase\?\.createClient/);
 });
 
 test("authentication remains responsive before cloud hydration", () => {
