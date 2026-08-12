@@ -3000,7 +3000,7 @@ node --check event-operation-service.js
 node tools/test_atomic_scored_event_embedded.mjs
 node tools/test_event_operation_service.mjs
 node tools/test_r207c_event_client.mjs
-node tools/test_r207_clock_command_batch.mjs
+node tools/test_r207_clock_command_batch_client.mjs
 node tools/run_v283_local_regression.mjs
 git diff --check
 ```
@@ -3024,7 +3024,7 @@ git diff --check
 
 ### Completion record
 
-Commit/PR: Draft PR #78; final no-Docker head pending push.
+Commit/PR: Draft PR #78.
 
 Files changed: Additive migration/rollback, atomic event queue integration,
 default-off runtime/Preview flag, portable workflow and release containment,
@@ -3035,9 +3035,9 @@ Focused checks: Atomic client `13/13`; embedded atomic transaction matrix
 existing event, R2-07, auth, clock, conflict, and tracked-time focused suites
 PASS on the implementation chain.
 
-Broad checks or CI: Supabase Preview successfully applied the migration on the
-prior PR #78 head. The final no-Docker head requires fresh portable CI,
-Supabase Preview, Vercel Preview, and exact-SHA independent review.
+Broad checks or CI: Exact-head portable CI, isolated data-less Supabase Preview
+migration application, and connected Vercel Preview PASS. The workflow invokes
+no Docker-backed test.
 
 Known limitations: Embedded PostgreSQL does not prove real concurrent sessions.
 Concurrent same-base serialization and zero-evidence rollback must be probed by
@@ -3047,9 +3047,9 @@ Production or external state changed: `NO`
 
 `REPO_CURRENT_STATE.md` updated: `NOT REQUIRED UNTIL MERGE/ACTIVATION`
 
-Remaining work: Push the no-Docker head, verify Preview/portable CI, integrate
-the vNext UX branch, complete browser QA, and obtain exact-SHA review. Merge and
-release remain separately authorized.
+Remaining work: Independent exact-PR-SHA Level 3 review, including adversarial
+multi-session probes against the isolated Preview branch. Merge, production
+activation, and release remain separately unauthorized.
 
 ## Ticket template
 
