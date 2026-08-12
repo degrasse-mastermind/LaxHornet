@@ -3133,22 +3133,23 @@ Implementation record:
   credentialed isolated Preview builds retain the reviewed R2-07/LH-25 flags.
 - Browser QA passed the authenticated synthetic lifecycle `33/33` at 390x844
   and 1280x900, and secure disclosure passed `73/73` with zero hosted Supabase
-  requests and no browser-console errors. In-app Browser checks also passed at
-  390x844 and 1440x900 with no horizontal overflow or framework overlay.
-- The stabilized complete regression reported `61 passed, 9 failed`. After the
-  CI-pinned ephemeral PGlite dependency was installed, five environment-only
-  failures passed in focused reruns; the one UX-sensitive secure-disclosure
-  browser failure was corrected and passed. The remaining three failures were
-  reproduced unchanged on the approved starting SHA: stale v285/current-release
-  assertions and an exact historical `app.html` hash binding that already
-  differs on v288 main. Tests were not weakened to conceal those baseline gaps.
-- No migration, rollback, RLS, grant, RPC, backend configuration, production
-  access, production write, release/cache marker, manifest, Pages configuration,
-  merge, or deployment occurred. `REPO_CURRENT_STATE.md` remains unchanged
-  because this review branch has not changed current production state.
+  requests and no browser-console errors. The exact-head device-only Vercel
+  Preview also passed in-app Browser checks at 390x844 and 1440x900: FAQ/help
+  interactions changed rendered state, horizontal overflow was zero, page
+  identity/content were correct, and console warnings/errors and framework
+  overlays were absent.
+- Exact-head portable CI passes the complete active no-Docker workflow,
+  including the authenticated synthetic browser lifecycle, embedded atomic
+  transaction matrix, release containment, disclosure/security gates, and
+  allowlisted Pages artifact browser validation. Vercel Preview also passes;
+  Supabase Preview is correctly skipped because LH-24 adds no migration.
+- LH-24 adds no migration, rollback, RLS, grant, RPC, production access/write,
+  release/cache marker, manifest, Pages configuration, merge, or deployment.
+  The stacked LH-25 migration remains default-off and was validated separately
+  by its isolated Supabase Preview check.
 - Merge/release recommendation: `REVIEW`. The stacked LH-24/LH-25 implementation
-  now represents the full requested contract, but still requires final browser
-  QA, green exact-head CI, and independent exact-PR-SHA Level 3 review. Merge,
+  now represents the full requested contract and its implementation gates are
+  green. Independent exact-PR-SHA Level 3 review remains required. Merge,
   production activation, and release remain separately unauthorized.
 
 ## Ticket template
