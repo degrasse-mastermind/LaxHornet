@@ -77,6 +77,12 @@ jobs:
       - name: Active no-container verification paths
         run: node tools/test_no_container_active_paths.mjs
 
+      - name: Recursive active-executable graph adversarial contracts
+        run: node tools/test_active_executable_graph.mjs
+
+      - name: Hosted Supabase Preview matrix contracts
+        run: node tools/test_supabase_preview_server_matrix_contract.mjs
+
       - name: Event operation service contracts
         run: node tools/test_event_operation_service.mjs
 

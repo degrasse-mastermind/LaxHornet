@@ -177,6 +177,18 @@ the independent authenticated multi-session matrix in
 `docs/ISOLATED_PREVIEW_REVIEW_GATE.md`. Portable, PGlite, embedded, and
 browser-mock results are complementary and cannot substitute for that gate.
 
+The executable hosted gate is:
+
+```powershell
+node tools/run_supabase_preview_server_matrix.mjs
+```
+
+It is mandatory for applicable migration/server/security PRs and is implemented
+by `.github/workflows/supabase-preview-server-matrix.yml`. Missing Preview
+credentials, missing branch identity, a production target, a skipped job, or a
+green migration-only status is a blocking failure. The durable retired-suite
+mapping is `release/hosted-postgres-verification-map.json`.
+
 ## Implementation workflow
 
 ### 1. Inspect and classify
@@ -221,6 +233,9 @@ node tools/run_v283_local_regression.mjs
 This is the canonical-plus-additive portable regression. It must not start or
 require a container or local Supabase stack. Real PostgreSQL and authenticated
 multi-session behavior are verified only through the isolated Preview gate.
+The portable runner also executes recursive active-entrypoint analysis rooted
+at GitHub workflows, package scripts, `vercel.json`, release tools, Preview
+tools, production-boundary validators, and current documented commands.
 
 Rerun the complete suite only when a later edit materially changes shared
 behavior. Do not run unrelated database, release, disclosure, service-worker,

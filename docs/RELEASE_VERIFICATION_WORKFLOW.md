@@ -32,6 +32,17 @@ multi-session behavior, or migration application. Those facts require the
 automatic isolated Supabase Preview plus the independent gate in
 `docs/ISOLATED_PREVIEW_REVIEW_GATE.md`.
 
+The canonical hosted command is:
+
+```powershell
+node tools/run_supabase_preview_server_matrix.mjs
+```
+
+It runs only with an exact isolated branch identity and branch-scoped URL,
+publishable credential, and direct database URL. It refuses production before
+contact or mutation. See `docs/HOSTED_POSTGRES_VERIFICATION.md` and
+`release/hosted-postgres-verification-map.json`.
+
 ## Preflight-only commands
 
 Read-only current-repository environment check:
@@ -85,6 +96,8 @@ node tools/run_release_preflight.mjs --cleanup
   connected Preview gate.
 - Production rollout, schema application, capability activation, deployment,
   and release publication remain separately authorized.
+- Missing GitHub `Preview` environment credentials or an unavailable automatic
+  Supabase branch is `BLOCKED`, never `SKIPPED` or portable-equivalent.
 
 ## Tracked-time authorization fixture
 

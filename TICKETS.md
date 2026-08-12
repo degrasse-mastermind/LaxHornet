@@ -2926,6 +2926,81 @@ Remaining work: Push the remediation head, obtain green exact-head CI and
 Preview checks, then obtain a fresh independent exact-PR-SHA Level 3 review.
 No container-based verification is permitted.
 
+## LH-26B — Restore hosted PostgreSQL verification without Docker
+
+Status: `BLOCKED — EXTERNAL PREVIEW CONFIGURATION`
+
+Risk level: `LEVEL 3`
+
+Branch: `codex/lh-26b-hosted-postgres-verification`
+
+#### Goal
+
+Close the retrospective merged-PR #77 findings by restoring executable,
+authenticated, real-PostgreSQL coverage on isolated Supabase Preview branches
+and recursively enforcing that every reachable active entrypoint is
+container-free.
+
+#### In scope
+
+- One fail-closed hosted Preview server matrix covering the six retired suites.
+- A normative guarantee-to-gate map.
+- A required GitHub Preview workflow using supported Supabase branch discovery.
+- Recursive active-entrypoint Docker detection and adversarial fixtures.
+- Verification documentation and bounded evidence.
+
+#### Out of scope
+
+- PR #78 semantic changes or its full scored-event review.
+- PR #76 UX changes.
+- Production migrations, deployment, activation, data, or configuration.
+- Restoring Docker or local Supabase.
+
+#### Acceptance criteria
+
+- [x] Six retired server suites have portable and hosted guarantee mappings.
+- [x] Hosted runner rejects missing identity, `main`, and production project
+  `ulbmjcvnyznvmjgpstno` before mutation.
+- [x] Runner exercises migration state, `auth.uid()`, RLS/FORCE RLS, grants,
+  public RPCs, concurrent sessions, transaction rollback, replay, tombstones,
+  conflicts, events, and clock/batch behavior on a real Preview database.
+- [x] Recursive guard covers workflows, package scripts, `vercel.json`, release,
+  Preview, and production-boundary tools, with seven adversarial fixtures.
+- [ ] GitHub `Preview` environment exposes the narrowly scoped Supabase access
+  token and parent project reference required for automatic branch discovery.
+- [ ] Exact-head hosted matrix passes on the isolated Preview branch.
+- [ ] Exact-head CI and Vercel Preview pass.
+- [ ] Fresh independent exact-head Level 3 review returns PASS before merge.
+
+#### Level 3 critical surface and rollback
+
+- The workflow can create synthetic rows only after proving isolated Preview
+  identity; it cannot fall back to production.
+- Mutable fixtures are deleted when safe. Append-only residue is confined to
+  the disposable PR Preview branch.
+- Rollback is a normal commit revert. No historical migration is rewritten.
+- Merge, production migration, deployment, and activation remain unauthorized.
+
+#### Completion record
+
+Starting main: `24b339ac46678dd3fd42c753ab817a311dc6b183`
+
+Known limitation: At implementation start the repository and `Preview`
+environment exposed no GitHub secrets/variables, so a real hosted PASS cannot
+be claimed until the external Preview credential path is configured and the
+automatic branch exists.
+
+Published implementation head `3a08e2fd2a46cfd22e956b14f495be8971562703`
+opened draft PR #79. Exact-head portable CI and credential-free Vercel Preview
+passed. Hosted run `31636860903` failed before mutation at the explicit
+`PREVIEW_CONFIGURATION_REQUIRED` gate because `SUPABASE_ACCESS_TOKEN` is absent
+from the GitHub `Preview` environment. No Supabase Preview status was produced
+because this remediation intentionally adds no meaningless migration or server
+schema change. The hosted matrix, connected Preview, and independent Level 3
+review remain blocked.
+
+Production or external state changed: `NO`
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { analyzeActiveExecutableGraph } from "./active-executable-graph.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
 const activeControlFiles = [
@@ -37,6 +38,10 @@ const invokedTools = [...runner.matchAll(/["'](tools\/(?:test|run|validate|build
 
 const exactBindingTool = "tools/test_r207_forward_migration_b_activation.mjs";
 const staticStateCTool = "tools/test_team_members_state_c.mjs";
+const guardFixtureTools = new Set([
+  "tools/test_active_executable_graph.mjs",
+  "tools/test_no_container_active_paths.mjs",
+]);
 assert.match(
   runner,
   /args:\s*\["tools\/test_r207_forward_migration_b_activation\.mjs",\s*"--binding-only"\]/,
@@ -59,7 +64,7 @@ assert.match(
 );
 
 for (const relative of invokedTools) {
-  if (relative === exactBindingTool || relative === staticStateCTool) continue;
+  if (relative === exactBindingTool || relative === staticStateCTool || guardFixtureTools.has(relative)) continue;
   const source = fs.readFileSync(path.join(root, relative), "utf8");
   for (const pattern of executablePatterns.slice(0, 2)) {
     assert.doesNotMatch(source, pattern, `canonical regression invokes container-backed tool ${relative}`);
@@ -75,3 +80,16 @@ assert.match(
 console.log(`PASS: ${activeControlFiles.length} active control files contain no container/local-stack command.`);
 console.log(`PASS: ${invokedTools.length} canonical regression tool invocations are container-free.`);
 console.log("PASS: authenticated isolated-Preview adversarial evidence remains a non-substitutable Level 3 gate.");
+
+const graph = analyzeActiveExecutableGraph(root);
+assert.deepEqual(
+  graph.failures,
+  [],
+  `reachable active executable graph contains prohibited paths: ${JSON.stringify(graph.failures)}`,
+);
+assert.ok(graph.files.includes("vercel.json"), "active graph must include vercel.json");
+assert.ok(
+  graph.files.includes("tools/build_r207b_vercel_preview.mjs"),
+  "active graph must follow the Vercel build command",
+);
+console.log(`PASS: recursive active graph scanned ${graph.files.length} reachable files across ${graph.edges.length} edges.`);

@@ -645,6 +645,17 @@ automatic isolated Supabase Preview plus the independent authenticated matrix
 in `docs/ISOLATED_PREVIEW_REVIEW_GATE.md`; a green migration-application status
 alone is insufficient.
 
+LH-26B adds the executable fail-closed hosted foundation at
+`tools/run_supabase_preview_server_matrix.mjs`, the six-suite guarantee map at
+`release/hosted-postgres-verification-map.json`, and the dedicated Preview
+workflow at `.github/workflows/supabase-preview-server-matrix.yml`. The runner
+requires branch-scoped Supabase URL, anon/publishable key, non-pooling database
+URL, Preview project reference, branch, and exact SHA; it refuses production
+project `ulbmjcvnyznvmjgpstno` before mutation. The active no-container guard now
+recursively follows GitHub workflows, `package.json`, `vercel.json`, Preview and
+release entrypoints, local imports, and nested script commands. Docker remains
+retired; hosted evidence is required rather than simulated locally.
+
 ### GitHub Actions regression
 
 `.github/workflows/laxhornet-regression.yml` provides the durable read-only CI layer.

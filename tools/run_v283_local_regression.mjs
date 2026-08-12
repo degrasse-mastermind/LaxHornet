@@ -105,6 +105,8 @@ const tests = [
     args: ["tools/test_r207_forward_migration_b_activation.mjs", "--binding-only"],
   },
   { name: "active no-container verification paths", command: process.execPath, args: ["tools/test_no_container_active_paths.mjs"] },
+  { name: "recursive active-executable graph adversarial contracts", command: process.execPath, args: ["tools/test_active_executable_graph.mjs"] },
+  { name: "hosted Supabase Preview matrix contracts", command: process.execPath, args: ["tools/test_supabase_preview_server_matrix_contract.mjs"] },
   { name: "sync error classification contracts", command: process.execPath, args: ["tools/test_sync_error_classification.mjs"] },
   { name: "sync characterization contracts", command: process.execPath, args: ["tools/test_sync_characterization.mjs"] },
   { name: "tracked playing time service contracts", command: process.execPath, args: ["tools/test_tracked_playing_time_service.mjs"] },
