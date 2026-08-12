@@ -56,3 +56,37 @@ At the exact PR SHA, confirm:
    `version.json`;
 5. `version.json`, `service-worker.js`, the release manifest, migrations,
    runtime configuration, and deployment workflows are unchanged.
+
+## 2026-08-12 bounded remediation
+
+Independent review of head `60deefaa53ad7571e6b8f7643d6e9f52a8c0e0bf`
+failed because the documented canonical regression and release-control tools
+still invoked container-backed tests and a local database stack, while green
+Preview migration application did not independently establish authenticated
+server concurrency and exactly-once behavior.
+
+The bounded remediation:
+
+- removes all container-backed test invocations from the canonical regression;
+- retains their historical bytes and evidence without invoking them;
+- makes Forward Migration B use its no-container exact-binding mode;
+- makes release preflight and release verification portable-only;
+- adds an active-path invocation-graph guard to CI and the canonical runner;
+- records the automatic isolated Preview plus independent authenticated
+  multi-session matrix as a non-substitutable migration-PR gate.
+
+This implementation record is not an independent review. The new exact head
+requires a fresh Level 3 reviewer disposition before merge.
+
+Focused remediation results before publication:
+
+```text
+PASS: 8 active control files contain no container/local-stack command.
+PASS: 57 canonical regression tool invocations are container-free.
+PASS: authenticated isolated-Preview adversarial evidence remains a non-substitutable Level 3 gate.
+22/22 phase-aware preflight tests passed.
+R2-07 Forward Migration B no-container binding verification: PASS (5 checks)
+R2-07B controlled preview tests: 37/37 passed
+V288 portable release verification: PASS
+Complete canonical-plus-additive portable regression: 65/65 passed
+```

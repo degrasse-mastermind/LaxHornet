@@ -2863,6 +2863,11 @@ review path with portable checks plus isolated Supabase Preview verification.
   hashed from their reviewed SHA.
 - Migration PRs require a successful Supabase Preview check before they can be
   recommended for merge.
+- Migration PRs that change authorization, operation identity, atomicity,
+  concurrency, or conflict semantics also require the exact-head independent
+  authenticated multi-session matrix in
+  `docs/ISOLATED_PREVIEW_REVIEW_GATE.md`; migration application alone is not
+  sufficient.
 - Documentation distinguishes embedded contract coverage from real Preview
   migration/concurrency evidence.
 - No production or external runtime state changes.
@@ -2881,24 +2886,45 @@ review path with portable checks plus isolated Supabase Preview verification.
 
 Commit/PR: Draft PR #77.
 
-Focused checks: Active workflow scan finds no Docker reference; R2-07
-no-container exact binding `5/5`; R2-07B controlled Preview contracts `37/37`;
-authentication responsiveness and diff hygiene PASS.
+Focused checks: Active workflow and invocation-graph guard finds no active
+container/local-stack command; R2-07 no-container exact binding `5/5`; R2-07B
+controlled Preview contracts `37/37`; authentication responsiveness and diff
+hygiene PASS.
 
 Broad checks or CI: Exact-head portable CI and device-only Vercel Preview PASS.
 The dependent migration PR #78 separately passes its automatic isolated,
 data-less Supabase Preview check.
 
 Known limitations: Preview credentials are not exposed to ordinary repository
-tests, so custom post-migration SQL probes require independent reviewer access
-to the isolated Preview branch.
+tests. Real PostgreSQL concurrency, transactional failure, revocation, replay,
+and exactly-once claims therefore remain blocked until an independent reviewer
+runs the non-substitutable authenticated matrix against the isolated Preview
+branch.
 
 Production or external state changed: `NO`
 
 `REPO_CURRENT_STATE.md` updated: `YES`
 
-Remaining work: Independent exact-PR-SHA Level 3 review and separately
-authorized merge. No Docker-based verification is permitted.
+Remediation after exact-head review failure: The canonical regression no longer
+invokes the six container-backed PostgreSQL matrices and uses the exact-binding
+activation mode. Release preflight and release verification are portable-only;
+local-stack startup is retired. The new active-path guard follows canonical
+tool invocations and fails on a container-backed command. The isolated Preview
+review gate now explicitly prevents treating embedded/PGlite/browser or green
+migration-application status as authenticated server evidence.
+
+Remediation verification: portable v288 release preflight PASS;
+production-ledger PGlite provenance PASS; active-path guard PASS across 8
+control files and 57 canonical tool invocations; complete
+canonical-plus-additive portable regression `65/65`; release baseline,
+historical v285 preservation `17/17`, manifest reconciliation `10/10`, phase
+preflight `22/22`, exact activation binding `5/5`, controlled Preview contracts
+`37/37`, and diff hygiene PASS. No database service or external runtime was
+contacted or changed.
+
+Remaining work: Push the remediation head, obtain green exact-head CI and
+Preview checks, then obtain a fresh independent exact-PR-SHA Level 3 review.
+No container-based verification is permitted.
 
 ## Ticket template
 
