@@ -74,6 +74,8 @@ const additivePaths = [
   "supabase/migrations/20260811211415_r207_forward_migration_b_activation.sql",
   "supabase/migrations/20260811211416_r207_forward_migration_b_postactivation_verification.sql",
   "supabase/rollback/20260811211415_r207_forward_migration_b_activation_rollback.sql",
+  "supabase/migrations/20260812005627_atomic_scored_event_command.sql",
+  "supabase/rollback/20260812005627_atomic_scored_event_command_rollback.sql",
 ].join(",");
 
 const rootJavaScript = readdirSync(root)
@@ -85,6 +87,7 @@ const tests = [
   ...rootJavaScript,
   { name: "local-storage safety contracts", command: process.execPath, args: ["tools/test_local_storage_safety.mjs"] },
   { name: "event-operation service contracts", command: process.execPath, args: ["tools/test_event_operation_service.mjs"] },
+  { name: "LH-25 atomic scored-event client", command: process.execPath, args: ["tools/test_atomic_scored_event_client.mjs"] },
   { name: "durable game and clock operation contracts", command: process.execPath, args: ["tools/test_durable_sync_operations.mjs"] },
   { name: "durable legacy game tombstone contracts", command: process.execPath, args: ["tools/test_game_tombstones.mjs"] },
   { name: "R2-06P hydration tombstone suppression contracts", command: process.execPath, args: ["tools/test_hydration_tombstone_suppression.mjs"] },
@@ -109,6 +112,12 @@ const tests = [
     name: "R2-07 Forward Migration B activation",
     command: process.execPath,
     args: ["tools/test_r207_forward_migration_b_activation.mjs"],
+    timeoutMs: 600000,
+  },
+  {
+    name: "LH-25 atomic scored-event PostgreSQL matrix",
+    command: process.execPath,
+    args: ["tools/test_atomic_scored_event_command.mjs"],
     timeoutMs: 600000,
   },
   { name: "sync error classification contracts", command: process.execPath, args: ["tools/test_sync_error_classification.mjs"] },
