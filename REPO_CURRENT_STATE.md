@@ -241,6 +241,11 @@ commands.
 
 ## Deployment and release control
 
+- Vercel Preview has two fail-closed modes. Migration PRs with a complete
+  isolated Supabase URL/publishable-key pair enable the reviewed Preview-only
+  R2-07 capabilities. UI-only PRs without that pair build device-only: the
+  Supabase client and trusted-disclosure flags are disabled, with no production
+  fallback. A partial credential pair fails the build.
 - Static production deployment uses the custom `Allowlisted GitHub Pages`
   workflow. It constructs `.pages-artifact` from the all-files-explicit
   `release/pages-deployment-allowlist.json`, validates hashes, references,

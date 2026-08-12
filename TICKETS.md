@@ -2840,6 +2840,9 @@ review path with portable checks plus isolated Supabase Preview verification.
   `--binding-only` mode that performs no container or network work.
 - Keep browser, PGlite, client, security, disclosure, release, Pages, and
   secret-scanning gates active.
+- Make credential-free Vercel UI previews explicitly device-only, with the
+  cloud client and trusted-disclosure flags disabled rather than falling back
+  to production configuration.
 - Require the automatic isolated, data-less Supabase Preview check for actual
   migration application on migration PRs.
 

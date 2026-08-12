@@ -430,6 +430,7 @@ const R207C_VERSIONED_EVENTS = RUNTIME_CONFIG.r207cVersionedEventCorrections ===
 const R207D_CONFLICT_RESOLUTION = RUNTIME_CONFIG.r207dConflictResolution === true;
 const R207_CLOCK_COMMAND_BATCH = RUNTIME_CONFIG.r207ClockCommandBatch === true;
 const R207_PRODUCTION_ACTIVATION_CLIENT = RUNTIME_CONFIG.r207ProductionActivation === true;
+const CLOUD_RUNTIME_DISABLED = RUNTIME_CONFIG.cloudDisabled === true;
 const SUPABASE_CONFIG = {
   url: RUNTIME_CONFIG.supabaseUrl || "https://ulbmjcvnyznvmjgpstno.supabase.co",
   publishableKey: RUNTIME_CONFIG.supabasePublishableKey || "sb_publishable_-RUc79OPosRLNP5B6JIH2A_f3I_2A0M",
@@ -985,7 +986,8 @@ const startupOpenTarget = startupParams.get("open")?.trim().toLowerCase() || "";
 const startupTeamId = startupParams.get("team")?.trim().slice(0, 160) || "";
 const startupRequestId = startupParams.get("request")?.trim().slice(0, 200) || "";
 const rawSupabaseClient =
-  window.supabase?.createClient && SUPABASE_CONFIG.url && SUPABASE_CONFIG.publishableKey
+  !CLOUD_RUNTIME_DISABLED
+    && window.supabase?.createClient && SUPABASE_CONFIG.url && SUPABASE_CONFIG.publishableKey
     ? window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.publishableKey)
     : null;
 const supabaseClient =

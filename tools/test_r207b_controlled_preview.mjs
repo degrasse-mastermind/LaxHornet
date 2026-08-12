@@ -140,10 +140,21 @@ check(calls === callsBeforeRetryable + 1 && retryable.state().operations[0].stat
 
 const runtime = fs.readFileSync("runtime-config.js", "utf8");
 const app = fs.readFileSync("app.js", "utf8");
+const previewBuilder = fs.readFileSync("tools/build_r207b_vercel_preview.mjs", "utf8");
 const migration = fs.readFileSync("supabase/migrations/20260809155442_r207b_controlled_preview_integration.sql", "utf8");
 const qualificationFix = fs.readFileSync("supabase/migrations/20260809164435_r207b_qualify_preview_game_update.sql", "utf8");
 const seed = fs.readFileSync("supabase/seed.sql", "utf8");
 check(runtime.includes("r207bControlledPreview: false"), "production runtime flag defaults off");
+check(app.includes("!CLOUD_RUNTIME_DISABLED"), "explicit device-only preview mode cannot create the production Supabase client");
+check(
+  previewBuilder.includes("cloudDisabled: true")
+    && previewBuilder.includes('replace("publicLiveShareRpc: true", "publicLiveShareRpc: false")'),
+  "credential-free UI Preview fails closed with cloud and trusted-disclosure features disabled",
+);
+check(
+  previewBuilder.includes("const connectedPreview = hasSupabaseUrl && hasPublishableKey"),
+  "isolated Preview credentials must be supplied as one complete pair",
+);
 check(app.includes(r207.CONFLICT_MESSAGE) === false && app.includes("CONFLICT_MESSAGE"), "UI consumes the bounded shared conflict copy without duplicating raw diagnostics");
 check(app.includes("&& r207ConflictForGame(game.id)"), "a conflict blocks the legacy whole-game overwrite path");
 check(/preview_enabled boolean not null default false/i.test(migration), "server preview capability defaults off");
