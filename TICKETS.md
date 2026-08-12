@@ -2793,28 +2793,27 @@ reproduced baseline failures, not changes caused by LH-25 or the vNext UX.
 
 ### Completion record
 
-Commit/PR: Draft PR pending creation from this branch.
+Commit/PR: Draft PR #77.
 
 Focused checks: `test_update_release` PASS for v288; post-R2-06
-stabilization `17/17`; R2-07 activation disposable certification `54` checks
-PASS with zero container residue; release manifest, reconciliation, R2-06
-closeout, Pages deployment, Pages settings, and diff hygiene PASS.
+stabilization `17/17`; R2-07 no-container exact-binding verification `5/5`;
+R2-07B controlled Preview contracts `37/37`; release manifest,
+reconciliation, R2-06 closeout, Pages deployment, Pages settings, auth startup,
+and diff hygiene PASS.
 
-Broad checks or CI: Complete local runner reached `37` passes before a
-pre-existing Playwright locator detached during the tracked-time browser test;
-the exact failed test then passed `33/33` in isolation. A prior attempt's
-hydration-browser navigation race also passed immediately in isolation. Draft
-PR CI remains the required uninterrupted aggregate.
+Broad checks or CI: Exact-head portable CI and the credential-free device-only
+Vercel Preview pass on PR #77. Supabase Preview is correctly skipped because
+this PR adds no migration.
 
-Known limitations: The complete browser-heavy local runner is susceptible to
-transient navigation/DOM-detachment races. No deterministic failure was
-reproduced, but an uninterrupted local aggregate was not obtained.
+Known limitations: Real PostgreSQL migration and multi-session concurrency are
+not exercised because this PR adds no migration. Migration PRs use the isolated
+Supabase Preview gate.
 
 Production or external state changed: `NO`
 
 `REPO_CURRENT_STATE.md` updated: `NOT REQUIRED — no durable behavior changed`
 
-Remaining work: Draft PR CI, exact-PR-SHA independent review, and separately
+Remaining work: Independent exact-PR-SHA Level 3 review and separately
 authorized merge.
 
 ## LH-27 — Retire Docker from active development and CI
@@ -2880,12 +2879,15 @@ review path with portable checks plus isolated Supabase Preview verification.
 
 ### Completion record
 
-Commit/PR: Draft PR #77 pending updated head.
+Commit/PR: Draft PR #77.
 
-Focused checks: Pending final no-container verification.
+Focused checks: Active workflow scan finds no Docker reference; R2-07
+no-container exact binding `5/5`; R2-07B controlled Preview contracts `37/37`;
+authentication responsiveness and diff hygiene PASS.
 
-Broad checks or CI: Supabase Preview is required on migration PRs; portable CI
-pending updated head.
+Broad checks or CI: Exact-head portable CI and device-only Vercel Preview PASS.
+The dependent migration PR #78 separately passes its automatic isolated,
+data-less Supabase Preview check.
 
 Known limitations: Preview credentials are not exposed to ordinary repository
 tests, so custom post-migration SQL probes require independent reviewer access
@@ -2895,8 +2897,8 @@ Production or external state changed: `NO`
 
 `REPO_CURRENT_STATE.md` updated: `YES`
 
-Remaining work: Push updated foundation, verify no-Docker CI, and perform
-independent exact-SHA review.
+Remaining work: Independent exact-PR-SHA Level 3 review and separately
+authorized merge. No Docker-based verification is permitted.
 
 ## Ticket template
 
