@@ -2928,7 +2928,7 @@ No container-based verification is permitted.
 
 ## LH-26B — Restore hosted PostgreSQL verification without Docker
 
-Status: `IN PROGRESS`
+Status: `BLOCKED — EXTERNAL PREVIEW CONFIGURATION`
 
 Risk level: `LEVEL 3`
 
@@ -2989,6 +2989,15 @@ Known limitation: At implementation start the repository and `Preview`
 environment exposed no GitHub secrets/variables, so a real hosted PASS cannot
 be claimed until the external Preview credential path is configured and the
 automatic branch exists.
+
+Published implementation head `3a08e2fd2a46cfd22e956b14f495be8971562703`
+opened draft PR #79. Exact-head portable CI and credential-free Vercel Preview
+passed. Hosted run `31636860903` failed before mutation at the explicit
+`PREVIEW_CONFIGURATION_REQUIRED` gate because `SUPABASE_ACCESS_TOKEN` is absent
+from the GitHub `Preview` environment. No Supabase Preview status was produced
+because this remediation intentionally adds no meaningless migration or server
+schema change. The hosted matrix, connected Preview, and independent Level 3
+review remain blocked.
 
 Production or external state changed: `NO`
 

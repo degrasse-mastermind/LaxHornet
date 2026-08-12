@@ -36,5 +36,21 @@ secrets/variables. Therefore no hosted result is recorded here yet. Missing
 branch, incomplete branch credentials, or any production identity causes the
 workflow to fail. This is a blocker, not a skip or portable-equivalent PASS.
 
+## Published exact-head result
+
+- Initial implementation head: `3a08e2fd2a46cfd22e956b14f495be8971562703`
+- Draft PR: <https://github.com/degrasse-mastermind/LaxHornet/pull/79>
+- Portable CI: PASS, run `31636860805`
+- Credential-free Vercel Preview: PASS
+- Hosted matrix: FAIL before mutation, run `31636860903`
+- Exact classification: `PREVIEW_CONFIGURATION_REQUIRED` because GitHub
+  `Preview` environment secret `SUPABASE_ACCESS_TOKEN` is absent
+- Supabase automatic Preview status: absent; the PR contains no fake migration
+  or semantic Supabase change merely to force branch creation
+
+No hosted assertion, synthetic actor, RPC call, database query, or cleanup step
+ran. The failure occurred before branch discovery and before any database URL
+was available.
+
 No production database, data, migration history, deployment, configuration, PR
 #78 implementation, or PR #76 implementation was contacted or changed.
