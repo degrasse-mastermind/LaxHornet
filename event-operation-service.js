@@ -368,6 +368,7 @@
     const currentAccountId = typeof hooks.currentAccountId === "function" ? hooks.currentAccountId : () => "";
     const onConflict = typeof hooks.onConflict === "function" ? hooks.onConflict : () => {};
     const onAccepted = typeof hooks.onAccepted === "function" ? hooks.onAccepted : () => {};
+    const prepareOperation = typeof hooks.prepareOperation === "function" ? hooks.prepareOperation : null;
     if (![getState, setState, persistState, execute].every((value) => typeof value === "function")) {
       throw new TypeError("R2-07C event service hooks are incomplete");
     }
@@ -490,13 +491,30 @@
         if (!snapshot.length) break;
         for (const queued of snapshot) {
         let active;
+        let preparationFailed = false;
         mutate((state) => {
           active = state.operations.find((operation) => operation.clientOperationId === queued.clientOperationId);
-          if (active) { active.attempts += 1; active.lastAttemptAt = now(); active.state = "attempting"; }
+          if (active) {
+            if (prepareOperation && !active.preparedRequest) {
+              try {
+                const record = state.records[active.eventId];
+                active.preparedRequest = prepareOperation(copy(active), copy(record));
+                if (!isObject(active.preparedRequest)) throw new TypeError("Prepared operation is invalid");
+              } catch {
+                preparationFailed = true;
+                active.state = "blocked";
+                active.lastError = { code: "validation_failed" };
+                return;
+              }
+            }
+            active.attempts += 1;
+            active.lastAttemptAt = now();
+            active.state = "attempting";
+          }
         });
-        if (!active) continue;
+        if (!active || preparationFailed) continue;
         let result;
-        try { result = await execute(copy(active.payload)); }
+        try { result = await execute(copy(active.preparedRequest || active.payload)); }
         catch (error) {
           const failure = classifyRpcFailure(error);
           if (String(currentAccountId() || "") !== accountId) return false;
@@ -531,7 +549,7 @@
             state.receipts = state.receipts.slice(-100);
             state.operations = state.operations.filter((item) => item.clientOperationId !== active.clientOperationId);
             materialize(state, record, active.payload.expected_game_lifecycle);
-            onAccepted(active, result);
+            onAccepted(active, result, state);
           } else if (result?.outcome === "conflicted") {
             operation.state = "conflicted";
             operation.lastError = { code: String(result.code || "event_conflict") };

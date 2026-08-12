@@ -50,7 +50,7 @@ jobs:
           cleanup_candidate="$(jq -r '.cleanupCandidate' release/laxhornet-release-manifest.json)"
           additive_paths="supabase/migrations/20260723040000_event_pipeline_capabilities.sql,supabase/rollback/20260723040000_event_pipeline_capabilities_rollback.sql,supabase/migrations/20260727000000_tracked_playing_time_operations.sql,supabase/rollback/20260727000000_tracked_playing_time_operations_rollback.sql,supabase/tests/tracked_playing_time_foundation.sql,supabase/migrations/20260728193942_v284_public_event_semantic_boundary.sql,supabase/rollback/20260728193942_v284_public_event_semantic_boundary_rollback.sql,supabase/tests/v284_public_event_semantic_boundary.sql,supabase/migrations/20260730004700_team_members_rls_recursion.sql,supabase/rollback/20260730004700_team_members_rls_recursion_rollback.sql,supabase/tests/team_members_rls_recursion.sql,supabase/tests/team_members_rls_recursion_reproduction.sql,supabase/migrations/20260730134439_durable_game_tombstones.sql,supabase/rollback/20260730134439_durable_game_tombstones_rollback.sql,supabase/tests/durable_game_tombstones.sql,supabase/migrations/20260730151714_durable_game_tombstone_concurrency.sql,supabase/rollback/20260730151714_durable_game_tombstone_concurrency_rollback.sql,supabase/tests/durable_game_tombstone_concurrency.sql,supabase/migrations/20260806143128_r207a_dormant_concurrency_foundation.sql,supabase/rollback/20260806143128_r207a_dormant_concurrency_foundation_rollback.sql,supabase/migrations/20260809155442_r207b_controlled_preview_integration.sql,supabase/rollback/20260809155442_r207b_controlled_preview_integration_rollback.sql,supabase/seed.sql,supabase/migrations/20260809164435_r207b_qualify_preview_game_update.sql,supabase/rollback/20260809164435_r207b_qualify_preview_game_update_rollback.sql,supabase/migrations/20260809173500_r207c_versioned_event_corrections.sql,supabase/rollback/20260809173500_r207c_versioned_event_corrections_rollback.sql,supabase/migrations/20260809201608_r207d_conflict_resolution_foundation.sql,supabase/rollback/20260809201608_r207d_conflict_resolution_foundation_rollback.sql,supabase/migrations/20260811010813_r207_clock_command_batch_integration.sql,supabase/rollback/20260811010813_r207_clock_command_batch_integration_rollback.sql,supabase/migrations/20260811131042_r207_forward_migration_b_cutover_gate.sql"
 
-          additive_paths="${additive_paths},supabase/migrations/20260811211414_r207_pre_activation_policy_reconciliation.sql,supabase/migrations/20260811211415_r207_forward_migration_b_activation.sql,supabase/rollback/20260811211415_r207_forward_migration_b_activation_rollback.sql,supabase/migrations/20260811211416_r207_forward_migration_b_postactivation_verification.sql"
+          additive_paths="${additive_paths},supabase/migrations/20260811211414_r207_pre_activation_policy_reconciliation.sql,supabase/migrations/20260811211415_r207_forward_migration_b_activation.sql,supabase/rollback/20260811211415_r207_forward_migration_b_activation_rollback.sql,supabase/migrations/20260811211416_r207_forward_migration_b_postactivation_verification.sql,supabase/migrations/20260812005627_atomic_scored_event_command.sql,supabase/rollback/20260812005627_atomic_scored_event_command_rollback.sql"
 
           if git merge-base --is-ancestor "$database_candidate" HEAD \
             && git merge-base --is-ancestor "$cleanup_candidate" HEAD; then
@@ -76,6 +76,9 @@ jobs:
 
       - name: Event operation service contracts
         run: node tools/test_event_operation_service.mjs
+
+      - name: LH-25 atomic scored-event client contracts
+        run: node tools/test_atomic_scored_event_client.mjs
 
       - name: Durable game and clock operation contracts
         run: node tools/test_durable_sync_operations.mjs
@@ -172,6 +175,9 @@ jobs:
 
       - name: R2-07 Forward Migration B exact binding
         run: node tools/test_r207_forward_migration_b_activation.mjs --binding-only
+
+      - name: LH-25 embedded atomic scored-event matrix
+        run: node tools/test_atomic_scored_event_embedded.mjs
 
       - name: R2-06 disposable synthetic verification
         run: node tools/test_r206_synthetic_verification_disposable.mjs

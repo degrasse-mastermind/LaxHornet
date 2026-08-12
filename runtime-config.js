@@ -8,6 +8,7 @@ window.LAXHORNET_RUNTIME_CONFIG = Object.freeze({
   r207dConflictResolution: false,
   r207ClockCommandBatch: false,
   r207ProductionActivation: false,
+  r207AtomicScoredEvents: false,
   minimumSchemaCapability: 1,
 });
 window.LAXHORNET_SCRIPT_ORDER = [...(window.LAXHORNET_SCRIPT_ORDER || []), "runtime-config"];

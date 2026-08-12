@@ -2900,6 +2900,157 @@ Production or external state changed: `NO`
 Remaining work: Independent exact-PR-SHA Level 3 review and separately
 authorized merge. No Docker-based verification is permitted.
 
+## LH-25 — Atomic scored-event command
+
+Status: `REVIEW`
+
+Risk level: `LEVEL 3`
+
+Branch: `codex/lh-25-atomic-scored-event`
+
+Owner: Codex implementation; independent exact-PR-SHA reviewer required
+
+Related decision/design document:
+
+- `docs/LH25_ATOMIC_SCORED_EVENT_CONTRACT.md`
+
+### Goal
+
+Make Goal, Assist, and Goal Allowed event creation, scoring effect, correction,
+and Undo one authenticated, idempotent PostgreSQL transaction while preserving
+the existing R2-07 event, score-version, conflict, tombstone, offline-first,
+authorization, and append-only evidence contracts.
+
+### In scope
+
+- One additive R2-07 composite scored-event RPC and private implementation.
+- A permanent parent operation identity, request hash, replay receipt, attempts,
+  and append-only operation history.
+- Server-derived score effects from the canonical R2-07 event vocabulary.
+- Atomic create, correct, and tombstone/reversal behavior.
+- A rollback that refuses to discard accepted immutable evidence.
+- Synthetic adversarial PostgreSQL tests and client contract coverage.
+- Default-off client capability and a durable composite operation queue.
+- Isolated Supabase Preview and Vercel Preview verification only.
+
+### Out of scope
+
+- Production migration application, activation, merge, deployment, release
+  publication, or use of production credentials/data.
+- A new event, score, authorization, conflict, or disclosure model.
+- Changing manual score-correction semantics or public disclosure allowlists.
+- Treating Trust Spine disclosure projection as a second mutation authority.
+
+### Current behavior
+
+`logEvent()` persists the local event and score together. Cloud synchronization
+then uses independent R2-07 event and game score operations with independent
+identities and receipts. A partial success, response loss, retry, or conflict
+can therefore leave the server event and score inconsistent. Undo has the same
+split-transaction risk.
+
+### Requirements
+
+- The R2-07 versioned event head is the canonical scored-event mutation owner.
+- Trust Spine/public disclosure remains a downstream projection and cannot
+  authorize or compensate the score mutation.
+- The server derives score effects: Goal/Assist `score_for + 1`, Goal Allowed
+  `score_against + 1`, correction uses the old/new effect difference, and
+  tombstone reverses the accepted original effect once.
+- One composite RPC must apply both child mutations or neither.
+- Replays with the same identity and payload return the original receipt;
+  payload or scope reuse is rejected and recorded.
+- Game lifecycle, authority, event version, score version, status version,
+  tombstone dominance, and nonnegative score constraints remain enforced.
+- The browser persists locally before cloud work and never falls back to the
+  unsafe two-RPC scored-event path when composite capability is unavailable.
+- New history tables are FORCE RLS, inaccessible directly to browser roles,
+  append-only, and reachable only through a narrowly granted authenticated RPC.
+
+### Acceptance criteria
+
+- Injected failure after either child mutation leaves no event, score, child
+  journal, or accepted parent operation residue.
+- Lost-response replay cannot duplicate an event or score effect.
+- Unauthorized, stale, completed, deleted, tombstoned, cross-game, and tampered
+  requests make no canonical mutation.
+- Correction and Undo apply exactly one server-derived net score effect.
+- Offline/reload/reconnect retains one permanent parent operation identity.
+- Existing R2-07 event/score conflicts and Needs Attention remain visible.
+- Focused tests and the complete Level 3 regression pass at the final diff, or
+  every independently reproduced baseline failure remains explicitly reported.
+- A draft PR receives independent exact-PR-SHA Level 3 review before merge.
+
+### Expected files
+
+- `TICKETS.md`
+- `docs/LH25_ATOMIC_SCORED_EVENT_CONTRACT.md`
+- `supabase/migrations/*_atomic_scored_event_command.sql`
+- `supabase/rollback/*_atomic_scored_event_command_rollback.sql`
+- `tools/test_atomic_scored_event_embedded.mjs`
+- `event-operation-service.js`
+- `app.js`
+- focused JavaScript/PostgreSQL test runners
+
+### Verification plan
+
+```powershell
+node --check app.js
+node --check event-operation-service.js
+node tools/test_atomic_scored_event_embedded.mjs
+node tools/test_event_operation_service.mjs
+node tools/test_r207c_event_client.mjs
+node tools/test_r207_clock_command_batch_client.mjs
+node tools/run_v283_local_regression.mjs
+git diff --check
+```
+
+### Level 3 critical surface and rollback
+
+- Critical surfaces: schema/migration, authenticated SECURITY DEFINER RPC,
+  offline synchronization, optimistic concurrency, immutable event history,
+  score correctness, and youth-data authorization.
+- Rollback is pre-activation only and refuses when accepted composite evidence
+  exists. It removes only the additive RPC, private helpers, and empty history
+  tables; it never rewrites historical migrations or accepted child evidence.
+- No local/manual/CLI/linked-main/production migration application is
+  authorized. An automatic data-less isolated Supabase Preview migration tied
+  to the PR is accepted CI verification.
+- Independent review must hash the exact PR SHA and probe replay, tampering,
+  authorization, atomic rollback, and persisted provenance before merge.
+- Release, merge, deployment, activation, and production changes require
+  separate explicit authorization.
+- Evidence package required because this ticket adds a migration.
+
+### Completion record
+
+Commit/PR: Draft PR #78.
+
+Files changed: Additive migration/rollback, atomic event queue integration,
+default-off runtime/Preview flag, portable workflow and release containment,
+contract/evidence, embedded SQL and client tests.
+
+Focused checks: Atomic client `13/13`; embedded atomic transaction matrix
+`18/18`; exact activation binding `5/5`; release manifest validation PASS;
+existing event, R2-07, auth, clock, conflict, and tracked-time focused suites
+PASS on the implementation chain.
+
+Broad checks or CI: Exact-head portable CI, isolated data-less Supabase Preview
+migration application, and connected Vercel Preview PASS. The workflow invokes
+no Docker-backed test.
+
+Known limitations: Embedded PostgreSQL does not prove real concurrent sessions.
+Concurrent same-base serialization and zero-evidence rollback must be probed by
+the independent reviewer against the isolated Supabase Preview branch.
+
+Production or external state changed: `NO`
+
+`REPO_CURRENT_STATE.md` updated: `NOT REQUIRED UNTIL MERGE/ACTIVATION`
+
+Remaining work: Independent exact-PR-SHA Level 3 review, including adversarial
+multi-session probes against the isolated Preview branch. Merge, production
+activation, and release remain separately unauthorized.
+
 ## Ticket template
 
 Use this section when a ticket is required or useful. Keep Level 2 tickets

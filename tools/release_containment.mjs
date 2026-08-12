@@ -85,6 +85,11 @@ export const R207_FORWARD_MIGRATION_B_ACTIVATION_REVIEW_DB_PATHS = Object.freeze
   "supabase/rollback/20260811211415_r207_forward_migration_b_activation_rollback.sql",
 ]);
 
+export const LH25_ATOMIC_SCORED_EVENT_REVIEW_DB_PATHS = Object.freeze([
+  "supabase/migrations/20260812005627_atomic_scored_event_command.sql",
+  "supabase/rollback/20260812005627_atomic_scored_event_command_rollback.sql",
+]);
+
 export const APPROVED_HISTORICAL_PROVENANCE_PATHS = Object.freeze([
   "supabase/migrations/20260723010607_remote_schema.sql",
   "supabase/production-history/20260723010607_remote_schema.sql",

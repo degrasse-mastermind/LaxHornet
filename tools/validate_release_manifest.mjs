@@ -10,6 +10,7 @@ import {
   APPROVED_HISTORICAL_PROVENANCE_PATHS,
   DURABLE_GAME_TOMBSTONE_CONCURRENCY_REVIEW_DB_PATHS,
   DURABLE_GAME_TOMBSTONE_REVIEW_DB_PATHS,
+  LH25_ATOMIC_SCORED_EVENT_REVIEW_DB_PATHS,
   R207A_DORMANT_CONCURRENCY_REVIEW_DB_PATHS,
   R207B_CONTROLLED_PREVIEW_REVIEW_DB_PATHS,
   R207C_VERSIONED_EVENT_REVIEW_DB_PATHS,
@@ -1109,6 +1110,7 @@ if (requireCombined) {
         ...R207D_CONFLICT_RESOLUTION_REVIEW_DB_PATHS,
         ...R207_CLOCK_COMMAND_BATCH_REVIEW_DB_PATHS,
         ...R207_FORWARD_MIGRATION_B_ACTIVATION_REVIEW_DB_PATHS,
+        ...LH25_ATOMIC_SCORED_EVENT_REVIEW_DB_PATHS,
       ],
       headRef: combinedRef,
     });
@@ -1152,6 +1154,8 @@ const allowedCleanupMigrations = new Set([
   ...R207_CLOCK_COMMAND_BATCH_REVIEW_DB_PATHS.filter((file) =>
     file.startsWith("supabase/migrations/")),
   ...R207_FORWARD_MIGRATION_B_ACTIVATION_REVIEW_DB_PATHS.filter((file) =>
+    file.startsWith("supabase/migrations/")),
+  ...LH25_ATOMIC_SCORED_EVENT_REVIEW_DB_PATHS.filter((file) =>
     file.startsWith("supabase/migrations/")),
 ]);
 for (const file of cleanupMigrations) {

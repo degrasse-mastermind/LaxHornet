@@ -431,6 +431,7 @@ const R207D_CONFLICT_RESOLUTION = RUNTIME_CONFIG.r207dConflictResolution === tru
 const R207_CLOCK_COMMAND_BATCH = RUNTIME_CONFIG.r207ClockCommandBatch === true;
 const R207_PRODUCTION_ACTIVATION_CLIENT = RUNTIME_CONFIG.r207ProductionActivation === true;
 const CLOUD_RUNTIME_DISABLED = RUNTIME_CONFIG.cloudDisabled === true;
+const R207_ATOMIC_SCORED_EVENTS = RUNTIME_CONFIG.r207AtomicScoredEvents === true;
 const SUPABASE_CONFIG = {
   url: RUNTIME_CONFIG.supabaseUrl || "https://ulbmjcvnyznvmjgpstno.supabase.co",
   publishableKey: RUNTIME_CONFIG.supabasePublishableKey || "sb_publishable_-RUc79OPosRLNP5B6JIH2A_f3I_2A0M",
@@ -7986,15 +7987,26 @@ function r207EventService() {
     persistState: persistR207EventSyncState,
     currentAccountId: currentUserId,
     isOffline: () => state.isOffline,
-    execute: async (operation) => {
+    prepareOperation: prepareR207EventRequest,
+    execute: async (prepared) => {
       if (!(await r207PreviewCapabilityAvailable())) {
         return { outcome: "rejected", code: "r207_not_activated" };
       }
-      const { data, error } = await supabaseClient.rpc("laxhornet_sync_event_v2", { p_operation: operation });
+      const envelope = prepared?.rpc && prepared?.operation
+        ? prepared
+        : { rpc: "event", operation: prepared };
+      const rpcName = envelope.rpc === "atomic_scored_event"
+        ? "laxhornet_apply_scored_event_v1"
+        : envelope.rpc === "event" ? "laxhornet_sync_event_v2" : "";
+      if (!rpcName) return { outcome: "rejected", code: "invalid_operation" };
+      const { data, error } = await supabaseClient.rpc(rpcName, { p_operation: envelope.operation });
       if (error) throw error;
       return data;
     },
-    onAccepted: (operation) => {
+    onAccepted: (operation, result, nextSyncState) => {
+      if (operation.preparedRequest?.rpc === "atomic_scored_event") {
+        applyAtomicScoredEventAcceptance(operation, result, nextSyncState);
+      }
       state.syncStatus = "Synced";
       if (operation.type === "tombstone") forgetDeletedEvent(operation.eventId);
     },
@@ -8004,6 +8016,119 @@ function r207EventService() {
     },
   });
   return r207EventOperationService;
+}
+
+function r207ScoringEffectForStat(statType = "") {
+  if (statType === "goal" || statType === "assist") return "for";
+  if (statType === "goalAllowed") return "against";
+  return "";
+}
+
+function r207OperationNeedsAtomicScore(operation = {}, record = {}) {
+  const action = String(operation.type || operation.payload?.operation_type || "");
+  const previous = r207ScoringEffectForStat(record.acceptedSnapshot?.stat_type);
+  const proposed = r207ScoringEffectForStat(
+    Object.hasOwn(operation.payload?.changes || {}, "stat_type")
+      ? operation.payload.changes.stat_type
+      : record.acceptedSnapshot?.stat_type,
+  );
+  if (action === "create") return Boolean(proposed);
+  if (action === "tombstone") return Boolean(previous);
+  return Boolean(previous || proposed);
+}
+
+function atomicScoredEventClientEnabled() {
+  return R207_ATOMIC_SCORED_EVENTS
+    && (R207B_CONTROLLED_PREVIEW || r207ProductionActivationConfirmed());
+}
+
+function gameForR207Operation(gameId = "") {
+  return state.activeGame?.id === gameId
+    ? state.activeGame
+    : state.games.find((game) => game.id === gameId);
+}
+
+function prepareR207EventRequest(operation = {}, record = {}) {
+  if (!atomicScoredEventClientEnabled() || !r207OperationNeedsAtomicScore(operation, record)) {
+    return { rpc: "event", operation: operation.payload };
+  }
+  const game = gameForR207Operation(operation.gameId);
+  const versions = window.LaxHornetR207FieldOperations.normalizeVersionMap(game?.serverVersions || {});
+  if (!game || !versions) throw new TypeError("Atomic scored event requires a hydrated server game");
+  return {
+    rpc: "atomic_scored_event",
+    local_score: {
+      score_for: Number(game.scoreFor || 0),
+      score_against: Number(game.scoreAgainst || 0),
+    },
+    operation: {
+      client_operation_id: operation.clientOperationId,
+      game_id: operation.gameId,
+      event_id: operation.eventId,
+      action: operation.type,
+      changes: { ...(operation.payload?.changes || {}) },
+      base_event_version: Number(operation.payload?.base_event_version || 0),
+      base_score_version: versions.scoreVersion,
+      base_status_version: versions.statusVersion,
+      expected_game_lifecycle: operation.payload?.expected_game_lifecycle,
+      client_created_at: operation.payload?.client_created_at,
+    },
+  };
+}
+
+function applyAtomicScoredEventAcceptance(operation, result = {}, nextSyncState = {}) {
+  const server = result.server_game || {};
+  const versions = window.LaxHornetR207FieldOperations.normalizeVersionMap(result.versions || {});
+  if (!versions || !operation?.gameId) return;
+  const laterScoredOperations = (nextSyncState.operations || []).some((candidate) => (
+    candidate.gameId === operation.gameId
+    && candidate.clientOperationId !== operation.clientOperationId
+    && ["pending", "retryable", "attempting"].includes(candidate.state)
+    && candidate.preparedRequest?.rpc === "atomic_scored_event"
+  ));
+  const update = (game) => {
+    if (!game || game.id !== operation.gameId) return game;
+    const preparedLocal = operation.preparedRequest?.local_score || {};
+    const localScoreChangedAfterPreparation = (
+      Object.hasOwn(preparedLocal, "score_for")
+      && Number(game.scoreFor || 0) !== Number(preparedLocal.score_for)
+    ) || (
+      Object.hasOwn(preparedLocal, "score_against")
+      && Number(game.scoreAgainst || 0) !== Number(preparedLocal.score_against)
+    );
+    const preserveOptimisticScore = laterScoredOperations || localScoreChangedAfterPreparation;
+    const accepted = normalizeGame({
+      ...game,
+      scoreFor: preserveOptimisticScore || !Object.hasOwn(server, "score_for")
+        ? game.scoreFor : server.score_for,
+      scoreAgainst: preserveOptimisticScore || !Object.hasOwn(server, "score_against")
+        ? game.scoreAgainst : server.score_against,
+      scoreKnown: Object.hasOwn(server, "score_known") ? server.score_known === true : game.scoreKnown,
+      lifecycleState: Object.hasOwn(server, "lifecycle_state") ? server.lifecycle_state : game.lifecycleState,
+      serverVersions: { ...(game.serverVersions || {}), ...versions },
+    });
+    accepted.r207ServerSnapshot = {
+      ...(game.r207ServerSnapshot || {}),
+      id: accepted.id,
+      scoreFor: Object.hasOwn(server, "score_for") ? Number(server.score_for) : accepted.scoreFor,
+      scoreAgainst: Object.hasOwn(server, "score_against") ? Number(server.score_against) : accepted.scoreAgainst,
+      lifecycleState: Object.hasOwn(server, "lifecycle_state") ? server.lifecycle_state : accepted.lifecycleState,
+      serverVersions: { ...accepted.serverVersions },
+    };
+    return accepted;
+  };
+  state.games = state.games.map(update);
+  state.activeGame = update(state.activeGame);
+}
+
+function pendingAtomicScoredEventForGame(gameId = "") {
+  if (!atomicScoredEventClientEnabled()) return false;
+  const sync = state.r207EventSync;
+  return (sync?.operations || []).some((operation) => {
+    if (operation.gameId !== gameId || !["pending", "retryable", "attempting"].includes(operation.state)) return false;
+    if (operation.preparedRequest?.rpc === "atomic_scored_event") return true;
+    return r207OperationNeedsAtomicScore(operation, sync.records?.[operation.eventId] || {});
+  });
 }
 
 function useR207VersionedEvents() {
@@ -9267,7 +9392,8 @@ async function syncGameWithR207Operations(game, options = {}) {
       requests.push(fields.buildMetadataOperation({ before, after: current,
         clientOperationId: uid("game-field"), createdAt: Date.now() }));
     }
-    if (before.scoreFor !== current.scoreFor || before.scoreAgainst !== current.scoreAgainst) {
+    if ((before.scoreFor !== current.scoreFor || before.scoreAgainst !== current.scoreAgainst)
+      && !pendingAtomicScoredEventForGame(current.id)) {
       requests.push(fields.buildScoreCorrectionOperation({ game: before,
         scoreFor: current.scoreFor, scoreAgainst: current.scoreAgainst,
         correctionReason: "data_entry_correction",
